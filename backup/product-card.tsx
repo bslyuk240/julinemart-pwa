@@ -7,7 +7,7 @@ import { Heart, ShoppingCart, Star } from 'lucide-react';
 import { Product } from '@/types/product';
 import { useCart } from '@/hooks/use-cart';
 import { useWishlist } from '@/hooks/use-wishlist';
-import { Badge } from '../ui/badge';
+import { Badge } from '@/components/ui/badge';
 
 interface ProductCardProps {
   product: Product;
