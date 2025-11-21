@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { TrendingUp, ChevronRight } from 'lucide-react';
-import ProductCard from '../product/product-card';
+import ProductCard from '@/components/product/product-card';
 import { Product } from '@/types/product';
 
 interface TrendingSectionProps {
