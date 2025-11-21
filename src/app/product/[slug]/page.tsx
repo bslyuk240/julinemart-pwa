@@ -206,14 +206,14 @@ export default function ProductDetailPage() {
           <span className="text-gray-900">{product.name}</span>
         </nav>
 
-        <div className="grid md:grid-cols-2 gap-8 mb-12">
+        <div className="grid md:grid-cols-2 gap-6 md:gap-8 mb-10">
           {/* Product Gallery */}
           <div>
             <ProductGallery images={product.images} productName={product.name} />
           </div>
 
           {/* Product Info */}
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div>
               {/* Vendor Badge */}
               {product.store && (
@@ -228,13 +228,13 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2">
                 {product.name}
               </h1>
               
               {/* Rating */}
               {product.average_rating && parseFloat(product.average_rating) > 0 && (
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-3 mb-3">
                   <div className="flex items-center gap-1">
                     {[...Array(5)].map((_, i) => (
                       <Star
@@ -254,13 +254,13 @@ export default function ProductDetailPage() {
               )}
 
               {/* Price */}
-              <div className="flex items-center gap-3 mb-4">
-                <span className="text-3xl font-bold text-primary-600">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-2xl font-bold text-primary-600">
                   {formatPrice(product.price)}
                 </span>
                 {product.on_sale && product.regular_price && (
                   <>
-                    <span className="text-xl text-gray-400 line-through">
+                    <span className="text-lg text-gray-400 line-through">
                       {formatPrice(product.regular_price)}
                     </span>
                     <Badge variant="danger">
@@ -272,7 +272,7 @@ export default function ProductDetailPage() {
 
               {/* Stock Status */}
               {product.stock_status === 'instock' ? (
-                <div className="flex items-center gap-2 mb-6">
+                <div className="flex items-center gap-2 mb-5">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <p className="text-green-600 font-medium">In Stock</p>
                   {product.stock_quantity && (
@@ -280,7 +280,7 @@ export default function ProductDetailPage() {
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2 mb-6">
+                <div className="flex items-center gap-2 mb-5">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                   <p className="text-red-600 font-medium">Out of Stock</p>
                 </div>
@@ -290,7 +290,7 @@ export default function ProductDetailPage() {
             {/* Short Description */}
             {product.short_description && (
               <div 
-                className="prose prose-sm text-gray-700 border-t pt-6"
+                className="prose prose-sm text-gray-700 border-t pt-5 line-clamp-4 overflow-hidden"
                 dangerouslySetInnerHTML={{ __html: product.short_description }}
               />
             )}

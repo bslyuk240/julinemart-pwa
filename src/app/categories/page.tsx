@@ -126,7 +126,7 @@ export default function CategoriesPage() {
         </div>
 
         {/* Categories Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
           {categories.map((category) => {
             const Icon = category.icon;
             return (
@@ -152,11 +152,11 @@ export default function CategoriesPage() {
                 </div>
 
                 {/* Category Info */}
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors">
+                <div className="p-3 md:p-4">
+                  <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors leading-snug">
                     {category.name}
                   </h3>
-                  <p className="text-sm text-gray-600">Browse products</p>
+                  <p className="text-xs md:text-sm text-gray-600">Browse products</p>
                 </div>
               </Link>
             );
