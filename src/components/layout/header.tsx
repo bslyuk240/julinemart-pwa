@@ -1,9 +1,15 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Search } from 'lucide-react';
 
 export default function Header() {
+  const logoSrc = process.env.NEXT_PUBLIC_LOGO_URL || '/images/logo.png';
+  const logoWidth = Number(process.env.NEXT_PUBLIC_LOGO_WIDTH) || 40;
+  const logoHeight = Number(process.env.NEXT_PUBLIC_LOGO_HEIGHT) || 40;
+  const logoAlt = process.env.NEXT_PUBLIC_LOGO_TEXT || 'Home';
+
   return (
     <header className="sticky top-0 z-50 bg-white shadow-sm">
       {/* Top Bar */}
@@ -16,9 +22,14 @@ export default function Header() {
         {/* Unified layout: logo + search, compact and inline */}
         <div className="flex items-center gap-3 md:gap-4">
           <Link href="/" className="flex-shrink-0">
-            <div className="w-9 h-9 md:w-10 md:h-10 bg-gradient-to-br from-primary-600 to-primary-800 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg md:text-xl">J</span>
-            </div>
+            <Image
+              src={logoSrc}
+              alt={logoAlt}
+              width={logoWidth}
+              height={logoHeight}
+              priority
+              className="h-9 w-auto md:h-10 object-contain"
+            />
           </Link>
 
           <div className="relative w-full">

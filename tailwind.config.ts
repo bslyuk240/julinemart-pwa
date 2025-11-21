@@ -11,38 +11,38 @@ const config: Config = {
       colors: {
         // JulineMart Brand Colors
         primary: {
-          50: '#f5f3ff',
-          100: '#ede9fe',
-          200: '#ddd6fe',
-          300: '#c4b5fd',
-          400: '#a78bfa',
-          500: '#8b5cf6',  // Main dark purple
-          600: '#7c3aed',
-          700: '#6d28d9',
-          800: '#5b21b6',
-          900: '#4c1d95',
-          950: '#2e1065',
+          50: '#f7e6fb',
+          100: '#efd1f7',
+          200: '#dfaaee',
+          300: '#c86bdc',
+          400: '#b033c8',
+          500: '#77088a',  // Main brand purple
+          600: '#670779',
+          700: '#50055d',
+          800: '#3c0445',
+          900: '#2d0334',
+          950: '#1a021f',
         },
         secondary: {
-          50: '#fff7ed',
-          100: '#ffedd5',
-          200: '#fed7aa',
-          300: '#fdba74',
-          400: '#fb923c',
-          500: '#f97316',  // Main orange
-          600: '#ea580c',
-          700: '#c2410c',
-          800: '#9a3412',
-          900: '#7c2d12',
-          950: '#431407',
+          50: '#fff3e8',
+          100: '#ffe3cc',
+          200: '#ffc899',
+          300: '#ffad66',
+          400: '#ff914d',
+          500: '#ff7a29',  // Main brand orange
+          600: '#f86600',
+          700: '#d65500',
+          800: '#a84200',
+          900: '#7d3200',
+          950: '#421900',
         },
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        'card': '0 2px 8px rgba(139, 92, 246, 0.1)',
-        'card-hover': '0 4px 16px rgba(139, 92, 246, 0.15)',
+        'card': '0 2px 8px rgba(119, 8, 138, 0.1)',
+        'card-hover': '0 4px 16px rgba(119, 8, 138, 0.15)',
       },
       animation: {
         'slide-in': 'slideIn 0.3s ease-out',
