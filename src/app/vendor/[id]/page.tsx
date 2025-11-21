@@ -59,7 +59,7 @@ export default function VendorStorePage() {
   }
 
   const vendorName = vendorInfo?.shop_name || vendorInfo?.name || 
-    vendorInfo?.url?.split('/').pop()?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 
+    vendorInfo?.url?.split('/').pop()?.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 
     'Vendor Store';
 
   return (

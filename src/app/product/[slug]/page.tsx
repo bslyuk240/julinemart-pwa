@@ -25,7 +25,7 @@ export default function ProductDetailPage() {
   const [showShareMenu, setShowShareMenu] = useState(false);
 
   const addToCart = useCartStore((state) => state.addItem);
-  const { toggleItem, isInWishlist } = useWishlist();
+  const { toggleWishlist, isInWishlist } = useWishlist();
 
   useEffect(() => {
     fetchProduct();
@@ -85,7 +85,7 @@ export default function ProductDetailPage() {
   const handleWishlist = () => {
     if (!product) return;
     
-    toggleItem({
+    toggleWishlist(product.id, {
       id: product.id,
       name: product.name,
       slug: product.slug,

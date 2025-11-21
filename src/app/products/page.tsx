@@ -4,15 +4,26 @@ import { useState, useEffect } from 'react';
 import { getProducts } from '@/lib/woocommerce/products';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown } from 'lucide-react';
+import { Product } from '@/types/product';
 
 export default function AllProductsPage() {
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [sortBy, setSortBy] = useState('date');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sortBy, setSortBy] = useState<'date' | 'popularity' | 'rating' | 'price' | 'price-desc'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const computeSortParams = (sort: typeof sortBy) => {
+    if (sort === 'price-desc') {
+      return { orderby: 'price' as const, order: 'desc' as const };
+    }
+    if (sort === 'price') {
+      return { orderby: 'price' as const, order: 'asc' as const };
+    }
+    return { orderby: sort as 'date' | 'popularity' | 'rating', order: 'desc' as const };
+  };
 
   // Fetch products
   useEffect(() => {
@@ -22,11 +33,12 @@ export default function AllProductsPage() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
+      const sortParams = computeSortParams(sortBy);
       const fetchedProducts = await getProducts({ 
         per_page: 20,
         page: 1,
-        orderby: sortBy,
-        order: sortOrder
+        orderby: sortParams.orderby,
+        order: sortParams.order
       });
       setProducts(fetchedProducts);
       setPage(1);
@@ -42,11 +54,12 @@ export default function AllProductsPage() {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
+      const sortParams = computeSortParams(sortBy);
       const moreProducts = await getProducts({ 
         per_page: 20,
         page: nextPage,
-        orderby: sortBy,
-        order: sortOrder
+        orderby: sortParams.orderby,
+        order: sortParams.order
       });
       
       if (moreProducts.length > 0) {
@@ -63,18 +76,18 @@ export default function AllProductsPage() {
     }
   };
 
-  const handleSort = async (newSortBy: string) => {
+  const handleSort = async (newSortBy: 'date' | 'popularity' | 'rating' | 'price' | 'price-desc') => {
     try {
       setLoading(true);
-      const newOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+      const { orderby, order } = computeSortParams(newSortBy);
       setSortBy(newSortBy);
-      setSortOrder(newOrder);
+      setSortOrder(order);
       
       const sortedProducts = await getProducts({ 
         per_page: 20,
         page: 1,
-        orderby: newSortBy,
-        order: newOrder
+        orderby,
+        order
       });
       
       setProducts(sortedProducts);
@@ -130,7 +143,9 @@ export default function AllProductsPage() {
           <div className="relative">
             <select
               value={sortBy}
-              onChange={(e) => handleSort(e.target.value)}
+              onChange={(e) =>
+                handleSort(e.target.value as 'date' | 'popularity' | 'rating' | 'price' | 'price-desc')
+              }
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors appearance-none pr-8 cursor-pointer"
             >
               <option value="date">Latest</option>
