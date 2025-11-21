@@ -20,17 +20,8 @@ export default function WishlistPage() {
   const handleMoveToCart = (productId: number) => {
     const product = wishlistProducts.find((p) => p?.id === productId);
     if (product) {
-      addItem({
-        id: product.id,
-        name: product.name,
-        slug: product.slug,
-        price: product.price,
-        regularPrice: product.regular_price,
-        image: product.images[0]?.src || '/images/placeholder.jpg',
-        quantity: 1,
-        stockStatus: product.stock_status,
-        stockQuantity: product.stock_quantity,
-      });
+      // Cart store expects a Product object; pass through and let it derive fields
+      addItem(product, 1);
     }
   };
 
