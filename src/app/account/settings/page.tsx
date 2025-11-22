@@ -62,6 +62,7 @@ export default function AccountSettingsPage() {
   useEffect(() => {
     if (!authLoading) {
       if (!isAuthenticated) {
+        setPageLoading(false);
         // Redirect to login if not authenticated
         router.push('/login?redirect=/account/settings');
       } else {
@@ -269,7 +270,17 @@ export default function AccountSettingsPage() {
   }
 
   if (!isAuthenticated) {
-    return null; // Will redirect in useEffect
+    return (
+      <main className="min-h-screen bg-gray-50 pb-24 md:pb-8 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-sm p-6 text-center max-w-md">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Sign in required</h1>
+          <p className="text-gray-600 mb-4">Please log in to view your account settings.</p>
+          <Link href="/login?redirect=/account/settings">
+            <Button variant="primary">Go to Login</Button>
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   const tabs = [
