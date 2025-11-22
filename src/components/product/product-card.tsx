@@ -12,9 +12,10 @@ import { Badge } from '../ui/badge';
 interface ProductCardProps {
   product: Product;
   showBadge?: boolean;
+  fullWidth?: boolean;
 }
 
-export default function ProductCard({ product, showBadge = false }: ProductCardProps) {
+export default function ProductCard({ product, showBadge = false, fullWidth = false }: ProductCardProps) {
   const { addItem } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -56,11 +57,9 @@ export default function ProductCard({ product, showBadge = false }: ProductCardP
   return (
     <Link
       href={`/product/${product.slug}`}
-      className="block 
-        w-[140px] sm:w-[150px] 
-        md:w-full
-        flex-shrink-0 md:flex-shrink 
-        bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
+      className={`block bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 ${
+        fullWidth ? 'w-full' : 'w-[140px] sm:w-[150px] md:w-full flex-shrink-0 md:flex-shrink'
+      }`}
     >
       <div className="relative">
         {/* Badges */}

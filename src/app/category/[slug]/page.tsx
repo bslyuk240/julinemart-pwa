@@ -34,7 +34,7 @@ export default function CategoryPage() {
       const category = await getCategoryBySlug(slug);
       
       if (category) {
-        setCategoryName(category.name);
+        setCategoryName(category.name.replace(/&amp;/g, '&'));
         
         const fetchedProducts = await getProducts({ 
           category: category.id.toString(),
@@ -108,8 +108,8 @@ export default function CategoryPage() {
         </nav>
 
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{categoryName}</h1>
-          <p className="text-gray-600">{displayText}</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">{categoryName}</h1>
+          <p className="text-sm md:text-base text-gray-600">{displayText}</p>
         </div>
 
         <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-lg shadow-sm">
