@@ -4,6 +4,7 @@ import FlashSales from '@/components/home/flash-sales';
 import DealsSection from '@/components/home/deals-section';
 import TrendingSection from '@/components/home/trending-section';
 import { getProducts } from '@/lib/woocommerce/products';
+import { dummyProducts, getFeaturedProducts, getProductsByTag } from '@/lib/dummy-data';
 
 export const revalidate = 300; // Revalidate every 5 minutes
 
@@ -17,10 +18,35 @@ export default async function HomePage() {
 
   // Fallback: if no products with tags, get latest products
   const productsToShow = {
-    flash: flashSaleProducts.length > 0 ? flashSaleProducts : await getProducts({ per_page: 10, orderby: 'date' }).catch(() => []),
-    deals: dealProducts.length > 0 ? dealProducts : await getProducts({ per_page: 10, orderby: 'popularity' }).catch(() => []),
-    trending: trendingProducts.length > 0 ? trendingProducts : await getProducts({ per_page: 10, orderby: 'rating' }).catch(() => []),
+    flash: flashSaleProducts.length > 0
+      ? flashSaleProducts
+      : (await getProducts({ per_page: 10, orderby: 'date' }).catch(() => [])) || [],
+    deals: dealProducts.length > 0
+      ? dealProducts
+      : (await getProducts({ per_page: 10, orderby: 'popularity' }).catch(() => [])) || [],
+    trending: trendingProducts.length > 0
+      ? trendingProducts
+      : (await getProducts({ per_page: 10, orderby: 'rating' }).catch(() => [])) || [],
   };
+
+  // Last-resort fallback to dummy data so home sections never render empty
+  const ensureProducts = (list: any[], fallback: any[]) =>
+    list && list.length > 0 ? list : fallback;
+
+  const flashFallback = ensureProducts(
+    productsToShow.flash,
+    getProductsByTag('flash-sale').length ? getProductsByTag('flash-sale') : dummyProducts
+  );
+
+  const dealsFallback = ensureProducts(
+    productsToShow.deals,
+    getProductsByTag('deal').length ? getProductsByTag('deal') : dummyProducts
+  );
+
+  const trendingFallback = ensureProducts(
+    productsToShow.trending,
+    getFeaturedProducts().length ? getFeaturedProducts() : dummyProducts
+  );
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -33,13 +59,13 @@ export default async function HomePage() {
       <CategoryStrip />
 
       {/* Flash Sales - Sections have their own responsive spacing */}
-      <FlashSales products={productsToShow.flash} />
+      <FlashSales products={flashFallback} />
 
       {/* Deals Section */}
-      <DealsSection products={productsToShow.deals} />
+      <DealsSection products={dealsFallback} />
 
       {/* Trending Products */}
-      <TrendingSection products={productsToShow.trending} />
+      <TrendingSection products={trendingFallback} />
 
       {/* Bottom spacing for mobile navigation */}
       <div className="h-20 md:h-8" />

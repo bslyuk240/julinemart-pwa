@@ -11,16 +11,16 @@ interface FlashSalesProps {
 
 export default function FlashSales({ products }: FlashSalesProps) {
   return (
-    <section className="bg-gradient-to-br from-secondary-50 via-white to-primary-50 py-3 md:py-8">
+    <section className="bg-gradient-to-br from-secondary-200 via-secondary-100 to-white py-3 md:py-8">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-3 md:mb-4">
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="rounded-lg bg-secondary-500/10 p-1.5 md:p-2">
-              <Flame className="h-4 w-4 md:h-5 md:w-5 text-secondary-600" />
+            <div className="rounded-lg bg-white/80 border border-secondary-300 p-1.5 md:p-2">
+              <Flame className="h-4 w-4 md:h-5 md:w-5 text-secondary-700" />
             </div>
             <div>
-              <p className="text-[10px] md:text-xs uppercase tracking-wide text-secondary-600">Limited time</p>
+              <p className="text-[10px] md:text-xs uppercase tracking-wide text-secondary-700">Limited time</p>
               <h2 className="text-base md:text-2xl font-bold text-gray-900">Flash Sales</h2>
             </div>
           </div>
