@@ -20,9 +20,9 @@ export interface CartItem {
   vendorId?: number;
   vendorName?: string;
   hubId?: string | null;
+  hubName?: string | null;  // ✅ ADD THIS LINE
   weight?: number;
 }
-
 export interface Cart {
   items: CartItem[];
   itemCount: number;

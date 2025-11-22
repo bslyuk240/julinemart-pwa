@@ -79,35 +79,48 @@ export const useCartStore = create<CartState>()(
           return;
         }
 
-        const hubMeta = product.meta_data?.find((m) => m.key === 'hub_id');
-        const hubId = hubMeta ? String(hubMeta.value) : null;
-        const numericWeight =
-          product.weight !== undefined && product.weight !== null && product.weight !== ''
-            ? parseFloat(String(product.weight))
-            : undefined;
+        // Get hub ID (your plugin stores as _julinemart_hub_id)
+const hubIdMeta = product.meta_data?.find((m) => 
+  m.key === '_julinemart_hub_id' ||
+  m.key === 'hub_id' ||
+  m.key === '_hub_id'
+);
+const hubId = hubIdMeta ? String(hubIdMeta.value) : null;
+
+// Get hub name (optional, for display)
+const hubNameMeta = product.meta_data?.find((m) => 
+  m.key === '_julinemart_hub_name'
+);
+const hubName = hubNameMeta ? String(hubNameMeta.value) : null;
+
+const numericWeight =
+  product.weight !== undefined && product.weight !== null && product.weight !== ''
+    ? parseFloat(String(product.weight))
+    : undefined;
 
         const newItem: CartItem = {
-          id: Date.now(),
-          productId: product.id,
-          name: product.name,
-          slug: product.slug,
-          price: product.sale_price
-            ? parseFloat(product.sale_price)
-            : parseFloat(product.price),
-          regularPrice: product.regular_price
-            ? parseFloat(product.regular_price)
-            : 0,
-          salePrice: product.sale_price ? parseFloat(product.sale_price) : undefined,
-          quantity,
-          image: product.images[0]?.src || '/placeholder.png',
-          stockStatus: product.stock_status,
-          stockQuantity: product.stock_quantity,
-          sku: product.sku,
-          vendorId: product.store?.id,
-          vendorName: product.store?.name,
-          hubId: hubId,
-          weight: numericWeight,
-        };
+  id: Date.now(),
+  productId: product.id,
+  name: product.name,
+  slug: product.slug,
+  price: product.sale_price
+    ? parseFloat(product.sale_price)
+    : parseFloat(product.price),
+  regularPrice: product.regular_price
+    ? parseFloat(product.regular_price)
+    : 0,
+  salePrice: product.sale_price ? parseFloat(product.sale_price) : undefined,
+  quantity,
+  image: product.images[0]?.src || '/placeholder.png',
+  stockStatus: product.stock_status,
+  stockQuantity: product.stock_quantity,
+  sku: product.sku,
+  vendorId: product.store?.id,
+  vendorName: product.store?.name,
+  hubId: hubId,          // ✅ Now extracts correctly
+  hubName: hubName,      
+  weight: numericWeight,
+};
 
         set((state) => ({
           items: [...state.items, newItem],
