@@ -140,6 +140,10 @@ export interface CreateOrderData {
     product_id: number;
     quantity: number;
     variation_id?: number;
+    meta_data?: {  // ← Add this
+      key: string;
+      value: any;
+    }[];
   }[];
   shipping_lines?: {
     method_id: string;

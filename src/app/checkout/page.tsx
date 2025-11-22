@@ -299,6 +299,12 @@ export default function CheckoutPage() {
           product_id: item.productId,
           quantity: item.quantity,
           variation_id: item.variation?.id || 0,
+          meta_data: [                  
+    {                            
+      key: 'hub_id',            
+      value: item.hubId || DEFAULT_HUB_ID, 
+    }                           
+  ], 
         })),
         shipping_lines: selectedShipping ? [{
           method_id: selectedOption?.methodId || 'flat_rate',
