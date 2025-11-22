@@ -81,7 +81,10 @@ export const useCartStore = create<CartState>()(
 
         const hubMeta = product.meta_data?.find((m) => m.key === 'hub_id');
         const hubId = hubMeta ? String(hubMeta.value) : null;
-        const numericWeight = product.weight ? parseFloat(product.weight) : undefined;
+        const numericWeight =
+          product.weight !== undefined && product.weight !== null && product.weight !== ''
+            ? parseFloat(String(product.weight))
+            : undefined;
 
         const newItem: CartItem = {
           id: Date.now(),
