@@ -39,7 +39,7 @@ export default function FlashSales({ products }: FlashSalesProps) {
               {products.slice(0, 12).map((product) => (
                 <div
                   key={product.id}
-                  className="w-1/2 sm:w-1/3 md:w-1/5 flex-shrink-0"
+                  className="w-1/3 sm:w-1/4 md:w-1/5 flex-shrink-0"
                 >
                   <ProductCard product={product} showBadge fullWidth />
                 </div>

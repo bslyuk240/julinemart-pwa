@@ -40,7 +40,7 @@ export default function TrendingSection({ products }: TrendingSectionProps) {
               {products.slice(0, 12).map((product, index) => (
                 <div
                   key={product.id}
-                  className="relative w-1/2 sm:w-1/3 md:w-1/5 flex-shrink-0"
+                  className="relative w-1/3 sm:w-1/4 md:w-1/5 flex-shrink-0"
                 >
                   {index < 3 && (
                     <div className="absolute top-1.5 left-1.5 z-10 bg-secondary-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg">
