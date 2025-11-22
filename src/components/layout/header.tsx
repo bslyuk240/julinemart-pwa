@@ -24,6 +24,10 @@ export default function Header() {
   const router = useRouter();
 
   useEffect(() => {
+    router.prefetch('/');
+  }, [router]);
+
+  useEffect(() => {
     if (!query.trim()) {
       setResults([]);
       return;
@@ -136,7 +140,7 @@ export default function Header() {
             <div className="relative">
               <ShoppingCart className="w-5 h-5 text-gray-700" />
               {itemCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-secondary-500 text-white text-[10px] font-bold rounded-full w-4.5 h-4.5 flex items-center justify-center">
+                <span className="absolute -top-2 -right-2 bg-secondary-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center leading-none">
                   {itemCount > 9 ? '9+' : itemCount}
                 </span>
               )}
