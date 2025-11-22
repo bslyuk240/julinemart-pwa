@@ -2,23 +2,11 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { toast } from 'sonner';
 import { Product } from '@/types/product';
+import type { CartItem as TypedCartItem } from '@/types/cart';
 import { calculateTax, areTaxesEnabled } from '@/lib/woocommerce/tax-calculator';
 import { getAllShippingMethods } from '@/lib/woocommerce/shipping';
 
-export interface CartItem {
-  id: number;
-  productId: number;
-  name: string;
-  price: number;
-  regularPrice?: number;
-  quantity: number;
-  image: string;
-  stockStatus: 'instock' | 'outofstock' | 'onbackorder';
-  stockQuantity: number | null;
-  sku: string;
-  vendorId?: number;
-  vendorName?: string;
-}
+export interface CartItem extends TypedCartItem {}
 
 interface CartState {
   items: CartItem[];
@@ -98,10 +86,12 @@ export const useCartStore = create<CartState>()(
           id: Date.now(), // Unique ID for cart item
           productId: product.id,
           name: product.name,
+          slug: product.slug,
           price: product.sale_price 
             ? parseFloat(product.sale_price)
             : parseFloat(product.price),
-          regularPrice: product.regular_price ? parseFloat(product.regular_price) : undefined,
+          regularPrice: product.regular_price ? parseFloat(product.regular_price) : 0,
+          salePrice: product.sale_price ? parseFloat(product.sale_price) : undefined,
           quantity,
           image: product.images[0]?.src || '/placeholder.png',
           stockStatus: product.stock_status,
