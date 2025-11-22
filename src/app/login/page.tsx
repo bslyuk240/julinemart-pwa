@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/input';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { authenticateCustomer } from '@/lib/woocommerce/auth';
 import { toast } from 'sonner';
+import PageLoading from '@/components/ui/page-loading';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/account';
@@ -283,5 +284,13 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<PageLoading text="Loading login..." />}>
+      <LoginContent />
+    </Suspense>
   );
 }
