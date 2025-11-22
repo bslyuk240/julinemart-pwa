@@ -24,9 +24,7 @@ export default function CartSummary({
   onCheckout,
   isLoading = false,
 }: CartSummaryProps) {
-  const formatPrice = (price: number) => {
-    return `₦${price.toLocaleString()}`;
-  };
+  const formatPrice = (price: number = 0) => `₦${Number(price || 0).toLocaleString()}`;
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 sticky top-4">
