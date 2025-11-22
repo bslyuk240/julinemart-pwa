@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle, Package, MapPin, CreditCard, Truck } from 'lucide-react';
@@ -9,7 +9,7 @@ import { Order } from '@/types/order';
 import { Button } from '@/components/ui/button';
 import PageLoading from '@/components/ui/page-loading';
 
-export default function OrderSuccessPage() {
+function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('order');
   const [order, setOrder] = useState<Order | null>(null);
@@ -260,5 +260,13 @@ export default function OrderSuccessPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function OrderSuccessPage() {
+  return (
+    <Suspense fallback={<PageLoading text="Loading order details..." />}>
+      <OrderSuccessContent />
+    </Suspense>
   );
 }
