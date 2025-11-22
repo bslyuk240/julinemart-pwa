@@ -19,6 +19,8 @@ export interface CartItem {
   };
   vendorId?: number;
   vendorName?: string;
+  hubId?: string | null;
+  weight?: number;
 }
 
 export interface Cart {
