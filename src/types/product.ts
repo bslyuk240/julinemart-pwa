@@ -34,12 +34,16 @@ export interface Product {
   backorders_allowed: boolean;
   backordered: boolean;
   sold_individually: boolean;
-  weight: string;
+
+  /** 👇 IMPORTANT FOR JLO SHIPPING */
+  weight: string | number | null;
+
   dimensions: {
     length: string;
     width: string;
     height: string;
   };
+
   shipping_required: boolean;
   shipping_taxable: boolean;
   shipping_class: string;
@@ -52,6 +56,7 @@ export interface Product {
   cross_sell_ids: number[];
   parent_id: number;
   purchase_note: string;
+
   categories: ProductCategory[];
   tags: ProductTag[];
   images: ProductImage[];
@@ -60,7 +65,10 @@ export interface Product {
   variations: number[];
   grouped_products: number[];
   menu_order: number;
+
+  /** 👇 This is where hub_id is located */
   meta_data: MetaData[];
+
   store?: {
     id: number;
     name: string;
