@@ -4,12 +4,8 @@ import { CartItem, CartState } from '@/types/cart';
 import { Product } from '@/types/product';
 import { toast } from 'sonner';
 import { SUCCESS_MESSAGES, ERROR_MESSAGES, MAX_CART_QUANTITY } from '@/lib/constants';
-import { calculateTax, areTaxesEnabled } from '@/lib/woocommerce/tax-calculator';
-import { getFreeShippingThreshold } from '@/lib/woocommerce/policies';
 
-interface CartStore extends CartState {
-  isCalculating?: boolean;
-}
+interface CartStore extends CartState {}
 
 export const useCartStore = create<CartStore>()(
   persist(
@@ -21,7 +17,6 @@ export const useCartStore = create<CartStore>()(
       tax: 0,
       shipping: 0,
       discount: 0,
-      isCalculating: false,
 
       addItem: (product: Product, quantity: number = 1) => {
         const { items } = get();
@@ -138,62 +133,23 @@ export const useCartStore = create<CartStore>()(
         return get().items.some(item => item.productId === productId);
       },
 
-      calculateTotals: async () => {
+      calculateTotals: () => {
         const { items } = get();
-        
-        // Set calculating flag
-        set({ isCalculating: true });
-        
-        // Calculate subtotal
         const subtotal = items.reduce(
           (total, item) => total + item.price * item.quantity,
           0
         );
-        
         const itemCount = items.reduce((count, item) => count + item.quantity, 0);
         
-        // Calculate tax dynamically from WooCommerce
-        let tax = 0;
-        try {
-          const taxesEnabled = await areTaxesEnabled();
-          
-          if (taxesEnabled) {
-            // Calculate tax for each item (in case different items have different tax classes)
-            tax = await calculateTax(subtotal, 'standard', 'NG', '');
-          }
-        } catch (error) {
-          console.error('Error calculating tax:', error);
-          // Fallback: no tax
-          tax = 0;
-        }
+        // Calculate tax (e.g., 7.5% VAT in Nigeria)
+        const tax = subtotal * 0.075;
         
-        // Calculate shipping dynamically based on WooCommerce settings
-        let shipping = 0;
-        try {
-          const freeShippingThreshold = await getFreeShippingThreshold();
-          
-          // Only charge shipping if subtotal is below threshold
-          if (subtotal > 0 && subtotal < freeShippingThreshold) {
-            // Get shipping cost from first available shipping method
-            // This is simplified - in a real app, you'd get this based on customer location
-            shipping = 1500; // Default shipping cost
-          }
-        } catch (error) {
-          console.error('Error calculating shipping:', error);
-          // Fallback: default shipping logic
-          shipping = subtotal > 0 && subtotal < 10000 ? 1500 : 0;
-        }
+        // Calculate shipping (simplified - should be calculated based on address)
+        const shipping = subtotal > 0 ? 1500 : 0;
         
         const total = subtotal + tax + shipping;
         
-        set({ 
-          subtotal, 
-          itemCount, 
-          tax, 
-          shipping, 
-          total,
-          isCalculating: false,
-        });
+        set({ subtotal, itemCount, tax, shipping, total });
       },
     }),
     {

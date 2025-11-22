@@ -8,6 +8,7 @@ import ProductGallery from '@/components/product/product-gallery';
 import ProductCarousel from '@/components/product/product-carousel';
 import { Badge } from '@/components/ui/badge';
 import { getProductBySlug, getRelatedProducts } from '@/lib/woocommerce/products';
+import ProductFeatures from '@/components/product/product-features';
 import { useCartStore } from '@/store/cart-store';
 import { useWishlist } from '@/hooks/use-wishlist';
 import { Product } from '@/types/product';
@@ -444,23 +445,7 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Features */}
-            <div className="grid grid-cols-3 gap-4 border-t pt-6">
-              <div className="text-center">
-                <Truck className="w-8 h-8 text-primary-600 mx-auto mb-2" />
-                <p className="text-sm font-medium text-gray-900">Free Delivery</p>
-                <p className="text-xs text-gray-500">On orders over ₦10k</p>
-              </div>
-              <div className="text-center">
-                <Shield className="w-8 h-8 text-primary-600 mx-auto mb-2" />
-                <p className="text-sm font-medium text-gray-900">Secure Payment</p>
-                <p className="text-xs text-gray-500">100% protected</p>
-              </div>
-              <div className="text-center">
-                <RotateCcw className="w-8 h-8 text-primary-600 mx-auto mb-2" />
-                <p className="text-sm font-medium text-gray-900">Easy Returns</p>
-                <p className="text-xs text-gray-500">7-day return</p>
-              </div>
-            </div>
+            <ProductFeatures className="border-t pt-6" />
 
             {/* Vendor Info Card */}
             {product.store && (

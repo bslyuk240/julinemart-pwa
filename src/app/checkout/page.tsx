@@ -16,6 +16,7 @@ import {
 import { createOrder } from '@/lib/woocommerce/orders';
 import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
+import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
 
 interface ShippingOption {
   id: string;
@@ -38,6 +39,8 @@ export default function CheckoutPage() {
   const [selectedShipping, setSelectedShipping] = useState<string>('');
   const [selectedPayment, setSelectedPayment] = useState<string>('');
   const [shippingCost, setShippingCost] = useState(0);
+  const [taxRate, setTaxRate] = useState(0);
+  const [taxAmount, setTaxAmount] = useState(0);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -96,6 +99,10 @@ export default function CheckoutPage() {
         if (gateways.length > 0) {
           setSelectedPayment(gateways[0].id);
         }
+
+        // Fetch default tax rate (for display)
+        const rate = await getDefaultTaxRate(formData.country);
+        setTaxRate(rate * 100);
       } catch (error) {
         console.error('Error fetching checkout data:', error);
         toast.error('Failed to load checkout options');
@@ -111,8 +118,27 @@ export default function CheckoutPage() {
     }
   }, [items]);
 
-  const tax = subtotal * 0.075; // 7.5% VAT
-  const total = subtotal + shippingCost + tax;
+  // Update tax amount when totals or location change
+  useEffect(() => {
+    const updateTaxAmount = async () => {
+      if (subtotal <= 0) {
+        setTaxAmount(0);
+        setTaxRate(0);
+        return;
+      }
+      const taxValue = await calculateTax(
+        subtotal,
+        'standard',
+        formData.country,
+        formData.state
+      );
+      setTaxAmount(taxValue);
+      setTaxRate(Number(((taxValue / subtotal) * 100).toFixed(2)));
+    };
+    updateTaxAmount();
+  }, [subtotal, formData.country, formData.state, formData.postcode, formData.city]);
+
+  const total = subtotal + shippingCost + taxAmount;
 
   const formatPrice = (price: number) => `₦${price.toLocaleString()}`;
 
@@ -512,10 +538,12 @@ export default function CheckoutPage() {
                     {shippingCost === 0 ? 'FREE' : formatPrice(shippingCost)}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tax (7.5%)</span>
-                  <span className="font-medium">{formatPrice(tax)}</span>
-                </div>
+                {taxRate > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Tax ({taxRate}%)</span>
+                    <span className="font-medium">{formatPrice(tax)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between pt-2 border-t text-lg font-bold">
                   <span>Total</span>
                   <span className="text-primary-600">{formatPrice(total)}</span>
