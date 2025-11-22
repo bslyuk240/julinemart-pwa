@@ -17,15 +17,19 @@ import { createOrder } from '@/lib/woocommerce/orders';
 import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
 import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
+import { getShippingFee } from '@/lib/shipping/jloShipping';
 
 interface ShippingOption {
   id: string;
   title: string;
-  cost: number;
+  cost: number | null;
   description?: string;
   zoneId: number;
   methodId: string;
 }
+
+const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d'; // same as plugin fallback
+const DEFAULT_WEIGHT = 0.5;
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -38,9 +42,13 @@ export default function CheckoutPage() {
   const [paymentGateways, setPaymentGateways] = useState<PaymentGateway[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<string>('');
   const [selectedPayment, setSelectedPayment] = useState<string>('');
-  const [shippingCost, setShippingCost] = useState(0);
+  const [shippingCost, setShippingCost] = useState<number | null>(null);
   const [taxRate, setTaxRate] = useState(0);
   const [taxAmount, setTaxAmount] = useState(0);
+
+  // JLO shipping calculation state
+  const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
+  const [shippingError, setShippingError] = useState<string | null>(null);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -59,19 +67,23 @@ export default function CheckoutPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const formatPrice = (price: number) => `₦${price.toLocaleString()}`;
+
   // Fetch shipping methods and payment gateways
   useEffect(() => {
     const fetchCheckoutData = async () => {
       try {
         setLoading(true);
 
-        // Fetch shipping methods
+        // Fetch shipping methods (just to know which methods exist)
         const zonesWithMethods = await getAllShippingMethods();
         const options: ShippingOption[] = [];
 
         zonesWithMethods.forEach(({ zone, methods }) => {
           methods.forEach((method) => {
-            const cost = parseFloat(method.settings?.cost?.value || '0');
+            const rawCost = method.settings?.cost?.value;
+            const parsedCost = rawCost !== undefined && rawCost !== '' ? parseFloat(rawCost) : NaN;
+            const cost = isNaN(parsedCost) ? null : parsedCost;
             options.push({
               id: `${zone.id}-${method.instance_id}`,
               title: method.title,
@@ -88,7 +100,7 @@ export default function CheckoutPage() {
         // Set first shipping option as default
         if (options.length > 0) {
           setSelectedShipping(options[0].id);
-          setShippingCost(options[0].cost);
+          setShippingCost(options[0].cost ?? null);
         }
 
         // Fetch payment gateways
@@ -138,9 +150,54 @@ export default function CheckoutPage() {
     updateTaxAmount();
   }, [subtotal, formData.country, formData.state, formData.postcode, formData.city]);
 
-  const total = subtotal + shippingCost + taxAmount;
+  // Automatically calculate JLO shipping when state/city + JLO method are selected
+  useEffect(() => {
+    const doCalc = async () => {
+      setShippingError(null);
 
-  const formatPrice = (price: number) => `₦${price.toLocaleString()}`;
+      if (!items.length) return;
+      if (!formData.state || !formData.city) return;
+
+      const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
+      if (!selectedOption) return;
+
+      // Only use JLO API for our custom JLO shipping method
+      if (selectedOption.methodId !== 'jlo_shipping') return;
+
+      setIsCalculatingShipping(true);
+
+      try {
+        const shippingItems = (items as any[]).map((item) => ({
+          hubId: item.hubId ?? DEFAULT_HUB_ID,
+          quantity: item.quantity,
+          weight: item.weight ?? DEFAULT_WEIGHT,
+        }));
+
+        const res = await getShippingFee({
+          deliveryState: formData.state,
+          deliveryCity: formData.city,
+          items: shippingItems,
+          totalOrderValue: subtotal,
+        });
+
+        if (!res.success) {
+          setShippingError(res.message ?? 'Unable to calculate shipping.');
+          return;
+        }
+
+        setShippingCost(res.shipping);
+      } catch (err) {
+        console.error('Error calculating JLO shipping:', err);
+        setShippingError('Error calculating shipping. Please try again.');
+      } finally {
+        setIsCalculatingShipping(false);
+      }
+    };
+
+    doCalc();
+  }, [selectedShipping, formData.state, formData.city, items, shippingOptions, subtotal]);
+
+  const total = subtotal + (shippingCost || 0) + taxAmount;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -154,9 +211,12 @@ export default function CheckoutPage() {
   const handleShippingChange = (optionId: string) => {
     setSelectedShipping(optionId);
     const option = shippingOptions.find(o => o.id === optionId);
-    if (option) {
-      setShippingCost(option.cost);
+
+    // For non-JLO methods, use Woo cost directly
+    if (option && option.methodId !== 'jlo_shipping') {
+      setShippingCost(option.cost ?? null);
     }
+    // For JLO, cost will be set by the effect when state/city are entered
   };
 
   const validateForm = () => {
@@ -197,10 +257,16 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Ensure shipping is calculated for JLO method
+    const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
+    if (selectedOption && selectedOption.methodId === 'jlo_shipping' && shippingCost === null) {
+      toast.error('Please wait for shipping to be calculated.');
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
-      // Prepare order data
       const orderData = {
         payment_method: selectedPayment,
         payment_method_title: paymentGateways.find(g => g.id === selectedPayment)?.title || 'Payment',
@@ -229,20 +295,19 @@ export default function CheckoutPage() {
           country: formData.country,
           company: '',
         },
-        line_items: items.map(item => ({
+        line_items: items.map((item: any) => ({
           product_id: item.productId,
           quantity: item.quantity,
           variation_id: item.variation?.id || 0,
         })),
         shipping_lines: selectedShipping ? [{
-          method_id: shippingOptions.find(o => o.id === selectedShipping)?.methodId || 'flat_rate',
-          method_title: shippingOptions.find(o => o.id === selectedShipping)?.title || 'Shipping',
-          total: shippingCost.toString(),
+          method_id: selectedOption?.methodId || 'flat_rate',
+          method_title: selectedOption?.title || 'Shipping',
+          total: (shippingCost ?? 0).toString(),
         }] : [],
         customer_note: formData.notes,
       };
 
-      // Create order via WooCommerce API
       const order = await createOrder(orderData);
 
       if (order) {
@@ -277,6 +342,8 @@ export default function CheckoutPage() {
       </main>
     );
   }
+
+  const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
@@ -438,37 +505,62 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="space-y-3">
-                  {shippingOptions.map((option) => (
-                    <label
-                      key={option.id}
-                      className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                        selectedShipping === option.id
-                          ? 'border-primary-600 bg-primary-50'
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="shipping"
-                        value={option.id}
-                        checked={selectedShipping === option.id}
-                        onChange={(e) => handleShippingChange(e.target.value)}
-                        className="mt-1 w-4 h-4 text-primary-600"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium text-gray-900">{option.title}</p>
-                          <p className="font-semibold text-primary-600">
-                            {option.cost === 0 ? 'FREE' : formatPrice(option.cost)}
-                          </p>
+                  {shippingOptions.map((option) => {
+                    const isJlo = option.methodId === 'jlo_shipping';
+                    const displayCost = isJlo ? shippingCost : option.cost;
+
+                    return (
+                      <label
+                        key={option.id}
+                        className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                          selectedShipping === option.id
+                            ? 'border-primary-600 bg-primary-50'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="shipping"
+                          value={option.id}
+                          checked={selectedShipping === option.id}
+                          onChange={(e) => handleShippingChange(e.target.value)}
+                          className="mt-1 w-4 h-4 text-primary-600"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium text-gray-900">{option.title}</p>
+                            <p className="font-semibold text-primary-600">
+                              {displayCost !== null
+                                ? (displayCost === 0
+                                  ? 'FREE'
+                                  : formatPrice(displayCost))
+                                : 'Calculated at checkout'}
+                            </p>
+                          </div>
+                          {option.description && (
+                            <p className="text-sm text-gray-600 mt-1">{option.description}</p>
+                          )}
+                          {isJlo && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Shipping is calculated automatically based on your state and city.
+                            </p>
+                          )}
                         </div>
-                        {option.description && (
-                          <p className="text-sm text-gray-600 mt-1">{option.description}</p>
-                        )}
-                      </div>
-                    </label>
-                  ))}
+                      </label>
+                    );
+                  })}
                 </div>
+
+                {isCalculatingShipping && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    Calculating shipping...
+                  </p>
+                )}
+                {shippingError && (
+                  <p className="text-sm text-red-600 mt-2">
+                    {shippingError}
+                  </p>
+                )}
               </div>
             )}
 
@@ -517,7 +609,7 @@ export default function CheckoutPage() {
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Summary</h2>
               
               <div className="space-y-3 mb-4 pb-4 border-b max-h-64 overflow-y-auto">
-                {items.map((item) => (
+                {items.map((item: any) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span className="text-gray-600">
                       {item.name} x{item.quantity}
@@ -534,8 +626,12 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="font-medium text-green-600">
-                    {shippingCost === 0 ? 'FREE' : formatPrice(shippingCost)}
+                  <span className="font-medium">
+                    {shippingCost !== null
+                      ? (shippingCost === 0 ? 'FREE' : formatPrice(shippingCost))
+                      : selectedOption?.methodId === 'jlo_shipping'
+                        ? 'Enter state & city'
+                        : 'Calculated at checkout'}
                   </span>
                 </div>
                 {taxRate > 0 && (

@@ -6,7 +6,7 @@ import { ShoppingBag, Tag } from 'lucide-react';
 interface CartSummaryProps {
   subtotal: number;
   discount?: number;
-  shipping?: number;
+  shipping?: number | null;
   tax?: number;
   total: number;
   itemCount: number;
@@ -56,11 +56,11 @@ export default function CartSummary({
         {/* Shipping */}
         <div className="flex justify-between text-gray-700">
           <span>Shipping</span>
-          {shipping === 0 ? (
-            <span className="text-green-600 font-medium">FREE</span>
-          ) : (
-            <span className="font-medium">{formatPrice(shipping)}</span>
-          )}
+          <span className="font-medium">
+            {shipping !== undefined && shipping !== null
+              ? (shipping === 0 ? 'FREE' : formatPrice(shipping))
+              : 'Calculated at checkout'}
+          </span>
         </div>
 
         {/* Tax */}
@@ -99,19 +99,13 @@ export default function CartSummary({
           <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          <span>Free shipping on orders over ₦10,000</span>
-        </div>
-        <div className="flex items-start gap-2">
-          <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
           <span>Secure payment processing</span>
         </div>
         <div className="flex items-start gap-2">
           <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          <span>Easy returns within 7 days</span>
+          <span>Easy returns within 3 days</span>
         </div>
       </div>
 

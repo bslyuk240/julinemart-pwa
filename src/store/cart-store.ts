@@ -6,7 +6,10 @@ import type { CartItem as TypedCartItem } from '@/types/cart';
 import { calculateTax, areTaxesEnabled } from '@/lib/woocommerce/tax-calculator';
 import { getAllShippingMethods } from '@/lib/woocommerce/shipping';
 
-export interface CartItem extends TypedCartItem {}
+export interface CartItem extends TypedCartItem {
+  hubId?: string | null;
+  weight?: number;
+}
 
 interface CartState {
   items: CartItem[];
@@ -82,24 +85,28 @@ export const useCartStore = create<CartState>()(
         }
         
         // Add new item
-        const newItem: CartItem = {
-          id: Date.now(), // Unique ID for cart item
-          productId: product.id,
-          name: product.name,
-          slug: product.slug,
-          price: product.sale_price 
-            ? parseFloat(product.sale_price)
-            : parseFloat(product.price),
-          regularPrice: product.regular_price ? parseFloat(product.regular_price) : 0,
-          salePrice: product.sale_price ? parseFloat(product.sale_price) : undefined,
-          quantity,
-          image: product.images[0]?.src || '/placeholder.png',
-          stockStatus: product.stock_status,
-          stockQuantity: product.stock_quantity,
-          sku: product.sku,
-          vendorId: product.store?.id,
-          vendorName: product.store?.name,
-        };
+       const newItem: CartItem = {
+  id: Date.now(),
+  productId: product.id,
+  name: product.name,
+  slug: product.slug,
+  price: product.sale_price 
+    ? parseFloat(product.sale_price)
+    : parseFloat(product.price),
+  regularPrice: product.regular_price ? parseFloat(product.regular_price) : 0,
+  salePrice: product.sale_price ? parseFloat(product.sale_price) : undefined,
+  quantity,
+  image: product.images[0]?.src || '/placeholder.png',
+  stockStatus: product.stock_status,
+  stockQuantity: product.stock_quantity,
+  sku: product.sku,
+  vendorId: product.store?.id,
+  vendorName: product.store?.name,
+
+  /** 🚀 NEW FIELDS FOR JLO SHIPPING **/
+  hubId: product.hubId || null,
+  weight: product.weight ? parseFloat(product.weight) : 0.5,
+};
         
         set(state => ({
           items: [...state.items, newItem],

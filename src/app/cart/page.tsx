@@ -10,10 +10,10 @@ import CartSummary from '@/components/cart/cart-summary';
 export default function CartPage() {
   const router = useRouter();
   const { items, updateQuantity, removeItem, subtotal, itemCount } = useCart();
-  const shipping = 0;
+  const shipping = null;
   const tax = 0;
   const discount = 0;
-  const total = subtotal + shipping + tax - discount;
+  const total = subtotal + (shipping || 0) + tax - discount;
 
   const handleCheckout = () => {
     router.push('/checkout');
