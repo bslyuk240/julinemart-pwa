@@ -1,14 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search } from 'lucide-react';
+import { Search, Menu, ShoppingCart } from 'lucide-react';
+import MobileMenu from '@/components/layout/mobile-menu';
+import { useCart } from '@/hooks/use-cart';
 
 export default function Header() {
   const logoSrc = process.env.NEXT_PUBLIC_LOGO_URL || '/images/logo.png';
   const logoWidth = Number(process.env.NEXT_PUBLIC_LOGO_WIDTH) || 40;
   const logoHeight = Number(process.env.NEXT_PUBLIC_LOGO_HEIGHT) || 40;
   const logoAlt = process.env.NEXT_PUBLIC_LOGO_TEXT || 'Home';
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { itemCount } = useCart();
 
   return (
     <header className="sticky top-0 z-50 bg-white shadow-sm">
@@ -21,7 +26,16 @@ export default function Header() {
       <div className="container mx-auto px-4 py-3 md:py-4">
         {/* Unified layout: logo + search, compact and inline */}
         <div className="flex items-center gap-3 md:gap-4">
-          <Link href="/" className="flex-shrink-0">
+          {/* Desktop menu toggle */}
+          <button
+            className="hidden md:inline-flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 border border-gray-200"
+            onClick={() => setIsMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5 text-gray-700" />
+          </button>
+
+          <Link href="/" className="flex-shrink-0 hidden md:inline-flex">
             <Image
               src={logoSrc}
               alt={logoAlt}
@@ -43,8 +57,27 @@ export default function Header() {
               Search
             </button>
           </div>
+
+          {/* Desktop cart icon */}
+          <Link
+            href="/cart"
+            className="hidden md:inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <div className="relative">
+              <ShoppingCart className="w-5 h-5 text-gray-700" />
+              {itemCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-secondary-500 text-white text-[10px] font-bold rounded-full w-4.5 h-4.5 flex items-center justify-center">
+                  {itemCount > 9 ? '9+' : itemCount}
+                </span>
+              )}
+            </div>
+            <span className="text-sm font-semibold text-gray-800">Cart</span>
+          </Link>
         </div>
       </div>
+
+      {/* Menu Drawer for desktop */}
+      <MobileMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} showOnDesktop />
     </header>
   );
 }

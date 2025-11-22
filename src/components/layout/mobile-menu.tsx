@@ -8,9 +8,10 @@ import { clsx } from 'clsx';
 interface MobileMenuProps {
   isOpen: boolean;
   onClose: () => void;
+  showOnDesktop?: boolean;
 }
 
-export default function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
+export default function MobileMenu({ isOpen, onClose, showOnDesktop = false }: MobileMenuProps) {
   const menuItems = [
     { name: 'My Account', href: '/account', icon: User },
     { name: 'Orders', href: '/account/orders', icon: MapPin },
@@ -23,7 +24,8 @@ export default function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
       {/* Overlay */}
       <div
         className={clsx(
-          'fixed inset-0 bg-black/50 z-50 transition-opacity duration-300 md:hidden',
+          'fixed inset-0 bg-black/50 z-50 transition-opacity duration-300',
+          showOnDesktop ? '' : 'md:hidden',
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
         onClick={onClose}
@@ -32,7 +34,8 @@ export default function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
       {/* Menu Drawer */}
       <div
         className={clsx(
-          'fixed top-0 left-0 bottom-0 w-[280px] bg-white z-50 transform transition-transform duration-300 ease-in-out md:hidden',
+          'fixed top-0 left-0 bottom-0 w-[280px] bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-xl',
+          showOnDesktop ? '' : 'md:hidden',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >

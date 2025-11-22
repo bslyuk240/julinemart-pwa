@@ -41,23 +41,18 @@ export default function DealsSection({
         </div>
 
         {products.length > 0 ? (
-          <>
-            {/* Mobile: Horizontal Scroll */}
-            <div className="md:hidden overflow-x-auto scrollbar-hide -mx-4 px-4">
-              <div className="flex gap-3 pb-2">
-                {products.slice(0, 10).map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-            </div>
-
-            {/* Desktop: Grid Layout */}
-            <div className="hidden md:grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {products.slice(0, 10).map((product) => (
-                <ProductCard key={product.id} product={product} />
+          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+            <div className="flex gap-3 md:gap-4 pb-2">
+              {products.slice(0, 12).map((product) => (
+                <div
+                  key={product.id}
+                  className="w-1/2 sm:w-1/3 md:w-1/5 flex-shrink-0"
+                >
+                  <ProductCard product={product} fullWidth />
+                </div>
               ))}
             </div>
-          </>
+          </div>
         ) : (
           <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg">
             <Tag className="w-8 h-8 md:w-12 md:h-12 text-gray-300 mx-auto mb-2 md:mb-3" />

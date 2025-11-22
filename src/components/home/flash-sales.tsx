@@ -34,23 +34,18 @@ export default function FlashSales({ products }: FlashSalesProps) {
         </div>
 
         {products.length > 0 ? (
-          <>
-            {/* Mobile: Horizontal Scroll */}
-            <div className="md:hidden overflow-x-auto scrollbar-hide -mx-4 px-4">
-              <div className="flex gap-3 pb-2">
-                {products.slice(0, 10).map((product) => (
-                  <ProductCard key={product.id} product={product} showBadge />
-                ))}
-              </div>
-            </div>
-
-            {/* Desktop: Grid Layout */}
-            <div className="hidden md:grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {products.slice(0, 10).map((product) => (
-                <ProductCard key={product.id} product={product} showBadge />
+          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+            <div className="flex gap-3 md:gap-4 pb-2">
+              {products.slice(0, 12).map((product) => (
+                <div
+                  key={product.id}
+                  className="w-1/2 sm:w-1/3 md:w-1/5 flex-shrink-0"
+                >
+                  <ProductCard product={product} showBadge fullWidth />
+                </div>
               ))}
             </div>
-          </>
+          </div>
         ) : (
           <div className="rounded-xl border border-dashed border-secondary-200 bg-white/70 p-4 md:p-6 text-secondary-700 shadow-sm text-sm">
             Flash sale items will appear here soon.

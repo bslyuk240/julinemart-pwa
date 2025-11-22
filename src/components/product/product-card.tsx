@@ -97,7 +97,7 @@ export default function ProductCard({ product, showBadge = false, fullWidth = fa
             src={product.images[0]?.src || '/images/placeholder.jpg'}
             alt={product.name}
             fill
-            sizes="(max-width: 640px) 140px, (max-width: 768px) 150px, (max-width: 1024px) 240px, 240px"
+            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 220px"
             className="object-cover transition-transform duration-200 group-hover:scale-105"
           />
         </div>

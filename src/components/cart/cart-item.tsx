@@ -28,10 +28,10 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
   const itemTotal = item.price * item.quantity;
 
   return (
-    <div className="flex gap-4 py-4 border-b border-gray-200 last:border-b-0">
+    <div className="flex gap-3 md:gap-4 py-3 md:py-4 border-b border-gray-200 last:border-b-0">
       {/* Product Image */}
       <Link href={`/product/${item.slug}`} className="flex-shrink-0">
-        <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden bg-gray-100">
+        <div className="relative w-18 h-18 md:w-24 md:h-24 rounded-lg overflow-hidden bg-gray-100">
           <Image
             src={item.image || '/images/placeholder.jpg'}
             alt={item.name}
@@ -45,14 +45,14 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
       <div className="flex-1 min-w-0">
         <Link 
           href={`/product/${item.slug}`}
-          className="block font-medium text-gray-900 hover:text-primary-600 transition-colors mb-1 line-clamp-2"
+          className="block font-medium text-gray-900 hover:text-primary-600 transition-colors mb-1 line-clamp-2 text-sm md:text-base"
         >
           {item.name}
         </Link>
 
         {/* Variation Details */}
         {item.variation?.attributes && Object.keys(item.variation.attributes).length > 0 && (
-          <div className="text-xs text-gray-500 mb-2">
+          <div className="text-xs text-gray-500 mb-1">
             {Object.entries(item.variation.attributes).map(([key, value]) => (
               <span key={key} className="mr-2">
                 {key}: <span className="font-medium">{value}</span>
@@ -62,12 +62,12 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
         )}
 
         {/* Price */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-lg font-bold text-primary-600">
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className="text-base md:text-lg font-bold text-primary-600">
             {formatPrice(item.price)}
           </span>
           {item.regularPrice && item.regularPrice > item.price && (
-            <span className="text-sm text-gray-400 line-through">
+            <span className="text-xs md:text-sm text-gray-400 line-through">
               {formatPrice(item.regularPrice)}
             </span>
           )}
@@ -82,7 +82,7 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
         )}
 
         {/* Quantity Controls & Remove Button */}
-        <div className="flex items-center gap-3 mt-3">
+        <div className="flex items-center gap-2 mt-3">
           {/* Quantity Control */}
           <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
             <button
@@ -93,11 +93,11 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
             >
               <Minus className="w-4 h-4 text-gray-600" />
             </button>
-            
-            <span className="px-4 py-2 font-medium text-gray-900 min-w-[40px] text-center">
+
+            <span className="px-3 py-1.5 font-medium text-gray-900 min-w-[34px] text-center text-sm">
               {item.quantity}
             </span>
-            
+
             <button
               onClick={handleIncrease}
               disabled={
@@ -122,7 +122,7 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
 
           {/* Item Total (Desktop) */}
           <div className="ml-auto hidden md:block">
-            <p className="text-lg font-bold text-primary-900">
+            <p className="text-base md:text-lg font-bold text-primary-900">
               {formatPrice(itemTotal)}
             </p>
           </div>
@@ -130,7 +130,7 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
 
         {/* Item Total (Mobile) */}
         <div className="md:hidden mt-2">
-          <p className="text-base font-bold text-primary-900">
+          <p className="text-sm font-bold text-primary-900">
             Subtotal: {formatPrice(itemTotal)}
           </p>
         </div>

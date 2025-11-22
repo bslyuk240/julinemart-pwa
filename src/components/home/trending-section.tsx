@@ -35,39 +35,23 @@ export default function TrendingSection({ products }: TrendingSectionProps) {
         </div>
 
         {products.length > 0 ? (
-          <>
-            {/* Mobile: Horizontal Scroll with badges */}
-            <div className="md:hidden overflow-x-auto scrollbar-hide -mx-4 px-4">
-              <div className="flex gap-3 pb-2">
-                {products.slice(0, 10).map((product, index) => (
-                  <div key={product.id} className="relative flex-shrink-0">
-                    {/* Trending Badge for Top 3 - Mobile only */}
-                    {index < 3 && (
-                      <div className="absolute top-1 left-1 z-10 bg-secondary-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-lg">
-                        #{index + 1}
-                      </div>
-                    )}
-                    <ProductCard product={product} />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Desktop: Grid Layout with badges */}
-            <div className="hidden md:grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {products.slice(0, 10).map((product, index) => (
-                <div key={product.id} className="relative">
-                  {/* Trending Badge for Top 3 - Desktop */}
+          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+            <div className="flex gap-3 md:gap-4 pb-2">
+              {products.slice(0, 12).map((product, index) => (
+                <div
+                  key={product.id}
+                  className="relative w-1/2 sm:w-1/3 md:w-1/5 flex-shrink-0"
+                >
                   {index < 3 && (
-                    <div className="absolute top-2 left-2 z-10 bg-secondary-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
+                    <div className="absolute top-1.5 left-1.5 z-10 bg-secondary-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg">
                       #{index + 1}
                     </div>
                   )}
-                  <ProductCard product={product} />
+                  <ProductCard product={product} fullWidth />
                 </div>
               ))}
             </div>
-          </>
+          </div>
         ) : (
           <div className="text-center py-8 md:py-12 bg-white rounded-lg">
             <TrendingUp className="w-8 h-8 md:w-12 md:h-12 text-gray-300 mx-auto mb-2 md:mb-3" />

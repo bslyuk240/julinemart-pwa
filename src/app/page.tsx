@@ -11,22 +11,22 @@ export const revalidate = 300; // Revalidate every 5 minutes
 export default async function HomePage() {
   // Fetch products in parallel for better performance
   const [flashSaleProducts, dealProducts, trendingProducts] = await Promise.all([
-    getProducts({ tag: 'flash-sale', per_page: 10 }).catch(() => []),
-    getProducts({ tag: 'deal', per_page: 10 }).catch(() => []),
-    getProducts({ featured: true, per_page: 10 }).catch(() => []),
+    getProducts({ tag: 'flash-sale', per_page: 8 }).catch(() => []),
+    getProducts({ tag: 'deal', per_page: 8 }).catch(() => []),
+    getProducts({ featured: true, per_page: 8 }).catch(() => []),
   ]);
 
   // Fallback: if no products with tags, get latest products
   const productsToShow = {
     flash: flashSaleProducts.length > 0
       ? flashSaleProducts
-      : (await getProducts({ per_page: 10, orderby: 'date' }).catch(() => [])) || [],
+      : (await getProducts({ per_page: 8, orderby: 'date' }).catch(() => [])) || [],
     deals: dealProducts.length > 0
       ? dealProducts
-      : (await getProducts({ per_page: 10, orderby: 'popularity' }).catch(() => [])) || [],
+      : (await getProducts({ per_page: 8, orderby: 'popularity' }).catch(() => [])) || [],
     trending: trendingProducts.length > 0
       ? trendingProducts
-      : (await getProducts({ per_page: 10, orderby: 'rating' }).catch(() => [])) || [],
+      : (await getProducts({ per_page: 8, orderby: 'rating' }).catch(() => [])) || [],
   };
 
   // Last-resort fallback to dummy data so home sections never render empty

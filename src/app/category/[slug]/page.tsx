@@ -38,7 +38,7 @@ export default function CategoryPage() {
         
         const fetchedProducts = await getProducts({ 
           category: category.id.toString(),
-          per_page: 50,
+          per_page: 24,
           orderby: sortBy,
           order: 'desc'
         });
@@ -47,7 +47,7 @@ export default function CategoryPage() {
       } else {
         const fetchedProducts = await getProducts({ 
           category: slug,
-          per_page: 50,
+          per_page: 24,
           orderby: sortBy,
           order: 'desc'
         });
@@ -68,7 +68,7 @@ export default function CategoryPage() {
       if (category) {
         const fetchedProducts = await getProducts({ 
           category: category.id.toString(),
-          per_page: 50,
+          per_page: 24,
           orderby: sortBy,
           order: 'desc'
         });

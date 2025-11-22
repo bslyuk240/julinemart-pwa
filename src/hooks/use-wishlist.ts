@@ -9,7 +9,8 @@ export function useWishlist() {
   const itemCount = items.length;
 
   const isInWishlist = (productId: number) => {
-    return items.some((item) => item.id === productId);
+    // Fixed: Check productId property, not id
+    return items.some((item) => item.productId === productId);
   };
 
   const toggleWishlist = (productId: number, productData?: any) => {

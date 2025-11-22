@@ -34,25 +34,15 @@ export default function ProductDetailPage() {
   const fetchProduct = async () => {
     try {
       setLoading(true);
-      console.log('Fetching product with slug:', slug);
-      
       const fetchedProduct = await getProductBySlug(slug);
-      console.log('Product fetched:', fetchedProduct);
-      console.log('Vendor/Store data:', fetchedProduct?.store);
-      console.log('Meta data:', fetchedProduct?.meta_data);
       
       if (!fetchedProduct) {
-        console.error('Product not found');
         setProduct(null);
         setLoading(false);
         return;
       }
       
       setProduct(fetchedProduct);
-      
-      // Fetch related products
-      const related = await getRelatedProducts(fetchedProduct.id, 8);
-      setRelatedProducts(related);
     } catch (error) {
       console.error('Error fetching product:', error);
       setProduct(null);
@@ -60,6 +50,20 @@ export default function ProductDetailPage() {
       setLoading(false);
     }
   };
+
+  // fetch related after product is set to avoid blocking initial render
+  useEffect(() => {
+    const fetchRelated = async () => {
+      if (!product) return;
+      try {
+        const related = await getRelatedProducts(product.id, 6);
+        setRelatedProducts(related);
+      } catch (error) {
+        console.error('Error fetching related products:', error);
+      }
+    };
+    fetchRelated();
+  }, [product]);
 
   const formatPrice = (price: string) => {
     return `₦${parseFloat(price).toLocaleString()}`;
