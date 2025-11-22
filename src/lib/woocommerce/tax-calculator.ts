@@ -156,6 +156,9 @@ export async function getDefaultTaxRate(country: string = 'NG'): Promise<number>
   return 0;
 }
 
+// Re-export to allow consumers to check tax enablement from this module
+export { areTaxesEnabled } from './settings';
+
 /**
  * Format tax for display
  */

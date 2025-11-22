@@ -541,7 +541,7 @@ export default function CheckoutPage() {
                 {taxRate > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Tax ({taxRate}%)</span>
-                    <span className="font-medium">{formatPrice(tax)}</span>
+                    <span className="font-medium">{formatPrice(taxAmount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between pt-2 border-t text-lg font-bold">
