@@ -7,7 +7,6 @@ import { calculateTax, areTaxesEnabled } from '@/lib/woocommerce/tax-calculator'
 import { getAllShippingMethods } from '@/lib/woocommerce/shipping';
 
 export interface CartItem extends TypedCartItem {
-  hubId?: string | null;
   weight?: number;
 }
 
@@ -80,13 +79,9 @@ export const useCartStore = create<CartState>()(
           return;
         }
 
-        const hubId =
-          product.meta_data?.find((m) => m.key === 'hub_id')?.value || null;
-
-        const numericWeight =
-          product.weight && !isNaN(Number(product.weight))
-            ? Number(product.weight)
-            : 0.5;
+        const hubMeta = product.meta_data?.find((m) => m.key === 'hub_id');
+        const hubId = hubMeta ? String(hubMeta.value) : null;
+        const numericWeight = product.weight ? parseFloat(product.weight) : undefined;
 
         const newItem: CartItem = {
           id: Date.now(),
@@ -107,9 +102,7 @@ export const useCartStore = create<CartState>()(
           sku: product.sku,
           vendorId: product.store?.id,
           vendorName: product.store?.name,
-
-          /** 🚀 UPDATED FOR JLO SHIPPING */
-          hubId,
+          hubId: hubId,
           weight: numericWeight,
         };
 
