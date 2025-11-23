@@ -29,6 +29,18 @@ interface ShippingOption {
   methodId: string;
 }
 
+interface SavedCard {
+  id: string;
+  authorization_code: string;
+  card_type: string;
+  last4: string;
+  exp_month: string;
+  exp_year: string;
+  bank: string;
+  country_code: string;
+  is_default: boolean;
+}
+
 const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
 const DEFAULT_WEIGHT = 0.5;
 
@@ -46,6 +58,12 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
   const currentOrderRef = useRef<any>(null);
+  
+  // NEW: Saved card state
+  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
+  const [defaultSavedCard, setDefaultSavedCard] = useState<SavedCard | null>(null);
+  const [useSavedCard, setUseSavedCard] = useState(false);
+  const [saveCard, setSaveCard] = useState(true); // Default checked
   
   // Shipping & Payment
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
@@ -77,7 +95,7 @@ export default function CheckoutPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const formatPrice = (price: number) => `NGN ${price.toLocaleString()}`;
+  const formatPrice = (price: number) => `NGN ${price.toLocaleString()}`;
   const total = subtotal + (shippingCost || 0) + taxAmount;
 
   // Load Paystack script
@@ -132,6 +150,80 @@ export default function CheckoutPage() {
     }
   };
 
+  // NEW: Handle saved card payment (charge authorization)
+  const handleSavedCardPayment = async (orderId: number) => {
+    if (!defaultSavedCard || !isAuthenticated || !customerId) {
+      toast.error('Unable to process payment with saved card');
+      return;
+    }
+
+    try {
+      console.log('🔵 Charging saved card...');
+      setIsProcessing(true);
+
+      const chargeResponse = await fetch('/api/payments/charge-authorization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId,
+          email: formData.email,
+          amount: Math.round(total * 100), // Convert to kobo
+          authorization_code: defaultSavedCard.authorization_code,
+          metadata: {
+            order_id: orderId,
+            customer_id: customerId,
+          },
+        }),
+      });
+
+      if (!chargeResponse.ok) {
+        const errorData = await chargeResponse.json();
+        throw new Error(errorData.error || 'Payment failed');
+      }
+
+      const chargeData = await chargeResponse.json();
+
+      if (chargeData.success) {
+        console.log('✅ Saved card charged successfully');
+        
+        // Update order status
+        const wpUrl = process.env.NEXT_PUBLIC_WP_URL;
+        const wcKey = process.env.NEXT_PUBLIC_WC_KEY;
+        const wcSecret = process.env.NEXT_PUBLIC_WC_SECRET;
+
+        const updateResponse = await fetch(
+          `${wpUrl}/wp-json/wc/v3/orders/${orderId}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Basic ${btoa(`${wcKey}:${wcSecret}`)}`,
+            },
+            body: JSON.stringify({
+              set_paid: true,
+              transaction_id: chargeData.reference,
+              status: 'processing',
+            }),
+          }
+        );
+
+        if (updateResponse.ok) {
+          clearCart();
+          toast.success('Payment successful!');
+          router.push(`/order-success?order=${orderId}`);
+        } else {
+          throw new Error('Failed to update order status');
+        }
+      } else {
+        throw new Error('Payment failed');
+      }
+    } catch (error: any) {
+      console.error('❌ Saved card payment error:', error);
+      toast.error(error.message || 'Payment failed. Please try another payment method.');
+      setIsProcessing(false);
+    }
+  };
+
   // Separate payment success handler
   const handlePaymentSuccess = async (response: any) => {
     console.log('🔵 Processing payment success...');
@@ -160,6 +252,57 @@ export default function CheckoutPage() {
       
       if (!orderId) {
         throw new Error('Order ID not found');
+      }
+
+      // NEW: If user chose to save card, verify and save it
+      if (saveCard && isAuthenticated && customerId) {
+        try {
+          console.log('🔵 Verifying transaction to save card...');
+          const verifyResponse = await fetch('/api/payments/verify-paystack', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reference: response.reference }),
+          });
+
+          if (verifyResponse.ok) {
+            const verifyData = await verifyResponse.json();
+            
+            if (verifyData.success && verifyData.authorization) {
+              const auth = verifyData.authorization;
+              
+              // Create new card object
+              const newCard: SavedCard = {
+                id: `card_${Date.now()}`,
+                authorization_code: auth.authorization_code,
+                card_type: auth.card_type || auth.brand || 'card',
+                last4: auth.last4,
+                exp_month: auth.exp_month,
+                exp_year: auth.exp_year,
+                bank: auth.bank,
+                country_code: auth.country_code,
+                is_default: savedCards.length === 0, // Make default if it's the first card
+              };
+
+              // Update cards array
+              const updatedCards = [...savedCards, newCard];
+
+              // Save to WooCommerce
+              const saveResponse = await fetch('/api/customers/save-card', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customerId, cards: updatedCards }),
+              });
+
+              if (saveResponse.ok) {
+                console.log('✅ Card saved successfully');
+                toast.success('Payment card saved for future use!');
+              }
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error saving card:', error);
+          // Don't fail the order if card saving fails
+        }
       }
 
       console.log('🔵 Updating order:', orderId);
@@ -261,9 +404,27 @@ export default function CheckoutPage() {
     }
   }, [items]);
 
-  // Prefill checkout form when customer data is available
+  // NEW: Load saved cards and prefill checkout form when customer data is available
   useEffect(() => {
     if (customer) {
+      // Load saved cards
+      const savedCardsMeta = (customer as any)?.meta_data?.find((m: any) => m.key === 'saved_payment_cards');
+      if (savedCardsMeta?.value) {
+        try {
+          const parsed = typeof savedCardsMeta.value === 'string'
+            ? JSON.parse(savedCardsMeta.value)
+            : savedCardsMeta.value;
+          if (Array.isArray(parsed)) {
+            setSavedCards(parsed);
+            const def = parsed.find((c) => c.is_default) || parsed[0] || null;
+            setDefaultSavedCard(def || null);
+          }
+        } catch (err) {
+          console.error('Error parsing saved cards:', err);
+        }
+      }
+
+      // Prefill form
       setFormData((prev) => ({
         ...prev,
         firstName: customer.first_name || prev.firstName,
@@ -473,38 +634,43 @@ export default function CheckoutPage() {
                                selectedGateway?.id !== 'cheque';
 
         if (requiresPayment) {
-          // Store order in ref
-          currentOrderRef.current = order;
-          
-          // Build Paystack config
-          const paystackConfig = {
-            reference: `JLM_${order.id}_${Date.now()}`,
-            email: formData.email,
-            amount: Math.round(total * 100), // Convert to kobo
-            publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
-            metadata: {
-              custom_fields: [
-                { 
-                  display_name: 'Order ID', 
-                  variable_name: 'order_id', 
-                  value: order.id.toString() 
-                },
-                { 
-                  display_name: 'Customer Name', 
-                  variable_name: 'customer_name', 
-                  value: `${formData.firstName} ${formData.lastName}` 
-                },
-              ],
-            },
-          };
+          // NEW: Check if using saved card
+          if (useSavedCard && defaultSavedCard && isAuthenticated) {
+            // Charge saved card
+            await handleSavedCardPayment(order.id);
+          } else {
+            // Store order in ref for callback
+            currentOrderRef.current = order;
+            
+            // Build Paystack config
+            const paystackConfig = {
+              reference: `JLM_${order.id}_${Date.now()}`,
+              email: formData.email,
+              amount: Math.round(total * 100), // Convert to kobo
+              publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
+              metadata: {
+                custom_fields: [
+                  { 
+                    display_name: 'Order ID', 
+                    variable_name: 'order_id', 
+                    value: order.id.toString() 
+                  },
+                  { 
+                    display_name: 'Customer Name', 
+                    variable_name: 'customer_name', 
+                    value: `${formData.firstName} ${formData.lastName}` 
+                  },
+                ],
+              },
+            };
 
-          toast.success('Opening payment window...');
-          
-          // Small delay to ensure toast shows
-          setTimeout(() => {
-            initializePaystackPayment(paystackConfig);
-          }, 500);
-          
+            toast.success('Opening payment window...');
+            
+            // Small delay to ensure toast shows
+            setTimeout(() => {
+              initializePaystackPayment(paystackConfig);
+            }, 500);
+          }
         } else {
           // For Cash on Delivery and other offline methods
           clearCart();
@@ -541,6 +707,7 @@ export default function CheckoutPage() {
   }
 
   const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
+  const isPaystackGateway = selectedPayment === 'paystack';
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
@@ -771,33 +938,84 @@ export default function CheckoutPage() {
                   <h2 className="text-xl font-semibold text-gray-900">Payment Method</h2>
                 </div>
 
-                <div className="space-y-3">
-                  {paymentGateways.map((gateway) => (
-                    <label
-                      key={gateway.id}
-                      className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                        selectedPayment === gateway.id
-                          ? 'border-primary-600 bg-primary-50'
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                    >
+                {/* NEW: Saved Card Option */}
+                {isAuthenticated && defaultSavedCard && isPaystackGateway && (
+                  <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                    <label className="flex items-start gap-3 cursor-pointer">
                       <input
-                        type="radio"
-                        name="payment"
-                        value={gateway.id}
-                        checked={selectedPayment === gateway.id}
-                        onChange={(e) => setSelectedPayment(e.target.value)}
+                        type="checkbox"
+                        checked={useSavedCard}
+                        onChange={(e) => setUseSavedCard(e.target.checked)}
                         className="mt-1 w-4 h-4 text-primary-600"
                       />
-                      <div>
-                        <p className="font-medium text-gray-900">{gateway.title}</p>
-                        {gateway.description && (
-                          <p className="text-sm text-gray-600 mt-1">{gateway.description}</p>
-                        )}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-5 h-5 text-blue-600" />
+                          <span className="font-medium text-gray-900">
+                            Use my saved card
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {defaultSavedCard.card_type.toUpperCase()} ending in {defaultSavedCard.last4}
+                          {' • '}Expires {defaultSavedCard.exp_month}/{defaultSavedCard.exp_year}
+                        </p>
                       </div>
                     </label>
-                  ))}
-                </div>
+                  </div>
+                )}
+
+                {/* Payment Gateways - Hidden when using saved card */}
+                {(!useSavedCard || !isPaystackGateway) && (
+                  <div className="space-y-3">
+                    {paymentGateways.map((gateway) => (
+                      <label
+                        key={gateway.id}
+                        className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                          selectedPayment === gateway.id
+                            ? 'border-primary-600 bg-primary-50'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="payment"
+                          value={gateway.id}
+                          checked={selectedPayment === gateway.id}
+                          onChange={(e) => setSelectedPayment(e.target.value)}
+                          className="mt-1 w-4 h-4 text-primary-600"
+                        />
+                        <div>
+                          <p className="font-medium text-gray-900">{gateway.title}</p>
+                          {gateway.description && (
+                            <p className="text-sm text-gray-600 mt-1">{gateway.description}</p>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {/* NEW: Save Card Checkbox - Only show when NOT using saved card and Paystack is selected */}
+                {isAuthenticated && !useSavedCard && isPaystackGateway && (
+                  <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={saveCard}
+                        onChange={(e) => setSaveCard(e.target.checked)}
+                        className="mt-1 w-4 h-4 text-primary-600"
+                      />
+                      <div className="flex-1">
+                        <span className="font-medium text-gray-900">
+                          Save this card for future payments
+                        </span>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Securely save your payment information for faster checkout next time
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -866,4 +1084,3 @@ export default function CheckoutPage() {
     </main>
   );
 }
-
