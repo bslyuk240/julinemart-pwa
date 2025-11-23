@@ -3,45 +3,16 @@ import { Product, ProductsQueryParams } from '@/types/product';
 
 /**
  * Get all products with optional filters
- * FIXED: Handles tag slug to ID conversion for WooCommerce compatibility
  */
 export async function getProducts(
   params: ProductsQueryParams = {}
 ): Promise<Product[]> {
   try {
-    // If filtering by tag slug, convert to tag ID first
-    if (params.tag && isNaN(Number(params.tag))) {
-      // It's a slug, not an ID
-      const tagId = await getTagIdBySlug(params.tag);
-      if (tagId) {
-        params.tag = tagId.toString();
-      } else {
-        console.warn(`Tag slug "${params.tag}" not found, returning empty array`);
-        return [];
-      }
-    }
-
     const response = await wcApi.get('products', params);
     return response.data;
   } catch (error) {
     handleApiError(error);
     return [];
-  }
-}
-
-/**
- * Helper: Get tag ID by slug
- */
-async function getTagIdBySlug(slug: string): Promise<number | null> {
-  try {
-    const response = await wcApi.get('products/tags', { slug });
-    if (response.data && response.data.length > 0) {
-      return response.data[0].id;
-    }
-    return null;
-  } catch (error) {
-    console.error(`Error fetching tag ID for slug "${slug}":`, error);
-    return null;
   }
 }
 

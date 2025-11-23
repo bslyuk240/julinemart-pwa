@@ -110,7 +110,7 @@ export default function CheckoutPage() {
 
   // Initialize Paystack payment with inline callbacks
   const initializePaystackPayment = (config: any) => {
-    console.log('🔵 Initializing Paystack with config:', { 
+    console.log('Initializing Paystack with config:', { 
       ref: config.reference, 
       email: config.email, 
       amount: config.amount 
@@ -130,21 +130,21 @@ export default function CheckoutPage() {
         ref: config.reference,
         metadata: config.metadata,
         onClose: function() {
-          console.log('❌ Payment window closed');
+          console.log('Payment window closed');
           toast.warning('Payment cancelled');
           setIsProcessing(false);
           currentOrderRef.current = null;
         },
         callback: function(response: any) {
-          console.log('✅ Payment callback received:', response);
+          console.log('Payment callback received:', response);
           handlePaymentSuccess(response);
         },
       });
 
-      console.log('🔵 Opening Paystack iframe...');
+      console.log('Opening Paystack iframe...');
       handler.openIframe();
     } catch (error) {
-      console.error('❌ Error initializing Paystack:', error);
+      console.error('Error initializing Paystack:', error);
       toast.error('Failed to open payment window. Please try again.');
       setIsProcessing(false);
     }
@@ -158,16 +158,24 @@ export default function CheckoutPage() {
     }
 
     try {
-      console.log('🔵 Charging saved card...');
+      console.log('Charging saved card...');
       setIsProcessing(true);
+
+      const amountKobo = Math.max(0, Math.round(total * 100));
+      if (amountKobo <= 0) {
+        throw new Error('Invalid payment amount');
+      }
 
       const chargeResponse = await fetch('/api/payments/charge-authorization', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-customer-id': customerId?.toString() || '',
+        },
         body: JSON.stringify({
           customerId,
-          email: formData.email,
-          amount: Math.round(total * 100), // Convert to kobo
+          email: formData.email || customer?.email,
+          amount: amountKobo, // Convert to kobo
           authorization_code: defaultSavedCard.authorization_code,
           metadata: {
             order_id: orderId,
@@ -183,13 +191,14 @@ export default function CheckoutPage() {
 
       const chargeData = await chargeResponse.json();
 
-      if (chargeData.success) {
-        console.log('✅ Saved card charged successfully');
+      if (chargeData.success && chargeData.data?.status === 'success') {
+        console.log('Saved card charged successfully');
         
         // Update order status
         const wpUrl = process.env.NEXT_PUBLIC_WP_URL;
         const wcKey = process.env.NEXT_PUBLIC_WC_KEY;
         const wcSecret = process.env.NEXT_PUBLIC_WC_SECRET;
+        const reference = chargeData.data?.reference || chargeData.data?.id || 'paystack-charge';
 
         const updateResponse = await fetch(
           `${wpUrl}/wp-json/wc/v3/orders/${orderId}`,
@@ -201,13 +210,14 @@ export default function CheckoutPage() {
             },
             body: JSON.stringify({
               set_paid: true,
-              transaction_id: chargeData.reference,
+              transaction_id: reference,
               status: 'processing',
             }),
           }
         );
 
         if (updateResponse.ok) {
+          setIsProcessing(false);
           clearCart();
           toast.success('Payment successful!');
           router.push(`/order-success?order=${orderId}`);
@@ -218,7 +228,7 @@ export default function CheckoutPage() {
         throw new Error('Payment failed');
       }
     } catch (error: any) {
-      console.error('❌ Saved card payment error:', error);
+      console.error('Saved card payment error:', error);
       toast.error(error.message || 'Payment failed. Please try another payment method.');
       setIsProcessing(false);
     }
@@ -226,7 +236,7 @@ export default function CheckoutPage() {
 
   // Separate payment success handler
   const handlePaymentSuccess = async (response: any) => {
-    console.log('🔵 Processing payment success...');
+    console.log('Processing payment success...');
     
     // Validate environment variables - using correct variable names
     const wpUrl = process.env.NEXT_PUBLIC_WP_URL;
@@ -234,7 +244,7 @@ export default function CheckoutPage() {
     const wcSecret = process.env.NEXT_PUBLIC_WC_SECRET;
 
     if (!wpUrl || !wcKey || !wcSecret) {
-      console.error('❌ Missing environment variables:', {
+      console.error('Missing environment variables:', {
         wpUrl: wpUrl || 'MISSING',
         wcKey: wcKey ? 'SET' : 'MISSING',
         wcSecret: wcSecret ? 'SET' : 'MISSING',
@@ -257,7 +267,7 @@ export default function CheckoutPage() {
       // NEW: If user chose to save card, verify and save it
       if (saveCard && isAuthenticated && customerId) {
         try {
-          console.log('🔵 Verifying transaction to save card...');
+          console.log('Verifying transaction to save card...');
           const verifyResponse = await fetch('/api/payments/verify-paystack', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -289,24 +299,29 @@ export default function CheckoutPage() {
               // Save to WooCommerce
               const saveResponse = await fetch('/api/customers/save-card', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'x-customer-id': customerId.toString(),
+                },
                 body: JSON.stringify({ customerId, cards: updatedCards }),
               });
 
               if (saveResponse.ok) {
-                console.log('✅ Card saved successfully');
+                console.log('Card saved successfully');
+                setSavedCards(updatedCards);
+                setDefaultSavedCard(updatedCards.find((c) => c.is_default) || updatedCards[0]);
                 toast.success('Payment card saved for future use!');
               }
             }
           }
         } catch (error) {
-          console.error('❌ Error saving card:', error);
+          console.error('Error saving card:', error);
           // Don't fail the order if card saving fails
         }
       }
 
-      console.log('🔵 Updating order:', orderId);
-      console.log('🔵 WordPress URL:', wpUrl);
+      console.log('Updating order:', orderId);
+      console.log('WordPress URL:', wpUrl);
 
       // Update order status in WooCommerce
       const updateResponse = await fetch(
@@ -326,17 +341,17 @@ export default function CheckoutPage() {
       );
 
       if (updateResponse.ok) {
-        console.log('✅ Order updated successfully');
+        console.log('Order updated successfully');
         clearCart();
         toast.success('Payment successful!');
         router.push(`/order-success?order=${orderId}`);
       } else {
         const errorData = await updateResponse.json();
-        console.error('❌ Order update failed:', errorData);
+        console.error('Order update failed:', errorData);
         throw new Error('Failed to update order');
       }
     } catch (error) {
-      console.error('❌ Error in payment success handler:', error);
+      console.error('Error in payment success handler:', error);
       toast.error('Payment received but order update failed. Please contact support with reference: ' + response.reference);
       if (currentOrderRef.current?.id) {
         clearCart();
@@ -440,6 +455,12 @@ export default function CheckoutPage() {
       }));
     }
   }, [customer]);
+
+  useEffect(() => {
+    if (!defaultSavedCard || selectedPayment !== 'paystack') {
+      setUseSavedCard(false);
+    }
+  }, [defaultSavedCard, selectedPayment]);
 
   // Update tax amount
   useEffect(() => {
@@ -621,11 +642,11 @@ export default function CheckoutPage() {
         customer_note: formData.notes,
       };
 
-      console.log('🔵 Creating order...');
+      console.log('   Creating order...');
       const order = await createOrder(orderData);
 
       if (order && order.id) {
-        console.log('✅ Order created:', order.id);
+        console.log('  Order created:', order.id);
         
         // Check if payment method requires online payment
         const selectedGateway = paymentGateways.find(g => g.id === selectedPayment);
@@ -634,6 +655,13 @@ export default function CheckoutPage() {
                                selectedGateway?.id !== 'cheque';
 
         if (requiresPayment) {
+          const amountKobo = Math.max(0, Math.round(total * 100));
+          if (amountKobo <= 0) {
+            toast.error('Invalid payment amount');
+            setIsProcessing(false);
+            return;
+          }
+
           // NEW: Check if using saved card
           if (useSavedCard && defaultSavedCard && isAuthenticated) {
             // Charge saved card
@@ -646,9 +674,11 @@ export default function CheckoutPage() {
             const paystackConfig = {
               reference: `JLM_${order.id}_${Date.now()}`,
               email: formData.email,
-              amount: Math.round(total * 100), // Convert to kobo
+              amount: amountKobo, // Convert to kobo
               publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
               metadata: {
+                order_id: order.id,
+                customer_id: customerId || 'guest',
                 custom_fields: [
                   { 
                     display_name: 'Order ID', 
@@ -682,7 +712,7 @@ export default function CheckoutPage() {
         throw new Error('Failed to create order');
       }
     } catch (error: any) {
-      console.error('❌ Order creation error:', error);
+      console.error('  Order creation error:', error);
       toast.error(error.message || 'Failed to place order. Please try again.');
       setIsProcessing(false);
     }
@@ -819,16 +849,43 @@ export default function CheckoutPage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     >
                       <option value="">Select State</option>
-                      <option value="Lagos">Lagos</option>
-                      <option value="Abuja">Abuja FCT</option>
-                      <option value="Kano">Kano</option>
-                      <option value="Rivers">Rivers</option>
-                      <option value="Oyo">Oyo</option>
-                      <option value="Kaduna">Kaduna</option>
-                      <option value="Enugu">Enugu</option>
-                      <option value="Delta">Delta</option>
+                      <option value="Abia">Abia</option>
+                      <option value="Adamawa">Adamawa</option>
+                      <option value="Akwa Ibom">Akwa Ibom</option>
                       <option value="Anambra">Anambra</option>
+                      <option value="Bauchi">Bauchi</option>
+                      <option value="Bayelsa">Bayelsa</option>
+                      <option value="Benue">Benue</option>
+                      <option value="Borno">Borno</option>
+                      <option value="Cross River">Cross River</option>
+                      <option value="Delta">Delta</option>
+                      <option value="Ebonyi">Ebonyi</option>
                       <option value="Edo">Edo</option>
+                      <option value="Ekiti">Ekiti</option>
+                      <option value="Enugu">Enugu</option>
+                      <option value="FCT">Federal Capital Territory (Abuja)</option>
+                      <option value="Gombe">Gombe</option>
+                      <option value="Imo">Imo</option>
+                      <option value="Jigawa">Jigawa</option>
+                      <option value="Kaduna">Kaduna</option>
+                      <option value="Kano">Kano</option>
+                      <option value="Katsina">Katsina</option>
+                      <option value="Kebbi">Kebbi</option>
+                      <option value="Kogi">Kogi</option>
+                      <option value="Kwara">Kwara</option>
+                      <option value="Lagos">Lagos</option>
+                      <option value="Nasarawa">Nasarawa</option>
+                      <option value="Niger">Niger</option>
+                      <option value="Ogun">Ogun</option>
+                      <option value="Ondo">Ondo</option>
+                      <option value="Osun">Osun</option>
+                      <option value="Oyo">Oyo</option>
+                      <option value="Plateau">Plateau</option>
+                      <option value="Rivers">Rivers</option>
+                      <option value="Sokoto">Sokoto</option>
+                      <option value="Taraba">Taraba</option>
+                      <option value="Yobe">Yobe</option>
+                      <option value="Zamfara">Zamfara</option>
                     </select>
                     {errors.state && (
                       <p className="mt-1.5 text-sm text-red-600">{errors.state}</p>

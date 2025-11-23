@@ -1,52 +1,178 @@
+'use client';
+
 import Link from 'next/link';
+import Image from 'next/image';
+import { useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
+// Hero Slider with Gradient Fallback
+// Will show gradient until you add images to public/images/
+const slides = [
+  {
+    id: 1,
+    primaryButton: {
+      text: 'Start shopping',
+      link: '/products',
+    },
+    secondaryButton: {
+      text: 'View deals',
+      link: '/products?tag=deal',
+    },
+    
+    // OPTION 1: Use your own image (recommended)
+    // Uncomment and add your image path:
+    // backgroundImage: '/images/hero-slide-1.jpg',
+    
+    // OPTION 2: Use gradient (current fallback)
+    useGradient: true,
+    gradientColors: 'from-primary-600 via-primary-500 to-secondary-400',
+    
+    // Optional overlay
+    overlayOpacity: 0,
+  },
+];
 
 export default function HeroSlider() {
-  return (
-    <div className="relative overflow-hidden rounded-xl md:rounded-2xl 
-      bg-gradient-to-r from-primary-600 via-primary-500 to-secondary-400 
-      px-4 py-6 md:px-6 md:py-10 
-      text-white shadow-lg">
-      <div className="relative z-10 grid gap-4 md:gap-6 lg:grid-cols-2 lg:items-center">
-        <div className="space-y-3 md:space-y-4">
-          <p className="text-[10px] md:text-sm uppercase tracking-[0.2em] text-white/80">JulineMart</p>
-          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold leading-tight">
-            Everything you need, delivered with care.
-          </h1>
-          <p className="max-w-xl text-sm md:text-base text-white/90">
-            Shop authentic products from trusted vendors across categories. New deals are added daily.
-          </p>
-          <div className="flex flex-wrap gap-2 md:gap-3">
-            <Link
-              href="/(shop)"
-              className="rounded-lg bg-white 
-                px-4 py-2 md:px-5 md:py-3 
-                text-xs md:text-sm 
-                font-semibold text-primary-700 transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              Start shopping
-            </Link>
-            <Link
-              href="/deals"
-              className="rounded-lg border border-white/50 
-                px-4 py-2 md:px-5 md:py-3 
-                text-xs md:text-sm 
-                font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10"
-            >
-              View deals
-            </Link>
-          </div>
-        </div>
+  const [currentSlide, setCurrentSlide] = useState(0);
 
-        <div className="relative hidden h-40 md:h-48 lg:h-60 items-center justify-center lg:flex">
-          <div className="absolute inset-4 rounded-full bg-white/15 blur-3xl" />
-          <div className="relative flex h-full w-full items-center justify-center rounded-2xl border border-white/20 bg-white/10 backdrop-blur">
-            <div className="flex flex-col items-center gap-2 text-center text-white">
-              <span className="text-3xl md:text-4xl">🛍️</span>
-              <p className="text-sm md:text-lg font-semibold">Shop the latest arrivals</p>
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % slides.length);
+  };
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+  };
+
+  const slide = slides[currentSlide];
+
+  return (
+    <div className="relative overflow-hidden rounded-xl md:rounded-2xl shadow-lg group">
+      {/* Slide Container */}
+      <div className="relative w-full h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px]">
+        
+        {/* Background - Image or Gradient */}
+        {slide.backgroundImage ? (
+          // Show image if provided
+          <>
+            <Image
+              src={slide.backgroundImage}
+              alt="Hero banner"
+              fill
+              className="object-cover"
+              priority
+              sizes="100vw"
+            />
+            {slide.overlayOpacity > 0 && (
+              <div 
+                className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"
+                style={{ opacity: slide.overlayOpacity }}
+              />
+            )}
+          </>
+        ) : (
+          // Show gradient fallback if no image
+          <div 
+            className={`absolute inset-0 bg-gradient-to-r ${
+              slide.useGradient ? slide.gradientColors : 'from-primary-600 via-primary-500 to-secondary-400'
+            }`}
+          />
+        )}
+
+        {/* Content Overlay */}
+        <div className="absolute inset-0 flex flex-col justify-between p-4 md:p-6">
+          
+          {/* TOP: JulineMart branding */}
+          <div className="flex justify-start">
+            <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 md:px-4 md:py-2 rounded-full shadow-lg">
+              <p className="text-[10px] md:text-xs font-bold text-primary-700 uppercase tracking-wider">
+                JulineMart
+              </p>
+            </div>
+          </div>
+
+          {/* BOTTOM: Buttons */}
+          <div className="flex justify-start">
+            <div className="flex flex-wrap gap-2 md:gap-3">
+              <Link
+                href={slide.primaryButton.link}
+                className="rounded-lg bg-white 
+                  px-4 py-2 md:px-6 md:py-3 
+                  text-xs md:text-sm 
+                  font-semibold text-primary-700 
+                  shadow-lg
+                  transition hover:-translate-y-0.5 hover:shadow-xl"
+              >
+                {slide.primaryButton.text}
+              </Link>
+              <Link
+                href={slide.secondaryButton.link}
+                className="rounded-lg bg-white/20 backdrop-blur-md border-2 border-white 
+                  px-4 py-2 md:px-6 md:py-3 
+                  text-xs md:text-sm 
+                  font-semibold text-white 
+                  shadow-lg
+                  transition hover:-translate-y-0.5 hover:bg-white/30"
+              >
+                {slide.secondaryButton.text}
+              </Link>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Navigation Arrows (only show if multiple slides) */}
+      {slides.length > 1 && (
+        <>
+          <button
+            onClick={prevSlide}
+            className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 
+              bg-white/90 hover:bg-white 
+              text-gray-800 
+              p-2 md:p-3 
+              rounded-full 
+              shadow-lg 
+              opacity-0 group-hover:opacity-100 
+              transition-opacity
+              z-20"
+            aria-label="Previous slide"
+          >
+            <ChevronLeft className="w-4 h-4 md:w-6 md:h-6" />
+          </button>
+          <button
+            onClick={nextSlide}
+            className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 
+              bg-white/90 hover:bg-white 
+              text-gray-800 
+              p-2 md:p-3 
+              rounded-full 
+              shadow-lg 
+              opacity-0 group-hover:opacity-100 
+              transition-opacity
+              z-20"
+            aria-label="Next slide"
+          >
+            <ChevronRight className="w-4 h-4 md:w-6 md:h-6" />
+          </button>
+        </>
+      )}
+
+      {/* Slide Indicators (only show if multiple slides) */}
+      {slides.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+          {slides.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentSlide(index)}
+              className={`h-2 rounded-full transition-all ${
+                index === currentSlide 
+                  ? 'w-8 bg-white' 
+                  : 'w-2 bg-white/50 hover:bg-white/75'
+              }`}
+              aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
