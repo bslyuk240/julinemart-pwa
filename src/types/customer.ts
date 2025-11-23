@@ -38,6 +38,7 @@ export interface ShippingAddress {
   postcode: string;
   country: string;
   state: string;
+  phone?: string;
 }
 
 export interface MetaData {
