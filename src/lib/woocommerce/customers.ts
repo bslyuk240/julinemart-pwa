@@ -121,6 +121,7 @@ export async function updateCustomerMetaData(
 
 /**
  * Add or update a single meta data field
+ * This is what your /api/customers/save-card is using for _saved_payment_cards
  */
 export async function updateCustomerMeta(
   customerId: number,
@@ -132,11 +133,16 @@ export async function updateCustomerMeta(
     const customer = await getCustomer(customerId);
     if (!customer) return null;
 
+    // Always treat meta_data as an array
+    const existingMeta = Array.isArray(customer.meta_data)
+      ? customer.meta_data
+      : [];
+
     // Find if meta key exists
-    const existingMetaIndex = customer.meta_data.findIndex(m => m.key === key);
-    
-    let updatedMetaData = [...customer.meta_data];
-    
+    const existingMetaIndex = existingMeta.findIndex(m => m.key === key);
+
+    const updatedMetaData = [...existingMeta];
+
     if (existingMetaIndex !== -1) {
       // Update existing meta
       updatedMetaData[existingMetaIndex] = {
@@ -146,7 +152,6 @@ export async function updateCustomerMeta(
     } else {
       // Add new meta
       updatedMetaData.push({
-        id: 0, // Will be assigned by WooCommerce
         key,
         value,
       });
@@ -344,7 +349,6 @@ export async function validateCustomerPassword(
   try {
     // This would typically use WordPress REST API authentication
     // or a custom endpoint you've created
-    // For now, return false as this needs custom implementation
     console.warn('Password validation requires WordPress authentication API');
     return false;
   } catch (error) {

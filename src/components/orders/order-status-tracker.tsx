@@ -75,15 +75,7 @@ export default function OrderStatusTracker({
     'completed': 5, // Map 'completed' to same level as 'delivered'
   };
 
-  // Debug logging (remove in production)
-  console.log('🔍 Order Status Debug:', {
-    originalStatus: status,
-    normalizedStatus: normalizedStatus,
-    progressionLevel: statusProgression[normalizedStatus],
-    hasTracking,
-    dateShipped,
-    metaDataKeys: metaData.map(m => m.key),
-  });
+
 
   // Define ALL possible status steps with their progression order
   const allStatusSteps: StatusStep[] = [
@@ -220,25 +212,25 @@ export default function OrderStatusTracker({
 
   // Determine step states
   const isStepCompleted = (stepKey: string): boolean => {
+    // If we're on 'delivered' or 'completed' status, mark all steps as completed
+    if (normalizedStatus === 'delivered' || normalizedStatus === 'completed') {
+      return true; // All steps are complete
+    }
+    // Otherwise, only mark steps before current as completed
     return statusProgression[stepKey] < currentStatusPosition;
   };
 
   const isStepCurrent = (stepKey: string): boolean => {
+    // If we're on 'delivered' or 'completed', no step is "current" - all are done
+    if (normalizedStatus === 'delivered' || normalizedStatus === 'completed') {
+      return false;
+    }
     return statusProgression[stepKey] === currentStatusPosition;
   };
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
       <h2 className="text-xl font-semibold text-gray-900 mb-6">Order Status</h2>
-      
-      {/* Debug Info - Remove in production */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mb-4 p-3 bg-gray-100 rounded text-xs font-mono">
-          <p><strong>Status:</strong> {status} → {normalizedStatus}</p>
-          <p><strong>Position:</strong> {currentStatusPosition}</p>
-          <p><strong>Steps Visible:</strong> {visibleSteps.length}</p>
-        </div>
-      )}
       
       {/* Multi-Hub Alert */}
       {jloMultiHub && (
