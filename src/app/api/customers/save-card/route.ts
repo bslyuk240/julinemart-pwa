@@ -19,10 +19,10 @@ export async function POST(request: NextRequest) {
     console.log("🔄 Updating WooCommerce meta…");
 
     const result = await updateCustomerMeta(
-      Number(customerId),
-      "_saved_payment_cards",
-      cards
-    );
+  Number(customerId),
+  'saved_payment_cards',
+  cards
+);
 
     console.log("🔍 WooCommerce response:", result);
 

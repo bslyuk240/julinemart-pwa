@@ -77,7 +77,7 @@ export default function PaymentMethodsPage() {
       
       // Get saved cards from customer meta_data
       const savedCardsData = customer.meta_data?.find(
-        (meta) => meta.key === '_saved_payment_cards'
+        (meta) => meta.key === 'saved_payment_cards'
       );
 
       console.log('🔍 Found saved cards data:', savedCardsData);
