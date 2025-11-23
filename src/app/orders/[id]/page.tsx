@@ -10,28 +10,12 @@ import { getOrder } from '@/lib/woocommerce/orders';
 import PageLoading from '@/components/ui/page-loading';
 import { toast } from 'sonner';
 import { generateInvoicePDF } from '@/lib/invoice-generator';
+import type { Order as WooOrder } from '@/types/order';
 
-interface OrderDetail {
-  id: number;
-  number: string;
-  status: string;
-  date_created: string;
-  date_modified: string;
-  total: string;
-  subtotal: string;
-  shipping_total: string;
-  tax_total: string;
-  currency: string;
-  line_items: any[];
-  shipping_lines: any[];
-  billing: any;
-  shipping: any;
-  payment_method: string;
-  payment_method_title: string;
-  transaction_id: string;
-  customer_note: string;
-  meta_data: any[];
-}
+type OrderDetail = WooOrder & {
+  subtotal?: string;
+  tax_total?: string;
+};
 
 const statusColors: Record<string, { bg: string; text: string; border: string }> = {
   pending: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' },
@@ -76,7 +60,25 @@ export default function OrderDetailPage() {
     try {
       setLoading(true);
       const orderData = await getOrder(parseInt(orderId));
-      setOrder(orderData);
+      if (orderData) {
+        const taxTotal =
+          (orderData as any).tax_total ??
+          orderData.total_tax ??
+          '0';
+        const computedSubtotal = (
+          parseFloat(orderData.total || '0') -
+          parseFloat(orderData.shipping_total || '0') -
+          parseFloat(taxTotal || '0')
+        ).toString();
+
+        setOrder({
+          ...orderData,
+          subtotal: (orderData as any).subtotal ?? computedSubtotal,
+          tax_total: taxTotal,
+        });
+      } else {
+        setOrder(null);
+      }
     } catch (error) {
       console.error('Error loading order:', error);
       toast.error('Failed to load order details');
@@ -88,6 +90,7 @@ export default function OrderDetailPage() {
 
   const formatPrice = (price: string, currency: string = 'NGN') => {
     const amount = parseFloat(price);
+    if (isNaN(amount)) return `${currency} 0`;
     if (currency === 'NGN') {
       return `NGN ${amount.toLocaleString()}`;
     }
@@ -127,7 +130,13 @@ export default function OrderDetailPage() {
     
     const toastId = toast.loading('Generating invoice...');
     try {
-      generateInvoicePDF({ order });
+      generateInvoicePDF({
+        order: {
+          ...order,
+          subtotal: order.subtotal ?? '0',
+          total_tax: order.total_tax ?? order.tax_total ?? '0',
+        },
+      });
       toast.dismiss(toastId);
       toast.success('Invoice downloaded successfully!');
     } catch (error) {
@@ -317,7 +326,7 @@ export default function OrderDetailPage() {
               <div className="space-y-3 mb-4 pb-4 border-b">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span>{formatPrice(order.subtotal, order.currency)}</span>
+                  <span>{formatPrice(order.subtotal ?? '0', order.currency)}</span>
                 </div>
                 {parseFloat(order.shipping_total) > 0 && (
                   <div className="flex justify-between text-gray-600">
@@ -325,10 +334,10 @@ export default function OrderDetailPage() {
                     <span>{formatPrice(order.shipping_total, order.currency)}</span>
                   </div>
                 )}
-                {parseFloat(order.tax_total) > 0 && (
+                {parseFloat(order.total_tax ?? order.tax_total ?? '0') > 0 && (
                   <div className="flex justify-between text-gray-600">
                     <span>Tax</span>
-                    <span>{formatPrice(order.tax_total, order.currency)}</span>
+                    <span>{formatPrice(order.total_tax ?? order.tax_total ?? '0', order.currency)}</span>
                   </div>
                 )}
               </div>

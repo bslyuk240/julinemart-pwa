@@ -7,30 +7,16 @@ import { CheckCircle, Package, MapPin, CreditCard, Truck } from 'lucide-react';
 import { getOrder } from '@/lib/woocommerce/orders';
 import { Button } from '@/components/ui/button';
 import PageLoading from '@/components/ui/page-loading';
+import type { Order as WooOrder } from '@/types/order';
 
-interface Order {
-  id: number;
-  number: string;
-  status: string;
-  date_created: string;
-  date_paid: string | null;
-  total: string;
-  subtotal: string;
-  shipping_total: string;
-  total_tax: string;
-  currency: string;
-  line_items: any[];
-  shipping_lines: any[];
-  billing: any;
-  shipping: any;
-  payment_method: string;
-  payment_method_title: string;
-}
+type OrderView = WooOrder & {
+  subtotal?: string;
+};
 
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('order');
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<OrderView | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,7 +28,19 @@ function OrderSuccessContent() {
 
       try {
         const fetchedOrder = await getOrder(parseInt(orderId));
-        setOrder(fetchedOrder);
+        if (fetchedOrder) {
+          const computedSubtotal = (
+            parseFloat(fetchedOrder.total || '0') -
+            parseFloat(fetchedOrder.shipping_total || '0') -
+            parseFloat((fetchedOrder as any).total_tax || '0')
+          ).toString();
+          setOrder({
+            ...fetchedOrder,
+            subtotal: (fetchedOrder as any).subtotal ?? computedSubtotal,
+          });
+        } else {
+          setOrder(null);
+        }
       } catch (error) {
         console.error('Error fetching order:', error);
       } finally {

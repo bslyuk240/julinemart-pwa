@@ -25,10 +25,10 @@ export const generateInvoicePDF = (data: InvoiceData) => {
   const { order } = data;
   const doc = new jsPDF();
   
-  const primaryColor = [124, 58, 237]; // #7C3AED
-  const accentColor = [16, 185, 129]; // #10B981
-  const textColor = [31, 41, 55]; // #1F2937 - Gray-800
-  const lightGray = [243, 244, 246]; // #F3F4F6
+  const primaryColor: [number, number, number] = [124, 58, 237]; // #7C3AED
+  const accentColor: [number, number, number] = [16, 185, 129]; // #10B981
+  const textColor: [number, number, number] = [31, 41, 55]; // #1F2937 - Gray-800
+  const lightGray: [number, number, number] = [243, 244, 246]; // #F3F4F6
 
   // Helper function to format price
   const formatPrice = (price: string) => {
@@ -105,15 +105,15 @@ export const generateInvoicePDF = (data: InvoiceData) => {
   doc.setFontSize(10);
   doc.setTextColor(...textColor);
   const customerName = `${order.billing.first_name} ${order.billing.last_name}`;
-  const wrapText = (text: string, width: number) => doc.splitTextToSize(text, width);
+  const wrapText = (text: string, width: number): string[] => doc.splitTextToSize(text, width);
 
   doc.text(customerName, 20, yPos + 16);
-  wrapText(order.billing.address_1, 90).forEach((line, idx) => {
+  wrapText(order.billing.address_1, 90).forEach((line: string, idx: number) => {
     doc.text(line, 20, yPos + 22 + idx * 6);
   });
   let addressYOffset = yPos + 22 + 6 * (wrapText(order.billing.address_1, 90).length - 1);
   if (order.billing.address_2) {
-    wrapText(order.billing.address_2, 90).forEach((line, idx) => {
+    wrapText(order.billing.address_2, 90).forEach((line: string, idx: number) => {
       doc.text(line, 20, addressYOffset + 6 + idx * 6);
     });
     addressYOffset += 6 * wrapText(order.billing.address_2, 90).length;
@@ -224,7 +224,7 @@ export const generateInvoicePDF = (data: InvoiceData) => {
     doc.text(`Transaction ID: ${order.transaction_id}`, 25, yPos + 20);
   }
 
-  const statusColor = order.date_paid ? accentColor : [234, 179, 8]; // Green or Yellow
+  const statusColor: [number, number, number] = order.date_paid ? accentColor : [234, 179, 8]; // Green or Yellow
   doc.setTextColor(...statusColor);
   doc.setFont('helvetica', 'bold');
   doc.text(`Status: ${order.date_paid ? 'PAID' : 'PENDING'}`, 130, yPos + 15);
@@ -250,12 +250,12 @@ export const generateInvoicePDF = (data: InvoiceData) => {
   doc.setTextColor(...textColor);
   const shippingName = `${order.shipping.first_name} ${order.shipping.last_name}`;
   doc.text(shippingName, 25, yPos + 15);
-  wrapText(order.shipping.address_1, 150).forEach((line, idx) => {
+  wrapText(order.shipping.address_1, 150).forEach((line: string, idx: number) => {
     doc.text(line, 25, yPos + 20 + idx * 5);
   });
   let shipYOffset = yPos + 20 + 5 * (wrapText(order.shipping.address_1, 150).length - 1);
   if (order.shipping.address_2) {
-    wrapText(order.shipping.address_2, 150).forEach((line, idx) => {
+    wrapText(order.shipping.address_2, 150).forEach((line: string, idx: number) => {
       doc.text(line, 25, shipYOffset + 6 + idx * 5);
     });
     shipYOffset += 5 * wrapText(order.shipping.address_2, 150).length;
