@@ -152,6 +152,7 @@ export async function updateCustomerMeta(
     } else {
       // Add new meta
       updatedMetaData.push({
+        id: 0,
         key,
         value,
       });
