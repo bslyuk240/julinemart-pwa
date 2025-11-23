@@ -12,20 +12,46 @@ import { toast } from 'sonner';
 import type { Order } from '@/types/order';
 
 const statusColors: Record<string, { bg: string; text: string; border: string }> = {
+  // Payment statuses
   pending: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' },
+  
+  // Processing statuses
   processing: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-  'on-hold': { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+  'ready-to-ship': { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
+  
+  // Shipping statuses
+  shipped: { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
+  'out-for-delivery': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+  
+  // Completion statuses
+  delivered: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
   completed: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+  
+  // Issue statuses
+  'on-hold': { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
   cancelled: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
   refunded: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
   failed: { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' },
 };
 
 const statusLabels: Record<string, string> = {
+  // Payment statuses
   pending: 'Pending Payment',
+  
+  // Processing statuses
   processing: 'Processing',
-  'on-hold': 'On Hold',
+  'ready-to-ship': 'Ready to Ship',
+  
+  // Shipping statuses
+  shipped: 'Shipped',
+  'out-for-delivery': 'Out for Delivery',
+  
+  // Completion statuses
+  delivered: 'Delivered',
   completed: 'Completed',
+  
+  // Issue statuses
+  'on-hold': 'On Hold',
   cancelled: 'Cancelled',
   refunded: 'Refunded',
   failed: 'Failed',
