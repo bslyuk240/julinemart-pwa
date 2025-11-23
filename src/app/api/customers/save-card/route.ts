@@ -1,67 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const WP_URL = process.env.NEXT_PUBLIC_WP_URL;
-const CK = process.env.NEXT_PUBLIC_WC_CONSUMER_KEY;
-const CS = process.env.NEXT_PUBLIC_WC_CONSUMER_SECRET;
-
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { customerId, cards } = await request.json();
+    const { customerId, cards } = await req.json();
 
     if (!customerId || !Array.isArray(cards)) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "customerId and cards array are required",
-        },
+        { success: false, error: "customerId and cards array are required" },
         { status: 400 }
       );
     }
 
-    // WooCommerce requires a full meta_data object
-    const payload = {
-      meta_data: [
-        {
-          key: "_saved_payment_cards",
-          value: JSON.stringify(cards), // Store as string for compatibility
-        },
-      ],
-    };
+    const consumerKey = process.env.NEXT_PUBLIC_WC_CONSUMER_KEY;
+    const consumerSecret = process.env.NEXT_PUBLIC_WC_CONSUMER_SECRET;
+    const storeUrl = process.env.NEXT_PUBLIC_WP_URL;
 
-    const url = `${WP_URL}/wp-json/wc/v3/customers/${customerId}?consumer_key=${CK}&consumer_secret=${CS}`;
+    // Fetch existing meta_data
+    const customerRes = await fetch(
+      `${storeUrl}/wp-json/wc/v3/customers/${customerId}?consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`
+    );
 
-    const response = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("WooCommerce meta update failed:", errorBody);
-
+    if (!customerRes.ok) {
       return NextResponse.json(
-        { success: false, error: "Failed to update WooCommerce meta data" },
-        { status: 500 }
+        { success: false, error: "Failed to fetch customer data" },
+        { status: customerRes.status }
       );
     }
 
-    const data = await response.json();
+    const customer = await customerRes.json();
 
-    return NextResponse.json({
-      success: true,
-      message: "Card saved successfully",
-      meta: data.meta_data,
-    });
-  } catch (error) {
-    console.error("Save card error:", error);
-    return NextResponse.json(
+    let meta = customer.meta_data || [];
+    const existing = meta.find((m: any) => m.key === "_saved_payment_cards");
+
+    if (existing) {
+      existing.value = cards;
+    } else {
+      meta.push({ key: "_saved_payment_cards", value: cards });
+    }
+
+    // Update WooCommerce
+    const updateRes = await fetch(
+      `${storeUrl}/wp-json/wc/v3/customers/${customerId}?consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`,
       {
-        success: false,
-        error: error instanceof Error ? error.message : "Unexpected server error",
-      },
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meta_data: meta }),
+      }
+    );
+
+    if (!updateRes.ok) {
+      return NextResponse.json(
+        { success: false, error: "Failed to update customer meta" },
+        { status: updateRes.status }
+      );
+    }
+
+    const updated = await updateRes.json();
+
+    return NextResponse.json({ success: true, customer: updated });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, error: err.message },
       { status: 500 }
     );
   }
