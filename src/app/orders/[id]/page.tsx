@@ -203,7 +203,7 @@ export default function OrderDetailPage() {
                         {formatPrice(item.total, order.currency)}
                       </p>
                       <p className="text-sm text-gray-600">
-                        {formatPrice(item.price, order.currency)} each
+                        {formatPrice(item.price.toString(), order.currency)} each
                       </p>
                     </div>
                   </div>
