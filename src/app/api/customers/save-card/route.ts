@@ -1,66 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
+import { updateCustomerMeta } from "@/lib/woocommerce/customers";
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const { customerId, cards } = await req.json();
+    const body = await request.json();
+    console.log("📥 Received body:", body);
+
+    const { customerId, cards } = body;
 
     if (!customerId || !Array.isArray(cards)) {
+      console.error("❌ Missing fields:", { customerId, cards });
       return NextResponse.json(
         { success: false, error: "customerId and cards array are required" },
         { status: 400 }
       );
     }
 
-    const consumerKey = process.env.NEXT_PUBLIC_WC_CONSUMER_KEY;
-    const consumerSecret = process.env.NEXT_PUBLIC_WC_CONSUMER_SECRET;
-    const storeUrl = process.env.NEXT_PUBLIC_WP_URL;
+    console.log("🔄 Updating WooCommerce meta…");
 
-    // Fetch existing meta_data
-    const customerRes = await fetch(
-      `${storeUrl}/wp-json/wc/v3/customers/${customerId}?consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`
+    const result = await updateCustomerMeta(
+      Number(customerId),
+      "_saved_payment_cards",
+      cards
     );
 
-    if (!customerRes.ok) {
-      return NextResponse.json(
-        { success: false, error: "Failed to fetch customer data" },
-        { status: customerRes.status }
-      );
-    }
+    console.log("🔍 WooCommerce response:", result);
 
-    const customer = await customerRes.json();
-
-    let meta = customer.meta_data || [];
-    const existing = meta.find((m: any) => m.key === "_saved_payment_cards");
-
-    if (existing) {
-      existing.value = cards;
-    } else {
-      meta.push({ key: "_saved_payment_cards", value: cards });
-    }
-
-    // Update WooCommerce
-    const updateRes = await fetch(
-      `${storeUrl}/wp-json/wc/v3/customers/${customerId}?consumer_key=${consumerKey}&consumer_secret=${consumerSecret}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meta_data: meta }),
-      }
-    );
-
-    if (!updateRes.ok) {
+    if (!result) {
       return NextResponse.json(
         { success: false, error: "Failed to update customer meta" },
-        { status: updateRes.status }
+        { status: 500 }
       );
     }
 
-    const updated = await updateRes.json();
-
-    return NextResponse.json({ success: true, customer: updated });
-  } catch (err: any) {
+    return NextResponse.json({ success: true, meta_data: result.meta_data });
+  } catch (error: any) {
+    console.error("❌ API ROUTE ERROR:", error);
     return NextResponse.json(
-      { success: false, error: err.message },
+      {
+        success: false,
+        error: error?.message || "Unexpected server error",
+        stack: error?.stack || null,
+      },
       { status: 500 }
     );
   }
