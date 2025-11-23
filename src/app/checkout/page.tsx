@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CreditCard, Truck, Package, MapPin } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
+import { useCustomerAuth } from '@/context/customer-auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
@@ -28,14 +29,23 @@ interface ShippingOption {
   methodId: string;
 }
 
-const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d'; // same as plugin fallback
+const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
 const DEFAULT_WEIGHT = 0.5;
+
+// Declare Paystack type
+declare global {
+  interface Window {
+    PaystackPop: any;
+  }
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, clearCart } = useCart();
+  const { customer, customerId, isAuthenticated } = useCustomerAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const currentOrderRef = useRef<any>(null);
   
   // Shipping & Payment
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
@@ -61,13 +71,139 @@ export default function CheckoutPage() {
     city: '',
     state: '',
     postcode: '',
-    country: 'NG', // Default to Nigeria
+    country: 'NG',
     notes: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const formatPrice = (price: number) => `₦${price.toLocaleString()}`;
+    const formatPrice = (price: number) => `NGN ${price.toLocaleString()}`;
+  const total = subtotal + (shippingCost || 0) + taxAmount;
+
+  // Load Paystack script
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !window.PaystackPop) {
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  // Initialize Paystack payment with inline callbacks
+  const initializePaystackPayment = (config: any) => {
+    console.log('🔵 Initializing Paystack with config:', { 
+      ref: config.reference, 
+      email: config.email, 
+      amount: config.amount 
+    });
+
+    if (typeof window === 'undefined' || !window.PaystackPop) {
+      toast.error('Payment system not loaded. Please refresh the page.');
+      setIsProcessing(false);
+      return;
+    }
+
+    try {
+      const handler = window.PaystackPop.setup({
+        key: config.publicKey,
+        email: config.email,
+        amount: config.amount,
+        ref: config.reference,
+        metadata: config.metadata,
+        onClose: function() {
+          console.log('❌ Payment window closed');
+          toast.warning('Payment cancelled');
+          setIsProcessing(false);
+          currentOrderRef.current = null;
+        },
+        callback: function(response: any) {
+          console.log('✅ Payment callback received:', response);
+          handlePaymentSuccess(response);
+        },
+      });
+
+      console.log('🔵 Opening Paystack iframe...');
+      handler.openIframe();
+    } catch (error) {
+      console.error('❌ Error initializing Paystack:', error);
+      toast.error('Failed to open payment window. Please try again.');
+      setIsProcessing(false);
+    }
+  };
+
+  // Separate payment success handler
+  const handlePaymentSuccess = async (response: any) => {
+    console.log('🔵 Processing payment success...');
+    
+    // Validate environment variables - using correct variable names
+    const wpUrl = process.env.NEXT_PUBLIC_WP_URL;
+    const wcKey = process.env.NEXT_PUBLIC_WC_KEY;
+    const wcSecret = process.env.NEXT_PUBLIC_WC_SECRET;
+
+    if (!wpUrl || !wcKey || !wcSecret) {
+      console.error('❌ Missing environment variables:', {
+        wpUrl: wpUrl || 'MISSING',
+        wcKey: wcKey ? 'SET' : 'MISSING',
+        wcSecret: wcSecret ? 'SET' : 'MISSING',
+      });
+      toast.error('Configuration error. Please contact support with reference: ' + response.reference);
+      if (currentOrderRef.current?.id) {
+        clearCart();
+        router.push(`/order-success?order=${currentOrderRef.current.id}`);
+      }
+      return;
+    }
+    
+    try {
+      const orderId = currentOrderRef.current?.id;
+      
+      if (!orderId) {
+        throw new Error('Order ID not found');
+      }
+
+      console.log('🔵 Updating order:', orderId);
+      console.log('🔵 WordPress URL:', wpUrl);
+
+      // Update order status in WooCommerce
+      const updateResponse = await fetch(
+        `${wpUrl}/wp-json/wc/v3/orders/${orderId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Basic ${btoa(`${wcKey}:${wcSecret}`)}`,
+          },
+          body: JSON.stringify({
+            set_paid: true,
+            transaction_id: response.reference,
+            status: 'processing',
+          }),
+        }
+      );
+
+      if (updateResponse.ok) {
+        console.log('✅ Order updated successfully');
+        clearCart();
+        toast.success('Payment successful!');
+        router.push(`/order-success?order=${orderId}`);
+      } else {
+        const errorData = await updateResponse.json();
+        console.error('❌ Order update failed:', errorData);
+        throw new Error('Failed to update order');
+      }
+    } catch (error) {
+      console.error('❌ Error in payment success handler:', error);
+      toast.error('Payment received but order update failed. Please contact support with reference: ' + response.reference);
+      if (currentOrderRef.current?.id) {
+        clearCart();
+        router.push(`/order-success?order=${currentOrderRef.current.id}`);
+      }
+    } finally {
+      setIsProcessing(false);
+      currentOrderRef.current = null;
+    }
+  };
 
   // Fetch shipping methods and payment gateways
   useEffect(() => {
@@ -75,7 +211,6 @@ export default function CheckoutPage() {
       try {
         setLoading(true);
 
-        // Fetch shipping methods (just to know which methods exist)
         const zonesWithMethods = await getAllShippingMethods();
         const options: ShippingOption[] = [];
 
@@ -97,22 +232,18 @@ export default function CheckoutPage() {
 
         setShippingOptions(options);
         
-        // Set first shipping option as default
         if (options.length > 0) {
           setSelectedShipping(options[0].id);
           setShippingCost(options[0].cost ?? null);
         }
 
-        // Fetch payment gateways
         const gateways = await getEnabledPaymentGateways();
         setPaymentGateways(gateways);
         
-        // Set first payment gateway as default
         if (gateways.length > 0) {
           setSelectedPayment(gateways[0].id);
         }
 
-        // Fetch default tax rate (for display)
         const rate = await getDefaultTaxRate(formData.country);
         setTaxRate(rate * 100);
       } catch (error) {
@@ -130,7 +261,26 @@ export default function CheckoutPage() {
     }
   }, [items]);
 
-  // Update tax amount when totals or location change
+  // Prefill checkout form when customer data is available
+  useEffect(() => {
+    if (customer) {
+      setFormData((prev) => ({
+        ...prev,
+        firstName: customer.first_name || prev.firstName,
+        lastName: customer.last_name || prev.lastName,
+        email: customer.email || prev.email,
+        phone: customer.billing?.phone || prev.phone,
+        address1: customer.billing?.address_1 || prev.address1,
+        address2: customer.billing?.address_2 || prev.address2,
+        city: customer.billing?.city || prev.city,
+        state: customer.billing?.state || prev.state,
+        postcode: customer.billing?.postcode || prev.postcode,
+        country: customer.billing?.country || prev.country,
+      }));
+    }
+  }, [customer]);
+
+  // Update tax amount
   useEffect(() => {
     const updateTaxAmount = async () => {
       if (subtotal <= 0) {
@@ -150,7 +300,7 @@ export default function CheckoutPage() {
     updateTaxAmount();
   }, [subtotal, formData.country, formData.state, formData.postcode, formData.city]);
 
-  // Automatically calculate JLO shipping when state/city + JLO method are selected
+  // Calculate JLO shipping
   useEffect(() => {
     const doCalc = async () => {
       setShippingError(null);
@@ -161,7 +311,6 @@ export default function CheckoutPage() {
       const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
       if (!selectedOption) return;
 
-      // Only use JLO API for our custom JLO shipping method
       if (selectedOption.methodId !== 'jlo_shipping') return;
 
       setIsCalculatingShipping(true);
@@ -197,12 +346,9 @@ export default function CheckoutPage() {
     doCalc();
   }, [selectedShipping, formData.state, formData.city, items, shippingOptions, subtotal]);
 
-  const total = subtotal + (shippingCost || 0) + taxAmount;
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -212,11 +358,9 @@ export default function CheckoutPage() {
     setSelectedShipping(optionId);
     const option = shippingOptions.find(o => o.id === optionId);
 
-    // For non-JLO methods, use Woo cost directly
     if (option && option.methodId !== 'jlo_shipping') {
       setShippingCost(option.cost ?? null);
     }
-    // For JLO, cost will be set by the effect when state/city are entered
   };
 
   const validateForm = () => {
@@ -230,13 +374,11 @@ export default function CheckoutPage() {
     if (!formData.city.trim()) newErrors.city = 'City is required';
     if (!formData.state.trim()) newErrors.state = 'State is required';
 
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (formData.email && !emailRegex.test(formData.email)) {
       newErrors.email = 'Invalid email address';
     }
 
-    // Phone validation
     const phoneRegex = /^(\+234|0)[789]\d{9}$/;
     if (formData.phone && !phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
       newErrors.phone = 'Invalid Nigerian phone number';
@@ -257,7 +399,6 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Ensure shipping is calculated for JLO method
     const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
     if (selectedOption && selectedOption.methodId === 'jlo_shipping' && shippingCost === null) {
       toast.error('Please wait for shipping to be calculated.');
@@ -268,6 +409,7 @@ export default function CheckoutPage() {
 
     try {
       const orderData = {
+        customer_id: isAuthenticated && customerId ? customerId : undefined,
         payment_method: selectedPayment,
         payment_method_title: paymentGateways.find(g => g.id === selectedPayment)?.title || 'Payment',
         set_paid: false,
@@ -296,20 +438,20 @@ export default function CheckoutPage() {
           company: '',
         },
         line_items: items.map((item: any) => ({
-  product_id: item.productId,
-  quantity: item.quantity,
-  variation_id: item.variation?.id || 0,
-  meta_data: [
-    {
-      key: '_hub_id',  // ✅ With underscore (matches your plugin)
-      value: item.hubId || DEFAULT_HUB_ID,
-    },
-    {
-      key: '_hub_name',  // ✅ Optional but good for debugging
-      value: item.hubName || 'Default Hub',
-    }
-  ],
-})),
+          product_id: item.productId,
+          quantity: item.quantity,
+          variation_id: item.variation?.id || 0,
+          meta_data: [
+            {
+              key: '_hub_id',
+              value: item.hubId || DEFAULT_HUB_ID,
+            },
+            {
+              key: '_hub_name',
+              value: item.hubName || 'Default Hub',
+            }
+          ],
+        })),
         shipping_lines: selectedShipping ? [{
           method_id: selectedOption?.methodId || 'flat_rate',
           method_title: selectedOption?.title || 'Shipping',
@@ -318,19 +460,64 @@ export default function CheckoutPage() {
         customer_note: formData.notes,
       };
 
+      console.log('🔵 Creating order...');
       const order = await createOrder(orderData);
 
-      if (order) {
-        clearCart();
-        toast.success('Order placed successfully!');
-        router.push(`/order-success?order=${order.id}`);
+      if (order && order.id) {
+        console.log('✅ Order created:', order.id);
+        
+        // Check if payment method requires online payment
+        const selectedGateway = paymentGateways.find(g => g.id === selectedPayment);
+        const requiresPayment = selectedGateway?.id !== 'cod' && 
+                               selectedGateway?.id !== 'bacs' && 
+                               selectedGateway?.id !== 'cheque';
+
+        if (requiresPayment) {
+          // Store order in ref
+          currentOrderRef.current = order;
+          
+          // Build Paystack config
+          const paystackConfig = {
+            reference: `JLM_${order.id}_${Date.now()}`,
+            email: formData.email,
+            amount: Math.round(total * 100), // Convert to kobo
+            publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
+            metadata: {
+              custom_fields: [
+                { 
+                  display_name: 'Order ID', 
+                  variable_name: 'order_id', 
+                  value: order.id.toString() 
+                },
+                { 
+                  display_name: 'Customer Name', 
+                  variable_name: 'customer_name', 
+                  value: `${formData.firstName} ${formData.lastName}` 
+                },
+              ],
+            },
+          };
+
+          toast.success('Opening payment window...');
+          
+          // Small delay to ensure toast shows
+          setTimeout(() => {
+            initializePaystackPayment(paystackConfig);
+          }, 500);
+          
+        } else {
+          // For Cash on Delivery and other offline methods
+          clearCart();
+          toast.success('Order placed successfully!');
+          router.push(`/order-success?order=${order.id}`);
+          setIsProcessing(false);
+        }
       } else {
         throw new Error('Failed to create order');
       }
     } catch (error: any) {
-      console.error('Order creation error:', error);
+      console.error('❌ Order creation error:', error);
       toast.error(error.message || 'Failed to place order. Please try again.');
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -548,7 +735,9 @@ export default function CheckoutPage() {
                             </p>
                           </div>
                           {option.description && (
-                            <p className="text-sm text-gray-600 mt-1">{option.description}</p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {option.description.replace(/<[^>]*>/g, '')}
+                            </p>
                           )}
                           {isJlo && (
                             <p className="text-xs text-gray-500 mt-1">
@@ -662,6 +851,7 @@ export default function CheckoutPage() {
                 fullWidth
                 isLoading={isProcessing}
                 onClick={handlePlaceOrder}
+                disabled={isProcessing}
               >
                 {isProcessing ? 'Processing...' : 'Place Order'}
               </Button>
@@ -676,3 +866,4 @@ export default function CheckoutPage() {
     </main>
   );
 }
+

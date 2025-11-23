@@ -4,68 +4,62 @@ import FlashSales from '@/components/home/flash-sales';
 import DealsSection from '@/components/home/deals-section';
 import TrendingSection from '@/components/home/trending-section';
 import { getProducts } from '@/lib/woocommerce/products';
-import { dummyProducts, getFeaturedProducts, getProductsByTag } from '@/lib/dummy-data';
 
 export const revalidate = 300; // Revalidate every 5 minutes
 
 export default async function HomePage() {
-  // Fetch products in parallel for better performance
+  // Fetch ONLY products with specific tags - NO FALLBACKS
   const [flashSaleProducts, dealProducts, trendingProducts] = await Promise.all([
     getProducts({ tag: 'flash-sale', per_page: 8 }).catch(() => []),
     getProducts({ tag: 'deal', per_page: 8 }).catch(() => []),
-    getProducts({ featured: true, per_page: 8 }).catch(() => []),
+    getProducts({ tag: 'best-seller', per_page: 8 }).catch(() => []), // Changed from 'featured'
   ]);
-
-  // Fallback: if no products with tags, get latest products
-  const productsToShow = {
-    flash: flashSaleProducts.length > 0
-      ? flashSaleProducts
-      : (await getProducts({ per_page: 8, orderby: 'date' }).catch(() => [])) || [],
-    deals: dealProducts.length > 0
-      ? dealProducts
-      : (await getProducts({ per_page: 8, orderby: 'popularity' }).catch(() => [])) || [],
-    trending: trendingProducts.length > 0
-      ? trendingProducts
-      : (await getProducts({ per_page: 8, orderby: 'rating' }).catch(() => [])) || [],
-  };
-
-  // Last-resort fallback to dummy data so home sections never render empty
-  const ensureProducts = (list: any[], fallback: any[]) =>
-    list && list.length > 0 ? list : fallback;
-
-  const flashFallback = ensureProducts(
-    productsToShow.flash,
-    getProductsByTag('flash-sale').length ? getProductsByTag('flash-sale') : dummyProducts
-  );
-
-  const dealsFallback = ensureProducts(
-    productsToShow.deals,
-    getProductsByTag('deal').length ? getProductsByTag('deal') : dummyProducts
-  );
-
-  const trendingFallback = ensureProducts(
-    productsToShow.trending,
-    getFeaturedProducts().length ? getFeaturedProducts() : dummyProducts
-  );
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Hero Slider - Compact on mobile, normal on desktop */}
+      {/* Hero Slider */}
       <section className="container mx-auto px-4 py-3 md:py-6">
         <HeroSlider />
       </section>
 
-      {/* Category Strip - No spacing on mobile, normal on desktop */}
+      {/* Category Strip */}
       <CategoryStrip />
 
-      {/* Flash Sales - Sections have their own responsive spacing */}
-      <FlashSales products={flashFallback} />
+      {/* Flash Sales - Only show if products exist */}
+      {flashSaleProducts.length > 0 && (
+        <FlashSales products={flashSaleProducts} />
+      )}
 
-      {/* Deals Section */}
-      <DealsSection products={dealsFallback} />
+      {/* Deals Section - Only show if products exist */}
+      {dealProducts.length > 0 && (
+        <DealsSection products={dealProducts} />
+      )}
 
-      {/* Trending Products */}
-      <TrendingSection products={trendingFallback} />
+      {/* Trending/Best Sellers - Only show if products exist */}
+      {trendingProducts.length > 0 && (
+        <TrendingSection products={trendingProducts} />
+      )}
+
+      {/* Empty State - Show when no products with tags */}
+      {flashSaleProducts.length === 0 && 
+       dealProducts.length === 0 && 
+       trendingProducts.length === 0 && (
+        <div className="container mx-auto px-4 py-12 text-center">
+          <p className="text-gray-600 mb-4">
+            No featured products yet. Add tags to your products to display them here.
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto">
+            <p className="text-sm text-blue-800 font-medium mb-2">
+              How to add products to homepage sections:
+            </p>
+            <ul className="text-sm text-blue-700 text-left space-y-1">
+              <li>• Tag products with "flash-sale" for Flash Sales section</li>
+              <li>• Tag products with "deal" for Deals section</li>
+              <li>• Tag products with "best-seller" for Trending section</li>
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Bottom spacing for mobile navigation */}
       <div className="h-20 md:h-8" />

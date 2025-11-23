@@ -5,9 +5,27 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle, Package, MapPin, CreditCard, Truck } from 'lucide-react';
 import { getOrder } from '@/lib/woocommerce/orders';
-import { Order } from '@/types/order';
 import { Button } from '@/components/ui/button';
 import PageLoading from '@/components/ui/page-loading';
+
+interface Order {
+  id: number;
+  number: string;
+  status: string;
+  date_created: string;
+  date_paid: string | null;
+  total: string;
+  subtotal: string;
+  shipping_total: string;
+  total_tax: string;
+  currency: string;
+  line_items: any[];
+  shipping_lines: any[];
+  billing: any;
+  shipping: any;
+  payment_method: string;
+  payment_method_title: string;
+}
 
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
@@ -35,7 +53,7 @@ function OrderSuccessContent() {
     fetchOrder();
   }, [orderId]);
 
-  const formatPrice = (price: string) => `₦${parseFloat(price).toLocaleString()}`;
+  const formatPrice = (price: string) => `NGN ${parseFloat(price).toLocaleString()}`;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-NG', {
@@ -209,7 +227,7 @@ function OrderSuccessContent() {
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/account/orders">
+            <Link href="/orders">
               <Button variant="primary" size="lg">
                 <Package className="w-5 h-5 mr-2" />
                 View All Orders
@@ -270,3 +288,5 @@ export default function OrderSuccessPage() {
     </Suspense>
   );
 }
+
+
