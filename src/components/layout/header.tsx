@@ -14,6 +14,14 @@ import { useRouter } from 'next/navigation';
 const WHATSAPP_NUMBER = '2347075825761';
 const WHATSAPP_MESSAGE = 'Hello! I need help with shopping on JulineMart.';
 
+// Banner data interface
+interface BannerData {
+  enabled: boolean;
+  text: string;
+  background_color: string;
+  text_color: string;
+}
+
 export default function Header() {
   const logoSrc = process.env.NEXT_PUBLIC_LOGO_URL || '/images/logo.png';
   const logoWidth = Number(process.env.NEXT_PUBLIC_LOGO_WIDTH) || 40;
@@ -27,9 +35,54 @@ export default function Header() {
   const { itemCount } = useCart();
   const router = useRouter();
 
+  // ==================== BANNER STATE (NEW!) ====================
+  const [banner, setBanner] = useState<BannerData>({
+    enabled: true,
+    text: 'Free Shipping on Orders Over ₦10,000 🎉',
+    background_color: '#77088a',
+    text_color: '#ffffff',
+  });
+  const [bannerLoading, setBannerLoading] = useState(true);
+  // =============================================================
+
   useEffect(() => {
     router.prefetch('/');
   }, [router]);
+
+  // ==================== FETCH BANNER FROM WORDPRESS (NEW!) ====================
+  useEffect(() => {
+    async function fetchBanner() {
+      try {
+        console.log('📢 Fetching banner from WordPress...');
+        const response = await fetch('/api/pwa-settings');
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.banner && Object.keys(data.banner).length > 0) {
+            console.log('✅ WordPress banner loaded:', data.banner);
+            setBanner({
+              enabled: data.banner.enabled ?? true,
+              text: data.banner.text || 'Free Shipping on Orders Over ₦10,000 🎉',
+              background_color: data.banner.background_color || '#77088a',
+              text_color: data.banner.text_color || '#ffffff',
+            });
+          } else {
+            console.log('⚠️ No WordPress banner found, using default');
+          }
+        } else {
+          console.log('⚠️ WordPress API failed, using default banner');
+        }
+      } catch (error) {
+        console.error('❌ Error fetching banner:', error);
+      } finally {
+        setBannerLoading(false);
+      }
+    }
+
+    fetchBanner();
+  }, []);
+  // ============================================================================
 
   useEffect(() => {
     if (!query.trim()) {
@@ -67,10 +120,19 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-white shadow-sm">
-      {/* Top Bar */}
-      <div className="bg-primary-600 text-white py-2 px-4 text-center text-sm">
-        <p>Free Shipping on Orders Over ₦10,000 🎉</p>
-      </div>
+      {/* ==================== TOP BAR - NOW DYNAMIC (UPDATED!) ==================== */}
+      {!bannerLoading && banner.enabled && (
+        <div 
+          className="py-2 px-4 text-center text-sm"
+          style={{
+            backgroundColor: banner.background_color,
+            color: banner.text_color,
+          }}
+        >
+          <p>{banner.text}</p>
+        </div>
+      )}
+      {/* ========================================================================== */}
 
       {/* Main Header */}
       <div className="container mx-auto px-4 py-3 md:py-4">
@@ -143,7 +205,7 @@ export default function Header() {
             )}
           </div>
 
-          {/* ==================== WHATSAPP ICON (NEW!) ==================== */}
+          {/* ==================== WHATSAPP ICON ==================== */}
           <button
             onClick={handleWhatsAppClick}
             className="hidden md:inline-flex items-center justify-center p-2 rounded-lg hover:bg-green-600 bg-green-500 text-white transition-colors"
@@ -152,7 +214,7 @@ export default function Header() {
           >
             <MessageCircle className="w-5 h-5" />
           </button>
-          {/* =============================================================== */}
+          {/* ======================================================= */}
 
           {/* Desktop cart icon */}
           <Link
