@@ -37,14 +37,14 @@ const slides: Slide[] = [
     id: 1,
     type: 'video',
     videoSrc: "https://res.cloudinary.com/dupgdbwrt/video/upload/v1763955248/copy_E58DF95E-E76A-4B31-B3D0-9D89B0E8F2C0_otgkkq.mov", // Put your video in public/videos/
-    videoPoster: '/images/video-poster-1.jpg', // Optional thumbnail
+    videoPoster: '/images/placeholder.jpg', // Optional thumbnail (kept local to avoid 404)
     primaryButton: {
       text: 'Shop Now',
       link: '/products',
     },
     secondaryButton: {
-      text: 'Learn More',
-      link: '/about',
+      text: 'View deals',
+      link: '/products?tag=deal',
     },
     useGradient: false,
     gradientColors: '',

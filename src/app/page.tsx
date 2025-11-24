@@ -6,15 +6,11 @@ import TrendingSection from '@/components/home/trending-section';
 import TopSellers from '@/components/home/top-sellers';
 import SponsoredProducts from '@/components/home/sponsored-products';
 import LaunchingDeals from '@/components/home/launching-deals';
-import BrandSection from '@/components/home/brand-section';
 import { getProducts } from '@/lib/woocommerce/products';
-import { getTopBrands } from '@/lib/woocommerce/brands';
 
 export const revalidate = 300; // Revalidate every 5 minutes
 
 export default async function HomePage() {
-  console.log('🏠 [HOMEPAGE] Starting data fetch...');
-  
   // Fetch each section individually with error logging
   let flashSaleProducts: any[] = [];
   let dealProducts: any[] = [];
@@ -22,65 +18,42 @@ export default async function HomePage() {
   let topSellerProducts: any[] = [];
   let sponsoredProducts: any[] = [];
   let launchingProducts: any[] = [];
-  let brands: any[] = [];
 
   try {
-    console.log('📦 Fetching flash-sale products...');
     flashSaleProducts = await getProducts({ tag: 'flash-sale', per_page: 12 });
-    console.log(`✅ Flash sale: ${flashSaleProducts.length} products`);
   } catch (error) {
-    console.error('❌ Flash sale fetch failed:', error);
+    console.error('Flash sale fetch failed:', error);
   }
 
   try {
-    console.log('📦 Fetching deal products...');
     dealProducts = await getProducts({ tag: 'deal', per_page: 12 });
-    console.log(`✅ Deals: ${dealProducts.length} products`);
   } catch (error) {
-    console.error('❌ Deals fetch failed:', error);
+    console.error('Deals fetch failed:', error);
   }
 
   try {
-    console.log('📦 Fetching best-seller products...');
     trendingProducts = await getProducts({ tag: 'best-seller', per_page: 12 });
-    console.log(`✅ Best sellers: ${trendingProducts.length} products`);
   } catch (error) {
-    console.error('❌ Best sellers fetch failed:', error);
+    console.error('Best sellers fetch failed:', error);
   }
 
   try {
-    console.log('📦 Fetching top-seller products...');
     topSellerProducts = await getProducts({ tag: 'top-seller', per_page: 12 });
-    console.log(`✅ Top sellers: ${topSellerProducts.length} products`);
   } catch (error) {
-    console.error('❌ Top sellers fetch failed:', error);
+    console.error('Top sellers fetch failed:', error);
   }
 
   try {
-    console.log('📦 Fetching sponsored products...');
     sponsoredProducts = await getProducts({ tag: 'sponsored', per_page: 12 });
-    console.log(`✅ Sponsored: ${sponsoredProducts.length} products`);
   } catch (error) {
-    console.error('❌ Sponsored fetch failed:', error);
+    console.error('Sponsored fetch failed:', error);
   }
 
   try {
-    console.log('📦 Fetching launching-deal products...');
     launchingProducts = await getProducts({ tag: 'launching-deal', per_page: 12 });
-    console.log(`✅ Launching deals: ${launchingProducts.length} products`);
   } catch (error) {
-    console.error('❌ Launching deals fetch failed:', error);
+    console.error('Launching deals fetch failed:', error);
   }
-
-  try {
-    console.log('📦 Fetching brands...');
-    brands = await getTopBrands(12);
-    console.log(`✅ Brands: ${brands.length} brands`);
-  } catch (error) {
-    console.error('❌ Brands fetch failed:', error);
-  }
-
-  console.log('✅ [HOMEPAGE] All data fetched');
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -120,11 +93,6 @@ export default async function HomePage() {
       {/* Trending/Best Sellers */}
       {trendingProducts.length > 0 && (
         <TrendingSection products={trendingProducts} />
-      )}
-
-      {/* Brand Section */}
-      {brands.length > 0 && (
-        <BrandSection brands={brands} />
       )}
 
       {/* Empty State - Show when no products with tags */}
