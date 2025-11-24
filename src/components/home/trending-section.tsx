@@ -35,22 +35,19 @@ export default function TrendingSection({ products }: TrendingSectionProps) {
         </div>
 
         {products.length > 0 ? (
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-            <div className="flex gap-3 md:gap-4 pb-2">
-              {products.slice(0, 12).map((product, index) => (
-                <div
-                  key={product.id}
-                  className="relative w-1/3 sm:w-1/4 md:w-1/5 flex-shrink-0"
-                >
-                  {index < 3 && (
-                    <div className="absolute top-1.5 left-1.5 z-10 bg-secondary-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg">
-                      #{index + 1}
-                    </div>
-                  )}
-                  <ProductCard product={product} fullWidth />
-                </div>
-              ))}
-            </div>
+          // GRID LAYOUT - 6 columns on desktop with rank badges
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
+            {products.slice(0, 18).map((product, index) => (
+              <div key={product.id} className="relative">
+                {/* Rank Badge for top 3 */}
+                {index < 3 && (
+                  <div className="absolute top-1.5 left-1.5 z-10 bg-secondary-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg">
+                    #{index + 1}
+                  </div>
+                )}
+                <ProductCard product={product} fullWidth />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="text-center py-8 md:py-12 bg-white rounded-lg">
@@ -59,16 +56,6 @@ export default function TrendingSection({ products }: TrendingSectionProps) {
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </section>
   );
 }

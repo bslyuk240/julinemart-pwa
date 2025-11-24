@@ -34,17 +34,14 @@ export default function FlashSales({ products }: FlashSalesProps) {
         </div>
 
         {products.length > 0 ? (
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-            <div className="flex gap-3 md:gap-4 pb-2">
-              {products.slice(0, 12).map((product) => (
-                <div
-                  key={product.id}
-                  className="w-1/3 sm:w-1/4 md:w-1/5 flex-shrink-0"
-                >
-                  <ProductCard product={product} showBadge fullWidth />
-                </div>
-              ))}
-            </div>
+          // GRID LAYOUT - 6 columns on desktop, responsive on smaller screens
+          // Mobile: 2, Small: 3, Medium: 4, Large: 5, XL: 6
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
+            {products.slice(0, 18).map((product) => (
+              <div key={product.id}>
+                <ProductCard product={product} showBadge fullWidth />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-secondary-200 bg-white/70 p-4 md:p-6 text-secondary-700 shadow-sm text-sm">
@@ -52,16 +49,6 @@ export default function FlashSales({ products }: FlashSalesProps) {
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </section>
   );
 }

@@ -75,6 +75,8 @@ export async function GET() {
       })
     );
 
+    const recommendations: string[] = [];
+
     // Step 4: Return comprehensive debug info
     const debugInfo = {
       timestamp: new Date().toISOString(),
@@ -98,28 +100,28 @@ export async function GET() {
         })),
       },
       productsByTag: results,
-      recommendations: [],
+      recommendations,
     };
 
     // Generate recommendations
     results.forEach(result => {
       if (!result.success) {
-        debugInfo.recommendations.push(
+        recommendations.push(
           `❌ Tag "${result.tag}" failed to fetch products: ${result.error}`
         );
       } else if (result.count === 0) {
         const tagExists = foundTags.find((t: any) => t.slug === result.tag);
         if (!tagExists) {
-          debugInfo.recommendations.push(
+          recommendations.push(
             `⚠️ Tag "${result.tag}" does not exist in WooCommerce. Create it in WordPress Admin → Products → Tags`
           );
         } else {
-          debugInfo.recommendations.push(
+          recommendations.push(
             `⚠️ Tag "${result.tag}" exists but has no products. Add this tag to products in WordPress Admin`
           );
         }
       } else {
-        debugInfo.recommendations.push(
+        recommendations.push(
           `✅ Tag "${result.tag}" working correctly with ${result.count} product(s)`
         );
       }

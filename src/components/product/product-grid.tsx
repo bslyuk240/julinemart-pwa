@@ -5,7 +5,7 @@ import { Product } from '@/types/product';
 
 interface ProductGridProps {
   products: Product[];
-  columns?: 2 | 3 | 4 | 5;
+  columns?: 2 | 3 | 4 | 5 | 6;
   showBadge?: boolean;
 }
 
@@ -19,6 +19,7 @@ export default function ProductGrid({
     3: 'grid-cols-2 md:grid-cols-3',
     4: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
     5: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+    6: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6', // NEW: 6 columns
   };
 
   if (!products || products.length === 0) {
@@ -46,7 +47,7 @@ export default function ProductGrid({
   }
 
   return (
-      <div className={`grid ${gridCols[columns]} gap-0.5 sm:gap-1.5 md:gap-2.5 lg:gap-3`}>
+    <div className={`grid ${gridCols[columns]} gap-2 md:gap-3 lg:gap-4`}>
       {products.map((product) => (
         <ProductCard key={product.id} product={product} showBadge={showBadge} fullWidth />
       ))}

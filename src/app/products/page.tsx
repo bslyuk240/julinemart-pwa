@@ -161,7 +161,7 @@ export default function AllProductsPage() {
         {/* Products Grid */}
         {products.length > 0 ? (
           <>
-            <ProductGrid products={products} columns={5} />
+            <ProductGrid products={products} columns={6} />
 
             {/* Load More Button */}
             {hasMore && (

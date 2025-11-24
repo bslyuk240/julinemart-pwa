@@ -41,17 +41,13 @@ export default function DealsSection({
         </div>
 
         {products.length > 0 ? (
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-            <div className="flex gap-3 md:gap-4 pb-2">
-              {products.slice(0, 12).map((product) => (
-                <div
-                  key={product.id}
-                  className="w-1/3 sm:w-1/4 md:w-1/5 flex-shrink-0"
-                >
-                  <ProductCard product={product} fullWidth />
-                </div>
-              ))}
-            </div>
+          // GRID LAYOUT - 6 columns on desktop
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
+            {products.slice(0, 18).map((product) => (
+              <div key={product.id}>
+                <ProductCard product={product} fullWidth />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg">
@@ -66,16 +62,6 @@ export default function DealsSection({
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </section>
   );
 }
