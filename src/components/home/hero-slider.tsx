@@ -2,12 +2,21 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 
 type Slide = {
   id: number;
+  type: 'image' | 'video';
+  
+  // For images
   backgroundImage?: string;
+  
+  // For videos
+  videoSrc?: string;
+  videoPoster?: string; // Thumbnail shown before video loads
+  
+  // Common properties
   primaryButton: {
     text: string;
     link: string;
@@ -21,11 +30,32 @@ type Slide = {
   overlayOpacity: number;
 };
 
-// Hero Slider with Gradient Fallback
-// Will show gradient until you add images to public/images/
+// Example slides with both images and videos
 const slides: Slide[] = [
+  // Slide 1: Video Example
   {
     id: 1,
+    type: 'video',
+    videoSrc: '/videos/hero-ad-1.mp4', // Put your video in public/videos/
+    videoPoster: '/images/video-poster-1.jpg', // Optional thumbnail
+    primaryButton: {
+      text: 'Shop Now',
+      link: '/products',
+    },
+    secondaryButton: {
+      text: 'Learn More',
+      link: '/about',
+    },
+    useGradient: false,
+    gradientColors: '',
+    overlayOpacity: 0.3, // Darken video slightly for text readability
+  },
+  
+  // Slide 2: Image Example
+  {
+    id: 2,
+    type: 'image',
+    backgroundImage: '/images/hero-slide-1.jpg',
     primaryButton: {
       text: 'Start shopping',
       link: '/products',
@@ -34,22 +64,57 @@ const slides: Slide[] = [
       text: 'View deals',
       link: '/products?tag=deal',
     },
-    
-    // OPTION 1: Use your own image (recommended)
-    // Uncomment and add your image path:
-    // backgroundImage: '/images/hero-slide-1.jpg',
-    
-    // OPTION 2: Use gradient (current fallback)
+    useGradient: false,
+    gradientColors: '',
+    overlayOpacity: 0.2,
+  },
+  
+  // Slide 3: Gradient Fallback (no image/video)
+  {
+    id: 3,
+    type: 'image',
+    primaryButton: {
+      text: 'Browse Categories',
+      link: '/categories',
+    },
+    secondaryButton: {
+      text: 'Hot Deals',
+      link: '/products?tag=deal',
+    },
     useGradient: true,
     gradientColors: 'from-primary-600 via-primary-500 to-secondary-400',
-    
-    // Optional overlay
     overlayOpacity: 0,
   },
 ];
 
 export default function HeroSlider() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const slide = slides[currentSlide];
+
+  // Auto-advance slides every 5 seconds (pause on video slides if you want manual control)
+  useEffect(() => {
+    // Don't auto-advance on video slides - let video play
+    if (slide.type === 'video') return;
+    
+    const timer = setInterval(() => {
+      nextSlide();
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [currentSlide]);
+
+  // Handle video playback when slide changes
+  useEffect(() => {
+    if (slide.type === 'video' && videoRef.current) {
+      // Play video when this slide becomes active
+      videoRef.current.play().catch(err => {
+        console.log('Video autoplay failed:', err);
+      });
+    }
+  }, [currentSlide, slide.type]);
 
   const nextSlide = () => {
     setCurrentSlide((prev) => (prev + 1) % slides.length);
@@ -59,16 +124,62 @@ export default function HeroSlider() {
     setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
   };
 
-  const slide = slides[currentSlide];
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(!isMuted);
+    }
+  };
 
   return (
     <div className="relative overflow-hidden rounded-xl md:rounded-2xl shadow-lg group">
       {/* Slide Container */}
       <div className="relative w-full h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px]">
         
-        {/* Background - Image or Gradient */}
-        {slide.backgroundImage ? (
-          // Show image if provided
+        {/* Background - Video, Image, or Gradient */}
+        {slide.type === 'video' && slide.videoSrc ? (
+          // VIDEO SLIDE
+          <>
+            <video
+              ref={videoRef}
+              src={slide.videoSrc}
+              poster={slide.videoPoster}
+              className="absolute inset-0 w-full h-full object-cover"
+              autoPlay
+              muted={isMuted}
+              loop
+              playsInline
+            />
+            
+            {/* Video Overlay */}
+            {slide.overlayOpacity > 0 && (
+              <div 
+                className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"
+                style={{ opacity: slide.overlayOpacity }}
+              />
+            )}
+
+            {/* Mute/Unmute Button */}
+            <button
+              onClick={toggleMute}
+              className="absolute top-4 right-4 z-30 
+                bg-black/50 hover:bg-black/70 
+                text-white 
+                p-2 md:p-3 
+                rounded-full 
+                shadow-lg 
+                transition-all"
+              aria-label={isMuted ? 'Unmute video' : 'Mute video'}
+            >
+              {isMuted ? (
+                <VolumeX className="w-4 h-4 md:w-5 md:h-5" />
+              ) : (
+                <Volume2 className="w-4 h-4 md:w-5 md:h-5" />
+              )}
+            </button>
+          </>
+        ) : slide.backgroundImage ? (
+          // IMAGE SLIDE
           <>
             <Image
               src={slide.backgroundImage}
@@ -86,16 +197,18 @@ export default function HeroSlider() {
             )}
           </>
         ) : (
-          // Show gradient fallback if no image
+          // GRADIENT FALLBACK
           <div 
             className={`absolute inset-0 bg-gradient-to-r ${
-              slide.useGradient ? slide.gradientColors : 'from-primary-600 via-primary-500 to-secondary-400'
+              slide.useGradient 
+                ? slide.gradientColors 
+                : 'from-primary-600 via-primary-500 to-secondary-400'
             }`}
           />
         )}
 
         {/* Content Overlay */}
-        <div className="absolute inset-0 flex flex-col justify-between p-4 md:p-6">
+        <div className="absolute inset-0 flex flex-col justify-between p-4 md:p-6 z-20">
           
           {/* TOP: JulineMart branding */}
           <div className="flex justify-start">
