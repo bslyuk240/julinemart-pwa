@@ -53,11 +53,11 @@ export default function BrandSection({ brands }: BrandSectionProps) {
             >
               <div className="relative bg-white border-2 border-gray-200 rounded-lg p-3 md:p-4 hover:border-primary-400 hover:shadow-md transition-all duration-200">
                 {/* Brand Logo or Name */}
-                {brand.image ? (
+                {brand.image?.src ? (
                   <div className="relative aspect-square w-full">
                     <Image
-                      src={brand.image}
-                      alt={brand.name}
+                      src={brand.image.src}
+                      alt={brand.image.alt || brand.name}
                       fill
                       className="object-contain p-2"
                       sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 16vw, 8vw"
