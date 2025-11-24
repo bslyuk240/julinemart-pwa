@@ -4,7 +4,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Store } from 'lucide-react';
 
-export const revalidate = 300; // Revalidate every 5 minutes
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface BrandPageProps {
   params: {

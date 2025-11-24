@@ -10,20 +10,16 @@ export const wcApi = new WooCommerceRestApi({
 });
 
 // Helper function for error handling
+// Log API errors but do not throw so callers can gracefully fall back.
 export const handleApiError = (error: any) => {
-  if (error.response) {
-    // Server responded with error
+  if (error?.response) {
     console.error('API Error:', error.response.data);
-    throw new Error(error.response.data.message || 'API request failed');
-  } else if (error.request) {
-    // Request made but no response
+  } else if (error?.request) {
     console.error('Network Error:', error.request);
-    throw new Error('Network error - please check your connection');
   } else {
-    // Something else happened
-    console.error('Error:', error.message);
-    throw new Error(error.message);
+    console.error('Error:', error?.message || error);
   }
+  return error;
 };
 
 // Types for API responses
