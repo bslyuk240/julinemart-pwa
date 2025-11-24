@@ -65,10 +65,10 @@ export default function ProductCarousel({
       {/* Carousel Container */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4"
+        className="grid grid-flow-col auto-cols-[minmax(200px,_calc((100%-32px)/3))] md:auto-cols-[minmax(220px,_calc((100%-32px)/3))] lg:auto-cols-[minmax(240px,_calc((100%-32px)/3))] gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4 snap-x snap-mandatory"
       >
         {products.map((product) => (
-          <div key={product.id} className="min-w-[180px] md:min-w-[220px] lg:min-w-[250px]">
+          <div key={product.id} className="snap-start">
             <ProductCard product={product} showBadge={showBadge} />
           </div>
         ))}

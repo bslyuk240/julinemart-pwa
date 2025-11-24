@@ -195,7 +195,7 @@ export default function ProductDetailPage() {
 
   return (
     <main className="min-h-screen bg-white pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-4 md:py-6">
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-600 mb-6">
           <a href="/" className="hover:text-primary-600">Home</a>
@@ -233,18 +233,18 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2">
+              <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2">
                 {product.name}
               </h1>
               
               {/* Rating */}
               {product.average_rating && parseFloat(product.average_rating) > 0 && (
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-2 md:gap-3 mb-3">
                   <div className="flex items-center gap-1">
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-5 h-5 ${
+                        className={`w-4 h-4 md:w-5 md:h-5 ${
                           i < Math.floor(parseFloat(product.average_rating))
                             ? 'fill-yellow-400 text-yellow-400'
                             : 'text-gray-300'
@@ -260,12 +260,12 @@ export default function ProductDetailPage() {
 
               {/* Price */}
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-2xl font-bold text-primary-600">
+                <span className="text-xl md:text-2xl font-bold text-primary-600">
                   {formatPrice(product.price)}
                 </span>
                 {product.on_sale && product.regular_price && (
                   <>
-                    <span className="text-lg text-gray-400 line-through">
+                    <span className="text-base md:text-lg text-gray-400 line-through">
                       {formatPrice(product.regular_price)}
                     </span>
                     <Badge variant="danger">
@@ -277,17 +277,17 @@ export default function ProductDetailPage() {
 
               {/* Stock Status */}
               {product.stock_status === 'instock' ? (
-                <div className="flex items-center gap-2 mb-5">
+                <div className="flex items-center gap-2 mb-4 md:mb-5">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <p className="text-green-600 font-medium">In Stock</p>
+                  <p className="text-green-600 font-medium text-sm md:text-base">In Stock</p>
                   {product.stock_quantity && (
-                    <span className="text-gray-500 text-sm">({product.stock_quantity} available)</span>
+                    <span className="text-gray-500 text-xs md:text-sm">({product.stock_quantity} available)</span>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2 mb-5">
+                <div className="flex items-center gap-2 mb-4 md:mb-5">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <p className="text-red-600 font-medium">Out of Stock</p>
+                  <p className="text-red-600 font-medium text-sm md:text-base">Out of Stock</p>
                 </div>
               )}
             </div>
@@ -302,11 +302,11 @@ export default function ProductDetailPage() {
 
             {/* Quantity Selector */}
             {product.stock_status === 'instock' && (
-              <div className="border-t pt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="border-t pt-4 md:pt-6">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                   Quantity:
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 md:gap-3">
                   <div className="flex items-center border border-gray-300 rounded-lg">
                     <button
                       onClick={decreaseQuantity}
@@ -315,7 +315,7 @@ export default function ProductDetailPage() {
                     >
                       <Minus className="w-4 h-4" />
                     </button>
-                    <span className="px-4 py-2 font-medium">{quantity}</span>
+                    <span className="px-3 py-1.5 md:px-4 md:py-2 font-medium text-sm md:text-base">{quantity}</span>
                     <button
                       onClick={increaseQuantity}
                       className="p-2 hover:bg-gray-100"
@@ -333,26 +333,26 @@ export default function ProductDetailPage() {
             )}
 
             {/* Add to Cart Section */}
-            <div className="space-y-4 border-t pt-6">
-              <div className="flex gap-4">
+            <div className="space-y-3 md:space-y-4 border-t pt-4 md:pt-6">
+              <div className="flex gap-3 md:gap-4">
                 <Button
                   onClick={handleAddToCart}
                   variant="primary"
-                  size="lg"
+                  size="md"
                   fullWidth
                   disabled={product.stock_status === 'outofstock'}
-                  className="flex-1"
+                  className="flex-1 text-sm md:text-base"
                 >
-                  <ShoppingCart className="w-5 h-5 mr-2" />
+                  <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                   Add to Cart
                 </Button>
                 
                 <Button 
                   onClick={handleWishlist}
                   variant={inWishlist ? "primary" : "outline"}
-                  size="lg"
+                  size="md"
                 >
-                  <Heart className={`w-5 h-5 ${inWishlist ? 'fill-current' : ''}`} />
+                  <Heart className={`w-4 h-4 md:w-5 md:h-5 ${inWishlist ? 'fill-current' : ''}`} />
                 </Button>
                 
                 {/* Share Dropdown */}
@@ -360,9 +360,9 @@ export default function ProductDetailPage() {
                   <Button 
                     onClick={() => setShowShareMenu(!showShareMenu)}
                     variant="outline" 
-                    size="lg"
+                    size="md"
                   >
-                    <Share2 className="w-5 h-5" />
+                    <Share2 className="w-4 h-4 md:w-5 md:h-5" />
                   </Button>
                   
                   {/* Share Menu */}
@@ -436,9 +436,10 @@ export default function ProductDetailPage() {
               <Button 
                 onClick={handleBuyNow}
                 variant="secondary" 
-                size="lg" 
+                size="md" 
                 fullWidth
                 disabled={product.stock_status === 'outofstock'}
+                className="text-sm md:text-base"
               >
                 Buy Now
               </Button>
