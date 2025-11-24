@@ -1,11 +1,11 @@
-import { getProductsByBrand, getBrandBySlug, getBrands } from '@/lib/woocommerce/brands';
+import { getProductsByBrand, getBrandBySlug } from '@/lib/woocommerce/brands';
 import ProductCard from '@/components/product/product-card';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Store } from 'lucide-react';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 300; // Revalidate every 5 minutes
+export const dynamic = 'force-dynamic'; // Force dynamic rendering
 
 interface BrandPageProps {
   params: {
@@ -14,8 +14,17 @@ interface BrandPageProps {
 }
 
 export default async function BrandPage({ params }: BrandPageProps) {
-  const brand = await getBrandBySlug(params.slug);
-  const products = await getProductsByBrand(params.slug, { per_page: 24 });
+  let brand = null;
+  let products: any[] = [];
+
+  try {
+    brand = await getBrandBySlug(params.slug);
+    if (brand) {
+      products = await getProductsByBrand(params.slug, { per_page: 24 });
+    }
+  } catch (error) {
+    console.error('Error fetching brand data:', error);
+  }
 
   if (!brand) {
     return (
@@ -50,7 +59,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
         <div className="bg-white rounded-lg shadow-sm p-6 md:p-8 mb-6">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             {/* Brand Logo */}
-            {brand.image ? (
+            {brand.image?.src ? (
               <div className="relative w-24 h-24 md:w-32 md:h-32 flex-shrink-0 bg-gray-50 rounded-lg p-2">
                 <Image
                   src={brand.image.src}
@@ -83,7 +92,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
               <div className="flex items-center gap-4 text-sm text-gray-500">
                 <div className="flex items-center gap-2">
                   <Store className="w-4 h-4" />
-                  <span>{brand.count} {brand.count === 1 ? 'product' : 'products'}</span>
+                  <span>{brand.count || 0} {brand.count === 1 ? 'product' : 'products'}</span>
                 </div>
               </div>
             </div>
@@ -154,18 +163,4 @@ export default async function BrandPage({ params }: BrandPageProps) {
       </div>
     </main>
   );
-}
-
-// Generate static paths for all brands (optional, for better performance)
-export async function generateStaticParams() {
-  try {
-    const brands = await getBrands({ per_page: 100 });
-    
-    return brands.map((brand) => ({
-      slug: brand.slug,
-    }));
-  } catch (error) {
-    console.error('Error generating brand static params:', error);
-    return [];
-  }
 }

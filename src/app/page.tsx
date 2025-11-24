@@ -11,9 +11,40 @@ import { getProducts } from '@/lib/woocommerce/products';
 import { getTopBrands } from '@/lib/woocommerce/brands';
 
 export const revalidate = 300; // Revalidate every 5 minutes
+export const dynamic = 'force-dynamic'; // Force dynamic rendering for reliability
+
+// Helper function with timeout and retry
+async function fetchWithRetry<T>(
+  fetchFn: () => Promise<T>,
+  defaultValue: T,
+  retries = 2
+): Promise<T> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const result = await Promise.race([
+        fetchFn(),
+        new Promise<T>((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 10000) // 10 second timeout
+        )
+      ]);
+      return result;
+    } catch (error) {
+      console.error(`Attempt ${i + 1} failed:`, error);
+      if (i === retries) {
+        console.error('All retries exhausted, returning default value');
+        return defaultValue;
+      }
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  return defaultValue;
+}
 
 export default async function HomePage() {
-  // Fetch all data in parallel
+  console.log('🏠 Homepage: Starting data fetch...');
+  
+  // Fetch all data in parallel with retry logic
   const [
     flashSaleProducts,
     dealProducts,
@@ -23,16 +54,16 @@ export default async function HomePage() {
     launchingProducts,
     brands,
   ] = await Promise.all([
-    getProducts({ tag: 'flash-sale', per_page: 12 }).catch(() => []),
-    getProducts({ tag: 'deal', per_page: 12 }).catch(() => []),
-    getProducts({ tag: 'best-seller', per_page: 12 }).catch(() => []),
-    getProducts({ tag: 'top-seller', per_page: 12 }).catch(() => []),
-    getProducts({ tag: 'sponsored', per_page: 12 }).catch(() => []),
-    getProducts({ tag: 'launching-deal', per_page: 12 }).catch(() => []),
-    getTopBrands(12).catch(() => []), // Fetch top 12 brands
+    fetchWithRetry(() => getProducts({ tag: 'flash-sale', per_page: 12 }), []),
+    fetchWithRetry(() => getProducts({ tag: 'deal', per_page: 12 }), []),
+    fetchWithRetry(() => getProducts({ tag: 'best-seller', per_page: 12 }), []),
+    fetchWithRetry(() => getProducts({ tag: 'top-seller', per_page: 12 }), []),
+    fetchWithRetry(() => getProducts({ tag: 'sponsored', per_page: 12 }), []),
+    fetchWithRetry(() => getProducts({ tag: 'launching-deal', per_page: 12 }), []),
+    fetchWithRetry(() => getTopBrands(12), []),
   ]);
 
-  console.log('🔍 Homepage Data Fetched:', {
+  console.log('✅ Homepage Data Fetched:', {
     flashSale: flashSaleProducts.length,
     deals: dealProducts.length,
     trending: trendingProducts.length,
@@ -55,6 +86,11 @@ export default async function HomePage() {
       {/* Flash Sales */}
       {flashSaleProducts.length > 0 && (
         <FlashSales products={flashSaleProducts} />
+      )}
+
+      {/* Brand Section */}
+      {brands.length > 0 && (
+        <BrandSection brands={brands} />
       )}
 
       {/* Launching Deals */}
@@ -81,12 +117,6 @@ export default async function HomePage() {
       {trendingProducts.length > 0 && (
         <TrendingSection products={trendingProducts} />
       )}
-
-      {/* ==================== BRAND SECTION ==================== */}
-      {brands.length > 0 && (
-        <BrandSection brands={brands} />
-      )}
-      {/* ======================================================== */}
 
       {/* Empty State - Show when no products with tags */}
       {flashSaleProducts.length === 0 && 
