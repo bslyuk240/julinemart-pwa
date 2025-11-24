@@ -63,6 +63,27 @@ export default function Header() {
 
       {/* Main Header */}
       <div className="container mx-auto px-4 py-3 md:py-4">
+        {/* Mobile: logo visible before sidebar/menu trigger */}
+        <div className="flex items-center justify-between md:hidden mb-3">
+          <Link href="/" className="flex-shrink-0">
+            <Image
+              src={logoSrc}
+              alt={logoAlt}
+              width={logoWidth}
+              height={logoHeight}
+              priority
+              className="h-9 w-auto object-contain"
+            />
+          </Link>
+          <button
+            className="inline-flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 border border-gray-200"
+            onClick={() => setIsMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5 text-gray-700" />
+          </button>
+        </div>
+
         {/* Unified layout: logo + search, compact and inline */}
         <div className="flex items-center gap-3 md:gap-4">
           {/* Desktop menu toggle */}

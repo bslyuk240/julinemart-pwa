@@ -41,13 +41,17 @@ export default function DealsSection({
         </div>
 
         {products.length > 0 ? (
-          // GRID LAYOUT - 6 columns on desktop
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
-            {products.slice(0, 18).map((product) => (
-              <div key={product.id}>
-                <ProductCard product={product} fullWidth />
-              </div>
-            ))}
+          <div className="overflow-x-auto pb-1">
+            <div className="flex gap-3 md:gap-4 min-w-full snap-x snap-mandatory">
+              {products.slice(0, 18).map((product) => (
+                <div
+                  key={product.id}
+                  className="min-w-[170px] sm:min-w-[200px] md:min-w-[230px] lg:min-w-[260px] max-w-[260px] flex-shrink-0 snap-start"
+                >
+                  <ProductCard product={product} fullWidth />
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg">

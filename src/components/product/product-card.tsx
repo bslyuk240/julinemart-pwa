@@ -13,9 +13,10 @@ interface ProductCardProps {
   product: Product;
   showBadge?: boolean;
   fullWidth?: boolean;
+  floatingBadge?: React.ReactNode;
 }
 
-export default function ProductCard({ product, showBadge = false, fullWidth = false }: ProductCardProps) {
+export default function ProductCard({ product, showBadge = false, fullWidth = false, floatingBadge }: ProductCardProps) {
   const { addItem } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -90,6 +91,13 @@ export default function ProductCard({ product, showBadge = false, fullWidth = fa
             strokeWidth={2}
           />
         </button>
+
+        {/* Optional floating badge on the image (e.g., Launch) */}
+        {floatingBadge && (
+          <div className="absolute bottom-2 right-2 z-10">
+            {floatingBadge}
+          </div>
+        )}
 
         {/* Product Image */}
         <div className="relative aspect-square overflow-hidden rounded-t-lg bg-gray-50">

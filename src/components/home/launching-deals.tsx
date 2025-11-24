@@ -51,39 +51,42 @@ export default function LaunchingDeals({ products }: LaunchingDealsProps) {
         </div>
 
         {products.length > 0 ? (
-          // GRID LAYOUT - Shows up to 3 rows (15 products total)
-          // Mobile: 2 columns, Tablet: 3 columns, Desktop: 5 columns
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-            {products.slice(0, 15).map((product) => {
-              const discount = product.on_sale && product.sale_price && product.regular_price
-                ? calculateDiscount(product.regular_price, product.sale_price)
-                : 0;
+          <div className="overflow-x-auto pb-1">
+            <div className="flex gap-3 md:gap-4 min-w-full snap-x snap-mandatory">
+              {products.slice(0, 15).map((product) => {
+                const discount = product.on_sale && product.sale_price && product.regular_price
+                  ? calculateDiscount(product.regular_price, product.sale_price)
+                  : 0;
 
-              return (
-                <div
-                  key={product.id}
-                  className="relative"
-                >
-                  {/* Discount Badge - Only show if there's a discount */}
-                  {discount > 0 && (
-                    <div className="absolute top-1.5 left-1.5 z-10">
-                      <div className="bg-gradient-to-br from-red-500 to-red-600 text-white px-2 py-1 rounded-lg shadow-lg">
-                        <div className="text-xs md:text-sm font-bold leading-none">-{discount}%</div>
-                        <div className="text-[8px] md:text-[9px] uppercase tracking-wide opacity-90">OFF</div>
+                return (
+                  <div
+                    key={product.id}
+                    className="relative min-w-[170px] sm:min-w-[200px] md:min-w-[230px] lg:min-w-[260px] max-w-[260px] flex-shrink-0 snap-start"
+                  >
+                    {/* Discount Badge - Only show if there's a discount */}
+                    {discount > 0 && (
+                      <div className="absolute top-2 left-2 z-10">
+                        <div className="bg-red-600 text-white px-2.5 py-1.5 rounded-md shadow-xl ring-2 ring-white flex flex-col items-center min-w-[60px]">
+                          <div className="text-sm md:text-base font-black leading-tight">-{discount}%</div>
+                          <div className="text-[9px] md:text-[10px] uppercase tracking-[0.08em] text-white/90 leading-none">off</div>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Launch Badge */}
-                  <div className="absolute top-1.5 right-1.5 z-10 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-[8px] md:text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1">
-                    <Rocket className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                    LAUNCH
+                    <ProductCard 
+                      product={product} 
+                      fullWidth 
+                      floatingBadge={
+                        <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white text-[8px] md:text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1">
+                          <Rocket className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                          LAUNCH
+                        </div>
+                      }
+                    />
                   </div>
-
-                  <ProductCard product={product} fullWidth />
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         ) : (
           <div className="text-center py-8 md:py-12 bg-white/70 rounded-lg border border-green-100">

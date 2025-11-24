@@ -35,20 +35,24 @@ export default function TopSellers({ products }: TopSellersProps) {
         </div>
 
         {products.length > 0 ? (
-          // GRID LAYOUT - 6 columns on desktop with top 3 badges
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
-            {products.slice(0, 18).map((product, index) => (
-              <div key={product.id} className="relative">
-                {/* Top 3 Badge */}
-                {index < 3 && (
-                  <div className="absolute top-1.5 left-1.5 z-10 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1">
-                    <Award className="w-3 h-3" />
-                    #{index + 1}
-                  </div>
-                )}
-                <ProductCard product={product} fullWidth />
-              </div>
-            ))}
+          <div className="overflow-x-auto pb-1">
+            <div className="flex gap-3 md:gap-4 min-w-full snap-x snap-mandatory">
+              {products.slice(0, 18).map((product, index) => (
+                <div
+                  key={product.id}
+                  className="relative min-w-[170px] sm:min-w-[200px] md:min-w-[230px] lg:min-w-[260px] max-w-[260px] flex-shrink-0 snap-start"
+                >
+                  {/* Top 3 Badge */}
+                  {index < 3 && (
+                    <div className="absolute top-1.5 left-1.5 z-10 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1">
+                      <Award className="w-3 h-3" />
+                      #{index + 1}
+                    </div>
+                  )}
+                  <ProductCard product={product} fullWidth />
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg">

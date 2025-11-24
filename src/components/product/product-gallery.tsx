@@ -102,7 +102,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
         <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4">
           <button
             onClick={() => setIsModalOpen(false)}
-            className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white"
+            className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white z-10"
             aria-label="Close"
           >
             <X className="w-6 h-6" />
@@ -110,7 +110,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
 
           <button
             onClick={goToPrevious}
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white"
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white z-10"
             aria-label="Previous image"
           >
             <ChevronLeft className="w-8 h-8" />
@@ -118,23 +118,23 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
 
           <button
             onClick={goToNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white"
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white z-10"
             aria-label="Next image"
           >
             <ChevronRight className="w-8 h-8" />
           </button>
 
-          <div className="relative w-full h-full flex items-center justify-center">
+          <div className="relative w-full h-full flex items-center justify-center z-0">
             <Image
               src={images[selectedImage].src}
               alt={images[selectedImage].alt || productName}
               fill
-              className="object-contain"
+              className="object-contain pointer-events-none"
               sizes="100vw"
             />
           </div>
 
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/10 text-white px-4 py-2 rounded-full">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/10 text-white px-4 py-2 rounded-full z-10">
             {selectedImage + 1} / {images.length}
           </div>
         </div>

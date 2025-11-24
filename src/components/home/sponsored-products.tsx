@@ -40,18 +40,22 @@ export default function SponsoredProducts({ products }: SponsoredProductsProps) 
         </div>
 
         {products.length > 0 ? (
-          // GRID LAYOUT - 6 columns on desktop with sponsored badge
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
-            {products.slice(0, 18).map((product) => (
-              <div key={product.id} className="relative">
-                {/* Sponsored Badge */}
-                <div className="absolute top-1.5 right-1.5 z-10 bg-gradient-to-r from-purple-600 to-purple-700 text-white text-[8px] md:text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1">
-                  <Star className="w-2.5 h-2.5 md:w-3 md:h-3 fill-white" />
-                  SPONSORED
+          <div className="overflow-x-auto pb-1">
+            <div className="flex gap-3 md:gap-4 min-w-full snap-x snap-mandatory">
+              {products.slice(0, 18).map((product) => (
+                <div
+                  key={product.id}
+                  className="relative min-w-[170px] sm:min-w-[200px] md:min-w-[230px] lg:min-w-[260px] max-w-[260px] flex-shrink-0 snap-start"
+                >
+                  {/* Sponsored Badge */}
+                  <div className="absolute top-1.5 right-1.5 z-10 bg-gradient-to-r from-purple-600 to-purple-700 text-white text-[8px] md:text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1">
+                    <Star className="w-2.5 h-2.5 md:w-3 md:h-3 fill-white" />
+                    SPONSORED
+                  </div>
+                  <ProductCard product={product} fullWidth />
                 </div>
-                <ProductCard product={product} fullWidth />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         ) : (
           <div className="text-center py-8 md:py-12 bg-white/70 rounded-lg border border-purple-100">
