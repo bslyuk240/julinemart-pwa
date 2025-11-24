@@ -23,27 +23,27 @@ export default function CartPage() {
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-5">
+        <div className="flex items-center gap-2 md:gap-3 mb-5">
           <Link
             href="/"
             className="flex items-center gap-2 text-gray-600 hover:text-primary-600 text-sm md:text-base"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
             <span className="hidden md:inline">Continue Shopping</span>
           </Link>
-          <h1 className="text-xl md:text-3xl font-bold text-gray-900 leading-tight">
+          <h1 className="text-lg md:text-2xl font-bold text-gray-900 leading-tight">
             Shopping Cart ({itemCount})
           </h1>
         </div>
 
         {items.length === 0 ? (
           /* Empty Cart State */
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-              <ShoppingBag className="w-16 h-16 text-gray-400" />
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-24 h-24 md:w-32 md:h-32 bg-gray-100 rounded-full flex items-center justify-center mb-5">
+              <ShoppingBag className="w-12 h-12 md:w-16 md:h-16 text-gray-400" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h2>
-            <p className="text-gray-600 mb-6 text-center max-w-md">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h2>
+            <p className="text-sm md:text-base text-gray-600 mb-6 text-center max-w-md">
               Looks like you haven't added anything to your cart yet. Start shopping to fill it up!
             </p>
             <Link

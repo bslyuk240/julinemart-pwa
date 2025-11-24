@@ -121,8 +121,8 @@ export default function CategoriesPage() {
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Shop by Category</h1>
-          <p className="text-gray-600">Browse all {categories.length} product categories</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">Shop by Category</h1>
+          <p className="text-sm md:text-base text-gray-600">Browse all {categories.length} product categories</p>
         </div>
 
         {/* Categories Grid */}

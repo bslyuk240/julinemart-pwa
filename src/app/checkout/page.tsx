@@ -727,7 +727,7 @@ export default function CheckoutPage() {
       <main className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Your cart is empty</h2>
+          <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">Your cart is empty</h2>
           <Link href="/" className="text-primary-600 hover:text-primary-700 font-medium">
             Continue Shopping
           </Link>
@@ -741,13 +741,13 @@ export default function CheckoutPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-4 md:py-6">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Link href="/cart" className="text-gray-600 hover:text-primary-600">
             <ArrowLeft className="w-6 h-6" />
           </Link>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Checkout</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Checkout</h1>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">

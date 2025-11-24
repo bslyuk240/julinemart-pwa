@@ -118,16 +118,16 @@ export default function AllProductsPage() {
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">All Products</h1>
-          <p className="text-gray-600">
+          <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-1">All Products</h1>
+          <p className="text-sm md:text-base text-gray-600">
             Browse our complete collection of {products.length}+ products
           </p>
         </div>
 
         {/* Filter Bar */}
-        <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-lg shadow-sm">
-          <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-white p-3 md:p-4 rounded-lg shadow-sm">
+          <div className="flex items-center gap-3 md:gap-4">
+            <button className="flex items-center gap-2 px-3 py-2 md:px-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm md:text-base">
               <Filter className="w-4 h-4" />
               <span className="font-medium">Filters</span>
             </button>
@@ -146,7 +146,7 @@ export default function AllProductsPage() {
               onChange={(e) =>
                 handleSort(e.target.value as 'date' | 'popularity' | 'rating' | 'price' | 'price-desc')
               }
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors appearance-none pr-8 cursor-pointer"
+              className="flex items-center gap-2 px-3 py-2 md:px-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors appearance-none pr-8 cursor-pointer text-sm md:text-base"
             >
               <option value="date">Latest</option>
               <option value="popularity">Most Popular</option>
