@@ -1,13 +1,13 @@
 'use client';
 
-import { MouseEvent, useMemo, useState } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, ShoppingCart, Star } from 'lucide-react';
+import { Heart, ShoppingCart, Star, BadgeCheck } from 'lucide-react';
 import { Product } from '@/types/product';
 import { useCart } from '@/hooks/use-cart';
 import { useWishlist } from '@/hooks/use-wishlist';
-import { Badge } from '../ui/badge';
+import { toast } from 'sonner';
 
 interface ProductCardProps {
   product: Product;
@@ -16,83 +16,145 @@ interface ProductCardProps {
   floatingBadge?: React.ReactNode;
 }
 
-export default function ProductCard({ product, showBadge = false, fullWidth = false, floatingBadge }: ProductCardProps) {
+export default function ProductCard({ 
+  product, 
+  showBadge = false, 
+  fullWidth = false,
+  floatingBadge 
+}: ProductCardProps) {
   const { addItem } = useCart();
-  const { toggleWishlist, isInWishlist } = useWishlist();
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const inWishlist = isInWishlist(product.id);
-  const price = useMemo(() => parseFloat(product.price) || 0, [product.price]);
-  const regularPrice = useMemo(
-    () => parseFloat(product.regular_price || product.price) || price,
-    [product.regular_price, product.price, price]
-  );
-  const rating = parseFloat(product.average_rating) || 0;
-  const outOfStock = product.stock_status !== 'instock';
+  
+  // Price handling
+  const price = parseFloat(product.price || '0');
+  const regularPrice = parseFloat(product.regular_price || product.price || '0');
+  const outOfStock = product.stock_status === 'outofstock';
+  
+  // Rating handling
+  const rating = parseFloat(product.average_rating || '0');
 
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency: 'NGN',
-      minimumFractionDigits: 0,
-    }).format(value);
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return `₦${amount.toLocaleString()}`;
+  };
 
-  const handleAddToCart = (event: MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
+  // Add to cart handler
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (outOfStock) return;
+
     setIsAddingToCart(true);
-    addItem(product);
-    setTimeout(() => setIsAddingToCart(false), 500);
+    try {
+      addItem(product, 1);
+      toast.success('Added to cart!');
+    } catch (error) {
+      toast.error('Failed to add to cart');
+    } finally {
+      setIsAddingToCart(false);
+    }
   };
 
-  const handleToggleWishlist = (event: MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    toggleWishlist(product.id, product);
+  // Wishlist toggle handler
+  const handleWishlistToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const added = toggleWishlist(product.id, product);
+    if (added) {
+      toast.success('Added to wishlist');
+    } else {
+      toast.success('Removed from wishlist');
+    }
   };
 
-  const discountPercent = regularPrice > price 
-    ? Math.round(((regularPrice - price) / regularPrice) * 100)
-    : 0;
+  // Check if vendor is official
+  // Method 1: Check for official-store tag
+  const hasOfficialTag = product.tags?.some(tag => tag.slug === 'official-store');
+  
+  // Method 2: Check vendor type (if you add it to your backend)
+  // const hasVendorType = product.store?.vendor_type === 'official';
+  
+  const isOfficialStore = hasOfficialTag; // Or: hasOfficialTag || hasVendorType
+
+  // Get product badges from tags (like "Black Friday deal", "Flash Sale", etc.)
+  const productBadges = product.tags?.filter(tag => 
+    ['flash-sale', 'deal', 'featured', 'new-arrival', 'black-friday'].includes(tag.slug)
+  ) || [];
+
+  // Badge configuration
+  const getBadgeConfig = (tagSlug: string) => {
+    const configs: Record<string, { label: string; color: string }> = {
+      'flash-sale': { label: 'Flash Sale', color: 'bg-red-500' },
+      'deal': { label: 'Deal', color: 'bg-orange-500' },
+      'featured': { label: 'Featured', color: 'bg-purple-500' },
+      'new-arrival': { label: 'New', color: 'bg-green-500' },
+      'black-friday': { label: 'Black Friday', color: 'bg-black' },
+    };
+    return configs[tagSlug] || { label: tagSlug, color: 'bg-gray-500' };
+  };
 
   return (
     <Link
       href={`/product/${product.slug}`}
-      className={`block bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 ${
-        fullWidth ? 'w-full' : 'w-[140px] sm:w-[150px] md:w-full flex-shrink-0 md:flex-shrink'
-      }`}
+      className={`block group ${fullWidth ? 'w-full' : 'max-w-[220px]'}`}
     >
-      <div className="relative">
-        {/* Badges */}
-        <div className="absolute top-1.5 md:top-3 left-1.5 md:left-3 z-10 flex flex-col gap-1">
-          {showBadge && (
-            <Badge variant="secondary" size="sm" className="text-[9px] md:text-xs px-1.5 md:px-2 py-0.5">
-              Featured
-            </Badge>
+      <div className="relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+        {/* Badges Section - Top of Image */}
+        <div className="absolute top-2 left-2 right-2 z-10 flex flex-col gap-1">
+          {/* Official Store Badge */}
+          {isOfficialStore && (
+            <div className="inline-flex items-center gap-1 bg-blue-600 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-md shadow-lg w-fit">
+              <BadgeCheck className="w-3 h-3 md:w-3.5 md:h-3.5" />
+              Official Store
+            </div>
           )}
-          {discountPercent > 0 && (
-            <Badge variant="danger" size="sm" className="text-[9px] md:text-xs px-1.5 md:px-2 py-0.5">
-              -{discountPercent}%
-            </Badge>
+
+          {/* Product Tag Badges */}
+          {productBadges.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {productBadges.map((tag) => {
+                const config = getBadgeConfig(tag.slug);
+                return (
+                  <span
+                    key={tag.id}
+                    className={`${config.color} text-white text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-md shadow-lg`}
+                  >
+                    {config.label}
+                  </span>
+                );
+              })}
+            </div>
           )}
         </div>
 
+        {/* Sale Badge - Top Right (only if showBadge is true) */}
+        {showBadge && product.on_sale && !productBadges.length && (
+          <div className="absolute top-2 right-2 z-10">
+            <div className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
+              SALE
+            </div>
+          </div>
+        )}
+
         {/* Wishlist Button */}
         <button
-          type="button"
-          onClick={handleToggleWishlist}
-          className="absolute right-1.5 md:right-3 top-1.5 md:top-3 z-10 
-            inline-flex h-6 w-6 md:h-9 md:w-9 
-            items-center justify-center rounded-full bg-white/90 text-gray-600 shadow-sm transition hover:text-secondary-600"
+          onClick={handleWishlistToggle}
+          className="absolute top-2 right-2 z-20 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-red-50 transition-colors"
+          aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
         >
-          <Heart
-            className="h-3 w-3 md:h-5 md:w-5"
+          <Heart 
+            className={`w-4 h-4 ${inWishlist ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
             fill={inWishlist ? 'currentColor' : 'none'}
             strokeWidth={2}
           />
         </button>
 
-        {/* Optional floating badge on the image (e.g., Launch) */}
+        {/* Optional floating badge on the image */}
         {floatingBadge && (
           <div className="absolute bottom-2 right-2 z-10">
             {floatingBadge}
@@ -111,9 +173,16 @@ export default function ProductCard({ product, showBadge = false, fullWidth = fa
         </div>
       </div>
 
-      {/* Product Info - Responsive padding */}
+      {/* Product Info */}
       <div className="p-2 md:p-4 space-y-1 md:space-y-2">
-        {/* Title - Compact on mobile, normal on desktop */}
+        {/* Vendor Name (if available) */}
+        {product.store?.shop_name && (
+          <p className="text-[10px] md:text-xs text-gray-500 truncate">
+            {product.store.shop_name}
+          </p>
+        )}
+
+        {/* Title */}
         <h3 className="line-clamp-2 
           text-xs md:text-sm 
           font-semibold text-gray-900 leading-tight 

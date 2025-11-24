@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Star, ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, Minus, Plus, Store } from 'lucide-react';
+import { Star, ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, Minus, Plus, Store, BadgeCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProductGallery from '@/components/product/product-gallery';
 import ProductCarousel from '@/components/product/product-carousel';
@@ -12,6 +12,18 @@ import ProductFeatures from '@/components/product/product-features';
 import { useCartStore } from '@/store/cart-store';
 import { useWishlist } from '@/hooks/use-wishlist';
 import { Product } from '@/types/product';
+
+// Badge configuration helper
+const getBadgeConfig = (tagSlug: string) => {
+  const configs: Record<string, { label: string; bgColor: string }> = {
+    'flash-sale': { label: 'Flash Sale', bgColor: 'bg-red-500' },
+    'deal': { label: 'Deal', bgColor: 'bg-orange-500' },
+    'featured': { label: 'Featured', bgColor: 'bg-purple-500' },
+    'new-arrival': { label: 'New', bgColor: 'bg-green-500' },
+    'black-friday': { label: 'Black Friday deal', bgColor: 'bg-black' },
+  };
+  return configs[tagSlug] || { label: tagSlug, bgColor: 'bg-gray-500' };
+};
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -197,7 +209,7 @@ export default function ProductDetailPage() {
     <main className="min-h-screen bg-white pb-24 md:pb-8">
       <div className="container mx-auto px-4 py-4 md:py-6">
         {/* Breadcrumb */}
-        <nav className="text-sm text-gray-600 mb-6">
+        <nav className="text-sm text-gray-600 mb-4">
           <a href="/" className="hover:text-primary-600">Home</a>
           <span className="mx-2">/</span>
           {product.categories && product.categories.length > 0 && (
@@ -210,6 +222,35 @@ export default function ProductDetailPage() {
           )}
           <span className="text-gray-900">{product.name}</span>
         </nav>
+
+        {/* ==================== PRODUCT BADGES (LIKE JUMIA) ==================== */}
+        {product.tags && product.tags.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {/* Official Store Badge */}
+            {product.tags.some(tag => tag.slug === 'official-store') && (
+              <div className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-xs md:text-sm font-semibold px-3 py-1.5 rounded-md shadow-sm">
+                <BadgeCheck className="w-4 h-4" />
+                Official Store
+              </div>
+            )}
+            
+            {/* Product Tag Badges */}
+            {product.tags
+              .filter(tag => ['flash-sale', 'deal', 'featured', 'new-arrival', 'black-friday'].includes(tag.slug))
+              .map((tag) => {
+                const config = getBadgeConfig(tag.slug);
+                return (
+                  <div
+                    key={tag.id}
+                    className={`${config.bgColor} text-white text-xs md:text-sm font-semibold px-3 py-1.5 rounded-md shadow-sm`}
+                  >
+                    {config.label}
+                  </div>
+                );
+              })}
+          </div>
+        )}
+        {/* ====================================================================== */}
 
         <div className="grid md:grid-cols-2 gap-6 md:gap-8 mb-10">
           {/* Product Gallery */}
