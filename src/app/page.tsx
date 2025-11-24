@@ -6,12 +6,14 @@ import TrendingSection from '@/components/home/trending-section';
 import TopSellers from '@/components/home/top-sellers';
 import SponsoredProducts from '@/components/home/sponsored-products';
 import LaunchingDeals from '@/components/home/launching-deals';
+import BrandSection from '@/components/home/brand-section';
 import { getProducts } from '@/lib/woocommerce/products';
+import { getTopBrands } from '@/lib/woocommerce/brands';
 
 export const revalidate = 300; // Revalidate every 5 minutes
 
 export default async function HomePage() {
-  // Use SLUGS not IDs - products.ts automatically converts them!
+  // Fetch all data in parallel
   const [
     flashSaleProducts,
     dealProducts,
@@ -19,13 +21,15 @@ export default async function HomePage() {
     topSellerProducts,
     sponsoredProducts,
     launchingProducts,
+    brands,
   ] = await Promise.all([
     getProducts({ tag: 'flash-sale', per_page: 12 }).catch(() => []),
     getProducts({ tag: 'deal', per_page: 12 }).catch(() => []),
     getProducts({ tag: 'best-seller', per_page: 12 }).catch(() => []),
-    getProducts({ tag: 'top-seller', per_page: 12 }).catch(() => []), // Create this tag in WordPress!
-    getProducts({ tag: 'sponsored', per_page: 12 }).catch(() => []),   // Create this tag in WordPress!
-    getProducts({ tag: 'launching-deal', per_page: 12 }).catch(() => []), // Create this tag in WordPress!
+    getProducts({ tag: 'top-seller', per_page: 12 }).catch(() => []),
+    getProducts({ tag: 'sponsored', per_page: 12 }).catch(() => []),
+    getProducts({ tag: 'launching-deal', per_page: 12 }).catch(() => []),
+    getTopBrands(12).catch(() => []), // Fetch top 12 brands
   ]);
 
   console.log('🔍 Homepage Data Fetched:', {
@@ -35,6 +39,7 @@ export default async function HomePage() {
     topSellers: topSellerProducts.length,
     sponsored: sponsoredProducts.length,
     launching: launchingProducts.length,
+    brands: brands.length,
   });
 
   return (
@@ -52,17 +57,17 @@ export default async function HomePage() {
         <FlashSales products={flashSaleProducts} />
       )}
 
-      {/* Launching Deals - NEW! */}
+      {/* Launching Deals */}
       {launchingProducts.length > 0 && (
         <LaunchingDeals products={launchingProducts} />
       )}
 
-      {/* Sponsored Products - NEW! */}
+      {/* Sponsored Products */}
       {sponsoredProducts.length > 0 && (
         <SponsoredProducts products={sponsoredProducts} />
       )}
 
-      {/* Top Sellers - NEW! */}
+      {/* Top Sellers */}
       {topSellerProducts.length > 0 && (
         <TopSellers products={topSellerProducts} />
       )}
@@ -76,6 +81,12 @@ export default async function HomePage() {
       {trendingProducts.length > 0 && (
         <TrendingSection products={trendingProducts} />
       )}
+
+      {/* ==================== BRAND SECTION ==================== */}
+      {brands.length > 0 && (
+        <BrandSection brands={brands} />
+      )}
+      {/* ======================================================== */}
 
       {/* Empty State - Show when no products with tags */}
       {flashSaleProducts.length === 0 && 
