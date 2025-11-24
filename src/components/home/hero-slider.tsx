@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 
 type Slide = {
-  id: number;
+  id?: number;
   type: 'image' | 'video';
   
   // For images
@@ -14,9 +14,11 @@ type Slide = {
   
   // For videos
   videoSrc?: string;
-  videoPoster?: string; // Thumbnail shown before video loads
+  videoPoster?: string;
   
   // Common properties
+  title?: string;
+  description?: string;
   primaryButton: {
     text: string;
     link: string;
@@ -30,14 +32,13 @@ type Slide = {
   overlayOpacity: number;
 };
 
-// Example slides with both images and videos
-const slides: Slide[] = [
-  // Slide 1: Video Example
+// Default slides (fallback if WordPress fails)
+const DEFAULT_SLIDES: Slide[] = [
   {
     id: 1,
     type: 'video',
-    videoSrc: "https://res.cloudinary.com/dupgdbwrt/video/upload/v1763955248/copy_E58DF95E-E76A-4B31-B3D0-9D89B0E8F2C0_otgkkq.mov", // Put your video in public/videos/
-    videoPoster: '/images/placeholder.jpg', // Optional thumbnail (kept local to avoid 404)
+    videoSrc: "https://res.cloudinary.com/dupgdbwrt/video/upload/v1763955248/copy_E58DF95E-E76A-4B31-B3D0-9D89B0E8F2C0_otgkkq.mov",
+    videoPoster: '/images/placeholder.jpg',
     primaryButton: {
       text: 'Shop Now',
       link: '/products',
@@ -48,10 +49,8 @@ const slides: Slide[] = [
     },
     useGradient: false,
     gradientColors: '',
-    overlayOpacity: 0.3, // Darken video slightly for text readability
+    overlayOpacity: 0.3,
   },
-  
-  // Slide 2: Image Example
   {
     id: 2,
     type: 'image',
@@ -68,8 +67,6 @@ const slides: Slide[] = [
     gradientColors: '',
     overlayOpacity: 0.2,
   },
-  
-  // Slide 3: Gradient Fallback (no image/video)
   {
     id: 3,
     type: 'image',
@@ -88,15 +85,68 @@ const slides: Slide[] = [
 ];
 
 export default function HeroSlider() {
+  const [slides, setSlides] = useState<Slide[]>(DEFAULT_SLIDES);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
+  const [loading, setLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const slide = slides[currentSlide];
 
-  // Auto-advance slides every 5 seconds (pause on video slides if you want manual control)
+  // Fetch slides from WordPress
   useEffect(() => {
-    // Don't auto-advance on video slides - let video play
+    async function fetchSlides() {
+      try {
+        console.log('🎬 Fetching slides from WordPress...');
+        const response = await fetch('/api/pwa-settings');
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.sliders && data.sliders.length > 0) {
+            console.log('✅ WordPress slides loaded:', data.sliders.length);
+            
+            // Transform WordPress slides to our format
+            const transformedSlides: Slide[] = data.sliders.map((wpSlide: any, index: number) => ({
+              id: index + 1,
+              type: wpSlide.type || 'image',
+              backgroundImage: wpSlide.type === 'image' ? wpSlide.media_url : undefined,
+              videoSrc: wpSlide.type === 'video' ? wpSlide.media_url : undefined,
+              videoPoster: wpSlide.type === 'video' ? '/images/placeholder.jpg' : undefined,
+              title: wpSlide.title,
+              description: wpSlide.description,
+              primaryButton: {
+                text: wpSlide.button_text || 'Shop Now',
+                link: wpSlide.button_link || '/products',
+              },
+              secondaryButton: {
+                text: wpSlide.button_text_2 || 'View deals',
+                link: wpSlide.button_link_2 || '/products?tag=deal',
+              },
+              useGradient: wpSlide.type === 'gradient',
+              gradientColors: 'from-primary-600 via-primary-500 to-secondary-400',
+              overlayOpacity: wpSlide.overlay_opacity || 0.3,
+            }));
+            
+            setSlides(transformedSlides);
+          } else {
+            console.log('⚠️ No WordPress slides found, using defaults');
+          }
+        } else {
+          console.log('⚠️ WordPress API failed, using defaults');
+        }
+      } catch (error) {
+        console.error('❌ Error fetching slides:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchSlides();
+  }, []);
+
+  // Auto-advance slides every 5 seconds (pause on video slides)
+  useEffect(() => {
     if (slide.type === 'video') return;
     
     const timer = setInterval(() => {
@@ -109,7 +159,6 @@ export default function HeroSlider() {
   // Handle video playback when slide changes
   useEffect(() => {
     if (slide.type === 'video' && videoRef.current) {
-      // Play video when this slide becomes active
       videoRef.current.play().catch(err => {
         console.log('Video autoplay failed:', err);
       });
@@ -130,6 +179,14 @@ export default function HeroSlider() {
       setIsMuted(!isMuted);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="relative overflow-hidden rounded-xl md:rounded-2xl shadow-lg">
+        <div className="w-full h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px] bg-gray-200 animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative overflow-hidden rounded-xl md:rounded-2xl shadow-lg group">
@@ -183,7 +240,7 @@ export default function HeroSlider() {
           <>
             <Image
               src={slide.backgroundImage}
-              alt="Hero banner"
+              alt={slide.title || "Hero banner"}
               fill
               className="object-cover"
               priority
@@ -219,14 +276,14 @@ export default function HeroSlider() {
             </div>
           </div>
 
-          {/* BOTTOM: Buttons */}
+          {/* BOTTOM: Buttons - SMALLER SIZE */}
           <div className="flex justify-start">
-            <div className="flex flex-wrap gap-2 md:gap-3">
+            <div className="flex flex-wrap gap-2">
               <Link
                 href={slide.primaryButton.link}
                 className="rounded-lg bg-white 
-                  px-4 py-2 md:px-6 md:py-3 
-                  text-xs md:text-sm 
+                  px-3 py-1.5 md:px-4 md:py-2 
+                  text-[10px] md:text-xs 
                   font-semibold text-primary-700 
                   shadow-lg
                   transition hover:-translate-y-0.5 hover:shadow-xl"
@@ -236,8 +293,8 @@ export default function HeroSlider() {
               <Link
                 href={slide.secondaryButton.link}
                 className="rounded-lg bg-white/20 backdrop-blur-md border-2 border-white 
-                  px-4 py-2 md:px-6 md:py-3 
-                  text-xs md:text-sm 
+                  px-3 py-1.5 md:px-4 md:py-2 
+                  text-[10px] md:text-xs 
                   font-semibold text-white 
                   shadow-lg
                   transition hover:-translate-y-0.5 hover:bg-white/30"
