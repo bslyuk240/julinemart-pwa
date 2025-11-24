@@ -5,6 +5,7 @@ import Header from '@/components/layout/header';
 import BottomNav from '@/components/layout/bottom-nav';
 import { Toaster } from 'sonner';
 import { CustomerAuthProvider } from '@/context/customer-auth-context';
+import WhatsAppFloat from '@/components/layout/whatsapp-float';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <BottomNav />
           <Toaster position="top-center" richColors />
         </CustomerAuthProvider>
+        <WhatsAppFloat />
       </body>
     </html>
   );

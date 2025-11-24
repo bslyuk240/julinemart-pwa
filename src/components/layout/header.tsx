@@ -3,12 +3,16 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, Menu, ShoppingCart } from 'lucide-react';
+import { Search, Menu, ShoppingCart, MessageCircle } from 'lucide-react';
 import MobileMenu from '@/components/layout/mobile-menu';
 import { useCart } from '@/hooks/use-cart';
 import { searchProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
 import { useRouter } from 'next/navigation';
+
+// WhatsApp configuration
+const WHATSAPP_NUMBER = '2347075825761';
+const WHATSAPP_MESSAGE = 'Hello! I need help with shopping on JulineMart.';
 
 export default function Header() {
   const logoSrc = process.env.NEXT_PUBLIC_LOGO_URL || '/images/logo.png';
@@ -52,6 +56,13 @@ export default function Header() {
       router.push(`/search?q=${encodeURIComponent(query.trim())}`);
       setIsFocused(false);
     }
+  };
+
+  // WhatsApp click handler
+  const handleWhatsAppClick = () => {
+    const encodedMessage = encodeURIComponent(WHATSAPP_MESSAGE);
+    const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   return (
@@ -131,6 +142,17 @@ export default function Header() {
               </div>
             )}
           </div>
+
+          {/* ==================== WHATSAPP ICON (NEW!) ==================== */}
+          <button
+            onClick={handleWhatsAppClick}
+            className="hidden md:inline-flex items-center justify-center p-2 rounded-lg hover:bg-green-600 bg-green-500 text-white transition-colors"
+            aria-label="Chat on WhatsApp"
+            title="Chat with us on WhatsApp"
+          >
+            <MessageCircle className="w-5 h-5" />
+          </button>
+          {/* =============================================================== */}
 
           {/* Desktop cart icon */}
           <Link
