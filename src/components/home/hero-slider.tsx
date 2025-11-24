@@ -5,9 +5,25 @@ import Image from 'next/image';
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
+type Slide = {
+  id: number;
+  backgroundImage?: string;
+  primaryButton: {
+    text: string;
+    link: string;
+  };
+  secondaryButton: {
+    text: string;
+    link: string;
+  };
+  useGradient: boolean;
+  gradientColors: string;
+  overlayOpacity: number;
+};
+
 // Hero Slider with Gradient Fallback
 // Will show gradient until you add images to public/images/
-const slides = [
+const slides: Slide[] = [
   {
     id: 1,
     primaryButton: {
