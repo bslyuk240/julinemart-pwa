@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { ArrowLeft, Store } from 'lucide-react';
 
 export const revalidate = 300; // Revalidate every 5 minutes
-export const dynamic = 'force-dynamic'; // Force dynamic rendering
 
 interface BrandPageProps {
   params: {
@@ -14,17 +13,10 @@ interface BrandPageProps {
 }
 
 export default async function BrandPage({ params }: BrandPageProps) {
-  let brand = null;
-  let products: any[] = [];
-
-  try {
-    brand = await getBrandBySlug(params.slug);
-    if (brand) {
-      products = await getProductsByBrand(params.slug, { per_page: 24 });
-    }
-  } catch (error) {
-    console.error('Error fetching brand data:', error);
-  }
+  const brand = await getBrandBySlug(params.slug).catch(() => null);
+  const products = brand 
+    ? await getProductsByBrand(params.slug, { per_page: 24 }).catch(() => [])
+    : [];
 
   if (!brand) {
     return (

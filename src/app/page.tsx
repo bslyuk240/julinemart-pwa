@@ -11,67 +11,76 @@ import { getProducts } from '@/lib/woocommerce/products';
 import { getTopBrands } from '@/lib/woocommerce/brands';
 
 export const revalidate = 300; // Revalidate every 5 minutes
-export const dynamic = 'force-dynamic'; // Force dynamic rendering for reliability
-
-// Helper function with timeout and retry
-async function fetchWithRetry<T>(
-  fetchFn: () => Promise<T>,
-  defaultValue: T,
-  retries = 2
-): Promise<T> {
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const result = await Promise.race([
-        fetchFn(),
-        new Promise<T>((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 10000) // 10 second timeout
-        )
-      ]);
-      return result;
-    } catch (error) {
-      console.error(`Attempt ${i + 1} failed:`, error);
-      if (i === retries) {
-        console.error('All retries exhausted, returning default value');
-        return defaultValue;
-      }
-      // Wait before retry
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-  return defaultValue;
-}
 
 export default async function HomePage() {
-  console.log('🏠 Homepage: Starting data fetch...');
+  console.log('🏠 [HOMEPAGE] Starting data fetch...');
   
-  // Fetch all data in parallel with retry logic
-  const [
-    flashSaleProducts,
-    dealProducts,
-    trendingProducts,
-    topSellerProducts,
-    sponsoredProducts,
-    launchingProducts,
-    brands,
-  ] = await Promise.all([
-    fetchWithRetry(() => getProducts({ tag: 'flash-sale', per_page: 12 }), []),
-    fetchWithRetry(() => getProducts({ tag: 'deal', per_page: 12 }), []),
-    fetchWithRetry(() => getProducts({ tag: 'best-seller', per_page: 12 }), []),
-    fetchWithRetry(() => getProducts({ tag: 'top-seller', per_page: 12 }), []),
-    fetchWithRetry(() => getProducts({ tag: 'sponsored', per_page: 12 }), []),
-    fetchWithRetry(() => getProducts({ tag: 'launching-deal', per_page: 12 }), []),
-    fetchWithRetry(() => getTopBrands(12), []),
-  ]);
+  // Fetch each section individually with error logging
+  let flashSaleProducts: any[] = [];
+  let dealProducts: any[] = [];
+  let trendingProducts: any[] = [];
+  let topSellerProducts: any[] = [];
+  let sponsoredProducts: any[] = [];
+  let launchingProducts: any[] = [];
+  let brands: any[] = [];
 
-  console.log('✅ Homepage Data Fetched:', {
-    flashSale: flashSaleProducts.length,
-    deals: dealProducts.length,
-    trending: trendingProducts.length,
-    topSellers: topSellerProducts.length,
-    sponsored: sponsoredProducts.length,
-    launching: launchingProducts.length,
-    brands: brands.length,
-  });
+  try {
+    console.log('📦 Fetching flash-sale products...');
+    flashSaleProducts = await getProducts({ tag: 'flash-sale', per_page: 12 });
+    console.log(`✅ Flash sale: ${flashSaleProducts.length} products`);
+  } catch (error) {
+    console.error('❌ Flash sale fetch failed:', error);
+  }
+
+  try {
+    console.log('📦 Fetching deal products...');
+    dealProducts = await getProducts({ tag: 'deal', per_page: 12 });
+    console.log(`✅ Deals: ${dealProducts.length} products`);
+  } catch (error) {
+    console.error('❌ Deals fetch failed:', error);
+  }
+
+  try {
+    console.log('📦 Fetching best-seller products...');
+    trendingProducts = await getProducts({ tag: 'best-seller', per_page: 12 });
+    console.log(`✅ Best sellers: ${trendingProducts.length} products`);
+  } catch (error) {
+    console.error('❌ Best sellers fetch failed:', error);
+  }
+
+  try {
+    console.log('📦 Fetching top-seller products...');
+    topSellerProducts = await getProducts({ tag: 'top-seller', per_page: 12 });
+    console.log(`✅ Top sellers: ${topSellerProducts.length} products`);
+  } catch (error) {
+    console.error('❌ Top sellers fetch failed:', error);
+  }
+
+  try {
+    console.log('📦 Fetching sponsored products...');
+    sponsoredProducts = await getProducts({ tag: 'sponsored', per_page: 12 });
+    console.log(`✅ Sponsored: ${sponsoredProducts.length} products`);
+  } catch (error) {
+    console.error('❌ Sponsored fetch failed:', error);
+  }
+
+  try {
+    console.log('📦 Fetching launching-deal products...');
+    launchingProducts = await getProducts({ tag: 'launching-deal', per_page: 12 });
+    console.log(`✅ Launching deals: ${launchingProducts.length} products`);
+  } catch (error) {
+    console.error('❌ Launching deals fetch failed:', error);
+  }
+
+  try {
+    console.log('📦 Fetching brands...');
+    brands = await getTopBrands(12);
+    console.log(`✅ Brands: ${brands.length} brands`);
+  } catch (error) {
+    console.error('❌ Brands fetch failed:', error);
+  }
+
+  console.log('✅ [HOMEPAGE] All data fetched');
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -86,11 +95,6 @@ export default async function HomePage() {
       {/* Flash Sales */}
       {flashSaleProducts.length > 0 && (
         <FlashSales products={flashSaleProducts} />
-      )}
-
-      {/* Brand Section */}
-      {brands.length > 0 && (
-        <BrandSection brands={brands} />
       )}
 
       {/* Launching Deals */}
@@ -116,6 +120,11 @@ export default async function HomePage() {
       {/* Trending/Best Sellers */}
       {trendingProducts.length > 0 && (
         <TrendingSection products={trendingProducts} />
+      )}
+
+      {/* Brand Section */}
+      {brands.length > 0 && (
+        <BrandSection brands={brands} />
       )}
 
       {/* Empty State - Show when no products with tags */}
