@@ -91,7 +91,7 @@ export default function HeroSlider() {
   const [loading, setLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const slide = slides[currentSlide];
+  const slide = slides[currentSlide] || slides[0];
 
   // Fetch slides from WordPress
   useEffect(() => {
@@ -145,16 +145,24 @@ export default function HeroSlider() {
     fetchSlides();
   }, []);
 
-  // Auto-advance slides every 5 seconds (pause on video slides)
+  // Keep the index within bounds when slides update from WordPress
   useEffect(() => {
-    if (slide.type === 'video') return;
-    
-    const timer = setInterval(() => {
-      nextSlide();
-    }, 5000);
+    if (currentSlide >= slides.length) {
+      setCurrentSlide(0);
+    }
+  }, [slides.length, currentSlide]);
 
-    return () => clearInterval(timer);
-  }, [currentSlide]);
+  // Auto-advance slides with a small delay (works for images and videos)
+  useEffect(() => {
+    if (slides.length <= 1 || !slide) return;
+    
+    const delay = slide.type === 'video' ? 8000 : 5000;
+    const timer = setTimeout(() => {
+      nextSlide();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [currentSlide, slides.length, slide]);
 
   // Handle video playback when slide changes
   useEffect(() => {
@@ -205,6 +213,7 @@ export default function HeroSlider() {
               autoPlay
               muted={isMuted}
               loop
+              onEnded={nextSlide}
               playsInline
             />
             
