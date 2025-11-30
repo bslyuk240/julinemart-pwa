@@ -47,9 +47,9 @@ export default function Footer() {
       </div>
 
       <div className="border-t border-white/10 py-3">
-        <div className="container mx-auto px-3 text-xs text-gray-200 flex flex-col md:flex-row items-center justify-between gap-2">
-          <span>© {new Date().getFullYear()} JulineMart.</span>
-          <div className="flex items-center gap-2">
+        <div className="container mx-auto px-3 text-xs text-gray-200 flex flex-row flex-wrap items-center justify-center md:justify-between gap-3">
+          <span className="whitespace-nowrap">© {new Date().getFullYear()} JulineMart.</span>
+          <div className="flex items-center gap-2 whitespace-nowrap">
             <Link href="/page/privacy-policy" className="hover:text-primary-200">Privacy</Link>
             <span>•</span>
             <Link href="/page/terms-of-service" className="hover:text-primary-200">Terms</Link>
