@@ -1,32 +1,31 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Lock, ArrowLeft, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { Eye, EyeOff, Lock, CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const key = searchParams.get('key');
   const login = searchParams.get('login');
-  
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isValidating, setIsValidating] = useState(true);
-  const [isValidKey, setIsValidKey] = useState<boolean | null>(null);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [resetSuccess, setResetSuccess] = useState(false);
+  const [isValidKey, setIsValidKey] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState('');
 
-  // Validate the reset key on page load
+  // Validate key on page load
   useEffect(() => {
     const validateKey = async () => {
       if (!key || !login) {
-        setIsValidKey(false);
-        setValidationError('Invalid password reset link. Please request a new one.');
         setIsValidating(false);
+        setError('Invalid reset link. Please request a new password reset.');
         return;
       }
 
@@ -37,17 +36,15 @@ function ResetPasswordContent() {
           body: JSON.stringify({ key, login }),
         });
 
-        if (response.ok) {
+        const data = await response.json();
+
+        if (data.valid) {
           setIsValidKey(true);
         } else {
-          const data = await response.json();
-          setIsValidKey(false);
-          setValidationError(data.error || 'Invalid or expired reset link.');
+          setError(data.error || 'This reset link is invalid or has expired.');
         }
-      } catch (error) {
-        // If validation endpoint doesn't exist, assume valid and let reset handle it
-        console.warn('Key validation endpoint not available, proceeding with reset');
-        setIsValidKey(true);
+      } catch (err) {
+        setError('Unable to validate reset link. Please try again.');
       } finally {
         setIsValidating(false);
       }
@@ -58,47 +55,36 @@ function ResetPasswordContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setError('');
+
     if (password !== confirmPassword) {
-      toast.error('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
-    
+
     if (password.length < 8) {
-      toast.error('Password must be at least 8 characters');
+      setError('Password must be at least 8 characters');
       return;
     }
-    
-    if (!key || !login) {
-      toast.error('Invalid reset link');
-      return;
-    }
-    
+
     setIsLoading(true);
-    
+
     try {
       const response = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, login, password }),
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
-        setResetSuccess(true);
-        toast.success('Password reset successfully!');
+        setIsSuccess(true);
       } else {
-        toast.error(data.error || 'Failed to reset password');
-        
-        // If key is invalid/expired, update state
-        if (data.error?.includes('expired') || data.error?.includes('invalid')) {
-          setIsValidKey(false);
-          setValidationError(data.error);
-        }
+        setError(data.error || 'Failed to reset password');
       }
-    } catch (error) {
-      toast.error('Something went wrong. Please try again.');
+    } catch (err) {
+      setError('An error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -107,46 +93,35 @@ function ResetPasswordContent() {
   // Loading state while validating key
   if (isValidating) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+      <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-            <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-600">Validating your reset link...</p>
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 text-center">
+            <Loader2 className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
+            <h1 className="text-xl font-semibold text-gray-900 mb-2">Validating Reset Link</h1>
+            <p className="text-gray-600">Please wait...</p>
           </div>
         </div>
       </main>
     );
   }
 
-  // Invalid key state
-  if (isValidKey === false) {
+  // Invalid/expired key state
+  if (!isValidKey && !isSuccess) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+      <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Login
-          </Link>
-
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
-                <AlertTriangle className="w-8 h-8 text-red-600" />
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Reset Link</h1>
-              <p className="text-gray-600 mb-6">
-                {validationError || 'This password reset link is invalid or has expired.'}
-              </p>
-              
-              <Link href="/forgot-password">
-                <Button variant="primary" size="lg" fullWidth>
-                  Request New Reset Link
-                </Button>
-              </Link>
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <XCircle className="w-8 h-8 text-red-600" />
             </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Link Expired</h1>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <Link
+              href="/forgot-password"
+              className="inline-flex items-center justify-center gap-2 w-full py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+            >
+              Request New Reset Link
+            </Link>
           </div>
         </div>
       </main>
@@ -154,26 +129,24 @@ function ResetPasswordContent() {
   }
 
   // Success state
-  if (resetSuccess) {
+  if (isSuccess) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+      <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-                <CheckCircle2 className="w-8 h-8 text-green-600" />
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Password Reset!</h1>
-              <p className="text-gray-600 mb-6">
-                Your password has been successfully reset. You can now log in with your new password.
-              </p>
-              
-              <Link href="/login">
-                <Button variant="primary" size="lg" fullWidth>
-                  Go to Login
-                </Button>
-              </Link>
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Password Reset!</h1>
+            <p className="text-gray-600 mb-6">
+              Your password has been successfully changed. You can now sign in with your new password.
+            </p>
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center gap-2 w-full py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+            >
+              Sign In
+            </Link>
           </div>
         </div>
       </main>
@@ -182,76 +155,99 @@ function ResetPasswordContent() {
 
   // Reset form
   return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
+    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <Link
-          href="/login"
-          className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Login
-        </Link>
-
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-100 rounded-full mb-4">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Lock className="w-8 h-8 text-primary-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Reset Password</h1>
-            <p className="text-gray-600 mt-2">Enter your new password</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Create New Password</h1>
+            <p className="text-gray-600">
+              Enter your new password below.
+            </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* New Password */}
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2">
+                <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                {error}
+              </div>
+            )}
+
+            {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 New Password
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="Enter new password"
-                required
-                minLength={8}
-                disabled={isLoading}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Must be at least 8 characters
-              </p>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                  placeholder="••••••••"
+                  required
+                  minLength={8}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
             </div>
 
             {/* Confirm Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
                 Confirm Password
               </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="Confirm new password"
-                required
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  id="confirmPassword"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
               {confirmPassword && password !== confirmPassword && (
                 <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
               )}
             </div>
 
-            {/* Submit */}
-            <Button
+            <button
               type="submit"
-              variant="primary"
-              size="lg"
-              fullWidth
-              isLoading={isLoading}
-              disabled={isLoading || password !== confirmPassword || password.length < 8}
+              disabled={isLoading || password.length < 8 || password !== confirmPassword}
+              className="w-full py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Reset Password
-            </Button>
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                'Reset Password'
+              )}
+            </button>
           </form>
         </div>
       </div>
@@ -261,11 +257,18 @@ function ResetPasswordContent() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full"></div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4">
+          <div className="w-full max-w-md">
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 text-center">
+              <Loader2 className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Loading...</p>
+            </div>
+          </div>
+        </main>
+      }
+    >
       <ResetPasswordContent />
     </Suspense>
   );
