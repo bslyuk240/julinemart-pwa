@@ -5,8 +5,8 @@ import Link from 'next/link';
 export default function Footer() {
   return (
     <footer className="bg-[#2a103b] text-gray-100 mt-10">
-      <div className="container mx-auto px-4 py-8 md:py-10 grid gap-8 md:grid-cols-3">
-        <div className="space-y-3">
+      <div className="container mx-auto px-4 py-6 md:py-10 grid gap-6 md:gap-8 grid-cols-1 md:grid-cols-3">
+        <div className="space-y-2">
           <h3 className="font-semibold text-white">Company</h3>
           <Link href="/page/about" className="block text-gray-200 hover:text-primary-200">
             About Us
