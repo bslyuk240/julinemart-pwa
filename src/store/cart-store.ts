@@ -20,7 +20,21 @@ interface CartState {
   discount: number;
   couponCode: string | null;
   isCalculating: boolean;
-  addItem: (product: Product, quantity?: number) => void;
+  addItem: (
+    product: Product,
+    quantity?: number,
+    variation?: {
+      id: number;
+      attributes: Record<string, string>;
+      price: number;
+      regularPrice: number;
+      salePrice?: number;
+      image?: string;
+      sku?: string;
+      stockQuantity: number | null;
+      stockStatus: 'instock' | 'outofstock' | 'onbackorder';
+    }
+  ) => void;
   removeItem: (itemId: number) => void;
   updateQuantity: (itemId: number, quantity: number) => void;
   clearCart: () => void;
@@ -59,22 +73,44 @@ export const useCartStore = create<CartState>()(
       couponCode: null,
       isCalculating: false,
 
-      addItem: (product: Product, quantity = 1) => {
+      addItem: (
+        product: Product,
+        quantity = 1,
+        variation?: {
+          id: number;
+          attributes: Record<string, string>;
+          price: number;
+          regularPrice: number;
+          salePrice?: number;
+          image?: string;
+          sku?: string;
+          stockQuantity: number | null;
+          stockStatus: 'instock' | 'outofstock' | 'onbackorder';
+        }
+      ) => {
         const { items } = get();
 
-        const existingItem = items.find((item) => item.productId === product.id);
+        const existingItem = items.find(
+          (item) =>
+            item.productId === product.id &&
+            (variation ? item.variation?.id === variation.id : !item.variation)
+        );
 
         if (existingItem) {
           get().updateQuantity(existingItem.id, existingItem.quantity + quantity);
           return;
         }
 
-        if (product.stock_status === 'outofstock') {
+        const effectiveStockStatus = variation?.stockStatus || product.stock_status;
+        const effectiveStockQty =
+          variation?.stockQuantity ?? product.stock_quantity ?? null;
+
+        if (effectiveStockStatus === 'outofstock') {
           toast.error(ERROR_MESSAGES.OUT_OF_STOCK);
           return;
         }
 
-        if (product.stock_quantity !== null && quantity > product.stock_quantity) {
+        if (effectiveStockQty !== null && quantity > effectiveStockQty) {
           toast.error(ERROR_MESSAGES.LOW_STOCK);
           return;
         }
@@ -98,28 +134,48 @@ const numericWeight =
     ? parseFloat(String(product.weight))
     : undefined;
 
+        const displayPrice =
+          variation?.salePrice ??
+          variation?.price ??
+          (product.sale_price ? parseFloat(product.sale_price) : parseFloat(product.price));
+
+        const displayRegularPrice =
+          variation?.regularPrice ??
+          (product.regular_price ? parseFloat(product.regular_price) : displayPrice);
+
         const newItem: CartItem = {
   id: Date.now(),
   productId: product.id,
   name: product.name,
   slug: product.slug,
-  price: product.sale_price
-    ? parseFloat(product.sale_price)
-    : parseFloat(product.price),
-  regularPrice: product.regular_price
-    ? parseFloat(product.regular_price)
-    : 0,
-  salePrice: product.sale_price ? parseFloat(product.sale_price) : undefined,
+  price: displayPrice,
+  regularPrice: displayRegularPrice,
+  salePrice:
+    variation?.salePrice ??
+    (product.sale_price ? parseFloat(product.sale_price) : undefined),
   quantity,
-  image: product.images[0]?.src || '/placeholder.png',
-  stockStatus: product.stock_status,
-  stockQuantity: product.stock_quantity,
-  sku: product.sku,
+  image: variation?.image || product.images[0]?.src || '/placeholder.png',
+  stockStatus: effectiveStockStatus,
+  stockQuantity: effectiveStockQty,
+  sku: variation?.sku || product.sku,
   vendorId: product.store?.id,
   vendorName: product.store?.name,
   hubId: hubId,          // ✅ Now extracts correctly
   hubName: hubName,      
   weight: numericWeight,
+  variation: variation
+    ? {
+        id: variation.id,
+        attributes: variation.attributes,
+        price: variation.price,
+        regularPrice: variation.regularPrice,
+        salePrice: variation.salePrice,
+        image: variation.image,
+        sku: variation.sku,
+        stockQuantity: variation.stockQuantity,
+        stockStatus: variation.stockStatus,
+      }
+    : undefined,
 };
 
         set((state) => ({
@@ -150,7 +206,11 @@ const numericWeight =
         }
 
         const item = get().items.find((i) => i.id === itemId);
-        if (item?.stockQuantity && quantity > item.stockQuantity) {
+        if (
+          item?.stockQuantity !== null &&
+          item?.stockQuantity !== undefined &&
+          quantity > item.stockQuantity
+        ) {
           toast.error(ERROR_MESSAGES.OUT_OF_STOCK);
           return;
         }

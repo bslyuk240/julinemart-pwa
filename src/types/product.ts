@@ -59,6 +59,7 @@ export interface Product {
 
   categories: ProductCategory[];
   tags: ProductTag[];
+  brands?: ProductBrand[];
   images: ProductImage[];
   attributes: ProductAttribute[];
   default_attributes: any[];
@@ -78,6 +79,26 @@ export interface Product {
   };
 }
 
+export interface VariationAttribute {
+  id: number;
+  name: string;
+  option: string;
+}
+
+export interface ProductVariation {
+  id: number;
+  sku: string;
+  price: string;
+  regular_price: string;
+  sale_price: string;
+  on_sale: boolean;
+  stock_status: 'instock' | 'outofstock' | 'onbackorder';
+  stock_quantity: number | null;
+  manage_stock: boolean;
+  attributes: VariationAttribute[];
+  image?: ProductImage;
+}
+
 export interface ProductCategory {
   id: number;
   name: string;
@@ -85,6 +106,12 @@ export interface ProductCategory {
 }
 
 export interface ProductTag {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface ProductBrand {
   id: number;
   name: string;
   slug: string;

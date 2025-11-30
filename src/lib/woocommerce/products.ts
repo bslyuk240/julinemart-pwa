@@ -1,5 +1,5 @@
 import { wcApi, handleApiError, WooCommerceResponse } from './client';
-import { Product, ProductsQueryParams } from '@/types/product';
+import { Product, ProductsQueryParams, ProductVariation } from '@/types/product';
 
 /**
  * Get all products with optional filters
@@ -55,6 +55,24 @@ export async function getProduct(id: number): Promise<Product | null> {
   } catch (error) {
     handleApiError(error);
     return null;
+  }
+}
+
+/**
+ * Get variations for a variable product
+ */
+export async function getProductVariations(
+  productId: number
+): Promise<ProductVariation[]> {
+  try {
+    const response = await wcApi.get(`products/${productId}/variations`, {
+      per_page: 100,
+      status: 'publish',
+    });
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
+    return [];
   }
 }
 

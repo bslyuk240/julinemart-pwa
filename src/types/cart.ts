@@ -16,6 +16,13 @@ export interface CartItem {
   variation?: {
     id: number;
     attributes: Record<string, string>;
+    price: number;
+    regularPrice: number;
+    salePrice?: number;
+    image?: string;
+    sku?: string;
+    stockQuantity: number | null;
+    stockStatus: 'instock' | 'outofstock' | 'onbackorder';
   };
   vendorId?: number;
   vendorName?: string;

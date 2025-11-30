@@ -1,19 +1,80 @@
 {
-  "name": "JulineMart - Online Marketplace",
+  "name": "JulineMart - Your One-Stop Marketplace",
   "short_name": "JulineMart",
-  "description": "Shop online for electronics, fashion, and more",
+  "description": "Shop the best deals on phones, electronics, fashion and more",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#7c3aed",
+  "theme_color": "#77088a",
   "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["shopping", "lifestyle", "business"],
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/favicon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
-  "categories": ["shopping", "lifestyle"]
+  "shortcuts": [
+    {
+      "name": "Browse Products",
+      "short_name": "Products",
+      "description": "Browse all products",
+      "url": "/products",
+      "icons": [
+        {
+          "src": "/favicon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "My Cart",
+      "short_name": "Cart",
+      "description": "View shopping cart",
+      "url": "/cart",
+      "icons": [
+        {
+          "src": "/favicon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "My Account",
+      "short_name": "Account",
+      "description": "Manage your account",
+      "url": "/account",
+      "icons": [
+        {
+          "src": "/favicon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "display_override": ["standalone", "fullscreen", "minimal-ui"],
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  }
 }

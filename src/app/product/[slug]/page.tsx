@@ -1,17 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Star, ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, Minus, Plus, Store, BadgeCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProductGallery from '@/components/product/product-gallery';
 import ProductCarousel from '@/components/product/product-carousel';
 import { Badge } from '@/components/ui/badge';
-import { getProductBySlug, getRelatedProducts } from '@/lib/woocommerce/products';
+import { getProductBySlug, getRelatedProducts, getProductVariations } from '@/lib/woocommerce/products';
 import ProductFeatures from '@/components/product/product-features';
 import { useCartStore } from '@/store/cart-store';
 import { useWishlist } from '@/hooks/use-wishlist';
-import { Product } from '@/types/product';
+import { Product, ProductVariation } from '@/types/product';
+import { toast } from 'sonner';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -36,6 +38,10 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<'description' | 'reviews'>('description');
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [variations, setVariations] = useState<ProductVariation[]>([]);
+  const [loadingVariations, setLoadingVariations] = useState(false);
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
+  const [selectedVariation, setSelectedVariation] = useState<ProductVariation | null>(null);
 
   const addToCart = useCartStore((state) => state.addItem);
   const { toggleWishlist, isInWishlist } = useWishlist();
@@ -78,23 +84,81 @@ export default function ProductDetailPage() {
     fetchRelated();
   }, [product]);
 
-  const formatPrice = (price: string) => {
-    return `₦${parseFloat(price).toLocaleString()}`;
+  const formatPrice = (price: string | number) => {
+    const numeric = typeof price === 'number' ? price : parseFloat(price);
+    return `₦${numeric.toLocaleString()}`;
   };
 
   const handleAddToCart = () => {
     if (!product) return;
-    
-    console.log('Adding to cart:', product);
-    addToCart(product, quantity);
+
+    const requiresSelection = product.type === 'variable' && variationAttributes.length > 0;
+    if (requiresSelection && !selectedVariation) {
+      toast.error('Please choose your options first');
+      return;
+    }
+
+    const variationPayload = selectedVariation
+      ? {
+          id: selectedVariation.id,
+          attributes: selectedVariation.attributes.reduce<Record<string, string>>(
+            (acc, attr) => {
+              acc[attr.name] = attr.option;
+              return acc;
+            },
+            {}
+          ),
+          price: selectedPrice,
+          regularPrice: selectedRegularPrice,
+          salePrice: selectedVariation.sale_price
+            ? parseFloat(selectedVariation.sale_price)
+            : undefined,
+          image: selectedVariation.image?.src,
+          sku: selectedVariation.sku,
+          stockQuantity: selectedVariation.stock_quantity ?? null,
+          stockStatus: selectedVariation.stock_status,
+        }
+      : undefined;
+
+    addToCart(product, quantity, variationPayload);
+    toast.success('Added to cart');
   };
 
   const handleBuyNow = () => {
     if (!product) return;
-    
+
+    const requiresSelection = product.type === 'variable' && variationAttributes.length > 0;
+    if (requiresSelection && !selectedVariation) {
+      toast.error('Please choose your options first');
+      return;
+    }
+
+    const variationPayload = selectedVariation
+      ? {
+          id: selectedVariation.id,
+          attributes: selectedVariation.attributes.reduce<Record<string, string>>(
+            (acc, attr) => {
+              acc[attr.name] = attr.option;
+              return acc;
+            },
+            {}
+          ),
+          price: selectedPrice,
+          regularPrice: selectedRegularPrice,
+          salePrice: selectedVariation.sale_price
+            ? parseFloat(selectedVariation.sale_price)
+            : undefined,
+          image: selectedVariation.image?.src,
+          sku: selectedVariation.sku,
+          stockQuantity: selectedVariation.stock_quantity ?? null,
+          stockStatus: selectedVariation.stock_status,
+        }
+      : undefined;
+
     // Add to cart first
-    addToCart(product, quantity);
-    
+    addToCart(product, quantity, variationPayload);
+    toast.success('Added to cart');
+
     // Redirect to checkout
     router.push('/checkout');
   };
@@ -154,9 +218,9 @@ export default function ProductDetailPage() {
   };
 
   const increaseQuantity = () => {
-    if (product && product.stock_quantity && quantity < product.stock_quantity) {
+    if (product && effectiveStockQty && quantity < effectiveStockQty) {
       setQuantity(quantity + 1);
-    } else if (!product?.stock_quantity) {
+    } else if (!effectiveStockQty) {
       setQuantity(quantity + 1);
     }
   };
@@ -166,6 +230,104 @@ export default function ProductDetailPage() {
       setQuantity(quantity - 1);
     }
   };
+
+  // Load variations for variable products
+  useEffect(() => {
+    const loadVariations = async () => {
+      if (!product || product.type !== 'variable') {
+        setVariations([]);
+        setSelectedAttributes({});
+        setSelectedVariation(null);
+        return;
+      }
+
+      try {
+        setLoadingVariations(true);
+        const data = await getProductVariations(product.id);
+        setVariations(data);
+
+        // Prefill defaults if available
+        if (product.default_attributes?.length) {
+          const defaults: Record<string, string> = {};
+          product.default_attributes.forEach((attr: any) => {
+            if (attr.name && attr.option) {
+              defaults[attr.name.toLowerCase()] = attr.option;
+            }
+          });
+          setSelectedAttributes(defaults);
+        }
+      } catch (err) {
+        console.error('Error loading variations', err);
+      } finally {
+        setLoadingVariations(false);
+      }
+    };
+
+    loadVariations();
+  }, [product]);
+
+  // Find matching variation when selections change
+  useEffect(() => {
+    if (!variations.length) {
+      setSelectedVariation(null);
+      return;
+    }
+
+    const match = variations.find((variation) => {
+      return variation.attributes.every((attr) => {
+        const key = attr.name.toLowerCase();
+        return selectedAttributes[key] && selectedAttributes[key] === attr.option;
+      });
+    });
+
+    setSelectedVariation(match || null);
+  }, [selectedAttributes, variations]);
+
+  const variationAttributes = useMemo(
+    () => product?.attributes?.filter((attr) => attr.variation) || [],
+    [product]
+  );
+
+  const selectedPrice = useMemo(() => {
+    if (!product) return 0;
+    if (selectedVariation) {
+      const sale = selectedVariation.sale_price ? parseFloat(selectedVariation.sale_price) : null;
+      return sale && !isNaN(sale)
+        ? sale
+        : selectedVariation.price
+        ? parseFloat(selectedVariation.price)
+        : parseFloat(product.price);
+    }
+    return parseFloat(product.sale_price || product.price);
+  }, [product, selectedVariation]);
+
+  const selectedRegularPrice = useMemo(() => {
+    if (!product) return 0;
+    if (selectedVariation?.regular_price) {
+      const reg = parseFloat(selectedVariation.regular_price);
+      if (!isNaN(reg)) return reg;
+    }
+    return product.regular_price ? parseFloat(product.regular_price) : selectedPrice;
+  }, [product, selectedPrice, selectedVariation]);
+
+  const effectiveStockStatus =
+    selectedVariation?.stock_status || product?.stock_status || 'outofstock';
+  const effectiveStockQty =
+    selectedVariation?.stock_quantity ?? product?.stock_quantity ?? null;
+
+  const galleryImages = selectedVariation?.image?.src && product
+    ? [
+        {
+          id: selectedVariation.image.id || selectedVariation.id,
+          date_created: '',
+          date_modified: '',
+          src: selectedVariation.image.src,
+          name: selectedVariation.image.name || product.name,
+          alt: selectedVariation.image.alt || product.name,
+        },
+        ...product.images,
+      ]
+    : product?.images || [];
 
   if (loading) {
     return (
@@ -199,9 +361,10 @@ export default function ProductDetailPage() {
     );
   }
 
-  const discountPercentage = product.on_sale && product.regular_price
-    ? Math.round(((parseFloat(product.regular_price) - parseFloat(product.price)) / parseFloat(product.regular_price)) * 100)
-    : 0;
+  const discountPercentage =
+    selectedRegularPrice && selectedRegularPrice > selectedPrice
+      ? Math.round(((selectedRegularPrice - selectedPrice) / selectedRegularPrice) * 100)
+      : 0;
 
   const inWishlist = isInWishlist(product.id);
 
@@ -255,7 +418,7 @@ export default function ProductDetailPage() {
         <div className="grid md:grid-cols-2 gap-6 md:gap-8 mb-10">
           {/* Product Gallery */}
           <div>
-            <ProductGallery images={product.images} productName={product.name} />
+            <ProductGallery images={galleryImages} productName={product.name} />
           </div>
 
           {/* Product Info */}
@@ -302,12 +465,12 @@ export default function ProductDetailPage() {
               {/* Price */}
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl md:text-2xl font-bold text-primary-600">
-                  {formatPrice(product.price)}
+                  {formatPrice(selectedPrice.toString())}
                 </span>
-                {product.on_sale && product.regular_price && (
+                {discountPercentage > 0 && (
                   <>
                     <span className="text-base md:text-lg text-gray-400 line-through">
-                      {formatPrice(product.regular_price)}
+                      {formatPrice(selectedRegularPrice.toString())}
                     </span>
                     <Badge variant="danger">
                       -{discountPercentage}% OFF
@@ -317,12 +480,12 @@ export default function ProductDetailPage() {
               </div>
 
               {/* Stock Status */}
-              {product.stock_status === 'instock' ? (
+              {effectiveStockStatus === 'instock' ? (
                 <div className="flex items-center gap-2 mb-4 md:mb-5">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <p className="text-green-600 font-medium text-sm md:text-base">In Stock</p>
-                  {product.stock_quantity && (
-                    <span className="text-gray-500 text-xs md:text-sm">({product.stock_quantity} available)</span>
+                  {effectiveStockQty !== null && (
+                    <span className="text-gray-500 text-xs md:text-sm">({effectiveStockQty} available)</span>
                   )}
                 </div>
               ) : (
@@ -332,6 +495,126 @@ export default function ProductDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* Variations */}
+            {product.type === 'variable' && variationAttributes.length > 0 && (
+              <div className="border-t pt-4 md:pt-5 space-y-4">
+                {variationAttributes.map((attr) => {
+                  const key = attr.name.toLowerCase();
+                  const selected = selectedAttributes[key];
+
+                  const isOptionAvailable = (option: string) => {
+                    if (!variations.length) return true;
+                    return variations.some((variation) =>
+                      variation.attributes.every((va) => {
+                        const nameKey = va.name.toLowerCase();
+                        if (nameKey === key) {
+                          return va.option === option;
+                        }
+                        if (selectedAttributes[nameKey]) {
+                          return va.option === selectedAttributes[nameKey];
+                        }
+                        return true;
+                      })
+                    );
+                  };
+
+                  return (
+                    <div key={attr.id || attr.name} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-900">
+                          {attr.name}
+                        </p>
+                        {selected && (
+                          <span className="text-xs text-gray-500">
+                            Selected: {selected}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {attr.options.map((option) => {
+                          const isSelected = selected === option;
+                          const disabled = !isOptionAvailable(option);
+                          return (
+                            <button
+                              key={option}
+                              type="button"
+                              disabled={disabled}
+                              onClick={() =>
+                                setSelectedAttributes((prev) => ({
+                                  ...prev,
+                                  [key]: option,
+                                }))
+                              }
+                              className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
+                                isSelected
+                                  ? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
+                                  : 'border-gray-300 text-gray-700 hover:border-primary-500'
+                              } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {option}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {loadingVariations && (
+                  <p className="text-sm text-gray-500">Loading variations...</p>
+                )}
+
+                {variationAttributes.length > 0 &&
+                  variationAttributes.every(
+                    (attr) => selectedAttributes[attr.name.toLowerCase()]
+                  ) &&
+                  !selectedVariation && !loadingVariations && (
+                    <p className="text-sm text-red-600">
+                      This combination is not available. Please choose a different option.
+                    </p>
+                  )}
+              </div>
+            )}
+
+            {/* SKU & BRAND - ADD THIS SECTION */}
+<div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-6 pb-6 border-b border-gray-200">
+  {/* SKU */}
+  {product.sku && (
+    <div className="flex items-center gap-2">
+      <span className="font-medium text-gray-900">SKU:</span>
+      <span className="bg-gray-100 px-2 py-1 rounded font-mono text-xs">
+        {product.sku}
+      </span>
+    </div>
+  )}
+  
+  {/* Brand */}
+  {product.brands && product.brands.length > 0 && (
+    <div className="flex items-center gap-2">
+      <span className="font-medium text-gray-900">Brand:</span>
+      <Link 
+        href={`/brand/${product.brands[0].slug}`}
+        className="text-primary-600 hover:text-primary-700 font-medium transition-colors"
+      >
+        {product.brands[0].name}
+      </Link>
+    </div>
+  )}
+  
+  {/* Category */}
+  {product.categories && product.categories.length > 0 && (
+    <div className="flex items-center gap-2">
+      <span className="font-medium text-gray-900">Category:</span>
+      <Link 
+        href={`/category/${product.categories[0].slug}`}
+        className="text-primary-600 hover:text-primary-700 font-medium transition-colors"
+      >
+        {product.categories[0].name}
+      </Link>
+    </div>
+  )}
+</div>
 
             {/* Short Description */}
             {product.short_description && (
@@ -381,7 +664,12 @@ export default function ProductDetailPage() {
                   variant="primary"
                   size="md"
                   fullWidth
-                  disabled={product.stock_status === 'outofstock'}
+                  disabled={
+                    effectiveStockStatus === 'outofstock' ||
+                    (product.type === 'variable' &&
+                      variationAttributes.length > 0 &&
+                      !selectedVariation)
+                  }
                   className="flex-1 text-sm md:text-base"
                 >
                   <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 mr-2" />
@@ -479,7 +767,12 @@ export default function ProductDetailPage() {
                 variant="secondary" 
                 size="md" 
                 fullWidth
-                disabled={product.stock_status === 'outofstock'}
+                disabled={
+                  effectiveStockStatus === 'outofstock' ||
+                  (product.type === 'variable' &&
+                    variationAttributes.length > 0 &&
+                    !selectedVariation)
+                }
                 className="text-sm md:text-base"
               >
                 Buy Now

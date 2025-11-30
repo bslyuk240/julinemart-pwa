@@ -182,3 +182,36 @@
     }
   }
 }
+
+/* Fix bottom nav sticky on mobile */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav-fixed {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Add padding to main content for bottom nav */
+main {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+  main {
+    padding-bottom: 2rem;
+  }
+}
+
+/* Prevent scroll bounce on iOS */
+body {
+  overscroll-behavior-y: none;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#__next {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}

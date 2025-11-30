@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CreditCard, Truck, Package, MapPin } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
 import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
 import { getShippingFee } from '@/lib/shipping/jloShipping';
+import { updateCustomer } from '@/lib/woocommerce/customers';
 
 interface ShippingOption {
   id: string;
@@ -54,7 +55,7 @@ declare global {
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, clearCart } = useCart();
-  const { customer, customerId, isAuthenticated } = useCustomerAuth();
+  const { customer, customerId, isAuthenticated, refreshCustomer } = useCustomerAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
   const currentOrderRef = useRef<any>(null);
@@ -77,6 +78,8 @@ export default function CheckoutPage() {
   // JLO shipping calculation state
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
   const [shippingError, setShippingError] = useState<string | null>(null);
+  const [useDifferentAddress, setUseDifferentAddress] = useState(false);
+  const [saveNewAddress, setSaveNewAddress] = useState(false);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -94,6 +97,47 @@ export default function CheckoutPage() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const applyShippingAddress = useCallback((): void => {
+    if (!customer?.shipping) return;
+
+    const shipping = customer.shipping;
+    const billing = customer.billing;
+
+    setFormData((prev) => ({
+      ...prev,
+      firstName: shipping.first_name || customer.first_name || prev.firstName,
+      lastName: shipping.last_name || customer.last_name || prev.lastName,
+      email: prev.email || customer.email || billing?.email || '',
+      phone: shipping.phone || billing?.phone || prev.phone,
+      address1: shipping.address_1 || prev.address1,
+      address2: shipping.address_2 || prev.address2,
+      city: shipping.city || prev.city,
+      state: shipping.state || prev.state,
+      postcode: shipping.postcode || prev.postcode,
+      country: shipping.country || prev.country || 'NG',
+    }));
+  }, [customer]);
+
+  const applyBillingAddress = useCallback((): void => {
+    if (!customer?.billing) return;
+
+    const billing = customer.billing;
+
+    setFormData((prev) => ({
+      ...prev,
+      firstName: billing.first_name || customer?.first_name || prev.firstName,
+      lastName: billing.last_name || customer?.last_name || prev.lastName,
+      email: billing.email || customer?.email || prev.email,
+      phone: billing.phone || prev.phone,
+      address1: billing.address_1 || prev.address1,
+      address2: billing.address_2 || prev.address2,
+      city: billing.city || prev.city,
+      state: billing.state || prev.state,
+      postcode: billing.postcode || prev.postcode,
+      country: billing.country || prev.country || 'NG',
+    }));
+  }, [customer]);
 
   const formatPrice = (price: number) => `NGN ${price.toLocaleString()}`;
   const total = subtotal + (shippingCost || 0) + taxAmount;
@@ -439,22 +483,27 @@ export default function CheckoutPage() {
         }
       }
 
-      // Prefill form
-      setFormData((prev) => ({
-        ...prev,
-        firstName: customer.first_name || prev.firstName,
-        lastName: customer.last_name || prev.lastName,
-        email: customer.email || prev.email,
-        phone: customer.billing?.phone || prev.phone,
-        address1: customer.billing?.address_1 || prev.address1,
-        address2: customer.billing?.address_2 || prev.address2,
-        city: customer.billing?.city || prev.city,
-        state: customer.billing?.state || prev.state,
-        postcode: customer.billing?.postcode || prev.postcode,
-        country: customer.billing?.country || prev.country,
-      }));
+      // Prefill form with saved shipping first, then billing
+      if (customer.shipping) {
+        applyShippingAddress();
+        setUseDifferentAddress(false);
+        setSaveNewAddress(false);
+      } else if (customer.billing) {
+        applyBillingAddress();
+        setUseDifferentAddress(true);
+      }
+    } else {
+      setUseDifferentAddress(true);
     }
   }, [customer]);
+
+  // If user switches back to saved address, re-apply it
+  useEffect(() => {
+    if (!useDifferentAddress && customer?.shipping) {
+      applyShippingAddress();
+      setSaveNewAddress(false);
+    }
+  }, [useDifferentAddress, customer, applyShippingAddress]);
 
   useEffect(() => {
     if (!defaultSavedCard || selectedPayment !== 'paystack') {
@@ -542,6 +591,45 @@ export default function CheckoutPage() {
 
     if (option && option.methodId !== 'jlo_shipping') {
       setShippingCost(option.cost ?? null);
+    }
+  };
+
+  const persistAddressIfNeeded = async () => {
+    if (!isAuthenticated || !customerId || !saveNewAddress || !useDifferentAddress) return;
+
+    try {
+      const shippingPayload = {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        address_1: formData.address1,
+        address_2: formData.address2,
+        city: formData.city,
+        state: formData.state,
+        postcode: formData.postcode,
+        country: formData.country,
+        phone: formData.phone,
+        company: '',
+      };
+
+      const billingPayload = {
+        ...shippingPayload,
+        email: formData.email,
+      };
+
+      const updated = await updateCustomer(customerId, {
+        shipping: shippingPayload,
+        billing: billingPayload,
+      });
+
+      if (updated) {
+        await refreshCustomer();
+        toast.success('Address saved for future checkouts');
+      } else {
+        toast.error('Could not save address to your account');
+      }
+    } catch (error) {
+      console.error('Address save error:', error);
+      toast.error('We could not save this address to your account');
     }
   };
 
@@ -647,6 +735,7 @@ export default function CheckoutPage() {
 
       if (order && order.id) {
         console.log('  Order created:', order.id);
+        await persistAddressIfNeeded();
         
         // Check if payment method requires online payment
         const selectedGateway = paymentGateways.find(g => g.id === selectedPayment);
@@ -738,6 +827,10 @@ export default function CheckoutPage() {
 
   const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
   const isPaystackGateway = selectedPayment === 'paystack';
+  const hasSavedShipping = Boolean(
+    customer?.shipping &&
+    (customer.shipping.address_1 || customer.shipping.city || customer.shipping.state)
+  );
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
@@ -810,110 +903,164 @@ export default function CheckoutPage() {
                 <h2 className="text-xl font-semibold text-gray-900">Delivery Address</h2>
               </div>
               
-              <div className="space-y-4">
-                <Input
-                  label="Street Address *"
-                  name="address1"
-                  value={formData.address1}
-                  onChange={handleInputChange}
-                  error={errors.address1}
-                  fullWidth
-                />
-
-                <Input
-                  label="Apartment, suite, etc. (optional)"
-                  name="address2"
-                  value={formData.address2}
-                  onChange={handleInputChange}
-                  fullWidth
-                />
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <Input
-                    label="City *"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleInputChange}
-                    error={errors.city}
-                    fullWidth
-                  />
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      State *
-                    </label>
-                    <select
-                      name="state"
-                      value={formData.state}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              {hasSavedShipping && (
+                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-green-900 mb-1">Saved Address</p>
+                      <p className="text-sm text-green-800">
+                        {customer?.shipping?.first_name} {customer?.shipping?.last_name}{customer?.shipping?.first_name || customer?.shipping?.last_name ? ' • ' : ''}
+                        {customer?.shipping?.address_1}{customer?.shipping?.city ? `, ${customer.shipping.city}` : ''}{customer?.shipping?.state ? `, ${customer.shipping.state}` : ''}
+                      </p>
+                      {customer?.shipping?.phone && (
+                        <p className="text-xs text-green-700 mt-1">Phone: {customer.shipping.phone}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !useDifferentAddress;
+                        setUseDifferentAddress(next);
+                        if (!next) {
+                          applyShippingAddress();
+                          setSaveNewAddress(false);
+                        }
+                      }}
+                      className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                     >
-                      <option value="">Select State</option>
-                      <option value="Abia">Abia</option>
-                      <option value="Adamawa">Adamawa</option>
-                      <option value="Akwa Ibom">Akwa Ibom</option>
-                      <option value="Anambra">Anambra</option>
-                      <option value="Bauchi">Bauchi</option>
-                      <option value="Bayelsa">Bayelsa</option>
-                      <option value="Benue">Benue</option>
-                      <option value="Borno">Borno</option>
-                      <option value="Cross River">Cross River</option>
-                      <option value="Delta">Delta</option>
-                      <option value="Ebonyi">Ebonyi</option>
-                      <option value="Edo">Edo</option>
-                      <option value="Ekiti">Ekiti</option>
-                      <option value="Enugu">Enugu</option>
-                      <option value="FCT">Federal Capital Territory (Abuja)</option>
-                      <option value="Gombe">Gombe</option>
-                      <option value="Imo">Imo</option>
-                      <option value="Jigawa">Jigawa</option>
-                      <option value="Kaduna">Kaduna</option>
-                      <option value="Kano">Kano</option>
-                      <option value="Katsina">Katsina</option>
-                      <option value="Kebbi">Kebbi</option>
-                      <option value="Kogi">Kogi</option>
-                      <option value="Kwara">Kwara</option>
-                      <option value="Lagos">Lagos</option>
-                      <option value="Nasarawa">Nasarawa</option>
-                      <option value="Niger">Niger</option>
-                      <option value="Ogun">Ogun</option>
-                      <option value="Ondo">Ondo</option>
-                      <option value="Osun">Osun</option>
-                      <option value="Oyo">Oyo</option>
-                      <option value="Plateau">Plateau</option>
-                      <option value="Rivers">Rivers</option>
-                      <option value="Sokoto">Sokoto</option>
-                      <option value="Taraba">Taraba</option>
-                      <option value="Yobe">Yobe</option>
-                      <option value="Zamfara">Zamfara</option>
-                    </select>
-                    {errors.state && (
-                      <p className="mt-1.5 text-sm text-red-600">{errors.state}</p>
-                    )}
+                      {useDifferentAddress ? 'Use saved address' : 'Use different address'}
+                    </button>
                   </div>
                 </div>
+              )}
 
-                <Input
-                  label="Postal Code (optional)"
-                  name="postcode"
-                  value={formData.postcode}
-                  onChange={handleInputChange}
-                  fullWidth
-                />
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Order Notes (optional)
-                  </label>
-                  <textarea
-                    name="notes"
-                    value={formData.notes}
+              {(!hasSavedShipping || useDifferentAddress) && (
+                <div className="space-y-4">
+                  <Input
+                    label="Street Address *"
+                    name="address1"
+                    value={formData.address1}
                     onChange={handleInputChange}
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="Special delivery instructions, etc."
+                    error={errors.address1}
+                    fullWidth
                   />
+
+                  <Input
+                    label="Apartment, suite, etc. (optional)"
+                    name="address2"
+                    value={formData.address2}
+                    onChange={handleInputChange}
+                    fullWidth
+                  />
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <Input
+                      label="City *"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleInputChange}
+                      error={errors.city}
+                      fullWidth
+                    />
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        State *
+                      </label>
+                      <select
+                        name="state"
+                        value={formData.state}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="">Select State</option>
+                        <option value="Abia">Abia</option>
+                        <option value="Adamawa">Adamawa</option>
+                        <option value="Akwa Ibom">Akwa Ibom</option>
+                        <option value="Anambra">Anambra</option>
+                        <option value="Bauchi">Bauchi</option>
+                        <option value="Bayelsa">Bayelsa</option>
+                        <option value="Benue">Benue</option>
+                        <option value="Borno">Borno</option>
+                        <option value="Cross River">Cross River</option>
+                        <option value="Delta">Delta</option>
+                        <option value="Ebonyi">Ebonyi</option>
+                        <option value="Edo">Edo</option>
+                        <option value="Ekiti">Ekiti</option>
+                        <option value="Enugu">Enugu</option>
+                        <option value="FCT">Federal Capital Territory (Abuja)</option>
+                        <option value="Gombe">Gombe</option>
+                        <option value="Imo">Imo</option>
+                        <option value="Jigawa">Jigawa</option>
+                        <option value="Kaduna">Kaduna</option>
+                        <option value="Kano">Kano</option>
+                        <option value="Katsina">Katsina</option>
+                        <option value="Kebbi">Kebbi</option>
+                        <option value="Kogi">Kogi</option>
+                        <option value="Kwara">Kwara</option>
+                        <option value="Lagos">Lagos</option>
+                        <option value="Nasarawa">Nasarawa</option>
+                        <option value="Niger">Niger</option>
+                        <option value="Ogun">Ogun</option>
+                        <option value="Ondo">Ondo</option>
+                        <option value="Osun">Osun</option>
+                        <option value="Oyo">Oyo</option>
+                        <option value="Plateau">Plateau</option>
+                        <option value="Rivers">Rivers</option>
+                        <option value="Sokoto">Sokoto</option>
+                        <option value="Taraba">Taraba</option>
+                        <option value="Yobe">Yobe</option>
+                        <option value="Zamfara">Zamfara</option>
+                      </select>
+                      {errors.state && (
+                        <p className="mt-1.5 text-sm text-red-600">{errors.state}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <Input
+                    label="Postal Code (optional)"
+                    name="postcode"
+                    value={formData.postcode}
+                    onChange={handleInputChange}
+                    fullWidth
+                  />
+
+                  {isAuthenticated && (
+                    <label className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={saveNewAddress}
+                        onChange={(e) => setSaveNewAddress(e.target.checked)}
+                        className="mt-1 w-4 h-4 text-primary-600"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">Save this address for future orders</p>
+                        <p className="text-sm text-gray-600">We will add it to your profile once this order is placed.</p>
+                      </div>
+                    </label>
+                  )}
                 </div>
+              )}
+
+              {!useDifferentAddress && hasSavedShipping && (
+                <p className="text-sm text-gray-600">
+                  We&apos;ll deliver to your saved address above. Select &quot;Use different address&quot; if you need to update it.
+                </p>
+              )}
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Order Notes (optional)
+                </label>
+                <textarea
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Special delivery instructions, etc."
+                />
               </div>
             </div>
 
