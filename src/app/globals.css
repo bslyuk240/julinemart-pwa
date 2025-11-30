@@ -201,17 +201,13 @@ main {
   }
 }
 
-/* Prevent scroll bounce on iOS */
+/* Prevent scroll bounce on iOS but keep normal scrolling */
 body {
   overscroll-behavior-y: none;
-  position: fixed;
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
 }
 
 #__next {
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  min-height: 100%;
 }
