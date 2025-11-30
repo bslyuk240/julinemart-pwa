@@ -1,21 +1,23 @@
 {
-  "name": "JulineMart",
-  "short_name": "Juline",
+  "name": "JulineMart - Your One-Stop Marketplace",
+  "short_name": "JulineMart",
   "icons": [
     {
-      "src": "/public/web-app-manifest-192x192.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     },
     {
-      "src": "/public/web-app-manifest-512x512.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
-  "theme_color": "#ffffff",
+  "theme_color": "#77088a",
   "background_color": "#ffffff",
-  "display": "standalone"
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/"
 }
