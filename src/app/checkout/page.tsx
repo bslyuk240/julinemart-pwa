@@ -1279,7 +1279,14 @@ export default function CheckoutPage() {
               </Button>
 
               <p className="text-xs text-gray-500 text-center mt-4">
-                By placing your order, you agree to our Terms & Conditions
+                By placing your order, you agree to our{' '}
+                <Link href="/page/terms-of-service" className="text-primary-600 hover:text-primary-700 underline">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/page/privacy-policy" className="text-primary-600 hover:text-primary-700 underline">
+                  Privacy Policy
+                </Link>.
               </p>
             </div>
           </div>

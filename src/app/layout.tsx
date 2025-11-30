@@ -7,6 +7,7 @@ import { Toaster } from 'sonner';
 import { CustomerAuthProvider } from '@/context/customer-auth-context';
 import WhatsAppFloat from '@/components/layout/whatsapp-float';
 import PWAInstallPrompt from '@/components/pwa/pwa-install-prompt';
+import Footer from '@/components/layout/footer';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -68,6 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <CustomerAuthProvider>
           <Header />
           {children}
+          <Footer />
           <BottomNav />
           <Toaster position="top-center" richColors />
           <PWAInstallPrompt />
