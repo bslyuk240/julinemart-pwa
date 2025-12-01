@@ -1105,16 +1105,6 @@ export default function CheckoutPage() {
                                 : 'Calculated at checkout'}
                             </p>
                           </div>
-                          {option.description && (
-                            <p className="text-sm text-gray-600 mt-1">
-                              {option.description.replace(/<[^>]*>/g, '')}
-                            </p>
-                          )}
-                          {isJlo && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Shipping is calculated automatically based on your state and city.
-                            </p>
-                          )}
                         </div>
                       </label>
                     );
