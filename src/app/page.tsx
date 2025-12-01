@@ -8,6 +8,16 @@ import SponsoredProducts from '@/components/home/sponsored-products';
 import LaunchingDeals from '@/components/home/launching-deals';
 import { getProducts } from '@/lib/woocommerce/products';
 
+// Simple fisher-yates shuffle so each render surfaces different items
+function shuffle<T>(items: T[]) {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 export const revalidate = 300; // Revalidate every 5 minutes
 
 export default async function HomePage() {
@@ -20,37 +30,37 @@ export default async function HomePage() {
   let launchingProducts: any[] = [];
 
   try {
-    flashSaleProducts = await getProducts({ tag: 'flash-sale', per_page: 12 });
+    flashSaleProducts = shuffle(await getProducts({ tag: 'flash-sale', per_page: 12 }));
   } catch (error) {
     console.error('Flash sale fetch failed:', error);
   }
 
   try {
-    dealProducts = await getProducts({ tag: 'deal', per_page: 12 });
+    dealProducts = shuffle(await getProducts({ tag: 'deal', per_page: 12 }));
   } catch (error) {
     console.error('Deals fetch failed:', error);
   }
 
   try {
-    trendingProducts = await getProducts({ tag: 'best-seller', per_page: 12 });
+    trendingProducts = shuffle(await getProducts({ tag: 'best-seller', per_page: 12 }));
   } catch (error) {
     console.error('Best sellers fetch failed:', error);
   }
 
   try {
-    topSellerProducts = await getProducts({ tag: 'top-seller', per_page: 12 });
+    topSellerProducts = shuffle(await getProducts({ tag: 'top-seller', per_page: 12 }));
   } catch (error) {
     console.error('Top sellers fetch failed:', error);
   }
 
   try {
-    sponsoredProducts = await getProducts({ tag: 'sponsored', per_page: 12 });
+    sponsoredProducts = shuffle(await getProducts({ tag: 'sponsored', per_page: 12 }));
   } catch (error) {
     console.error('Sponsored fetch failed:', error);
   }
 
   try {
-    launchingProducts = await getProducts({ tag: 'launching-deal', per_page: 12 });
+    launchingProducts = shuffle(await getProducts({ tag: 'launching-deal', per_page: 12 }));
   } catch (error) {
     console.error('Launching deals fetch failed:', error);
   }

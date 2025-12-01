@@ -61,7 +61,7 @@ export default function LaunchingDeals({ products }: LaunchingDealsProps) {
                 return (
                   <div
                     key={product.id}
-                    className="relative min-w-[170px] sm:min-w-[200px] md:min-w-[230px] lg:min-w-[260px] max-w-[260px] flex-shrink-0 snap-start"
+                    className="relative w-[170px] sm:w-[200px] md:w-[230px] lg:w-[260px] flex-shrink-0 snap-start"
                   >
                     {/* Discount Badge - Only show if there's a discount */}
                     {discount > 0 && (

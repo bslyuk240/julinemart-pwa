@@ -79,6 +79,17 @@ export interface Product {
   };
 }
 
+export interface ProductReview {
+  id: number;
+  date_created: string;
+  review: string;
+  rating: number;
+  reviewer: string;
+  reviewer_email: string;
+  verified: boolean;
+  status: string;
+}
+
 export interface VariationAttribute {
   id: number;
   name: string;

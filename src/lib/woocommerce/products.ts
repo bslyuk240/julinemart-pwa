@@ -1,5 +1,5 @@
 import { wcApi, handleApiError, WooCommerceResponse } from './client';
-import { Product, ProductsQueryParams, ProductVariation } from '@/types/product';
+import { Product, ProductsQueryParams, ProductVariation, ProductReview } from '@/types/product';
 
 /**
  * Get all products with optional filters
@@ -51,6 +51,47 @@ async function getTagIdBySlug(slug: string): Promise<number | null> {
 export async function getProduct(id: number): Promise<Product | null> {
   try {
     const response = await wcApi.get(`products/${id}`);
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
+    return null;
+  }
+}
+
+/**
+ * Get reviews for a specific product
+ */
+export async function getProductReviews(
+  productId: number,
+  params: { page?: number; per_page?: number } = {}
+): Promise<ProductReview[]> {
+  try {
+    const response = await wcApi.get('products/reviews', {
+      product: productId,
+      per_page: params.per_page ?? 20,
+      page: params.page ?? 1,
+      order: 'desc',
+      orderby: 'date',
+    });
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
+    return [];
+  }
+}
+
+/**
+ * Create a new product review
+ */
+export async function createProductReview(payload: {
+  product_id: number;
+  review: string;
+  reviewer: string;
+  reviewer_email: string;
+  rating: number;
+}): Promise<ProductReview | null> {
+  try {
+    const response = await wcApi.post('products/reviews', payload);
     return response.data;
   } catch (error) {
     handleApiError(error);
