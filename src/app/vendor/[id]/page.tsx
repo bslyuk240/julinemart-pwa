@@ -6,6 +6,8 @@ import { Store, MapPin, Star, Phone, Mail } from 'lucide-react';
 import ProductGrid from '@/components/product/product-grid';
 import { getProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
+import { getStorePolicies, StorePolicies } from '@/lib/woocommerce/policies';
+import { formatPrice } from '@/lib/utils/format-price';
 
 export default function VendorStorePage() {
   const params = useParams();
@@ -14,10 +16,27 @@ export default function VendorStorePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [vendorInfo, setVendorInfo] = useState<any>(null);
+  const [policies, setPolicies] = useState<StorePolicies | null>(null);
+  const [policyLoading, setPolicyLoading] = useState(true);
 
   useEffect(() => {
     fetchVendorProducts();
   }, [vendorId]);
+
+  useEffect(() => {
+    const loadPolicies = async () => {
+      try {
+        const data = await getStorePolicies();
+        setPolicies(data);
+      } catch (error) {
+        console.error('Error fetching store policies:', error);
+      } finally {
+        setPolicyLoading(false);
+      }
+    };
+
+    loadPolicies();
+  }, []);
 
   const fetchVendorProducts = async () => {
     try {
@@ -61,6 +80,15 @@ export default function VendorStorePage() {
   const vendorName = vendorInfo?.shop_name || vendorInfo?.name || 
     vendorInfo?.url?.split('/').pop()?.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 
     'Vendor Store';
+  const freeShippingThreshold = policies?.shippingPolicy?.freeShippingThreshold ?? 0;
+  const shippingDescription = policies?.shippingPolicy?.description;
+  const shippingText = policies?.shippingPolicy
+    ? freeShippingThreshold > 0
+      ? shippingDescription?.toLowerCase().includes('free shipping on orders over')
+        ? shippingDescription
+        : `Free shipping on orders over ${formatPrice(freeShippingThreshold)}.${shippingDescription ? ` ${shippingDescription}` : ''}`
+      : shippingDescription || 'Shipping details will appear here once available.'
+    : 'Shipping details will appear here once available.';
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
@@ -170,16 +198,24 @@ export default function VendorStorePage() {
           <div className="grid md:grid-cols-3 gap-6 mt-8">
             <div className="bg-white rounded-lg p-6">
               <h3 className="font-semibold text-gray-900 mb-3">Return Policy</h3>
-              <p className="text-sm text-gray-600">
-                7-day return policy on all items. Items must be in original condition.
-              </p>
+              {policyLoading ? (
+                <p className="text-sm text-gray-500">Loading policy...</p>
+              ) : (
+                <p className="text-sm text-gray-600">
+                  {policies?.returnPolicy?.enabled
+                    ? `${policies.returnPolicy.days}-day return window. ${policies.returnPolicy.description}`
+                    : 'Returns are currently unavailable for this store.'}
+                </p>
+              )}
             </div>
             
             <div className="bg-white rounded-lg p-6">
               <h3 className="font-semibold text-gray-900 mb-3">Shipping</h3>
-              <p className="text-sm text-gray-600">
-                Ships within 1-2 business days. Free shipping on orders over ₦10,000.
-              </p>
+              {policyLoading ? (
+                <p className="text-sm text-gray-500">Loading shipping policy...</p>
+              ) : (
+                <p className="text-sm text-gray-600">{shippingText}</p>
+              )}
             </div>
             
             <div className="bg-white rounded-lg p-6">
@@ -194,3 +230,4 @@ export default function VendorStorePage() {
     </main>
   );
 }
+

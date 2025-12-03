@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProductGrid from '@/components/product/product-grid';
 import { searchProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
 
-export default function SearchPage() {
+function SearchContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q')?.trim() ?? '';
 
@@ -94,5 +94,26 @@ export default function SearchPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function SearchFallback() {
+  return (
+    <main className="min-h-screen bg-gray-50 pb-24 md:pb-12">
+      <div className="container mx-auto px-4 py-6">
+        <div className="bg-white rounded-lg shadow-sm p-10 text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading search...</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchFallback />}>
+      <SearchContent />
+    </Suspense>
   );
 }
