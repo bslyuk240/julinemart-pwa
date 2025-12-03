@@ -40,7 +40,7 @@ export default function TrendingSection({ products }: TrendingSectionProps) {
               {products.slice(0, 18).map((product, index) => (
                 <div
                   key={product.id}
-                  className="relative min-w-[170px] sm:min-w-[200px] md:min-w-[230px] lg:min-w-[260px] max-w-[260px] flex-shrink-0 snap-start"
+                  className="relative w-[170px] sm:w-[200px] md:w-[230px] lg:w-[260px] flex-shrink-0 snap-start"
                 >
                   {/* Rank Badge for top 3 */}
                   {index < 3 && (
