@@ -26,6 +26,11 @@ export function usePullToRefresh({
   useEffect(() => {
     if (disabled) return undefined;
 
+    // On iOS Safari, block the native rubber-band bounce so our handler can run.
+    const root = document.documentElement;
+    const previousOverscroll = root.style.overscrollBehavior;
+    root.style.overscrollBehavior = 'contain';
+
     const handleStart = (event: TouchEvent) => {
       if (isRefreshing) return;
       const scrollTop = document.scrollingElement?.scrollTop ?? window.scrollY;
@@ -79,6 +84,7 @@ export function usePullToRefresh({
     window.addEventListener('touchend', handleEnd);
 
     return () => {
+      root.style.overscrollBehavior = previousOverscroll;
       window.removeEventListener('touchstart', handleStart);
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('touchend', handleEnd);
