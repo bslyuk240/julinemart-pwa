@@ -19,8 +19,11 @@ export type JloShippingResponse = {
   message?: string;
 };
 
-const JLO_SHIPPING_URL =
-  "https://julinemart.com/wp-json/jlo/v1/calc-shipping";
+const JLO_BASE_URL =
+  process.env.NEXT_PUBLIC_JLO_URL?.replace(/\/$/, '') ||
+  'https://admin.julinemart.com';
+
+const JLO_SHIPPING_URL = `${JLO_BASE_URL}/wp-json/jlo/v1/calc-shipping`;
 
 export async function getShippingFee(
   payload: JloShippingPayload
