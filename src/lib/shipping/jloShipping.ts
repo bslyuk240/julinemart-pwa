@@ -19,20 +19,20 @@ export type JloShippingResponse = {
   message?: string;
 };
 
-const JLO_BASE_URL =
-  process.env.NEXT_PUBLIC_JLO_URL?.replace(/\/$/, '') ||
-  'https://admin.julinemart.com';
-
-const JLO_SHIPPING_URL = `${JLO_BASE_URL}/wp-json/jlo/v1/calc-shipping`;
-
 export async function getShippingFee(
   payload: JloShippingPayload
 ): Promise<JloShippingResponse> {
-  const res = await axios.post(JLO_SHIPPING_URL, payload, {
+  const res = await fetch('/api/shipping/jlo', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
+    body: JSON.stringify(payload),
   });
 
-  return res.data as JloShippingResponse;
+  if (!res.ok) {
+    throw new Error('Failed to calculate shipping');
+  }
+
+  return (await res.json()) as JloShippingResponse;
 }
