@@ -51,18 +51,11 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     fetchOrder();
   }, [orderId]);
 
-  const createReturnShipment = async () => {
+  const createReturnShipment = async (jloReturnRequestId: string) => {
     if (!order) return null;
 
-    // Lookup JLO return_request UUID by WooCommerce order number
-    const lookupRes = await fetch(`/api/return-request-id?orderNumber=${order.number}`);
-    const lookupData = await lookupRes.json();
-    if (!lookupRes.ok || !lookupData?.success || !lookupData.return_request_id) {
-      throw new Error(lookupData?.message || 'Unable to find return request in JLO');
-    }
-
     const payload = {
-      return_request_id: lookupData.return_request_id,
+      return_request_id: jloReturnRequestId,
       method: 'pickup' as const,
       customer: {
         name: `${order.shipping.first_name || order.billing.first_name} ${
@@ -193,7 +186,21 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
       toast.success('Return request submitted successfully!');
       try {
-        const shipment = await createReturnShipment();
+        // Create JLO return request to obtain return_request_id
+        const jloRes = await fetch('/api/jlo/return-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            woo_order_id: order.number,
+            reason: fullReason,
+          }),
+        });
+        const jloData = await jloRes.json();
+        if (!jloRes.ok || !jloData?.return_request_id) {
+          throw new Error(jloData?.message || 'Failed to create JLO return request');
+        }
+
+        const shipment = await createReturnShipment(jloData.return_request_id);
         if (shipment?.shipment) {
           setReturnShipment(shipment.shipment);
           toast.success(
