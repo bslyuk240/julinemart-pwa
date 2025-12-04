@@ -17,10 +17,19 @@ export async function POST(request: Request) {
       body: JSON.stringify(body),
     });
 
-    const data = await response.json().catch(() => ({}));
+    const data = await response.json().catch(async () => {
+      // fallback: try text if JSON parsing fails
+      const text = await response.text().catch(() => '');
+      return { message: text || null };
+    });
     if (!response.ok || !data?.success) {
       return NextResponse.json(
-        { success: false, message: data?.message || 'Return shipment creation failed', details: data },
+        {
+          success: false,
+          message: data?.message || 'Return shipment creation failed',
+          details: data,
+          status: response.status,
+        },
         { status: response.status || 500 }
       );
     }
