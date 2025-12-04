@@ -9,13 +9,13 @@ import { useCustomerAuth } from '@/context/customer-auth-context';
 import { getOrder } from '@/lib/woocommerce/orders';
 import PageLoading from '@/components/ui/page-loading';
 import {
-  getRefundPolicy,
   canOrderBeRefunded,
   isOrderEligibleForRefund,
   getRefundRequestStatus,
   formatRefundStatus,
   RefundRequestMeta,
 } from '@/lib/woocommerce/refunds';
+import { getRefundPolicy } from '@/lib/woocommerce/policies';
 import { toast } from 'sonner';
 import { generateInvoicePDF } from '@/lib/invoice-generator';
 import OrderStatusTracker from '@/components/orders/order-status-tracker';
