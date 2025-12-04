@@ -27,30 +27,30 @@ async function callProxy(method: 'get' | 'post' | 'put' | 'delete', endpoint: st
 
 // Client-safe wrapper: uses server API directly on the server, proxy route on the client
 export const wcApi = {
-  get: async (endpoint: string, params?: any, config?: any) => {
+  get: async (endpoint: string, params?: any) => {
     if (serverApi) {
-      return serverApi.get(endpoint, params, config);
+      return serverApi.get(endpoint, params);
     }
     const data = await callProxy('get', endpoint, { params });
     return { data };
   },
-  post: async (endpoint: string, data?: any, config?: any) => {
+  post: async (endpoint: string, data?: any) => {
     if (serverApi) {
-      return serverApi.post(endpoint, data, config);
+      return serverApi.post(endpoint, data);
     }
     const proxyData = await callProxy('post', endpoint, { data });
     return { data: proxyData };
   },
-  put: async (endpoint: string, data?: any, config?: any) => {
+  put: async (endpoint: string, data?: any) => {
     if (serverApi) {
-      return serverApi.put(endpoint, data, config);
+      return serverApi.put(endpoint, data);
     }
     const proxyData = await callProxy('put', endpoint, { data });
     return { data: proxyData };
   },
-  delete: async (endpoint: string, params?: any, config?: any) => {
+  delete: async (endpoint: string, params?: any) => {
     if (serverApi) {
-      return serverApi.delete(endpoint, params, config);
+      return serverApi.delete(endpoint, params);
     }
     const proxyData = await callProxy('delete', endpoint, { params });
     return { data: proxyData };
