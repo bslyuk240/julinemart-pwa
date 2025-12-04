@@ -14,7 +14,7 @@ import {
   ShippingMethod,
   PaymentGateway 
 } from '@/lib/woocommerce/shipping';
-import { createOrder } from '@/lib/woocommerce/orders';
+// Orders are created via server API to avoid client-side CORS
 import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
 import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
@@ -731,7 +731,17 @@ export default function CheckoutPage() {
       };
 
       console.log('   Creating order...');
-      const order = await createOrder(orderData);
+      const createOrderResponse = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData),
+      });
+
+      if (!createOrderResponse.ok) {
+        throw new Error('Failed to create order');
+      }
+
+      const order = await createOrderResponse.json();
 
       if (order && order.id) {
         console.log('  Order created:', order.id);
