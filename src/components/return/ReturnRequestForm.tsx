@@ -51,6 +51,47 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     fetchOrder();
   }, [orderId]);
 
+  const createReturnShipment = async () => {
+    const apiBase = process.env.NEXT_PUBLIC_JLO_URL || '';
+    if (!apiBase) {
+      console.warn('JLO API base URL not configured');
+      return null;
+    }
+    if (!order) return null;
+
+    const payload = {
+      return_request_id: order.id,
+      method: 'pickup' as const,
+      customer: {
+        name: `${order.shipping.first_name || order.billing.first_name} ${
+          order.shipping.last_name || order.billing.last_name
+        }`.trim(),
+        phone: order.billing.phone,
+        address: order.shipping.address_1 || order.billing.address_1,
+        city: order.shipping.city || order.billing.city,
+        state: order.shipping.state || order.billing.state,
+      },
+      hub: {
+        name: 'JulineMart Returns',
+        phone: order.billing.phone,
+        address: order.billing.address_1,
+        city: order.billing.city,
+        state: order.billing.state,
+      },
+    };
+
+    const res = await fetch(`${apiBase}/api/create-return-shipment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || 'Failed to create return shipment');
+    }
+    return data;
+  };
+
   const fetchOrder = async () => {
     try {
       setLoading(true);
@@ -149,7 +190,21 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
       }
 
       toast.success('Return request submitted successfully!');
-      router.push(`/account/orders/${order.id}/return/method`);
+      try {
+        const shipment = await createReturnShipment();
+        if (shipment?.shipment) {
+          setReturnShipment(shipment.shipment);
+          toast.success(
+            `Return shipment created. Code: ${shipment.shipment.return_code}${
+              shipment.shipment.fez_tracking ? `, Tracking: ${shipment.shipment.fez_tracking}` : ''
+            }`
+          );
+        }
+      } catch (shipmentErr: any) {
+        console.warn('Return shipment creation failed:', shipmentErr);
+        toast.error(shipmentErr?.message || 'Return shipment creation failed');
+      }
+      router.push(`/account/orders/${order.id}/return`);
     } catch (error: any) {
       console.error('Error submitting return:', error);
       toast.error(error.message || 'Failed to submit return request');
