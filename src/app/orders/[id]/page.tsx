@@ -35,6 +35,8 @@ export default function OrderDetailPage() {
     eligible: boolean;
     message: string;
     existingRequest?: RefundRequestMeta | null;
+    status?: RefundRequestMeta['status'];
+    statusDisplay?: ReturnType<typeof formatRefundStatus>;
   }>({ eligible: false, message: 'Loading refund policy...' });
 
   useEffect(() => {
@@ -80,17 +82,20 @@ export default function OrderDetailPage() {
           );
           const statusEligibility = canOrderBeRefunded(orderData.status);
           const existingRequest = refundRequest ?? null;
+          const statusDisplay = existingRequest ? formatRefundStatus(existingRequest.status) : undefined;
 
           setRefundInfo({
             eligible: timeEligibility.eligible && statusEligibility && !existingRequest,
             message: existingRequest
-              ? `Refund request ${formatRefundStatus(existingRequest.status)}`
+              ? statusDisplay?.label || 'Refund request'
               : statusEligibility
               ? timeEligibility.eligible
                 ? `Eligible for refund (${timeEligibility.daysRemaining} day(s) remaining)`
                 : timeEligibility.reason || 'Outside refund window'
               : `Orders with status "${orderData.status}" cannot be refunded`,
             existingRequest,
+            status: existingRequest?.status,
+            statusDisplay,
           });
         } catch (error) {
           console.error('Error checking refund eligibility:', error);
@@ -371,9 +376,18 @@ export default function OrderDetailPage() {
                     : 'Refund unavailable'}
                 </Button>
               </Link>
-              <p className="text-xs text-gray-500 text-center">
-                {refundInfo.message}
-              </p>
+              <div className="text-center space-y-1">
+                {refundInfo.existingRequest && refundInfo.statusDisplay && (
+                  <span
+                    className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full ${refundInfo.statusDisplay.bgColor} ${refundInfo.statusDisplay.color}`}
+                  >
+                    {refundInfo.statusDisplay.label}
+                  </span>
+                )}
+                <p className="text-xs text-gray-500 text-center">
+                  {refundInfo.message}
+                </p>
+              </div>
             </div>
           </div>
         </div>
