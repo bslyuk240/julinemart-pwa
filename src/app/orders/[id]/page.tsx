@@ -38,6 +38,12 @@ export default function OrderDetailPage() {
     status?: RefundRequestMeta['status'];
     statusDisplay?: ReturnType<typeof formatRefundStatus>;
   }>({ eligible: false, message: 'Loading refund policy...' });
+  const [returnInfo, setReturnInfo] = useState<{
+    eligible: boolean;
+    message: string;
+    existingRequest?: RefundRequestMeta | null;
+    statusDisplay?: ReturnType<typeof formatRefundStatus>;
+  }>({ eligible: false, message: 'Loading return policy...' });
 
   useEffect(() => {
     if (!authLoading) {
@@ -54,7 +60,7 @@ export default function OrderDetailPage() {
       setLoading(true);
       const res = await fetch(`/api/orders/${orderId}`);
       if (!res.ok) throw new Error('Failed to fetch order');
-      const { order: orderData, refundRequest } = await res.json();
+      const { order: orderData, refundRequest, returnRequest } = await res.json();
       if (orderData) {
         const taxTotal =
           (orderData as any).tax_total ??
@@ -97,11 +103,29 @@ export default function OrderDetailPage() {
             status: existingRequest?.status,
             statusDisplay,
           });
+
+          const returnExisting = returnRequest ?? null;
+          const returnStatusDisplay = returnExisting ? formatRefundStatus(returnExisting.status) : undefined;
+          const returnEligible = statusEligibility && !returnExisting;
+          setReturnInfo({
+            eligible: returnEligible,
+            message: returnExisting
+              ? returnStatusDisplay?.label || 'Return request'
+              : statusEligibility
+              ? 'Eligible for return (after delivery/completion)'
+              : `Returns available after delivery/completion`,
+            existingRequest: returnExisting,
+            statusDisplay: returnStatusDisplay,
+          });
         } catch (error) {
           console.error('Error checking refund eligibility:', error);
           setRefundInfo({
             eligible: false,
             message: 'Unable to determine refund eligibility right now.',
+          });
+          setReturnInfo({
+            eligible: false,
+            message: 'Unable to determine return eligibility right now.',
           });
         }
       } else {
@@ -376,6 +400,19 @@ export default function OrderDetailPage() {
                     : 'Refund unavailable'}
                 </Button>
               </Link>
+              <Link href={`/account/orders/${order.id}/return`} className="block">
+                <Button
+                  variant="outline"
+                  fullWidth
+                  disabled={!returnInfo.eligible}
+                >
+                  {returnInfo.existingRequest
+                    ? 'View return request'
+                    : returnInfo.eligible
+                    ? 'Request a return'
+                    : 'Return unavailable'}
+                </Button>
+              </Link>
               <div className="text-center space-y-1">
                 {refundInfo.existingRequest && refundInfo.statusDisplay && (
                   <span
@@ -384,8 +421,18 @@ export default function OrderDetailPage() {
                     {refundInfo.statusDisplay.label}
                   </span>
                 )}
+                {returnInfo.existingRequest && returnInfo.statusDisplay && (
+                  <span
+                    className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full ${returnInfo.statusDisplay.bgColor} ${returnInfo.statusDisplay.color}`}
+                  >
+                    {returnInfo.statusDisplay.label}
+                  </span>
+                )}
                 <p className="text-xs text-gray-500 text-center">
                   {refundInfo.message}
+                </p>
+                <p className="text-xs text-gray-500 text-center">
+                  {returnInfo.message}
                 </p>
               </div>
             </div>

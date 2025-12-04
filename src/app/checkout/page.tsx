@@ -274,8 +274,8 @@ export default function CheckoutPage() {
     
     // Validate environment variables - using correct variable names
     const wpUrl = process.env.NEXT_PUBLIC_WP_URL;
-    const wcKey = process.env.NEXT_PUBLIC_WC_KEY;
-    const wcSecret = process.env.NEXT_PUBLIC_WC_SECRET;
+    const wcKey = process.env.WC_KEY;
+    const wcSecret = process.env.WC_SECRET;
 
     if (!wpUrl || !wcKey || !wcSecret) {
       console.error('Missing environment variables:', {

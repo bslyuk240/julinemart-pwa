@@ -1,12 +1,17 @@
 import WooCommerceRestApi from '@woocommerce/woocommerce-rest-api';
 
-// Initialize WooCommerce REST API client
+// Prevent client-side use
+if (typeof window !== 'undefined') {
+  throw new Error('wcApi cannot run on the client');
+}
+
+// Initialize WooCommerce REST API client (server-side only)
 export const wcApi = new WooCommerceRestApi({
-  url: process.env.NEXT_PUBLIC_WC_BASE_URL?.replace('/wp-json/wc/v3', '') || '',
-  consumerKey: process.env.NEXT_PUBLIC_WC_KEY || '',
-  consumerSecret: process.env.NEXT_PUBLIC_WC_SECRET || '',
+  url: process.env.WC_BASE_URL?.replace('/wp-json/wc/v3', '') || '',
+  consumerKey: process.env.WC_KEY || '',
+  consumerSecret: process.env.WC_SECRET || '',
   version: 'wc/v3',
-  queryStringAuth: true, // Force Basic Authentication as query string
+  queryStringAuth: false, // use HTTP auth, avoid exposing keys in query
 });
 
 // Helper function for error handling

@@ -6,10 +6,9 @@ export async function GET() {
   
   // Check if environment variables are loaded
   const config = {
-    baseUrl: process.env.NEXT_PUBLIC_WC_BASE_URL,
-    hasKey: !!process.env.NEXT_PUBLIC_WC_KEY,
-    hasSecret: !!process.env.NEXT_PUBLIC_WC_SECRET,
-    keyPrefix: process.env.NEXT_PUBLIC_WC_KEY?.substring(0, 5),
+    baseUrl: process.env.WC_BASE_URL,
+    hasKey: !!process.env.WC_KEY,
+    hasSecret: !!process.env.WC_SECRET,
   };
 
   console.log('Config:', config);

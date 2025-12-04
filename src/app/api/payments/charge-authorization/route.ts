@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
     }
 
     const wpUrl = process.env.NEXT_PUBLIC_WP_URL;
-    const wcKey = process.env.NEXT_PUBLIC_WC_KEY;
-    const wcSecret = process.env.NEXT_PUBLIC_WC_SECRET;
+    const wcKey = process.env.WC_KEY;
+    const wcSecret = process.env.WC_SECRET;
     const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
     if (!paystackSecretKey || !wpUrl || !wcKey || !wcSecret) {
       return NextResponse.json(

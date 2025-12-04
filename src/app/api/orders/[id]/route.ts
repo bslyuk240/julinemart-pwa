@@ -15,7 +15,11 @@ export async function GET(
     const order = response.data;
 
     let refundRequest: any = null;
+    let returnRequest: any = null;
+    let returnShipment: any = null;
     const refundMeta = order?.meta_data?.find((m: any) => m.key === '_refund_request');
+    const returnMeta = order?.meta_data?.find((m: any) => m.key === '_return_request');
+    const returnShipmentMeta = order?.meta_data?.find((m: any) => m.key === '_return_shipment');
     if (refundMeta?.value) {
       try {
         refundRequest = JSON.parse(refundMeta.value);
@@ -23,8 +27,22 @@ export async function GET(
         refundRequest = null;
       }
     }
+    if (returnMeta?.value) {
+      try {
+        returnRequest = JSON.parse(returnMeta.value);
+      } catch {
+        returnRequest = null;
+      }
+    }
+    if (returnShipmentMeta?.value) {
+      try {
+        returnShipment = JSON.parse(returnShipmentMeta.value);
+      } catch {
+        returnShipment = null;
+      }
+    }
 
-    return NextResponse.json({ order, refundRequest });
+    return NextResponse.json({ order, refundRequest, returnRequest, returnShipment });
   } catch (error) {
     handleApiError(error);
     return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 });

@@ -7,7 +7,7 @@ import { wcApi } from './client';
 
 export async function testWooCommerceConnection() {
   console.log('🔌 Testing WooCommerce API Connection...');
-  console.log('Base URL:', process.env.NEXT_PUBLIC_WC_BASE_URL);
+  console.log('Base URL:', process.env.WC_BASE_URL);
 
   try {
     // Test 1: Fetch products

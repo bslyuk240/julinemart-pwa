@@ -48,13 +48,27 @@ export interface WooRefund {
 export interface RefundRequestMeta {
   status: 'pending' | 'approved' | 'rejected' | 'processed';
   reason: string;
-  requested_amount: number;
+  requested_amount?: number;
   requested_at: string;
+  line_items?: Array<{
+    id: number;
+    quantity: number;
+    refund_total?: number;
+    name?: string;
+  }>;
   customer_email: string;
   customer_name: string;
   admin_notes?: string;
   rejection_reason?: string;
   processed_at?: string;
+}
+
+export interface ReturnShipmentMeta {
+  method: 'pickup' | 'dropoff';
+  return_code: string;
+  status: 'pending' | 'in_transit' | 'delivered' | 'completed';
+  fez_tracking?: string | null;
+  created_at: string;
 }
 
 // ============ REFUND API FUNCTIONS ============
@@ -257,14 +271,8 @@ export function isOrderEligibleForRefund(
  * Check if order status allows refund
  */
 export function canOrderBeRefunded(status: string): boolean {
-  const refundableStatuses = [
-    'completed',
-    'processing',
-    'ready-to-ship',
-    'shipped',
-    'out-for-delivery',
-    'delivered',
-  ];
+  // Refunds allowed only after delivery/completion
+  const refundableStatuses = ['delivered', 'completed'];
   return refundableStatuses.includes(status);
 }
 

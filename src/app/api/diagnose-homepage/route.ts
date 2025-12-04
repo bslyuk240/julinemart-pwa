@@ -6,9 +6,9 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     environment: {
       WP_URL: process.env.NEXT_PUBLIC_WP_URL || 'NOT SET',
-      WC_BASE_URL: process.env.NEXT_PUBLIC_WC_BASE_URL || 'NOT SET',
-      WC_KEY: process.env.NEXT_PUBLIC_WC_KEY ? 'SET (' + process.env.NEXT_PUBLIC_WC_KEY.substring(0, 10) + '...)' : 'NOT SET',
-      WC_SECRET: process.env.NEXT_PUBLIC_WC_SECRET ? 'SET (hidden)' : 'NOT SET',
+      WC_BASE_URL: process.env.WC_BASE_URL || 'NOT SET',
+      WC_KEY: process.env.WC_KEY ? 'SET' : 'NOT SET',
+      WC_SECRET: process.env.WC_SECRET ? 'SET' : 'NOT SET',
     },
     tests: [],
   };
