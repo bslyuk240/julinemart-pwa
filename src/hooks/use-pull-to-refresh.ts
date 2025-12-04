@@ -28,8 +28,12 @@ export function usePullToRefresh({
 
     // On iOS Safari, block the native rubber-band bounce so our handler can run.
     const root = document.documentElement;
+    const body = document.body;
     const previousOverscroll = root.style.overscrollBehavior;
+    const previousBodyOverscroll = body.style.overscrollBehaviorY;
+    const previousBodyTouchAction = body.style.touchAction;
     root.style.overscrollBehavior = 'contain';
+    body.style.overscrollBehaviorY = 'contain';
 
     const handleStart = (event: TouchEvent) => {
       if (isRefreshing) return;
@@ -38,6 +42,8 @@ export function usePullToRefresh({
 
       startYRef.current = event.touches[0].clientY;
       pullingRef.current = true;
+      // Temporarily disable body touch scrolling to prevent rubber-band
+      body.style.touchAction = 'none';
     };
 
     const handleMove = (event: TouchEvent) => {
@@ -85,6 +91,8 @@ export function usePullToRefresh({
 
     return () => {
       root.style.overscrollBehavior = previousOverscroll;
+      body.style.overscrollBehaviorY = previousBodyOverscroll;
+      body.style.touchAction = previousBodyTouchAction;
       window.removeEventListener('touchstart', handleStart);
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('touchend', handleEnd);
