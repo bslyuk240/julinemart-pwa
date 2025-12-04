@@ -24,6 +24,7 @@ export function usePullToRefresh({
   const startYRef = useRef<number | null>(null);
   const pullingRef = useRef(false);
   const distanceRef = useRef(0);
+  const previousTouchActionRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (disabled) return undefined;
@@ -36,6 +37,7 @@ export function usePullToRefresh({
     const previousOverscroll = root.style.overscrollBehavior;
     const previousScrollOverscroll = scrollElement.style.overscrollBehaviorY;
     const previousScrollTouchAction = scrollElement.style.touchAction;
+    previousTouchActionRef.current = previousScrollTouchAction;
     root.style.overscrollBehavior = 'contain';
     scrollElement.style.overscrollBehaviorY = 'contain';
 
@@ -78,6 +80,8 @@ export function usePullToRefresh({
       const shouldRefresh = distanceRef.current >= threshold;
       distanceRef.current = 0;
       setPullDistance(0);
+      // Restore touch action after gesture ends
+      scrollElement.style.touchAction = previousTouchActionRef.current || '';
 
       if (shouldRefresh && !isRefreshing) {
         setIsRefreshing(true);
