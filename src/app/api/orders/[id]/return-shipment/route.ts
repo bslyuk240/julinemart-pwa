@@ -2,11 +2,6 @@ import { NextResponse } from 'next/server';
 import { wcApi, handleApiError } from '@/lib/woocommerce/client';
 import { generateReturnCode, ReturnMethod } from '@/lib/return-shipping';
 
-interface FezShipmentResponse {
-  tracking_number?: string;
-  trackingNumber?: string;
-}
-
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const orderId = Number(params.id);
   if (Number.isNaN(orderId)) {
@@ -26,37 +21,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const returnCode = generateReturnCode();
     let fezTracking: string | null = null;
-
-    if (method === 'pickup') {
-      try {
-        const fezBase = process.env.FEZ_API_BASE_URL;
-        const fezKey = process.env.FEZ_API_KEY;
-        if (!fezBase || !fezKey) {
-          throw new Error('Missing Fez API config');
-        }
-
-        const response = await fetch(`${fezBase}/shipment/create`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${fezKey}`,
-          },
-          body: JSON.stringify({
-            customer: body.customer,
-            hub: body.hub,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Fez API request failed');
-        }
-        const data: FezShipmentResponse = await response.json();
-        fezTracking = data.tracking_number || data.trackingNumber || null;
-      } catch (fezError) {
-        console.error('Fez pickup creation failed:', fezError);
-        // Fall back to manual drop-off instructions while keeping the return code
-      }
-    }
 
     const shipmentMeta = {
       method,
