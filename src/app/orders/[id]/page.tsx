@@ -6,16 +6,13 @@ import Link from 'next/link';
 import { ArrowLeft, Package, MapPin, CreditCard, Phone, Mail, Download, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
-import { getOrder } from '@/lib/woocommerce/orders';
 import PageLoading from '@/components/ui/page-loading';
 import {
   canOrderBeRefunded,
   isOrderEligibleForRefund,
-  getRefundRequestStatus,
   formatRefundStatus,
   RefundRequestMeta,
 } from '@/lib/woocommerce/refunds';
-import { getRefundPolicy } from '@/lib/woocommerce/policies';
 import { toast } from 'sonner';
 import { generateInvoicePDF } from '@/lib/invoice-generator';
 import OrderStatusTracker from '@/components/orders/order-status-tracker';
@@ -53,7 +50,9 @@ export default function OrderDetailPage() {
   const loadOrder = async () => {
     try {
       setLoading(true);
-      const orderData = await getOrder(parseInt(orderId));
+      const res = await fetch(`/api/orders/${orderId}`);
+      if (!res.ok) throw new Error('Failed to fetch order');
+      const { order: orderData, refundRequest } = await res.json();
       if (orderData) {
         const taxTotal =
           (orderData as any).tax_total ??
@@ -73,13 +72,14 @@ export default function OrderDetailPage() {
 
         // Refund eligibility + status
         try {
-          const policy = await getRefundPolicy();
+          const policyRes = await fetch('/api/policies/refund');
+          const policy = policyRes.ok ? await policyRes.json() : { days: 3 };
           const timeEligibility = isOrderEligibleForRefund(
             orderData.date_completed || orderData.date_created,
             policy.days
           );
           const statusEligibility = canOrderBeRefunded(orderData.status);
-          const existingRequest = await getRefundRequestStatus(orderData.id);
+          const existingRequest = refundRequest ?? null;
 
           setRefundInfo({
             eligible: timeEligibility.eligible && statusEligibility && !existingRequest,

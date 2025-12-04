@@ -13,16 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
-import { getOrder } from '@/lib/woocommerce/orders';
-import { getRefundPolicy } from '@/lib/woocommerce/policies';
-import {
-  isOrderEligibleForRefund,
-  canOrderBeRefunded,
-  submitRefundRequest,
-  getRefundRequestStatus,
-  formatRefundStatus,
-  RefundRequestMeta,
-} from '@/lib/woocommerce/refunds';
+import { isOrderEligibleForRefund, canOrderBeRefunded, formatRefundStatus, RefundRequestMeta } from '@/lib/woocommerce/refunds';
 import { useAuth } from '@/hooks/use-auth';
 import { Order } from '@/types/order';
 
@@ -67,20 +58,16 @@ export default function RefundRequestForm({ orderId }: RefundRequestFormProps) {
     try {
       setLoading(true);
 
-      // Fetch order
-      const orderData = await getOrder(orderId);
+      const res = await fetch(`/api/orders/${orderId}`);
+      if (!res.ok) throw new Error('Failed to fetch order');
+      const { order: orderData, refundRequest } = await res.json();
       if (!orderData) {
         toast.error('Order not found');
         router.push('/account/orders');
         return;
       }
       setOrder(orderData);
-
-      // Check for existing refund request in order meta
-      const existingRefundRequest = await getRefundRequestStatus(orderId);
-      if (existingRefundRequest) {
-        setExistingRequest(existingRefundRequest);
-      }
+      if (refundRequest) setExistingRequest(refundRequest);
 
       // Check order status eligibility
       if (!canOrderBeRefunded(orderData.status)) {
@@ -93,7 +80,8 @@ export default function RefundRequestForm({ orderId }: RefundRequestFormProps) {
       }
 
       // Check time-based eligibility
-      const refundPolicy = await getRefundPolicy();
+      const policyRes = await fetch('/api/policies/refund');
+      const refundPolicy = policyRes.ok ? await policyRes.json() : { days: 3 };
       const eligibilityResult = isOrderEligibleForRefund(
         orderData.date_completed || orderData.date_created,
         refundPolicy.days
@@ -132,23 +120,27 @@ export default function RefundRequestForm({ orderId }: RefundRequestFormProps) {
               reasonDetails ? `: ${reasonDetails}` : ''
             }`;
 
-      const result = await submitRefundRequest(order.id, {
-        reason: fullReason,
-        amount: parseFloat(order.total),
-        customerEmail: user?.email || order.billing?.email || '',
-        customerName: (
-          user?.name ||
-          `${order.billing?.first_name || ''} ${order.billing?.last_name || ''}`
-        ).trim(),
+      const response = await fetch(`/api/orders/${order.id}/refund-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: fullReason,
+          amount: parseFloat(order.total),
+          customerEmail: user?.email || order.billing?.email || '',
+          customerName: (
+            user?.name ||
+            `${order.billing?.first_name || ''} ${order.billing?.last_name || ''}`
+          ).trim(),
+        }),
       });
 
-      if (result.success) {
-        toast.success('Refund request submitted successfully!');
-        // Refresh to show the status
-        await fetchOrderAndEligibility();
-      } else {
-        toast.error(result.message || 'Failed to submit refund request');
+      const submitResult = await response.json();
+      if (!response.ok || !submitResult.success) {
+        throw new Error(submitResult.message || 'Failed to submit refund request');
       }
+
+      toast.success('Refund request submitted successfully!');
+      await fetchOrderAndEligibility();
     } catch (error: any) {
       console.error('Error submitting refund:', error);
       toast.error(error.message || 'Failed to submit refund request');
