@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Store, MapPin, Star, Phone, Mail } from 'lucide-react';
 import ProductGrid from '@/components/product/product-grid';
@@ -8,6 +8,7 @@ import { getProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
 import { getStorePolicies, StorePolicies } from '@/lib/woocommerce/policies';
 import { formatPrice } from '@/lib/utils/format-price';
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 
 export default function VendorStorePage() {
   const params = useParams();
@@ -18,30 +19,26 @@ export default function VendorStorePage() {
   const [vendorInfo, setVendorInfo] = useState<any>(null);
   const [policies, setPolicies] = useState<StorePolicies | null>(null);
   const [policyLoading, setPolicyLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchVendorProducts();
-  }, [vendorId]);
-
-  useEffect(() => {
-    const loadPolicies = async () => {
-      try {
-        const data = await getStorePolicies();
-        setPolicies(data);
-      } catch (error) {
-        console.error('Error fetching store policies:', error);
-      } finally {
-        setPolicyLoading(false);
-      }
-    };
-
-    loadPolicies();
-  }, []);
-
-  const fetchVendorProducts = async () => {
+  const fetchPolicies = async (forceRefresh = false, opts: { silent?: boolean } = {}) => {
+    const { silent = false } = opts;
     try {
-      setLoading(true);
-      
+      if (!silent) setPolicyLoading(true);
+      const data = await getStorePolicies(forceRefresh);
+      setPolicies(data);
+    } catch (error) {
+      console.error('Error fetching store policies:', error);
+    } finally {
+      if (!silent) setPolicyLoading(false);
+    }
+  };
+
+  const fetchVendorProducts = async (opts: { silent?: boolean } = {}) => {
+    const { silent = false } = opts;
+    try {
+      if (!silent) setLoading(true);
+
       // Fetch all products and filter by vendor
       const allProducts = await getProducts({ per_page: 100 });
       
@@ -60,9 +57,34 @@ export default function VendorStorePage() {
     } catch (error) {
       console.error('Error fetching vendor products:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchVendorProducts();
+  }, [vendorId]);
+
+  useEffect(() => {
+    fetchPolicies();
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetchVendorProducts({ silent: true }),
+        fetchPolicies(true, { silent: true }),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [vendorId]);
+
+  const { pullDistance, isRefreshing } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    disabled: loading,
+  });
 
   if (loading) {
     return (
@@ -93,6 +115,28 @@ export default function VendorStorePage() {
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
       <div className="container mx-auto px-4 py-6">
+        {(pullDistance > 0 || isRefreshing || refreshing) && (
+          <div
+            className="flex justify-center mb-2 transition-transform duration-150"
+            style={{ transform: `translateY(${Math.min(pullDistance, 40)}px)` }}
+          >
+            <div className="flex items-center gap-2 rounded-full bg-white shadow px-3 py-1 text-xs text-gray-700">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  isRefreshing || refreshing ? 'bg-primary-600 animate-pulse' : 'bg-gray-400'
+                }`}
+              />
+              <span>
+                {isRefreshing || refreshing
+                  ? 'Refreshing store...'
+                  : pullDistance >= 70
+                  ? 'Release to refresh'
+                  : 'Pull to refresh'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-600 mb-6">
           <a href="/" className="hover:text-primary-600">Home</a>

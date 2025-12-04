@@ -97,8 +97,8 @@ export async function getStorePolicies(forceRefresh = false): Promise<StorePolic
     const policies: StorePolicies = {
       returnPolicy: {
         enabled: true,
-        days: 30, // Default 30 days - can be customized via WooCommerce settings
-        description: 'We offer a hassle-free return policy. Items can be returned within the specified period for a full refund.',
+        days: 3, // Default 3 days - can be customized via WooCommerce settings
+        description: 'We offer a hassle-free return policy. Items can be returned within 3 days for a full refund.',
         conditions: [
           'Items must be unused and in original packaging',
           'Proof of purchase required',
@@ -108,8 +108,8 @@ export async function getStorePolicies(forceRefresh = false): Promise<StorePolic
       },
       refundPolicy: {
         enabled: true,
-        days: 14,
-        description: 'Refunds are processed within 5-10 business days after we receive your returned item.',
+        days: 3,
+        description: 'Refunds are processed within 5-10 business days after we receive your returned item (requests accepted within 3 days).',
         conditions: [
           'Item must meet return policy conditions',
           'Refunds are issued to the original payment method',
@@ -161,8 +161,8 @@ export async function getStorePolicies(forceRefresh = false): Promise<StorePolic
     return {
       returnPolicy: {
         enabled: true,
-        days: 30,
-        description: 'We offer a 30-day return policy on most items.',
+        days: 3,
+        description: 'We offer a 3-day return policy on most items.',
         conditions: [
           'Items must be unused and in original packaging',
           'Proof of purchase required',
@@ -170,8 +170,8 @@ export async function getStorePolicies(forceRefresh = false): Promise<StorePolic
       },
       refundPolicy: {
         enabled: true,
-        days: 14,
-        description: 'Refunds processed within 5-10 business days.',
+        days: 3,
+        description: 'Refunds processed within 5-10 business days (requests accepted within 3 days).',
         conditions: [
           'Item must meet return policy conditions',
           'Refunds issued to original payment method',

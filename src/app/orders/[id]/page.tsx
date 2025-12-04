@@ -8,6 +8,14 @@ import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { getOrder } from '@/lib/woocommerce/orders';
 import PageLoading from '@/components/ui/page-loading';
+import {
+  getRefundPolicy,
+  canOrderBeRefunded,
+  isOrderEligibleForRefund,
+  getRefundRequestStatus,
+  formatRefundStatus,
+  RefundRequestMeta,
+} from '@/lib/woocommerce/refunds';
 import { toast } from 'sonner';
 import { generateInvoicePDF } from '@/lib/invoice-generator';
 import OrderStatusTracker from '@/components/orders/order-status-tracker';
@@ -26,6 +34,11 @@ export default function OrderDetailPage() {
   
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refundInfo, setRefundInfo] = useState<{
+    eligible: boolean;
+    message: string;
+    existingRequest?: RefundRequestMeta | null;
+  }>({ eligible: false, message: 'Loading refund policy...' });
 
   useEffect(() => {
     if (!authLoading) {
@@ -57,6 +70,35 @@ export default function OrderDetailPage() {
           subtotal: (orderData as any).subtotal ?? computedSubtotal,
           tax_total: taxTotal,
         });
+
+        // Refund eligibility + status
+        try {
+          const policy = await getRefundPolicy();
+          const timeEligibility = isOrderEligibleForRefund(
+            orderData.date_completed || orderData.date_created,
+            policy.days
+          );
+          const statusEligibility = canOrderBeRefunded(orderData.status);
+          const existingRequest = await getRefundRequestStatus(orderData.id);
+
+          setRefundInfo({
+            eligible: timeEligibility.eligible && statusEligibility && !existingRequest,
+            message: existingRequest
+              ? `Refund request ${formatRefundStatus(existingRequest.status)}`
+              : statusEligibility
+              ? timeEligibility.eligible
+                ? `Eligible for refund (${timeEligibility.daysRemaining} day(s) remaining)`
+                : timeEligibility.reason || 'Outside refund window'
+              : `Orders with status "${orderData.status}" cannot be refunded`,
+            existingRequest,
+          });
+        } catch (error) {
+          console.error('Error checking refund eligibility:', error);
+          setRefundInfo({
+            eligible: false,
+            message: 'Unable to determine refund eligibility right now.',
+          });
+        }
       } else {
         setOrder(null);
       }
@@ -316,6 +358,22 @@ export default function OrderDetailPage() {
                   Continue Shopping
                 </Button>
               </Link>
+              <Link href={`/account/orders/${order.id}/refund`} className="block">
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  disabled={!refundInfo.eligible}
+                >
+                  {refundInfo.existingRequest
+                    ? 'View refund request'
+                    : refundInfo.eligible
+                    ? 'Request a refund'
+                    : 'Refund unavailable'}
+                </Button>
+              </Link>
+              <p className="text-xs text-gray-500 text-center">
+                {refundInfo.message}
+              </p>
             </div>
           </div>
         </div>
