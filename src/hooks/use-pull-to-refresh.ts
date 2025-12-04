@@ -41,6 +41,12 @@ export function usePullToRefresh({
       const delta = currentY - startYRef.current;
 
       if (delta > 0) {
+        // Prevent the native browser rubber-band bounce while pulling
+        try {
+          event.preventDefault();
+        } catch {
+          /* noop */
+        }
         const distance = Math.min(delta, maxPull);
         distanceRef.current = distance;
         setPullDistance(distance);
@@ -68,8 +74,8 @@ export function usePullToRefresh({
       }
     };
 
-    window.addEventListener('touchstart', handleStart, { passive: true });
-    window.addEventListener('touchmove', handleMove, { passive: true });
+    window.addEventListener('touchstart', handleStart, { passive: false });
+    window.addEventListener('touchmove', handleMove, { passive: false });
     window.addEventListener('touchend', handleEnd);
 
     return () => {
