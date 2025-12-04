@@ -8,6 +8,7 @@ import { CustomerAuthProvider } from '@/context/customer-auth-context';
 import WhatsAppFloat from '@/components/layout/whatsapp-float';
 import PWAInstallPrompt from '@/components/pwa/pwa-install-prompt';
 import Footer from '@/components/layout/footer';
+import GlobalPullToRefresh from '@/components/layout/global-pull-to-refresh';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -67,12 +68,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={inter.className}>
         <CustomerAuthProvider>
-          <Header />
-          {children}
-          <Footer />
-          <BottomNav />
-          <Toaster position="top-center" richColors />
-          <PWAInstallPrompt />
+          <GlobalPullToRefresh>
+            <Header />
+            {children}
+            <Footer />
+            <BottomNav />
+            <Toaster position="top-center" richColors />
+            <PWAInstallPrompt />
+          </GlobalPullToRefresh>
         </CustomerAuthProvider>
         <WhatsAppFloat />
       </body>
