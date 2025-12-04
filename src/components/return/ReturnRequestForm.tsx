@@ -52,11 +52,6 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   }, [orderId]);
 
   const createReturnShipment = async () => {
-    const apiBase = process.env.NEXT_PUBLIC_JLO_URL || '';
-    if (!apiBase) {
-      console.warn('JLO API base URL not configured');
-      return null;
-    }
     if (!order) return null;
 
     const payload = {
@@ -80,7 +75,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
       },
     };
 
-    const res = await fetch(`${apiBase}/api/create-return-shipment`, {
+    const res = await fetch(`/api/return-shipment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
