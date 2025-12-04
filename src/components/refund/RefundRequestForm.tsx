@@ -228,7 +228,7 @@ export default function RefundRequestForm({ orderId }: RefundRequestFormProps) {
               <div className="flex justify-between py-3 border-b">
                 <span className="text-gray-600">Refund Amount</span>
                 <span className="font-medium">
-                  {formatPrice(existingRequest.requested_amount)}
+                  {formatPrice(existingRequest.requested_amount ?? 0)}
                 </span>
               </div>
               <div className="py-3">
