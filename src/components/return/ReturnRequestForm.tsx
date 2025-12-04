@@ -54,8 +54,15 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const createReturnShipment = async () => {
     if (!order) return null;
 
+    // Lookup JLO return_request UUID by WooCommerce order number
+    const lookupRes = await fetch(`/api/return-request-id?orderNumber=${order.number}`);
+    const lookupData = await lookupRes.json();
+    if (!lookupRes.ok || !lookupData?.success || !lookupData.return_request_id) {
+      throw new Error(lookupData?.message || 'Unable to find return request in JLO');
+    }
+
     const payload = {
-      return_request_id: order.id,
+      return_request_id: lookupData.return_request_id,
       method: 'pickup' as const,
       customer: {
         name: `${order.shipping.first_name || order.billing.first_name} ${
