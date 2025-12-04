@@ -238,27 +238,17 @@ export default function CheckoutPage() {
       if (chargeData.success && chargeData.data?.status === 'success') {
         console.log('Saved card charged successfully');
         
-        // Update order status
-        const wpUrl = process.env.NEXT_PUBLIC_WP_URL;
-        const wcKey = process.env.NEXT_PUBLIC_WC_KEY;
-        const wcSecret = process.env.NEXT_PUBLIC_WC_SECRET;
+        // Update order status via server API to avoid client-side CORS
         const reference = chargeData.data?.reference || chargeData.data?.id || 'paystack-charge';
-
-        const updateResponse = await fetch(
-          `${wpUrl}/wp-json/wc/v3/orders/${orderId}`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Basic ${btoa(`${wcKey}:${wcSecret}`)}`,
-            },
-            body: JSON.stringify({
-              set_paid: true,
-              transaction_id: reference,
-              status: 'processing',
-            }),
-          }
-        );
+        const updateResponse = await fetch(`/api/orders/${orderId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            set_paid: true,
+            transaction_id: reference,
+            status: 'processing',
+          }),
+        });
 
         if (updateResponse.ok) {
           setIsProcessing(false);
@@ -367,22 +357,16 @@ export default function CheckoutPage() {
       console.log('Updating order:', orderId);
       console.log('WordPress URL:', wpUrl);
 
-      // Update order status in WooCommerce
-      const updateResponse = await fetch(
-        `${wpUrl}/wp-json/wc/v3/orders/${orderId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Basic ${btoa(`${wcKey}:${wcSecret}`)}`,
-          },
-          body: JSON.stringify({
-            set_paid: true,
-            transaction_id: response.reference,
-            status: 'processing',
-          }),
-        }
-      );
+      // Update order status via server API to avoid client-side CORS
+      const updateResponse = await fetch(`/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          set_paid: true,
+          transaction_id: response.reference,
+          status: 'processing',
+        }),
+      });
 
       if (updateResponse.ok) {
         console.log('Order updated successfully');

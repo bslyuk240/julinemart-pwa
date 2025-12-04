@@ -30,3 +30,22 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 });
   }
 }
+
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const orderId = Number(params.id);
+  if (Number.isNaN(orderId)) {
+    return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
+  }
+
+  try {
+    const body = await request.json();
+    const response = await wcApi.put(`orders/${orderId}`, body);
+    return NextResponse.json(response.data);
+  } catch (error) {
+    handleApiError(error);
+    return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
+  }
+}
