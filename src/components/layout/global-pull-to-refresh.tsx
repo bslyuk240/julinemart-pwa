@@ -14,9 +14,13 @@ export default function GlobalPullToRefresh({ children }: GlobalPullToRefreshPro
 
   const { pullDistance, isRefreshing } = usePullToRefresh({
     onRefresh: async () => {
-      router.refresh();
-      // Keep the indicator visible briefly so users see feedback
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Force a full page reload to ensure data/state is fresh
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      } else {
+        router.refresh();
+      }
     },
     targetRef: scrollRef,
   });
