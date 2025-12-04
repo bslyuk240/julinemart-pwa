@@ -5,6 +5,7 @@ interface PullToRefreshOptions {
   threshold?: number;
   maxPull?: number;
   disabled?: boolean;
+  targetRef?: React.RefObject<HTMLElement | null>;
 }
 
 /**
@@ -16,6 +17,7 @@ export function usePullToRefresh({
   threshold = 70,
   maxPull = 140,
   disabled = false,
+  targetRef,
 }: PullToRefreshOptions) {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -26,14 +28,16 @@ export function usePullToRefresh({
   useEffect(() => {
     if (disabled) return undefined;
 
+    const target = targetRef?.current ?? window;
+
     // On iOS Safari, block the native rubber-band bounce so our handler can run.
-    const root = document.documentElement;
-    const body = document.body;
-    const previousOverscroll = root.style.overscrollBehavior;
-    const previousBodyOverscroll = body.style.overscrollBehaviorY;
-    const previousBodyTouchAction = body.style.touchAction;
-    root.style.overscrollBehavior = 'contain';
-    body.style.overscrollBehaviorY = 'contain';
+    const root = target instanceof Window ? document.documentElement : target;
+    const body = target instanceof Window ? document.body : (target as HTMLElement);
+    const previousOverscroll = (root as HTMLElement).style.overscrollBehavior;
+    const previousBodyOverscroll = (body as HTMLElement).style.overscrollBehaviorY;
+    const previousBodyTouchAction = (body as HTMLElement).style.touchAction;
+    (root as HTMLElement).style.overscrollBehavior = 'contain';
+    (body as HTMLElement).style.overscrollBehaviorY = 'contain';
 
     const handleStart = (event: TouchEvent) => {
       if (isRefreshing) return;
@@ -85,19 +89,19 @@ export function usePullToRefresh({
       }
     };
 
-    window.addEventListener('touchstart', handleStart, { passive: false });
-    window.addEventListener('touchmove', handleMove, { passive: false });
-    window.addEventListener('touchend', handleEnd);
+    target.addEventListener('touchstart', handleStart, { passive: false });
+    target.addEventListener('touchmove', handleMove, { passive: false });
+    target.addEventListener('touchend', handleEnd);
 
     return () => {
-      root.style.overscrollBehavior = previousOverscroll;
-      body.style.overscrollBehaviorY = previousBodyOverscroll;
-      body.style.touchAction = previousBodyTouchAction;
-      window.removeEventListener('touchstart', handleStart);
-      window.removeEventListener('touchmove', handleMove);
-      window.removeEventListener('touchend', handleEnd);
+      (root as HTMLElement).style.overscrollBehavior = previousOverscroll;
+      (body as HTMLElement).style.overscrollBehaviorY = previousBodyOverscroll;
+      (body as HTMLElement).style.touchAction = previousBodyTouchAction;
+      target.removeEventListener('touchstart', handleStart);
+      target.removeEventListener('touchmove', handleMove);
+      target.removeEventListener('touchend', handleEnd);
     };
-  }, [onRefresh, threshold, maxPull, disabled, isRefreshing]);
+  }, [onRefresh, threshold, maxPull, disabled, isRefreshing, targetRef]);
 
   return { pullDistance, isRefreshing };
 }

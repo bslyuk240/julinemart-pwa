@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Store, MapPin, Star, Phone, Mail } from 'lucide-react';
 import ProductGrid from '@/components/product/product-grid';
@@ -20,6 +20,7 @@ export default function VendorStorePage() {
   const [policies, setPolicies] = useState<StorePolicies | null>(null);
   const [policyLoading, setPolicyLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const fetchPolicies = async (forceRefresh = false, opts: { silent?: boolean } = {}) => {
     const { silent = false } = opts;
@@ -84,6 +85,7 @@ export default function VendorStorePage() {
   const { pullDistance, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
     disabled: loading,
+    targetRef: scrollRef,
   });
 
   if (loading) {
@@ -113,7 +115,11 @@ export default function VendorStorePage() {
     : 'Shipping details will appear here once available.';
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
+    <main
+      ref={scrollRef}
+      className="min-h-screen bg-gray-50 pb-24 md:pb-8 overscroll-contain"
+      style={{ touchAction: 'pan-y' }}
+    >
       <div className="container mx-auto px-4 py-6">
         {(pullDistance > 0 || isRefreshing || refreshing) && (
           <div
