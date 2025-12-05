@@ -91,7 +91,7 @@ export default function ReturnsPage() {
                     <div>
                       <p className="text-sm text-gray-600">Order #{item.order_number || item.order_id}</p>
                       <p className="text-base font-semibold text-gray-900">
-                        Return {item.return_id.slice(0, 8)}
+                        Return {(item.return_id || item.id || '').toString().slice(0, 8) || '—'}
                       </p>
                       {item.created_at ? (
                         <p className="text-xs text-gray-500">
