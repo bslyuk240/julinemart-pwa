@@ -57,6 +57,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const [reasonCode, setReasonCode] = useState('');
   const [reasonNote, setReasonNote] = useState('');
   const [imageUrls, setImageUrls] = useState('');
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [method, setMethod] = useState<'pickup' | 'dropoff'>('pickup');
 
   const currency = order?.currency || 'NGN';
@@ -109,10 +110,11 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
     try {
       setSubmitting(true);
-      const images = imageUrls
+      const urlImages = imageUrls
         .split('\n')
         .map((url) => url.trim())
         .filter(Boolean);
+      const images = [...urlImages, ...uploadedImages];
 
       const lineItems = (order.line_items || [])
         .map((item) => {
@@ -198,6 +200,54 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const toBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+    });
+
+  const handleImageUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const maxFiles = 5;
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSizeBytes = 8 * 1024 * 1024; // 8MB
+
+    const selectedFiles = Array.from(files).slice(0, maxFiles);
+    const validationErrors = selectedFiles
+      .map((file) => {
+        if (!allowedTypes.includes(file.type)) {
+          return `${file.name}: unsupported type`;
+        }
+        if (file.size > maxSizeBytes) {
+          return `${file.name}: exceeds 8MB`;
+        }
+        return null;
+      })
+      .filter(Boolean) as string[];
+
+    if (validationErrors.length) {
+      toast.error(`Image upload issue: ${validationErrors.join(', ')}`);
+      return;
+    }
+
+    try {
+      const readFiles = await Promise.all(selectedFiles.map((file) => toBase64(file)));
+      setUploadedImages((prev) => {
+        const next = [...prev, ...readFiles].slice(0, maxFiles);
+        return next;
+      });
+    } catch (err) {
+      console.error('Error reading images', err);
+      toast.error('Could not load one or more images. Please try again.');
+    }
+  };
+
+  const removeUploadedImage = (index: number) => {
+    setUploadedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const renderShipment = (shipment: JloReturnShipment | undefined) => {
@@ -552,15 +602,48 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
           <div>
             <h2 className="font-semibold text-gray-900 mb-3">Photos (optional)</h2>
-            <div className="flex items-start gap-3">
-              <Image className="w-5 h-5 text-gray-500 mt-1" />
-              <textarea
-                value={imageUrls}
-                onChange={(e) => setImageUrls(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                rows={3}
-                placeholder="Paste image URLs here (one per line)"
-              />
+            <div className="space-y-3">
+              <label className="flex items-center gap-3 border border-dashed border-gray-300 rounded-lg p-3 cursor-pointer hover:border-primary-500 transition">
+                <Image className="w-5 h-5 text-gray-500" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Upload photos</p>
+                  <p className="text-xs text-gray-600">You can add up to 5 images (JPEG, PNG, WEBP, max 8MB each).</p>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handleImageUpload(e.target.files)}
+                  className="hidden"
+                />
+              </label>
+              {uploadedImages.length ? (
+                <div className="grid grid-cols-3 gap-3">
+                  {uploadedImages.map((src, idx) => (
+                    <div key={idx} className="relative rounded-lg overflow-hidden border border-gray-200">
+                      <img src={src} alt={`Uploaded ${idx + 1}`} className="h-24 w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeUploadedImage(idx)}
+                        className="absolute top-1 right-1 bg-white/80 text-xs px-2 py-1 rounded hover:bg-white"
+                        aria-label="Remove image"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex items-start gap-3">
+                <Image className="w-5 h-5 text-gray-500 mt-1" />
+                <textarea
+                  value={imageUrls}
+                  onChange={(e) => setImageUrls(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  rows={3}
+                  placeholder="Paste image URLs here (one per line)"
+                />
+              </div>
             </div>
           </div>
 
