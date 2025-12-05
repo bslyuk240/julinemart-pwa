@@ -14,7 +14,6 @@ import {
   formatJloReturnStatus,
   buildFezTrackingUrl,
 } from '@/lib/jlo/returns';
-import { useCustomerAuth } from '@/context/customer-auth-context';
 
 interface ReturnRequestFormProps {
   orderId: number;
@@ -46,7 +45,6 @@ function latestReturn(returns: JloReturn[]): JloReturn | null {
 
 export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const router = useRouter();
-  const { customer } = useCustomerAuth();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [returns, setReturns] = useState<JloReturn[]>([]);
@@ -59,6 +57,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const [imageUrls, setImageUrls] = useState('');
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [method, setMethod] = useState<'pickup' | 'dropoff'>('pickup');
+  const [hubId, setHubId] = useState('');
 
   const currency = order?.currency || 'NGN';
   const activeReturn = useMemo(() => latestReturn(returns), [returns]);
@@ -108,6 +107,11 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
       return;
     }
 
+    if (method === 'pickup' && !hubId.trim()) {
+      toast.error('Select a pickup hub');
+      return;
+    }
+
     try {
       setSubmitting(true);
       const urlImages = imageUrls
@@ -116,64 +120,17 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
         .filter(Boolean);
       const images = [...urlImages, ...uploadedImages];
 
-      const lineItems = (order.line_items || [])
-        .map((item) => {
-          const qty = selectedItems[item.id] || 0;
-          if (!qty) return null;
-          return {
-            wc_order_item_id: item.id,
-            product_id: item.product_id,
-            variation_id: item.variation_id,
-            qty,
-            unit_price: item.price,
-            name: item.name,
-          };
-        })
-        .filter(Boolean) as {
-        wc_order_item_id: number;
-        product_id: number;
-        variation_id: number;
-        qty: number;
-        unit_price: number;
-        name: string;
-      }[];
-
-      if (!lineItems.length) {
-        toast.error('Select at least one item to return');
-        return;
-      }
-
       const response = await fetch(JLO_RETURNS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           order_id: order.id,
-          wc_customer_id: order.customer_id || customer?.id,
-          customer_email: order.billing?.email || '',
-          customer_name: `${order.billing?.first_name || ''} ${order.billing?.last_name || ''}`.trim() || undefined,
-          line_items: lineItems,
           preferred_resolution: preferredResolution,
           reason_code: reasonCode,
           reason_note: reasonNote,
           images,
           method,
-          customer: {
-            name: `${order.shipping?.first_name || order.billing?.first_name || ''} ${order.shipping?.last_name || order.billing?.last_name || ''}`.trim(),
-            phone: order.billing?.phone,
-            address: order.shipping?.address_1 || order.billing?.address_1,
-            city: order.shipping?.city || order.billing?.city,
-            state: order.shipping?.state || order.billing?.state,
-          },
-          hub:
-            method === 'pickup'
-              ? {
-                  name: 'JulineMart Returns',
-                  phone: order.billing?.phone,
-                  address: order.billing?.address_1 || order.shipping?.address_1,
-                  city: order.billing?.city || order.shipping?.city,
-                  state: order.billing?.state || order.shipping?.state,
-                }
-              : undefined,
+          hub_id: hubId || undefined,
         }),
       });
 
@@ -562,10 +519,22 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
               </button>
             </div>
             {method === 'pickup' ? (
-              <p className="text-xs text-gray-600 mt-2">
-                Pickup address: {order.shipping?.address_1 || order.billing?.address_1},{' '}
-                {order.shipping?.city || order.billing?.city} {order.shipping?.state || order.billing?.state}
-              </p>
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-gray-600">
+                  Pickup will be arranged via your selected hub.
+                </p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">Pickup hub ID</label>
+                  <input
+                    type="text"
+                    value={hubId}
+                    onChange={(e) => setHubId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                    placeholder="Enter hub ID"
+                    required={method === 'pickup'}
+                  />
+                </div>
+              </div>
             ) : (
               <p className="text-xs text-gray-600 mt-2">
                 You&apos;ll get drop-off instructions after submitting.
