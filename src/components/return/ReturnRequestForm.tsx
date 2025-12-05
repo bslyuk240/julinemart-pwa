@@ -28,6 +28,7 @@ const RETURN_REASONS = [
 ];
 
 type Resolution = 'refund' | 'replacement';
+const JLO_RETURNS_URL = 'https://jlo.julinemart.com/api/returns';
 
 function canOrderBeReturned(status: string) {
   const eligible = ['delivered', 'completed'];
@@ -106,11 +107,24 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
         .map((url) => url.trim())
         .filter(Boolean);
 
-      const response = await fetch(`/api/jlo/returns`, {
+      const lineItems = (order.line_items || []).map((item) => ({
+        wc_order_item_id: item.id,
+        product_id: item.product_id,
+        variation_id: item.variation_id,
+        qty: item.quantity,
+        unit_price: item.price,
+        name: item.name,
+      }));
+
+      const response = await fetch(JLO_RETURNS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           order_id: order.id,
+          wc_customer_id: order.customer_id || customer?.id,
+          customer_email: order.billing?.email || '',
+          customer_name: `${order.billing?.first_name || ''} ${order.billing?.last_name || ''}`.trim() || undefined,
+          line_items: lineItems,
           preferred_resolution: preferredResolution,
           reason_code: reasonCode,
           reason_note: reasonNote,
@@ -123,29 +137,29 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
             city: order.shipping?.city || order.billing?.city,
             state: order.shipping?.state || order.billing?.state,
           },
-          hub: {
-            name: 'JulineMart Returns',
-            phone: order.billing?.phone,
-            address: order.billing?.address_1 || order.shipping?.address_1,
-            city: order.billing?.city || order.shipping?.city,
-            state: order.billing?.state || order.shipping?.state,
-          },
-          wc_customer_id: order.customer_id || customer?.id,
-          customer_email: order.billing?.email || '',
-          customer_name: `${order.billing?.first_name || ''} ${order.billing?.last_name || ''}`.trim(),
+          hub:
+            method === 'pickup'
+              ? {
+                  name: 'JulineMart Returns',
+                  phone: order.billing?.phone,
+                  address: order.billing?.address_1 || order.shipping?.address_1,
+                  city: order.billing?.city || order.shipping?.city,
+                  state: order.billing?.state || order.shipping?.state,
+                }
+              : undefined,
         }),
       });
 
       const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result?.message || 'Failed to submit return request');
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.message || result?.error || 'Failed to submit return request');
       }
 
+      const payload = result?.data ?? result;
       const createdReturn: JloReturn | null =
-        result?.return ||
-        result?.data ||
-        result?.return_request ||
-        (result?.return_id ? result : null);
+        payload?.return_request ||
+        payload?.return ||
+        (payload?.return_id || payload?.id ? payload : null);
 
       toast.success('Return request submitted. We will update you soon.');
       if (createdReturn) {

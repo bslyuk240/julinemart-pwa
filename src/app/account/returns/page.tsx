@@ -28,7 +28,7 @@ export default function ReturnsPage() {
   const loadReturns = async (id: number) => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/jlo/returns?wc_customer_id=${id}`);
+      const res = await fetch(`https://jlo.julinemart.com/api/returns?wc_customer_id=${id}`);
       if (!res.ok) throw new Error('Failed to fetch returns');
       const data = await res.json();
       const payload = data?.data ?? data;
