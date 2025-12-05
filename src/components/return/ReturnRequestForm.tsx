@@ -28,7 +28,7 @@ const RETURN_REASONS = [
 ];
 
 type Resolution = 'refund' | 'replacement';
-const JLO_RETURNS_URL = 'https://jlo.julinemart.com/api/returns';
+const JLO_RETURNS_URL = 'https://jlo.julinemart.com/api/returns-create';
 
 function canOrderBeReturned(status: string) {
   const eligible = ['delivered', 'completed'];
