@@ -31,7 +31,8 @@ export default function ReturnsPage() {
       const res = await fetch(`/api/jlo/returns?wc_customer_id=${id}`);
       if (!res.ok) throw new Error('Failed to fetch returns');
       const data = await res.json();
-      const list = Array.isArray(data?.returns) ? data.returns : Array.isArray(data) ? data : [];
+      const payload = data?.data ?? data;
+      const list = Array.isArray(payload) ? payload : Array.isArray(payload?.returns) ? payload.returns : [];
       setReturns(list);
     } catch (error) {
       console.error(error);

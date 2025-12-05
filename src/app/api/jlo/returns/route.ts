@@ -17,7 +17,7 @@ async function proxy(path: string, init: RequestInit) {
     return { message: text || null };
   });
 
-  if (!response.ok) {
+  if (!response.ok || data?.success === false) {
     return NextResponse.json(
       {
         success: false,
@@ -29,7 +29,7 @@ async function proxy(path: string, init: RequestInit) {
     );
   }
 
-  return NextResponse.json(data, { status: response.status });
+  return NextResponse.json(data?.data ?? data, { status: response.status });
 }
 
 export async function GET(request: Request) {

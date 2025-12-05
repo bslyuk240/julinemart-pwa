@@ -23,7 +23,7 @@ export async function GET(
       return { message: text || null };
     });
 
-    if (!response.ok) {
+    if (!response.ok || data?.success === false) {
       return NextResponse.json(
         {
           success: false,
@@ -35,7 +35,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data?.data ?? data, { status: response.status });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, message: error?.message || 'Unexpected error fetching order returns' },

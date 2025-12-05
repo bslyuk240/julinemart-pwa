@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    if (!body?.return_request_id) {
+    if (!body?.order_id) {
       return NextResponse.json(
-        { success: false, message: 'return_request_id is required to schedule a return shipment' },
+        { success: false, message: 'order_id is required to create a return' },
         { status: 400 }
       );
     }
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          message: data?.message || data?.error || 'Return shipment creation failed',
+          message: data?.message || data?.error || 'Return request failed',
           details: data,
           status: response.status,
         },
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     return NextResponse.json(data, { status: response.status });
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, message: error?.message || 'Unexpected error creating return shipment' },
+      { success: false, message: error?.message || 'Unexpected error creating return request' },
       { status: 500 }
     );
   }

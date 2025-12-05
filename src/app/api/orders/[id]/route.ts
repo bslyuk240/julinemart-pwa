@@ -26,7 +26,8 @@ export async function GET(
           return { message: text || null };
         });
         if (jloResponse.ok) {
-          jloReturns = Array.isArray(jloData?.returns) ? jloData.returns : Array.isArray(jloData) ? jloData : [];
+          const payload = jloData?.data ?? jloData;
+          jloReturns = Array.isArray(payload) ? payload : Array.isArray(payload?.returns) ? payload.returns : [];
         }
       } catch (error) {
         console.warn('Failed to fetch JLO returns', error);

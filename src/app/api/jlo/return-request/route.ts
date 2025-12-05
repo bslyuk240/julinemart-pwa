@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json(data, { status: response.status || 200 });
+    return NextResponse.json(data?.data ?? data, { status: response.status || 200 });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, message: error?.message || 'Unexpected error creating JLO return request' },

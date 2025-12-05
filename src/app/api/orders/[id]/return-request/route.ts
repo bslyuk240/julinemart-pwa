@@ -18,12 +18,12 @@ export async function POST(
     return NextResponse.json({ success: false, message: 'Invalid request body' }, { status: 400 });
   }
 
-  const { line_items, preferred_resolution, reason_code } = body;
-  if (!Array.isArray(line_items) || !line_items.length) {
-    return NextResponse.json({ success: false, message: 'Select at least one item to return' }, { status: 400 });
-  }
+  const { preferred_resolution, reason_code, method } = body;
   if (!reason_code) {
     return NextResponse.json({ success: false, message: 'Missing reason code' }, { status: 400 });
+  }
+  if (!method || !['pickup', 'dropoff'].includes(method)) {
+    return NextResponse.json({ success: false, message: 'Return method is required (pickup | dropoff)' }, { status: 400 });
   }
 
   if (!JLO_BASE) {
@@ -34,46 +34,37 @@ export async function POST(
     const orderResponse = await wcApi.get(`orders/${orderId}`);
     const order = orderResponse.data;
 
-    const orderLineItems = new Map<number, any>();
-    (order?.line_items || []).forEach((item: any) => {
-      orderLineItems.set(item.id, item);
-    });
+    const customerPayload = body.customer || {
+      name: `${order.shipping?.first_name || order.billing?.first_name || ''} ${order.shipping?.last_name || order.billing?.last_name || ''}`.trim(),
+      phone: order.billing?.phone,
+      address: order.shipping?.address_1 || order.billing?.address_1,
+      city: order.shipping?.city || order.billing?.city,
+      state: order.shipping?.state || order.billing?.state,
+    };
 
-    const payloadLineItems = line_items.map((item: any) => {
-      const orderItem = orderLineItems.get(item.id || item.wc_order_item_id);
-      const qty = Math.min(
-        Number(item.quantity || item.qty || 0),
-        Number(orderItem?.quantity || item.quantity || item.qty || 0)
-      );
-      const unitPrice =
-        orderItem?.price ??
-        (orderItem?.total && orderItem?.quantity
-          ? Number(orderItem.total) / Number(orderItem.quantity)
-          : undefined);
-      return {
-        wc_order_item_id: orderItem?.id || item.id || item.wc_order_item_id,
-        product_id: orderItem?.product_id || item.product_id || 0,
-        variation_id: orderItem?.variation_id || item.variation_id || 0,
-        qty: qty > 0 ? qty : 1,
-        unit_price: unitPrice ?? Number(item.unit_price || 0),
-        name: orderItem?.name || item.name,
-      };
-    });
+    const hubPayload = body.hub || {
+      name: 'JulineMart Returns',
+      phone: order.billing?.phone,
+      address: order.billing?.address_1 || order.shipping?.address_1,
+      city: order.billing?.city || order.shipping?.city,
+      state: order.billing?.state || order.shipping?.state,
+    };
 
     const payload = {
       order_id: order.id,
-      order_number: order.number,
-      wc_customer_id: order.customer_id || body.wc_customer_id || null,
-      customer_email: order.billing?.email || body.customer_email || '',
+      wc_customer_id: order.customer_id || body.wc_customer_id || undefined,
+      customer_email: order.billing?.email || body.customer_email || undefined,
       customer_name:
         body.customer_name ||
-        `${order.billing?.first_name || ''} ${order.billing?.last_name || ''}`.trim(),
+        `${order.billing?.first_name || ''} ${order.billing?.last_name || ''}`.trim() ||
+        undefined,
       preferred_resolution: preferred_resolution || 'refund',
       reason_code,
       reason_note: body.reason_note || '',
       images: Array.isArray(body.images) ? body.images.filter(Boolean) : [],
-      line_items: payloadLineItems,
-      notes: body.notes || '',
+      method,
+      customer: method === 'pickup' ? customerPayload : undefined,
+      hub: method === 'pickup' ? hubPayload : undefined,
     };
 
     const jloResponse = await fetch(`${JLO_BASE}/api/returns`, {
@@ -87,7 +78,7 @@ export async function POST(
       return { message: text || null };
     });
 
-    if (!jloResponse.ok) {
+    if (!jloResponse.ok || jloData?.success === false) {
       return NextResponse.json(
         {
           success: false,
@@ -99,7 +90,7 @@ export async function POST(
       );
     }
 
-    return NextResponse.json(jloData, { status: jloResponse.status });
+    return NextResponse.json(jloData?.data ?? jloData, { status: jloResponse.status || 200 });
   } catch (error) {
     handleApiError(error);
     return NextResponse.json({ success: false, message: 'Failed to submit return request' }, { status: 500 });

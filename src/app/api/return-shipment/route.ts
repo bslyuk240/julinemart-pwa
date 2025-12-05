@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getJloBaseUrl } from '@/lib/jlo/returns';
 
 const JLO_BASE = getJloBaseUrl();
-const RETURN_FUNCTION_PATH = '/api/create-return-shipment';
 
 export async function POST(request: Request) {
   if (!JLO_BASE) {
@@ -11,7 +10,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const response = await fetch(`${JLO_BASE}${RETURN_FUNCTION_PATH}`, {
+    const response = await fetch(`${JLO_BASE}/api/returns`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -27,7 +26,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          message: data?.message || data?.error || 'Return shipment creation failed',
+          message: data?.message || data?.error || 'Return request failed',
           details: data,
           status: response.status,
         },
@@ -35,10 +34,10 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json(data, { status: response.status || 200 });
+    return NextResponse.json(data?.data ?? data, { status: response.status || 200 });
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, message: error?.message || 'Unexpected error creating return shipment' },
+      { success: false, message: error?.message || 'Unexpected error creating return request' },
       { status: 500 }
     );
   }

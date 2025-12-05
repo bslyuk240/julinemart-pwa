@@ -51,21 +51,14 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const [returns, setReturns] = useState<JloReturn[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<Record<number, number>>({});
   const [preferredResolution, setPreferredResolution] = useState<Resolution>('refund');
   const [reasonCode, setReasonCode] = useState('');
   const [reasonNote, setReasonNote] = useState('');
   const [imageUrls, setImageUrls] = useState('');
+  const [method, setMethod] = useState<'pickup' | 'dropoff'>('pickup');
 
   const currency = order?.currency || 'NGN';
   const activeReturn = useMemo(() => latestReturn(returns), [returns]);
-
-  const selectedAmount =
-    order?.line_items?.reduce((sum, item) => {
-      const qty = selectedItems[item.id] || 0;
-      const unitTotal = item.quantity ? Number(item.total) / item.quantity : 0;
-      return sum + unitTotal * qty;
-    }, 0) || 0;
 
   useEffect(() => {
     fetchOrder();
@@ -96,33 +89,6 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     e.preventDefault();
     if (!order) return;
 
-    const selectedLineItems = (order.line_items || [])
-      .map((item) => {
-        const qty = selectedItems[item.id] || 0;
-        if (!qty) return null;
-        return {
-          id: item.id,
-          quantity: qty,
-          product_id: item.product_id,
-          variation_id: item.variation_id,
-          unit_price: item.price,
-          name: item.name,
-        };
-      })
-      .filter(Boolean) as {
-        id: number;
-        quantity: number;
-        product_id: number;
-        variation_id: number;
-        unit_price: number;
-        name: string;
-      }[];
-
-    if (!selectedLineItems.length) {
-      toast.error('Select at least one item to return');
-      return;
-    }
-
     if (!reasonCode) {
       toast.error('Select a reason for your return');
       return;
@@ -148,14 +114,21 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           reason_code: reasonCode,
           reason_note: reasonNote,
           images,
-          line_items: selectedLineItems.map((item) => ({
-            id: item.id,
-            quantity: item.quantity,
-            product_id: item.product_id,
-            variation_id: item.variation_id,
-            unit_price: item.unit_price,
-            name: item.name,
-          })),
+          method,
+          customer: {
+            name: `${order.shipping?.first_name || order.billing?.first_name || ''} ${order.shipping?.last_name || order.billing?.last_name || ''}`.trim(),
+            phone: order.billing?.phone,
+            address: order.shipping?.address_1 || order.billing?.address_1,
+            city: order.shipping?.city || order.billing?.city,
+            state: order.shipping?.state || order.billing?.state,
+          },
+          hub: {
+            name: 'JulineMart Returns',
+            phone: order.billing?.phone,
+            address: order.billing?.address_1 || order.shipping?.address_1,
+            city: order.billing?.city || order.shipping?.city,
+            state: order.billing?.state || order.shipping?.state,
+          },
           wc_customer_id: order.customer_id || customer?.id,
           customer_email: order.billing?.email || '',
           customer_name: `${order.billing?.first_name || ''} ${order.billing?.last_name || ''}`.trim(),
@@ -401,53 +374,6 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Select Items to Return</h2>
-          <div className="space-y-4">
-            {order.line_items.map((item) => {
-              const selectedQty = selectedItems[item.id] || 0;
-              const unitPrice = item.quantity ? Number(item.total) / item.quantity : 0;
-              return (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-600">Ordered qty: {item.quantity}</p>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      {formatPrice(unitPrice, currency)} each
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm text-gray-700">Return quantity</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={item.quantity}
-                      value={selectedQty}
-                      onChange={(e) => {
-                        const value = Math.min(
-                          Math.max(parseInt(e.target.value, 10) || 0, 0),
-                          item.quantity
-                        );
-                        setSelectedItems((prev) => ({ ...prev, [item.id]: value }));
-                      }}
-                      className="w-24 border border-gray-300 rounded-lg px-3 py-2"
-                    />
-                    <span className="text-sm text-gray-700">
-                      Value: {formatPrice(unitPrice * selectedQty, currency)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-4 flex justify-between text-sm text-gray-700">
-            <span>Estimated value</span>
-            <span className="font-semibold">{formatPrice(selectedAmount, currency)}</span>
-          </div>
-        </div>
-
         <form className="bg-white rounded-xl shadow-sm p-6 space-y-5" onSubmit={handleSubmit}>
           <div>
             <h2 className="font-semibold text-gray-900 mb-3">Preferred resolution</h2>
@@ -472,6 +398,42 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <h2 className="font-semibold text-gray-900 mb-3">Return method</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setMethod('pickup')}
+                className={`border rounded-lg p-3 text-left transition ${
+                  method === 'pickup' ? 'border-primary-600 bg-primary-50' : 'border-gray-200 bg-white'
+                }`}
+              >
+                <p className="font-semibold text-gray-900">Pickup</p>
+                <p className="text-xs text-gray-600">Fez rider picks up from your address</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMethod('dropoff')}
+                className={`border rounded-lg p-3 text-left transition ${
+                  method === 'dropoff' ? 'border-primary-600 bg-primary-50' : 'border-gray-200 bg-white'
+                }`}
+              >
+                <p className="font-semibold text-gray-900">Dropoff</p>
+                <p className="text-xs text-gray-600">Take items to a Fez drop-off point</p>
+              </button>
+            </div>
+            {method === 'pickup' ? (
+              <p className="text-xs text-gray-600 mt-2">
+                Pickup address: {order.shipping?.address_1 || order.billing?.address_1},{' '}
+                {order.shipping?.city || order.billing?.city} {order.shipping?.state || order.billing?.state}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-600 mt-2">
+                You&apos;ll get drop-off instructions after submitting.
+              </p>
+            )}
           </div>
 
           <div>

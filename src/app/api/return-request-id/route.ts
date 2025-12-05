@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       return { message: text || null };
     });
 
-    if (!response.ok || !data?.success) {
+    if (!response.ok || data?.success === false) {
       return NextResponse.json(
         {
           success: false,
@@ -33,7 +33,8 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, return_request_id: data.return_request_id });
+    const payload = data?.data ?? data;
+    return NextResponse.json({ success: true, return_request_id: payload?.return_request_id || payload?.id });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, message: error?.message || 'Unexpected error fetching return request id' },

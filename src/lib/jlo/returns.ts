@@ -5,6 +5,7 @@ const RAW_JLO_BASE =
 
 export type JloReturnShipment = {
   shipment_id?: string;
+  id?: string;
   method?: 'pickup' | 'dropoff';
   return_code?: string;
   fez_tracking?: string | null;
@@ -30,7 +31,8 @@ export type JloRefundInfo = {
 };
 
 export type JloReturn = {
-  return_id: string;
+  return_id?: string;
+  id?: string;
   order_id: number;
   order_number?: string;
   status: string;

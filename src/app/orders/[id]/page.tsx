@@ -74,7 +74,8 @@ export default function OrderDetailPage() {
           subtotal: (orderData as any).subtotal ?? computedSubtotal,
           tax_total: taxTotal,
         });
-        setReturns(Array.isArray(jloReturns) ? jloReturns : []);
+        const payload = jloReturns?.data ?? jloReturns;
+        setReturns(Array.isArray(payload) ? payload : Array.isArray(payload?.returns) ? payload.returns : []);
       } else {
         setOrder(null);
       }
