@@ -106,10 +106,11 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
         .map((url) => url.trim())
         .filter(Boolean);
 
-      const response = await fetch(`/api/orders/${order.id}/return-request`, {
+      const response = await fetch(`/api/jlo/returns`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          order_id: order.id,
           preferred_resolution: preferredResolution,
           reason_code: reasonCode,
           reason_note: reasonNote,
