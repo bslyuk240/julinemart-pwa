@@ -1,27 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Package, MapPin, CreditCard, Phone, Mail, Download, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import PageLoading from '@/components/ui/page-loading';
-import {
-  canOrderBeRefunded,
-  isOrderEligibleForRefund,
-  formatRefundStatus,
-  RefundRequestMeta,
-} from '@/lib/woocommerce/refunds';
 import { toast } from 'sonner';
 import { generateInvoicePDF } from '@/lib/invoice-generator';
 import OrderStatusTracker from '@/components/orders/order-status-tracker';
+import { JloReturn, formatJloRefundStatus, formatJloReturnStatus } from '@/lib/jlo/returns';
 import type { Order as WooOrder } from '@/types/order';
 
 type OrderDetail = WooOrder & {
   subtotal?: string;
   tax_total?: string;
 };
+
+function canOrderBeReturned(status: string) {
+  const eligible = ['delivered', 'completed'];
+  return eligible.includes(status);
+}
 
 export default function OrderDetailPage() {
   const router = useRouter();
@@ -31,19 +31,16 @@ export default function OrderDetailPage() {
   
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refundInfo, setRefundInfo] = useState<{
-    eligible: boolean;
-    message: string;
-    existingRequest?: RefundRequestMeta | null;
-    status?: RefundRequestMeta['status'];
-    statusDisplay?: ReturnType<typeof formatRefundStatus>;
-  }>({ eligible: false, message: 'Loading refund policy...' });
-  const [returnInfo, setReturnInfo] = useState<{
-    eligible: boolean;
-    message: string;
-    existingRequest?: RefundRequestMeta | null;
-    statusDisplay?: ReturnType<typeof formatRefundStatus>;
-  }>({ eligible: false, message: 'Loading return policy...' });
+  const [returns, setReturns] = useState<JloReturn[]>([]);
+
+  const activeReturn = useMemo(() => {
+    if (!returns.length) return null;
+    return [...returns].sort((a, b) => {
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bDate - aDate;
+    })[0];
+  }, [returns]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -60,7 +57,7 @@ export default function OrderDetailPage() {
       setLoading(true);
       const res = await fetch(`/api/orders/${orderId}`);
       if (!res.ok) throw new Error('Failed to fetch order');
-      const { order: orderData, refundRequest, returnRequest } = await res.json();
+      const { order: orderData, returns: jloReturns } = await res.json();
       if (orderData) {
         const taxTotal =
           (orderData as any).tax_total ??
@@ -77,57 +74,7 @@ export default function OrderDetailPage() {
           subtotal: (orderData as any).subtotal ?? computedSubtotal,
           tax_total: taxTotal,
         });
-
-        // Refund eligibility + status
-        try {
-          const policyRes = await fetch('/api/policies/refund');
-          const policy = policyRes.ok ? await policyRes.json() : { days: 3 };
-          const timeEligibility = isOrderEligibleForRefund(
-            orderData.date_completed || orderData.date_created,
-            policy.days
-          );
-          const statusEligibility = canOrderBeRefunded(orderData.status);
-          const existingRequest = refundRequest ?? null;
-          const statusDisplay = existingRequest ? formatRefundStatus(existingRequest.status) : undefined;
-
-          setRefundInfo({
-            eligible: timeEligibility.eligible && statusEligibility && !existingRequest,
-            message: existingRequest
-              ? statusDisplay?.label || 'Refund request'
-              : statusEligibility
-              ? timeEligibility.eligible
-                ? `Eligible for refund (${timeEligibility.daysRemaining} day(s) remaining)`
-                : timeEligibility.reason || 'Outside refund window'
-              : `Orders with status "${orderData.status}" cannot be refunded`,
-            existingRequest,
-            status: existingRequest?.status,
-            statusDisplay,
-          });
-
-          const returnExisting = returnRequest ?? null;
-          const returnStatusDisplay = returnExisting ? formatRefundStatus(returnExisting.status) : undefined;
-          const returnEligible = statusEligibility && !returnExisting;
-          setReturnInfo({
-            eligible: returnEligible,
-            message: returnExisting
-              ? returnStatusDisplay?.label || 'Return request'
-              : statusEligibility
-              ? 'Eligible for return (after delivery/completion)'
-              : `Returns available after delivery/completion`,
-            existingRequest: returnExisting,
-            statusDisplay: returnStatusDisplay,
-          });
-        } catch (error) {
-          console.error('Error checking refund eligibility:', error);
-          setRefundInfo({
-            eligible: false,
-            message: 'Unable to determine refund eligibility right now.',
-          });
-          setReturnInfo({
-            eligible: false,
-            message: 'Unable to determine return eligibility right now.',
-          });
-        }
+        setReturns(Array.isArray(jloReturns) ? jloReturns : []);
       } else {
         setOrder(null);
       }
@@ -159,6 +106,11 @@ export default function OrderDetailPage() {
       minute: '2-digit',
     });
   };
+
+  const returnStatusDisplay = activeReturn ? formatJloReturnStatus(activeReturn.status) : null;
+  const refundStatusDisplay = activeReturn
+    ? formatJloRefundStatus(activeReturn.refund_status || 'none')
+    : null;
 
   const handleShare = async () => {
     if (navigator.share) {
@@ -215,6 +167,9 @@ export default function OrderDetailPage() {
       </div>
     );
   }
+
+  const returnEligible = canOrderBeReturned(order.status) && !activeReturn;
+  const returnShipment = activeReturn?.return_shipments?.[0];
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
@@ -374,67 +329,115 @@ export default function OrderDetailPage() {
 
             {/* Actions */}
             <div className="space-y-2">
-              <Button 
-                variant="outline" 
-                fullWidth
-                onClick={handleDownloadInvoice}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Download Invoice
+            <Button 
+              variant="outline" 
+              fullWidth
+              onClick={handleDownloadInvoice}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download Invoice
+            </Button>
+            <Link href="/" className="block">
+              <Button variant="primary" fullWidth>
+                Continue Shopping
               </Button>
-              <Link href="/" className="block">
-                <Button variant="primary" fullWidth>
-                  Continue Shopping
-                </Button>
-              </Link>
-              <Link href={`/account/orders/${order.id}/refund`} className="block">
+            </Link>
+              <Link href={`/account/orders/${order.id}/return`} className="block">
                 <Button
                   variant="secondary"
                   fullWidth
-                  disabled={!refundInfo.eligible}
+                  disabled={!returnEligible && !activeReturn}
                 >
-                  {refundInfo.existingRequest
-                    ? 'View refund request'
-                    : refundInfo.eligible
-                    ? 'Request a refund'
-                    : 'Refund unavailable'}
-                </Button>
-              </Link>
-              <Link href={`/account/orders/${order.id}/return`} className="block">
-                <Button
-                  variant="outline"
-                  fullWidth
-                  disabled={!returnInfo.eligible}
-                >
-                  {returnInfo.existingRequest
+                  {activeReturn
                     ? 'View return request'
-                    : returnInfo.eligible
+                    : returnEligible
                     ? 'Request a return'
                     : 'Return unavailable'}
                 </Button>
               </Link>
               <div className="text-center space-y-1">
-                {refundInfo.existingRequest && refundInfo.statusDisplay && (
+                {activeReturn && returnStatusDisplay && (
                   <span
-                    className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full ${refundInfo.statusDisplay.bgColor} ${refundInfo.statusDisplay.color}`}
+                    className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full ${returnStatusDisplay.bgColor} ${returnStatusDisplay.color}`}
                   >
-                    {refundInfo.statusDisplay.label}
+                    {returnStatusDisplay.label}
                   </span>
                 )}
-                {returnInfo.existingRequest && returnInfo.statusDisplay && (
+                {activeReturn && refundStatusDisplay && (
                   <span
-                    className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full ${returnInfo.statusDisplay.bgColor} ${returnInfo.statusDisplay.color}`}
+                    className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full ${refundStatusDisplay.bgColor} ${refundStatusDisplay.color}`}
                   >
-                    {returnInfo.statusDisplay.label}
+                    {refundStatusDisplay.label}
                   </span>
                 )}
-                <p className="text-xs text-gray-500 text-center">
-                  {refundInfo.message}
-                </p>
-                <p className="text-xs text-gray-500 text-center">
-                  {returnInfo.message}
-                </p>
+                {!activeReturn && (
+                  <p className="text-xs text-gray-500 text-center">
+                    Returns are available after delivery/completion.
+                  </p>
+                )}
               </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Returns & Refunds</h3>
+              {activeReturn ? (
+                <div className="space-y-3 text-sm text-gray-700">
+                  {returnStatusDisplay && (
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${returnStatusDisplay.bgColor} ${returnStatusDisplay.color}`}
+                      >
+                        {returnStatusDisplay.label}
+                      </span>
+                      <span className="text-gray-600">
+                        {activeReturn.created_at
+                          ? `Requested ${new Date(activeReturn.created_at).toLocaleDateString()}`
+                          : ''}
+                      </span>
+                    </div>
+                  )}
+                  {returnShipment ? (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-1">
+                      <p className="font-semibold text-blue-900 capitalize">
+                        {returnShipment.method || 'Return shipment'}
+                      </p>
+                      {returnShipment.return_code ? (
+                        <p className="text-sm text-blue-800">Return Code: {returnShipment.return_code}</p>
+                      ) : null}
+                      {returnShipment.fez_tracking ? (
+                        <p className="text-sm text-blue-800">Tracking: {returnShipment.fez_tracking}</p>
+                      ) : null}
+                      {returnShipment.status ? (
+                        <p className="text-sm text-blue-800">Status: {returnShipment.status}</p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-600">
+                      We will share pickup or drop-off details once the return is scheduled.
+                    </p>
+                  )}
+                  {refundStatusDisplay ? (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700 mb-1">Refund Status</p>
+                      <span
+                        className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${refundStatusDisplay.bgColor} ${refundStatusDisplay.color}`}
+                      >
+                        {refundStatusDisplay.label}
+                      </span>
+                      {activeReturn.refund_amount ? (
+                        <p className="text-sm text-gray-700 mt-1">
+                          Amount: {formatPrice(activeReturn.refund_amount, activeReturn.refund_currency || order.currency)}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-700 space-y-2">
+                  <p>No return has been requested for this order.</p>
+                  <p>Returns are managed by JulineMart Logistics after delivery.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

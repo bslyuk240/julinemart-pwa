@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { getJloBaseUrl } from '@/lib/jlo/returns';
 
-const JLO_BASE = process.env.JLO_API_BASE_URL || process.env.NEXT_PUBLIC_JLO_URL || '';
+const JLO_BASE = getJloBaseUrl();
+const RETURN_FUNCTION_PATH = '/api/create-return-shipment';
 
 export async function POST(request: Request) {
   if (!JLO_BASE) {
@@ -9,7 +11,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const response = await fetch(`${JLO_BASE}/api/create-return-shipment`, {
+    const response = await fetch(`${JLO_BASE}${RETURN_FUNCTION_PATH}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -18,15 +20,14 @@ export async function POST(request: Request) {
     });
 
     const data = await response.json().catch(async () => {
-      // fallback: try text if JSON parsing fails
       const text = await response.text().catch(() => '');
       return { message: text || null };
     });
-    if (!response.ok || !data?.success) {
+    if (!response.ok || data?.success === false) {
       return NextResponse.json(
         {
           success: false,
-          message: data?.message || 'Return shipment creation failed',
+          message: data?.message || data?.error || 'Return shipment creation failed',
           details: data,
           status: response.status,
         },
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(data, { status: response.status || 200 });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, message: error?.message || 'Unexpected error creating return shipment' },

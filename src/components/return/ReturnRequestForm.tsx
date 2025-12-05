@@ -1,44 +1,64 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowLeft, CheckCircle, Clock, XCircle, Package, AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth';
+import { ArrowLeft, Package, AlertCircle, Loader2, Truck, MapPin, Image, Info } from 'lucide-react';
 import { Order } from '@/types/order';
-import { canOrderBeRefunded, formatRefundStatus, RefundRequestMeta } from '@/lib/woocommerce/refunds';
 import { formatPrice } from '@/lib/utils/format-price';
+import {
+  JloReturn,
+  JloReturnShipment,
+  formatJloRefundStatus,
+  formatJloReturnStatus,
+  buildFezTrackingUrl,
+} from '@/lib/jlo/returns';
+import { useCustomerAuth } from '@/context/customer-auth-context';
 
 interface ReturnRequestFormProps {
   orderId: number;
 }
 
 const RETURN_REASONS = [
-  { value: 'damaged', label: 'Item arrived damaged' },
-  { value: 'wrong_item', label: 'Received wrong item' },
-  { value: 'not_as_described', label: 'Item not as described' },
-  { value: 'quality_issue', label: 'Quality not satisfactory' },
-  { value: 'size_issue', label: 'Wrong size/fit' },
-  { value: 'late_delivery', label: 'Delivered too late' },
-  { value: 'other', label: 'Other reason' },
+  { value: 'wrong_item', label: 'Wrong item delivered' },
+  { value: 'damaged', label: 'Item damaged' },
+  { value: 'not_as_described', label: 'Not as described' },
+  { value: 'other', label: 'Other (add details)' },
 ];
+
+type Resolution = 'refund' | 'replacement';
+
+function canOrderBeReturned(status: string) {
+  const eligible = ['delivered', 'completed'];
+  return eligible.includes(status);
+}
+
+function latestReturn(returns: JloReturn[]): JloReturn | null {
+  if (!returns?.length) return null;
+  return [...returns].sort((a, b) => {
+    const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return bDate - aDate;
+  })[0];
+}
 
 export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { customer } = useCustomerAuth();
 
   const [order, setOrder] = useState<Order | null>(null);
+  const [returns, setReturns] = useState<JloReturn[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [existingRequest, setExistingRequest] = useState<RefundRequestMeta | null>(null);
-  const [returnShipment, setReturnShipment] = useState<any>(null);
-  const [eligible, setEligible] = useState<boolean>(false);
-
-  const [reason, setReason] = useState('');
-  const [reasonDetails, setReasonDetails] = useState('');
   const [selectedItems, setSelectedItems] = useState<Record<number, number>>({});
+  const [preferredResolution, setPreferredResolution] = useState<Resolution>('refund');
+  const [reasonCode, setReasonCode] = useState('');
+  const [reasonNote, setReasonNote] = useState('');
+  const [imageUrls, setImageUrls] = useState('');
+
   const currency = order?.currency || 'NGN';
+  const activeReturn = useMemo(() => latestReturn(returns), [returns]);
 
   const selectedAmount =
     order?.line_items?.reduce((sum, item) => {
@@ -51,57 +71,19 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     fetchOrder();
   }, [orderId]);
 
-  const createReturnShipment = async (jloReturnRequestId: string) => {
-    if (!order) return null;
-
-    const payload = {
-      return_request_id: jloReturnRequestId,
-      method: 'pickup' as const,
-      customer: {
-        name: `${order.shipping.first_name || order.billing.first_name} ${
-          order.shipping.last_name || order.billing.last_name
-        }`.trim(),
-        phone: order.billing.phone,
-        address: order.shipping.address_1 || order.billing.address_1,
-        city: order.shipping.city || order.billing.city,
-        state: order.shipping.state || order.billing.state,
-      },
-      hub: {
-        name: 'JulineMart Returns',
-        phone: order.billing.phone,
-        address: order.billing.address_1,
-        city: order.billing.city,
-        state: order.billing.state,
-      },
-    };
-
-    const res = await fetch(`/api/return-shipment`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok || !data?.success) {
-      throw new Error(data?.message || 'Failed to create return shipment');
-    }
-    return data;
-  };
-
   const fetchOrder = async () => {
     try {
       setLoading(true);
       const res = await fetch(`/api/orders/${orderId}`);
       if (!res.ok) throw new Error('Failed to fetch order');
-      const { order: orderData, returnRequest, returnShipment: shipmentMeta } = await res.json();
-      if (!orderData) {
+      const data = await res.json();
+      if (!data.order) {
         toast.error('Order not found');
         router.push('/orders');
         return;
       }
-      setOrder(orderData);
-      if (returnRequest) setExistingRequest(returnRequest);
-      if (shipmentMeta) setReturnShipment(shipmentMeta);
-      setEligible(canOrderBeRefunded(orderData.status));
+      setOrder(data.order);
+      setReturns(Array.isArray(data.returns) ? data.returns : []);
     } catch (error) {
       console.error('Error fetching order:', error);
       toast.error('Failed to load order details');
@@ -112,114 +94,123 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!order) return;
 
     const selectedLineItems = (order.line_items || [])
       .map((item) => {
         const qty = selectedItems[item.id] || 0;
         if (!qty) return null;
-        const unitTotal = item.quantity ? Number(item.total) / item.quantity : 0;
-        const refundTotal = parseFloat((unitTotal * qty).toFixed(2));
         return {
           id: item.id,
-          name: item.name,
           quantity: qty,
-          refund_total: refundTotal,
+          product_id: item.product_id,
+          variation_id: item.variation_id,
+          unit_price: item.price,
+          name: item.name,
         };
       })
-      .filter(Boolean) as { id: number; name: string; quantity: number; refund_total: number }[];
+      .filter(Boolean) as {
+        id: number;
+        quantity: number;
+        product_id: number;
+        variation_id: number;
+        unit_price: number;
+        name: string;
+      }[];
 
-    const requestedAmount = selectedLineItems.reduce(
-      (sum, item) => sum + (item.refund_total || 0),
-      0
-    );
-
-    if (!selectedLineItems.length || requestedAmount <= 0) {
+    if (!selectedLineItems.length) {
       toast.error('Select at least one item to return');
       return;
     }
 
-    if (!reason) {
-      toast.error('Please select a reason for your return');
+    if (!reasonCode) {
+      toast.error('Select a reason for your return');
       return;
     }
 
-    if (reason === 'other' && !reasonDetails) {
-      toast.error('Please provide details for your return');
+    if (reasonCode === 'other' && !reasonNote.trim()) {
+      toast.error('Add details for your return');
       return;
     }
 
     try {
       setSubmitting(true);
-      const fullReason =
-        reason === 'other'
-          ? reasonDetails
-          : `${RETURN_REASONS.find((r) => r.value === reason)?.label}${
-              reasonDetails ? `: ${reasonDetails}` : ''
-            }`;
+      const images = imageUrls
+        .split('\n')
+        .map((url) => url.trim())
+        .filter(Boolean);
 
       const response = await fetch(`/api/orders/${order.id}/return-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reason: fullReason,
+          preferred_resolution: preferredResolution,
+          reason_code: reasonCode,
+          reason_note: reasonNote,
+          images,
           line_items: selectedLineItems.map((item) => ({
             id: item.id,
             quantity: item.quantity,
-            refund_total: item.refund_total,
+            product_id: item.product_id,
+            variation_id: item.variation_id,
+            unit_price: item.unit_price,
             name: item.name,
           })),
-          requested_amount: requestedAmount,
-          customerEmail: user?.email || order.billing?.email || '',
-          customerName: (
-            user?.name ||
-            `${order.billing?.first_name || ''} ${order.billing?.last_name || ''}`
-          ).trim(),
+          wc_customer_id: order.customer_id || customer?.id,
+          customer_email: order.billing?.email || '',
+          customer_name: `${order.billing?.first_name || ''} ${order.billing?.last_name || ''}`.trim(),
         }),
       });
 
       const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Failed to submit return request');
+      if (!response.ok) {
+        throw new Error(result?.message || 'Failed to submit return request');
       }
 
-      toast.success('Return request submitted successfully!');
-      try {
-        // Create JLO return request to obtain return_request_id
-        const jloRes = await fetch('/api/jlo/return-request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            woo_order_id: order.number,
-            reason: fullReason,
-          }),
-        });
-        const jloData = await jloRes.json();
-        if (!jloRes.ok || !jloData?.return_request_id) {
-          throw new Error(jloData?.message || 'Failed to create JLO return request');
-        }
+      const createdReturn: JloReturn | null =
+        result?.return ||
+        result?.data ||
+        result?.return_request ||
+        (result?.return_id ? result : null);
 
-        const shipment = await createReturnShipment(jloData.return_request_id);
-        if (shipment?.shipment) {
-          setReturnShipment(shipment.shipment);
-          toast.success(
-            `Return shipment created. Code: ${shipment.shipment.return_code}${
-              shipment.shipment.fez_tracking ? `, Tracking: ${shipment.shipment.fez_tracking}` : ''
-            }`
-          );
-        }
-      } catch (shipmentErr: any) {
-        console.warn('Return shipment creation failed:', shipmentErr);
-        toast.error(shipmentErr?.message || 'Return shipment creation failed');
+      toast.success('Return request submitted. We will update you soon.');
+      if (createdReturn) {
+        setReturns((prev) => [createdReturn, ...prev]);
+      } else {
+        await fetchOrder();
       }
-      router.push(`/account/orders/${order.id}/return`);
     } catch (error: any) {
       console.error('Error submitting return:', error);
-      toast.error(error.message || 'Failed to submit return request');
+      toast.error(error?.message || 'Failed to submit return request');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const renderShipment = (shipment: JloReturnShipment | undefined) => {
+    if (!shipment) return null;
+    const trackingUrl = shipment.tracking_url || buildFezTrackingUrl(shipment.fez_tracking);
+    return (
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-1">
+        <div className="flex items-center gap-2 text-blue-900 font-semibold">
+          {shipment.method === 'pickup' ? <Truck className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
+          <span className="capitalize">{shipment.method || 'Return shipment'}</span>
+        </div>
+        {shipment.return_code ? <p className="text-sm text-blue-800">Return Code: {shipment.return_code}</p> : null}
+        {shipment.fez_tracking ? <p className="text-sm text-blue-800">Tracking: {shipment.fez_tracking}</p> : null}
+        {shipment.status ? <p className="text-sm text-blue-800">Status: {shipment.status}</p> : null}
+        {trackingUrl ? (
+          <a
+            href={trackingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block text-sm font-medium text-blue-700 underline"
+          >
+            Track shipment
+          </a>
+        ) : null}
+      </div>
+    );
   };
 
   if (loading) {
@@ -244,8 +235,13 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     );
   }
 
-  if (existingRequest) {
-    const status = formatRefundStatus(existingRequest.status);
+  const eligible = canOrderBeReturned(order.status);
+
+  if (activeReturn) {
+    const statusDisplay = formatJloReturnStatus(activeReturn.status);
+    const shipment = activeReturn.return_shipments?.[0];
+    const refundDisplay = formatJloRefundStatus(activeReturn.refund_status || 'none');
+
     return (
       <main className="min-h-screen bg-gray-50 pb-24">
         <div className="container mx-auto px-4 py-6 max-w-2xl">
@@ -253,118 +249,96 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
             <Link href={`/orders/${orderId}`} className="text-gray-600 hover:text-primary-600">
               <ArrowLeft className="w-6 h-6" />
             </Link>
-            <h1 className="text-xl font-bold text-gray-900">Return Request Status</h1>
+            <h1 className="text-xl font-bold text-gray-900">Return Status</h1>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-            <div className="flex items-center gap-4 mb-6">
-              {existingRequest.status === 'processed' && (
-                <CheckCircle className="w-12 h-12 text-green-500" />
-              )}
-              {existingRequest.status === 'pending' && (
-                <Clock className="w-12 h-12 text-yellow-500" />
-              )}
-              {existingRequest.status === 'approved' && (
-                <CheckCircle className="w-12 h-12 text-blue-500" />
-              )}
-              {existingRequest.status === 'rejected' && (
-                <XCircle className="w-12 h-12 text-red-500" />
-              )}
+          <div className="bg-white rounded-xl shadow-sm p-6 space-y-5">
+            <div className="flex items-center gap-4">
+              <span
+                className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${statusDisplay.bgColor} ${statusDisplay.color}`}
+              >
+                {statusDisplay.label}
+              </span>
+              <span className="text-gray-600 text-sm">
+                Requested {activeReturn.created_at ? new Date(activeReturn.created_at).toLocaleString() : ''}
+              </span>
+            </div>
 
-              <div>
-                <span
-                  className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${status.bgColor} ${status.color}`}
-                >
-                  {status.label}
+            <div className="grid gap-3 text-sm text-gray-700">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Order</span>
+                <span className="font-semibold">#{order.number}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Resolution</span>
+                <span className="font-semibold capitalize">
+                  {activeReturn.preferred_resolution || 'refund'}
                 </span>
-                <p className="text-gray-600 mt-1">
-                  Submitted: {new Date(existingRequest.requested_at).toLocaleDateString()}
+              </div>
+              {activeReturn.reason_code ? (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Reason</span>
+                  <span className="font-semibold">{activeReturn.reason_code}</span>
+                </div>
+              ) : null}
+              {activeReturn.reason_note ? (
+                <div>
+                  <p className="text-gray-600 mb-1">Details</p>
+                  <p className="text-gray-900">{activeReturn.reason_note}</p>
+                </div>
+              ) : null}
+            </div>
+
+            {activeReturn.line_items?.length ? (
+              <div className="border-t pt-4">
+                <p className="font-semibold text-gray-900 mb-2">Items</p>
+                <ul className="space-y-2 text-sm text-gray-800">
+                  {activeReturn.line_items.map((item) => (
+                    <li key={item.wc_order_item_id} className="flex justify-between">
+                      <span>{item.name || `Item ${item.wc_order_item_id}`}</span>
+                      <span>x{item.qty}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {shipment ? renderShipment(shipment) : (
+              <div className="flex items-start gap-3 rounded-lg border border-gray-200 p-4 bg-gray-50">
+                <Info className="w-5 h-5 text-gray-500 mt-0.5" />
+                <div className="text-sm text-gray-700">
+                  <p className="font-semibold text-gray-900">Return shipping</p>
+                  <p>We will schedule pickup or share drop-off details once the return is accepted.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-2">
+              <p className="text-sm font-semibold text-emerald-900">Refund Status</p>
+              <span
+                className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${refundDisplay.bgColor} ${refundDisplay.color}`}
+              >
+                {refundDisplay.label}
+              </span>
+              {activeReturn.refund_amount ? (
+                <p className="text-sm text-emerald-900">
+                  Amount: {formatPrice(activeReturn.refund_amount, activeReturn.refund_currency || currency)}
                 </p>
-              </div>
+              ) : null}
+              {activeReturn.refund_completed_at ? (
+                <p className="text-xs text-emerald-800">
+                  Completed: {new Date(activeReturn.refund_completed_at).toLocaleString()}
+                </p>
+              ) : null}
             </div>
 
-            <div className="space-y-4">
-              <div className="flex justify-between py-3 border-b">
-                <span className="text-gray-600">Order Number</span>
-                <span className="font-medium">#{order.number}</span>
-              </div>
-              {returnShipment ? (
-                <div className="py-3 border-b space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Return Method</span>
-                    <span className="font-medium capitalize">{returnShipment.method}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Return Code</span>
-                    <span className="font-medium">{returnShipment.return_code}</span>
-                  </div>
-                  {returnShipment.fez_tracking ? (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Tracking</span>
-                      <span className="font-medium">{returnShipment.fez_tracking}</span>
-                    </div>
-                  ) : null}
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Shipment Status</span>
-                    <span className="font-medium capitalize">{returnShipment.status}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="py-3 border-b">
-                  <span className="text-gray-600 block mb-2">Return Shipping</span>
-                  <p className="text-gray-900 mb-3">
-                    Choose how to send items back to us (pickup or drop-off).
-                  </p>
-                  <Link
-                    href={`/account/orders/${orderId}/return/method`}
-                    className="inline-block px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
-                  >
-                    Select Return Method
-                  </Link>
-                </div>
-              )}
-              {existingRequest.requested_amount ? (
-                <div className="flex justify-between py-3 border-b">
-                  <span className="text-gray-600">Requested Amount</span>
-                  <span className="font-medium">
-                    {formatPrice(existingRequest.requested_amount || 0, currency)}
-                  </span>
-                </div>
-              ) : null}
-              {existingRequest.line_items?.length ? (
-                <div className="py-3 border-b">
-                  <span className="text-gray-600 block mb-2">Items</span>
-                  <ul className="space-y-2">
-                    {existingRequest.line_items.map((item) => (
-                      <li key={item.id} className="text-gray-900">
-                        <span className="font-medium">{item.name || `#${item.id}`}</span> — qty {item.quantity}
-                        {item.refund_total
-                          ? ` (${formatPrice(item.refund_total, currency)})`
-                          : null}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              <div className="py-3">
-                <span className="text-gray-600 block mb-2">Reason</span>
-                <p className="text-gray-900">{existingRequest.reason}</p>
-              </div>
-              {existingRequest.admin_notes && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-blue-800 font-medium">Notes</p>
-                  <p className="text-blue-700 mt-1">{existingRequest.admin_notes}</p>
-                </div>
-              )}
-            </div>
+            <Link
+              href={`/orders/${orderId}`}
+              className="block w-full text-center py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold"
+            >
+              Back to Order
+            </Link>
           </div>
-
-          <Link
-            href={`/orders/${orderId}`}
-            className="block w-full py-3 text-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-          >
-            Back to Order
-          </Link>
         </div>
       </main>
     );
@@ -384,11 +358,9 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="text-center">
               <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                Not Eligible for Return
-              </h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Not Eligible for Return</h2>
               <p className="text-gray-600 mb-6">
-                Returns are only available after your order is delivered or completed.
+                Returns are available after your order is delivered/completed. We&apos;ll keep you updated.
               </p>
               <Link
                 href={`/orders/${orderId}`}
@@ -463,7 +435,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                       className="w-24 border border-gray-300 rounded-lg px-3 py-2"
                     />
                     <span className="text-sm text-gray-700">
-                      Refund: {formatPrice(unitPrice * selectedQty, currency)}
+                      Value: {formatPrice(unitPrice * selectedQty, currency)}
                     </span>
                   </div>
                 </div>
@@ -471,57 +443,87 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
             })}
           </div>
           <div className="mt-4 flex justify-between text-sm text-gray-700">
-            <span>Estimated refund</span>
+            <span>Estimated value</span>
             <span className="font-semibold">{formatPrice(selectedAmount, currency)}</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Reason for Return</h2>
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select a reason
-              </label>
+        <form className="bg-white rounded-xl shadow-sm p-6 space-y-5" onSubmit={handleSubmit}>
+          <div>
+            <h2 className="font-semibold text-gray-900 mb-3">Preferred resolution</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(['refund', 'replacement'] as Resolution[]).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setPreferredResolution(option)}
+                  className={`border rounded-lg p-3 text-left transition ${
+                    preferredResolution === option
+                      ? 'border-primary-600 bg-primary-50'
+                      : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <p className="font-semibold text-gray-900 capitalize">{option}</p>
+                  <p className="text-xs text-gray-600">
+                    {option === 'refund'
+                      ? 'Refund after inspection'
+                      : 'Replacement if stock is available'}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h2 className="font-semibold text-gray-900 mb-3">Reason for return</h2>
+            <div className="space-y-2">
               <select
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                value={reasonCode}
+                onChange={(e) => setReasonCode(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
                 required
               >
-                <option value="">Select reason</option>
+                <option value="">Select a reason</option>
                 {RETURN_REASONS.map((r) => (
                   <option key={r.value} value={r.value}>
                     {r.label}
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Details (optional)
-              </label>
               <textarea
-                value={reasonDetails}
-                onChange={(e) => setReasonDetails(e.target.value)}
+                value={reasonNote}
+                onChange={(e) => setReasonNote(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
                 rows={3}
-                placeholder="Describe the issue"
+                placeholder="Add more details (helps us process faster)"
+                required={reasonCode === 'other'}
               />
             </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold disabled:opacity-60"
-            >
-              {submitting ? 'Submitting...' : 'Submit Return Request'}
-            </button>
-          </form>
-        </div>
+          <div>
+            <h2 className="font-semibold text-gray-900 mb-3">Photos (optional)</h2>
+            <div className="flex items-start gap-3">
+              <Image className="w-5 h-5 text-gray-500 mt-1" />
+              <textarea
+                value={imageUrls}
+                onChange={(e) => setImageUrls(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                rows={3}
+                placeholder="Paste image URLs here (one per line)"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold disabled:opacity-60"
+          >
+            {submitting ? 'Submitting...' : 'Submit Return Request'}
+          </button>
+        </form>
       </div>
     </main>
   );
 }
-

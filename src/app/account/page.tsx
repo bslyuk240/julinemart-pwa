@@ -99,6 +99,14 @@ export default function AccountPage() {
       bgColor: 'bg-blue-50',
     },
     {
+      icon: ShoppingBag,
+      title: 'My Returns',
+      description: 'Track returns & refunds',
+      href: '/account/returns',
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+    },
+    {
       icon: MapPin,
       title: 'Addresses',
       description: 'Manage shipping & billing',

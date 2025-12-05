@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { wcApi, handleApiError } from '@/lib/woocommerce/client';
+import { getJloBaseUrl } from '@/lib/jlo/returns';
+
+const JLO_BASE = getJloBaseUrl();
 
 export async function GET(
   _request: Request,
@@ -14,35 +17,23 @@ export async function GET(
     const response = await wcApi.get(`orders/${orderId}`);
     const order = response.data;
 
-    let refundRequest: any = null;
-    let returnRequest: any = null;
-    let returnShipment: any = null;
-    const refundMeta = order?.meta_data?.find((m: any) => m.key === '_refund_request');
-    const returnMeta = order?.meta_data?.find((m: any) => m.key === '_return_request');
-    const returnShipmentMeta = order?.meta_data?.find((m: any) => m.key === '_return_shipment');
-    if (refundMeta?.value) {
+    let jloReturns: any[] = [];
+    if (JLO_BASE) {
       try {
-        refundRequest = JSON.parse(refundMeta.value);
-      } catch {
-        refundRequest = null;
-      }
-    }
-    if (returnMeta?.value) {
-      try {
-        returnRequest = JSON.parse(returnMeta.value);
-      } catch {
-        returnRequest = null;
-      }
-    }
-    if (returnShipmentMeta?.value) {
-      try {
-        returnShipment = JSON.parse(returnShipmentMeta.value);
-      } catch {
-        returnShipment = null;
+        const jloResponse = await fetch(`${JLO_BASE}/api/orders/${orderId}/returns`);
+        const jloData = await jloResponse.json().catch(async () => {
+          const text = await jloResponse.text().catch(() => '');
+          return { message: text || null };
+        });
+        if (jloResponse.ok) {
+          jloReturns = Array.isArray(jloData?.returns) ? jloData.returns : Array.isArray(jloData) ? jloData : [];
+        }
+      } catch (error) {
+        console.warn('Failed to fetch JLO returns', error);
       }
     }
 
-    return NextResponse.json({ order, refundRequest, returnRequest, returnShipment });
+    return NextResponse.json({ order, returns: jloReturns });
   } catch (error) {
     handleApiError(error);
     return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 });

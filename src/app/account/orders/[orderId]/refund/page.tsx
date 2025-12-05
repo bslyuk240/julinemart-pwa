@@ -1,19 +1,20 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import RefundRequestForm from '@/components/refund/RefundRequestForm';
+import { useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 
-export default function RefundRequestPage() {
+export default function RefundRedirectPage() {
   const params = useParams();
-  const orderId = parseInt(params.orderId as string);
+  const router = useRouter();
+  const orderId = params.orderId as string;
 
-  if (!orderId || isNaN(orderId)) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">Invalid order ID</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (orderId) {
+      router.replace(`/account/orders/${orderId}/return`);
+    } else {
+      router.replace('/orders');
+    }
+  }, [orderId, router]);
 
-  return <RefundRequestForm orderId={orderId} />;
+  return null;
 }

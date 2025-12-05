@@ -1,54 +1,42 @@
 import { NextResponse } from 'next/server';
-import { wcApi, handleApiError } from '@/lib/woocommerce/client';
-import { generateReturnCode, ReturnMethod } from '@/lib/return-shipping';
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const orderId = Number(params.id);
-  if (Number.isNaN(orderId)) {
-    return NextResponse.json({ success: false, message: 'Invalid order id' }, { status: 400 });
-  }
-
-  const body = await request.json().catch(() => null);
-  if (!body) {
-    return NextResponse.json({ success: false, message: 'Invalid body' }, { status: 400 });
-  }
-
-  const method = body.method as ReturnMethod;
-  if (!['pickup', 'dropoff'].includes(method)) {
-    return NextResponse.json({ success: false, message: 'Invalid method' }, { status: 400 });
-  }
-
+export async function POST(request: Request) {
   try {
-    const returnCode = generateReturnCode();
-    let fezTracking: string | null = null;
+    const body = await request.json();
+    if (!body?.return_request_id) {
+      return NextResponse.json(
+        { success: false, message: 'return_request_id is required to schedule a return shipment' },
+        { status: 400 }
+      );
+    }
 
-    const shipmentMeta = {
-      method,
-      return_code: returnCode,
-      status: 'pending',
-      fez_tracking: fezTracking,
-      created_at: new Date().toISOString(),
-    };
-
-    await wcApi.put(`orders/${orderId}`, {
-      meta_data: [{ key: '_return_shipment', value: JSON.stringify(shipmentMeta) }],
+    const response = await fetch(`${new URL(request.url).origin}/api/return-shipment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
 
-    await wcApi.post(`orders/${orderId}/notes`, {
-      note: `RETURN SHIPPING SET\nMethod: ${method}\nReturn Code: ${returnCode}${
-        fezTracking ? `\nTracking: ${fezTracking}` : ''
-      }`,
-      customer_note: false,
+    const data = await response.json().catch(async () => {
+      const text = await response.text().catch(() => '');
+      return { message: text || null };
     });
 
-    return NextResponse.json({
-      success: true,
-      shipment: shipmentMeta,
-    });
-  } catch (error) {
-    handleApiError(error);
+    if (!response.ok || data?.success === false) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: data?.message || data?.error || 'Return shipment creation failed',
+          details: data,
+          status: response.status,
+        },
+        { status: response.status || 500 }
+      );
+    }
+
+    return NextResponse.json(data, { status: response.status });
+  } catch (error: any) {
     return NextResponse.json(
-      { success: false, message: 'Failed to set return shipping method' },
+      { success: false, message: error?.message || 'Unexpected error creating return shipment' },
       { status: 500 }
     );
   }

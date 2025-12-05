@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { wcApi, handleApiError } from '@/lib/woocommerce/client';
+import { getJloBaseUrl } from '@/lib/jlo/returns';
+
+const JLO_BASE = getJloBaseUrl();
 
 export async function POST(
   request: Request,
@@ -15,58 +18,88 @@ export async function POST(
     return NextResponse.json({ success: false, message: 'Invalid request body' }, { status: 400 });
   }
 
-  const { reason, customerEmail, customerName } = body;
-  if (!reason) {
-    return NextResponse.json({ success: false, message: 'Missing reason' }, { status: 400 });
+  const { line_items, preferred_resolution, reason_code } = body;
+  if (!Array.isArray(line_items) || !line_items.length) {
+    return NextResponse.json({ success: false, message: 'Select at least one item to return' }, { status: 400 });
   }
-  const line_items = Array.isArray(body.line_items) ? body.line_items : [];
-  const requested_amount =
-    typeof body.requested_amount === 'number' && !Number.isNaN(body.requested_amount)
-      ? body.requested_amount
-      : 0;
+  if (!reason_code) {
+    return NextResponse.json({ success: false, message: 'Missing reason code' }, { status: 400 });
+  }
 
-  if (!line_items.length) {
-    return NextResponse.json(
-      { success: false, message: 'Select at least one item to return' },
-      { status: 400 }
-    );
+  if (!JLO_BASE) {
+    return NextResponse.json({ success: false, message: 'JLO API base URL not configured' }, { status: 500 });
   }
 
   try {
-    const returnRequest = {
-      status: 'pending',
-      reason,
-      requested_at: new Date().toISOString(),
-      requested_amount: requested_amount > 0 ? requested_amount : undefined,
-      line_items,
-      customer_email: customerEmail || '',
-      customer_name: customerName || '',
+    const orderResponse = await wcApi.get(`orders/${orderId}`);
+    const order = orderResponse.data;
+
+    const orderLineItems = new Map<number, any>();
+    (order?.line_items || []).forEach((item: any) => {
+      orderLineItems.set(item.id, item);
+    });
+
+    const payloadLineItems = line_items.map((item: any) => {
+      const orderItem = orderLineItems.get(item.id || item.wc_order_item_id);
+      const qty = Math.min(
+        Number(item.quantity || item.qty || 0),
+        Number(orderItem?.quantity || item.quantity || item.qty || 0)
+      );
+      const unitPrice =
+        orderItem?.price ??
+        (orderItem?.total && orderItem?.quantity
+          ? Number(orderItem.total) / Number(orderItem.quantity)
+          : undefined);
+      return {
+        wc_order_item_id: orderItem?.id || item.id || item.wc_order_item_id,
+        product_id: orderItem?.product_id || item.product_id || 0,
+        variation_id: orderItem?.variation_id || item.variation_id || 0,
+        qty: qty > 0 ? qty : 1,
+        unit_price: unitPrice ?? Number(item.unit_price || 0),
+        name: orderItem?.name || item.name,
+      };
+    });
+
+    const payload = {
+      order_id: order.id,
+      order_number: order.number,
+      wc_customer_id: order.customer_id || body.wc_customer_id || null,
+      customer_email: order.billing?.email || body.customer_email || '',
+      customer_name:
+        body.customer_name ||
+        `${order.billing?.first_name || ''} ${order.billing?.last_name || ''}`.trim(),
+      preferred_resolution: preferred_resolution || 'refund',
+      reason_code,
+      reason_note: body.reason_note || '',
+      images: Array.isArray(body.images) ? body.images.filter(Boolean) : [],
+      line_items: payloadLineItems,
+      notes: body.notes || '',
     };
 
-    const response = await wcApi.put(`orders/${orderId}`, {
-      meta_data: [
-        { key: '_return_request', value: JSON.stringify(returnRequest) },
-        { key: '_return_request_status', value: 'pending' },
-      ],
+    const jloResponse = await fetch(`${JLO_BASE}/api/returns`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
 
-    if (!response.data) {
-      return NextResponse.json({ success: false, message: 'Failed to update order' }, { status: 500 });
+    const jloData = await jloResponse.json().catch(async () => {
+      const text = await jloResponse.text().catch(() => '');
+      return { message: text || null };
+    });
+
+    if (!jloResponse.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: jloData?.message || jloData?.error || 'Failed to create return request',
+          details: jloData,
+          status: jloResponse.status,
+        },
+        { status: jloResponse.status || 500 }
+      );
     }
 
-    const itemsNote = line_items
-      .map((item: any) => `- ${item.name || item.id} x${item.quantity} (${item.refund_total || 0})`)
-      .join('\n');
-
-    await wcApi.post(`orders/${orderId}/notes`, {
-      note:
-        `RETURN REQUEST SUBMITTED\nReason: ${reason}\nCustomer: ${customerName} (${customerEmail})` +
-        (itemsNote ? `\nItems:\n${itemsNote}` : '') +
-        (requested_amount ? `\nRequested: ${requested_amount}` : ''),
-      customer_note: false,
-    });
-
-    return NextResponse.json({ success: true, message: 'Return request submitted successfully' });
+    return NextResponse.json(jloData, { status: jloResponse.status });
   } catch (error) {
     handleApiError(error);
     return NextResponse.json({ success: false, message: 'Failed to submit return request' }, { status: 500 });

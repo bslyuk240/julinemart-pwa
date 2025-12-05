@@ -3,29 +3,31 @@ import { getJloBaseUrl } from '@/lib/jlo/returns';
 
 const JLO_BASE = getJloBaseUrl();
 
-export async function POST(request: Request) {
+export async function GET(
+  _request: Request,
+  { params }: { params: { orderId: string } }
+) {
   if (!JLO_BASE) {
     return NextResponse.json({ success: false, message: 'JLO API base URL not configured' }, { status: 500 });
   }
 
-  try {
-    const body = await request.json();
-    const response = await fetch(`${JLO_BASE}/api/returns`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+  const orderId = params.orderId;
+  if (!orderId) {
+    return NextResponse.json({ success: false, message: 'orderId is required' }, { status: 400 });
+  }
 
+  try {
+    const response = await fetch(`${JLO_BASE}/api/orders/${orderId}/returns`);
     const data = await response.json().catch(async () => {
       const text = await response.text().catch(() => '');
       return { message: text || null };
     });
 
-    if (!response.ok || data?.success === false) {
+    if (!response.ok) {
       return NextResponse.json(
         {
           success: false,
-          message: data?.message || data?.error || 'Failed to create JLO return request',
+          message: data?.message || data?.error || 'Failed to fetch returns for order',
           details: data,
           status: response.status,
         },
@@ -33,10 +35,10 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json(data, { status: response.status || 200 });
+    return NextResponse.json(data, { status: response.status });
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, message: error?.message || 'Unexpected error creating JLO return request' },
+      { success: false, message: error?.message || 'Unexpected error fetching order returns' },
       { status: 500 }
     );
   }
