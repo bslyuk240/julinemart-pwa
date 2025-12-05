@@ -87,8 +87,8 @@ export default function OrderDetailPage() {
     }
   };
 
-  const formatPrice = (price: string, currency: string = 'NGN') => {
-    const amount = parseFloat(price);
+  const formatPrice = (price: number | string, currency: string = 'NGN') => {
+    const amount = typeof price === 'string' ? parseFloat(price) : price;
     if (isNaN(amount)) return `${currency} 0`;
     if (currency === 'NGN') {
       return `NGN ${amount.toLocaleString()}`;
