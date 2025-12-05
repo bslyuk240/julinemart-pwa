@@ -43,6 +43,19 @@ function latestReturn(returns: JloReturn[]): JloReturn | null {
   })[0];
 }
 
+function extractHubId(order: Order | null) {
+  if (!order?.line_items?.length) return '';
+  for (const item of order.line_items) {
+    const meta = (item as any)?.meta_data as { key: string; value: any }[] | undefined;
+    if (!meta) continue;
+    const hubMeta = meta.find(
+      (m) => m.key === 'hub_id' || m.key === '_hub_id' || m.key === 'hubId' || m.key === 'hubID'
+    );
+    if (hubMeta?.value) return String(hubMeta.value);
+  }
+  return '';
+}
+
 export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const router = useRouter();
 
@@ -85,6 +98,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
       }
       setOrder(data.order);
       setReturns(Array.isArray(data.returns) ? data.returns : []);
+      setHubId(extractHubId(data.order));
     } catch (error) {
       console.error('Error fetching order:', error);
       toast.error('Failed to load order details');
@@ -108,7 +122,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     }
 
     if (method === 'pickup' && !hubId.trim()) {
-      toast.error('Select a pickup hub');
+      toast.error('Pickup hub missing for this order. Please contact support.');
       return;
     }
 
@@ -519,22 +533,9 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
               </button>
             </div>
             {method === 'pickup' ? (
-              <div className="mt-3 space-y-2">
-                <p className="text-xs text-gray-600">
-                  Pickup will be arranged via your selected hub.
-                </p>
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-1">Pickup hub ID</label>
-                  <input
-                    type="text"
-                    value={hubId}
-                    onChange={(e) => setHubId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    placeholder="Enter hub ID"
-                    required={method === 'pickup'}
-                  />
-                </div>
-              </div>
+              <p className="text-xs text-gray-600 mt-2">
+                Pickup will be arranged via the hub assigned to this order.
+              </p>
             ) : (
               <p className="text-xs text-gray-600 mt-2">
                 You&apos;ll get drop-off instructions after submitting.
