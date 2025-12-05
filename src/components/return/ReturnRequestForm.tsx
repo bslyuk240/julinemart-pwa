@@ -52,6 +52,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const [returns, setReturns] = useState<JloReturn[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Record<number, number>>({});
   const [preferredResolution, setPreferredResolution] = useState<Resolution>('refund');
   const [reasonCode, setReasonCode] = useState('');
   const [reasonNote, setReasonNote] = useState('');
@@ -60,6 +61,12 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
   const currency = order?.currency || 'NGN';
   const activeReturn = useMemo(() => latestReturn(returns), [returns]);
+  const selectedAmount =
+    order?.line_items?.reduce((sum, item) => {
+      const qty = selectedItems[item.id] || 0;
+      const unitTotal = item.quantity ? Number(item.total) / item.quantity : 0;
+      return sum + unitTotal * qty;
+    }, 0) || 0;
 
   useEffect(() => {
     fetchOrder();
@@ -107,14 +114,32 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
         .map((url) => url.trim())
         .filter(Boolean);
 
-      const lineItems = (order.line_items || []).map((item) => ({
-        wc_order_item_id: item.id,
-        product_id: item.product_id,
-        variation_id: item.variation_id,
-        qty: item.quantity,
-        unit_price: item.price,
-        name: item.name,
-      }));
+      const lineItems = (order.line_items || [])
+        .map((item) => {
+          const qty = selectedItems[item.id] || 0;
+          if (!qty) return null;
+          return {
+            wc_order_item_id: item.id,
+            product_id: item.product_id,
+            variation_id: item.variation_id,
+            qty,
+            unit_price: item.price,
+            name: item.name,
+          };
+        })
+        .filter(Boolean) as {
+        wc_order_item_id: number;
+        product_id: number;
+        variation_id: number;
+        qty: number;
+        unit_price: number;
+        name: string;
+      }[];
+
+      if (!lineItems.length) {
+        toast.error('Select at least one item to return');
+        return;
+      }
 
       const response = await fetch(JLO_RETURNS_URL, {
         method: 'POST',
@@ -386,6 +411,53 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                 {new Date(order.date_created).toLocaleDateString()}
               </span>
             </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <h2 className="font-semibold text-gray-900 mb-4">Select items to return</h2>
+          <div className="space-y-4">
+            {order.line_items.map((item) => {
+              const selectedQty = selectedItems[item.id] || 0;
+              const unitPrice = item.quantity ? Number(item.total) / item.quantity : 0;
+              return (
+                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-medium text-gray-900">{item.name}</p>
+                      <p className="text-sm text-gray-600">Ordered qty: {item.quantity}</p>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {formatPrice(unitPrice, currency)} each
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-gray-700">Return qty</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={item.quantity}
+                      value={selectedQty}
+                      onChange={(e) => {
+                        const value = Math.min(
+                          Math.max(parseInt(e.target.value, 10) || 0, 0),
+                          item.quantity
+                        );
+                        setSelectedItems((prev) => ({ ...prev, [item.id]: value }));
+                      }}
+                      className="w-24 border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Value: {formatPrice(unitPrice * selectedQty, currency)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 flex justify-between text-sm text-gray-700">
+            <span>Estimated value</span>
+            <span className="font-semibold">{formatPrice(selectedAmount, currency)}</span>
           </div>
         </div>
 
