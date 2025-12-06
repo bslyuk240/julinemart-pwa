@@ -1,49 +1,41 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getJloBaseUrl } from '@/lib/jlo/returns';
 
-const JLO_BASE = getJloBaseUrl();
-
-export async function POST(
-  req: Request,
+export async function GET(
+  req: NextRequest,
   { params }: { params: { returnId: string } }
 ) {
-  if (!JLO_BASE) {
-    return NextResponse.json({ success: false, message: 'JLO API base URL not configured' }, { status: 500 });
-  }
-
-  const { returnId } = params;
-  if (!returnId) {
-    return NextResponse.json({ success: false, message: 'Return ID is required' }, { status: 400 });
-  }
+  const base = getJloBaseUrl();
+  const returnId = params.returnId;
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const res = await fetch(`${JLO_BASE}/api/return-shipments/${encodeURIComponent(returnId)}/tracking`, {
-      method: 'POST',
+    const res = await fetch(
+      `${base}/api/returns/${encodeURIComponent(returnId)}/tracking`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+      }
+    );
+
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : {};
+
+    return new NextResponse(JSON.stringify(data), {
+      status: res.status,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
     });
-    const data = await res.json().catch(async () => {
-      const text = await res.text().catch(() => '');
-      return { message: text || null };
-    });
-
-    if (!res.ok || data?.success === false) {
-      return NextResponse.json(
-        { success: false, message: data?.message || data?.error || 'Failed to save tracking', details: data },
-        { status: res.status || 500 }
-      );
-    }
-
-    return NextResponse.json(data?.data ?? data, { status: res.status });
-  } catch (error: any) {
+  } catch (err: any) {
+    console.error('PWA tracking proxy error:', err);
     return NextResponse.json(
-      { success: false, message: error?.message || 'Failed to save tracking' },
+      {
+        success: false,
+        message: 'Failed to fetch tracking from JLO',
+        error: err.message,
+      },
       { status: 500 }
     );
   }
-}
-
-export function OPTIONS() {
-  return NextResponse.json({}, { status: 200 });
 }
