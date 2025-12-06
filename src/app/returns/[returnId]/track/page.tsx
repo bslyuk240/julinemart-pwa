@@ -58,7 +58,7 @@ export default function TrackReturnPage() {
       case 'refund_completed':
         return 'Refund completed';
       default:
-        return status || 'ƒ?"';
+        return status || '--';
     }
   }, [status]);
 
@@ -118,7 +118,7 @@ export default function TrackReturnPage() {
           <div className="flex flex-wrap items-center gap-4">
             <div>
               <p className="text-xs uppercase text-gray-500">Return code</p>
-              <p className="text-lg font-semibold text-gray-900">{returnCode || 'ƒ?"'}</p>
+              <p className="text-lg font-semibold text-gray-900">{returnCode || '--'}</p>
             </div>
             <div>
               <p className="text-xs uppercase text-gray-500">Tracking number</p>

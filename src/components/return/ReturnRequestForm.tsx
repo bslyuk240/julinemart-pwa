@@ -244,7 +244,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
   const eligible = canOrderBeReturned(order.status);
   const activeShipment = activeReturn?.return_shipment;
-  const returnCode = activeShipment?.return_code || activeReturn?.return_code || 'ƒ?"';
+  const returnCode = activeShipment?.return_code || activeReturn?.return_code || '--';
   const returnId = activeReturn?.return_request_id;
 
   if (activeReturn) {
@@ -353,7 +353,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                   <ul className="list-disc pl-5 space-y-1">
                     <li>Search Fez Delivery in {order.shipping?.state || order.billing?.state}</li>
                     <li>Ask the attendant to tag destination as JulineMart Warri Hub</li>
-                    <li>Keep your waybill ƒ?" it has your tracking number</li>
+                    <li>Keep your waybill — it has your tracking number</li>
                   </ul>
                 </div>
               ) : null}

@@ -81,7 +81,7 @@ export default function ReturnsPage() {
               const returnRequestId = item.return_request_id;
               const statusDisplay = formatJloReturnStatus(item.status);
               const refundDisplay = formatJloRefundStatus(item.refund_status || 'none');
-              const returnCode = item.return_shipment?.return_code || item.return_code || 'ƒ?"';
+              const returnCode = item.return_shipment?.return_code || item.return_code || '--';
               const tracking = item.return_shipment?.tracking_number || null;
 
               return (
