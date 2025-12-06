@@ -14,15 +14,11 @@ export default function AddTrackingPage() {
     () => `/api/returns/${encodeURIComponent(returnId || '')}/tracking`,
     [returnId]
   );
-  const trackingPostUrl = useMemo(
-    () => `/api/return-shipments/${encodeURIComponent(returnId || '')}/tracking`,
-    [returnId]
-  );
-
   const [trackingNumber, setTrackingNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentTracking, setCurrentTracking] = useState<string | null>(null);
+  const [shipmentId, setShipmentId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadCurrent = async () => {
@@ -40,6 +36,9 @@ export default function AddTrackingPage() {
             payload?.tracking_no1 ||
             payload?.trackingNo;
           if (tn) setCurrentTracking(tn);
+          if (payload?.shipment_id || payload?.return_shipment_id) {
+            setShipmentId(payload.shipment_id || payload.return_shipment_id);
+          }
         }
       } catch (err) {
         console.error('Error loading tracking', err);
@@ -56,9 +55,13 @@ export default function AddTrackingPage() {
       toast.error('Enter a tracking number');
       return;
     }
+    if (!shipmentId) {
+      toast.error('Shipment ID not found yet. Please try again shortly.');
+      return;
+    }
     try {
       setSubmitting(true);
-      const res = await fetch(trackingPostUrl, {
+      const res = await fetch(`/api/return-shipments/${encodeURIComponent(shipmentId)}/tracking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
