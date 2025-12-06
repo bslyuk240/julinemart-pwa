@@ -43,3 +43,7 @@ export async function POST(
     );
   }
 }
+
+export function OPTIONS() {
+  return NextResponse.json({}, { status: 200 });
+}

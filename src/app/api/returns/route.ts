@@ -3,21 +3,23 @@ import { getJloBaseUrl } from '@/lib/jlo/returns';
 
 const JLO_BASE = getJloBaseUrl();
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { returnId: string } }
-) {
+export async function GET(request: Request) {
   if (!JLO_BASE) {
     return NextResponse.json({ success: false, message: 'JLO API base URL not configured' }, { status: 500 });
   }
 
-  const { returnId } = params;
-  if (!returnId) {
-    return NextResponse.json({ success: false, message: 'Return ID is required' }, { status: 400 });
-  }
+  const { searchParams } = new URL(request.url);
+  const customerId = searchParams.get('wc_customer_id');
+  const orderId = searchParams.get('order_id');
+
+  const path = orderId
+    ? `/api/orders/${orderId}/returns`
+    : customerId
+    ? `/api/returns?wc_customer_id=${encodeURIComponent(customerId)}`
+    : '/api/returns';
 
   try {
-    const res = await fetch(`${JLO_BASE}/api/returns/${encodeURIComponent(returnId)}/tracking`);
+    const res = await fetch(`${JLO_BASE}${path}`);
     const data = await res.json().catch(async () => {
       const text = await res.text().catch(() => '');
       return { message: text || null };
@@ -25,7 +27,7 @@ export async function GET(
 
     if (!res.ok || data?.success === false) {
       return NextResponse.json(
-        { success: false, message: data?.message || data?.error || 'Failed to fetch tracking', details: data },
+        { success: false, message: data?.message || data?.error || 'Failed to fetch returns', details: data },
         { status: res.status || 500 }
       );
     }
@@ -33,12 +35,8 @@ export async function GET(
     return NextResponse.json(data?.data ?? data, { status: res.status });
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, message: error?.message || 'Failed to fetch tracking' },
+      { success: false, message: error?.message || 'Failed to fetch returns' },
       { status: 500 }
     );
   }
-}
-
-export function OPTIONS() {
-  return NextResponse.json({}, { status: 200 });
 }
