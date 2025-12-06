@@ -11,7 +11,8 @@ export default function AddTrackingPage() {
   const router = useRouter();
   const returnId = params?.returnId as string;
   const trackingGetUrl = useMemo(
-    () => `/api/returns/${encodeURIComponent(returnId || '')}/tracking`,
+    () =>
+      `/.netlify/functions/get-return-tracking?return_request_id=${encodeURIComponent(returnId || '')}`,
     [returnId]
   );
   const [trackingNumber, setTrackingNumber] = useState('');
@@ -61,14 +62,17 @@ export default function AddTrackingPage() {
     }
     try {
       setSubmitting(true);
-      const res = await fetch(`/api/return-shipments/${encodeURIComponent(shipmentId)}/tracking`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tracking_number: trackingNumber.trim(),
-          courier: 'fez',
-        }),
-      });
+      const res = await fetch(
+        `/.netlify/functions/add-return-tracking?return_shipment_id=${encodeURIComponent(shipmentId)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tracking_number: trackingNumber.trim(),
+            courier: 'fez',
+          }),
+        }
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.success === false) {
         throw new Error(data?.message || data?.error || 'Failed to save tracking');
