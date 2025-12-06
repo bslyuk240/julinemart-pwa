@@ -6,19 +6,16 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { ArrowLeft, Hash, Loader2 } from 'lucide-react';
 
-const JLO_API_BASE =
-  (process.env.NEXT_PUBLIC_JLO_URL || 'https://jlo.julinemart.com').replace(/\/$/, '') + '/api';
-
 export default function AddTrackingPage() {
   const params = useParams();
   const router = useRouter();
   const returnId = params?.returnId as string;
   const trackingGetUrl = useMemo(
-    () => `${JLO_API_BASE}/returns/${encodeURIComponent(returnId || '')}/tracking`,
+    () => `/api/returns/${encodeURIComponent(returnId || '')}/tracking`,
     [returnId]
   );
   const trackingPostUrl = useMemo(
-    () => `${JLO_API_BASE}/return-shipments/${encodeURIComponent(returnId || '')}/tracking`,
+    () => `/api/return-shipments/${encodeURIComponent(returnId || '')}/tracking`,
     [returnId]
   );
 
