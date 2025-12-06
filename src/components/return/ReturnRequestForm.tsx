@@ -44,6 +44,19 @@ function latestReturn(returns: JloReturn[]): JloReturn | null {
   })[0];
 }
 
+function extractHubId(order: Order | null) {
+  if (!order?.line_items?.length) return '';
+  for (const item of order.line_items) {
+    const meta = (item as any)?.meta_data as { key: string; value: any }[] | undefined;
+    if (!meta) continue;
+    const hubMeta = meta.find(
+      (m) => m.key === 'hub_id' || m.key === '_hub_id' || m.key === 'hubId' || m.key === 'hubID'
+    );
+    if (hubMeta?.value) return String(hubMeta.value);
+  }
+  return '';
+}
+
 export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const router = useRouter();
 
@@ -58,6 +71,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const [imageUrls, setImageUrls] = useState('');
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const method: 'dropoff' = 'dropoff';
+  const hubId = useMemo(() => extractHubId(order) || DEFAULT_HUB_ID, [order]);
 
   const currency = order?.currency || 'NGN';
   const activeReturn = useMemo(() => latestReturn(returns), [returns]);
@@ -107,6 +121,11 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
       return;
     }
 
+    if (!hubId) {
+      toast.error('Hub not found for this order. Please contact support.');
+      return;
+    }
+
     try {
       setSubmitting(true);
       const urlImages = imageUrls
@@ -125,7 +144,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           reason_note: reasonNote,
           images,
           method,
-          hub_id: DEFAULT_HUB_ID,
+          hub_id: hubId,
         }),
       });
 
