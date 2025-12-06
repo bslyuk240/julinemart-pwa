@@ -5,6 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, MapPin, Package, RefreshCw, Truck } from 'lucide-react';
 
+const JLO_API_BASE =
+  (process.env.NEXT_PUBLIC_JLO_URL || 'https://jlo.julinemart.com').replace(/\/$/, '') + '/api';
+
 type TrackingEvent = {
   status?: string;
   description?: string;
@@ -17,6 +20,10 @@ export default function TrackReturnPage() {
   const params = useParams();
   const router = useRouter();
   const returnId = params?.returnId as string;
+  const trackingGetUrl = useMemo(
+    () => `${JLO_API_BASE}/returns/${encodeURIComponent(returnId || '')}/tracking`,
+    [returnId]
+  );
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +37,7 @@ export default function TrackReturnPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/returns/${returnId}/tracking`);
+      const res = await fetch(trackingGetUrl);
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.success === false) {
         throw new Error(data?.message || data?.error || 'Failed to fetch tracking');

@@ -1,15 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { ArrowLeft, Hash, Loader2 } from 'lucide-react';
 
+const JLO_API_BASE =
+  (process.env.NEXT_PUBLIC_JLO_URL || 'https://jlo.julinemart.com').replace(/\/$/, '') + '/api';
+
 export default function AddTrackingPage() {
   const params = useParams();
   const router = useRouter();
   const returnId = params?.returnId as string;
+  const trackingGetUrl = useMemo(
+    () => `${JLO_API_BASE}/returns/${encodeURIComponent(returnId || '')}/tracking`,
+    [returnId]
+  );
+  const trackingPostUrl = useMemo(
+    () => `${JLO_API_BASE}/return-shipments/${encodeURIComponent(returnId || '')}/tracking`,
+    [returnId]
+  );
 
   const [trackingNumber, setTrackingNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -21,7 +32,7 @@ export default function AddTrackingPage() {
       if (!returnId) return;
       setLoading(true);
       try {
-        const res = await fetch(`/api/returns/${returnId}/tracking`);
+        const res = await fetch(trackingGetUrl);
         if (res.ok) {
           const data = await res.json();
           const payload = data?.data ?? data;
@@ -50,7 +61,7 @@ export default function AddTrackingPage() {
     }
     try {
       setSubmitting(true);
-      const res = await fetch(`/api/return-shipments/${returnId}/tracking`, {
+      const res = await fetch(trackingPostUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
