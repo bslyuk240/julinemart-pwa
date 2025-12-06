@@ -7,17 +7,33 @@ import { toast } from 'sonner';
 import { ArrowLeft, Hash, Loader2 } from 'lucide-react';
 
 type TrackingPayload = {
+   return_request_id?: string;
+  return_shipment_id?: string;
   return_shipment?: {
     return_shipment_id: string;
     tracking_number: string | null;
   };
+   tracking_number?: string | null;
+};
+
+// Extract shipment ID from various possible response structures
+const extractShipmentId = (payload: TrackingPayload): string | null => {
+  // Check nested return_shipment first
+  if (payload?.return_shipment?.return_shipment_id) {
+    return payload.return_shipment.return_shipment_id;
+  }
+  // Check top-level return_shipment_id
+  if (payload?.return_shipment_id) {
+    return payload.return_shipment_id;
+  }
+  return null;
 };
 
 const parseTrackingResponse = (payload: TrackingPayload) => {
   const shipment = payload?.return_shipment;
   return {
-    tracking: shipment?.tracking_number || null,
-    shipmentId: shipment?.return_shipment_id || null,
+    tracking: shipment?.tracking_number || payload?.tracking_number || null,
+    shipmentId: extractShipmentId(payload),
   };
 };
 
@@ -38,10 +54,15 @@ export default function AddTrackingPage() {
       if (!returnId) return;
       setLoading(true);
       try {
+          // Fetch tracking data from the return endpoint
         const res = await fetch(trackingGetUrl);
         const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.data) {
-          const parsed = parseTrackingResponse(data.data);
+        
+        // Try to parse tracking from the response
+        if (res.ok) {
+          // Try data.data first (wrapped response), then data directly
+          const payload = data?.data || data;
+          const parsed = parseTrackingResponse(payload);
           if (parsed.tracking) setCurrentTracking(parsed.tracking);
           if (parsed.shipmentId) setShipmentId(parsed.shipmentId);
         }
@@ -60,13 +81,17 @@ export default function AddTrackingPage() {
     if (!trackingNumber.trim()) {
       return toast.error('Please enter a tracking number.');
     }
-    if (!shipmentId) {
-      return toast.error('Shipment ID not ready yet. Please try again.');
+    
+    // Use shipmentId if available, otherwise fall back to returnId
+    // This handles cases where the return_shipment_id was not returned separately
+    const idToUse = shipmentId || returnId;
+    if (!idToUse) {
+      return toast.error('Unable to identify the shipment. Please refresh and try again.');
     }
 
     try {
       setSubmitting(true);
-      const response = await fetch(`/api/return-shipments/${encodeURIComponent(shipmentId)}/tracking`, {
+      const response = await fetch(`/api/return-shipments/${encodeURIComponent(idToUse)}/tracking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tracking_number: trackingNumber.trim() }),
