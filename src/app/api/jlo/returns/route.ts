@@ -42,10 +42,10 @@ export async function GET(request: Request) {
   const orderId = searchParams.get('order_id');
 
   const path = orderId
-    ? `/api/orders/${orderId}/returns`
+    ? `/api/returns-by-order/${encodeURIComponent(orderId)}`
     : customerId
-    ? `/api/returns?wc_customer_id=${encodeURIComponent(customerId)}`
-    : '/api/returns';
+    ? `/api/returns-list?wc_customer_id=${encodeURIComponent(customerId)}`
+    : '/api/returns-list';
 
   try {
     return await proxy(path, { method: 'GET' });
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    return await proxy('/api/returns', {
+    return await proxy('/api/returns-create', {
       method: 'POST',
       body: JSON.stringify(body),
     });
