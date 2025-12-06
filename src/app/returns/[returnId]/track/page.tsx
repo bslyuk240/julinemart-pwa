@@ -13,13 +13,48 @@ type TrackingEvent = {
   created_at?: string;
 };
 
+const parseTrackingPayload = (payload: any, fallbackReturnId: string) => {
+  const tracking =
+    payload?.tracking_number ||
+    payload?.tracking ||
+    payload?.tracking_no ||
+    payload?.tracking_no1 ||
+    payload?.trackingNo ||
+    payload?.return_shipment?.tracking_number ||
+    payload?.return_shipment?.fez_tracking ||
+    payload?.return_shipments?.[0]?.tracking_number ||
+    payload?.return_shipments?.[0]?.fez_tracking ||
+    null;
+
+  const returnCode =
+    payload?.return_code ||
+    payload?.returnId ||
+    payload?.return_id ||
+    payload?.return_shipments?.[0]?.return_code ||
+    fallbackReturnId;
+
+  const status =
+    payload?.status ||
+    payload?.current_status ||
+    payload?.return_shipment?.status ||
+    payload?.return_shipments?.[0]?.status ||
+    null;
+
+  const events = Array.isArray(payload?.events)
+    ? payload.events
+    : Array.isArray(payload?.history)
+    ? payload.history
+    : [];
+
+  return { tracking, returnCode, status, events };
+};
+
 export default function TrackReturnPage() {
   const params = useParams();
   const router = useRouter();
   const returnId = params?.returnId as string;
   const trackingGetUrl = useMemo(
-    () =>
-      `/.netlify/functions/get-return-tracking?return_request_id=${encodeURIComponent(returnId || '')}`,
+    () => (returnId ? `/api/returns/${encodeURIComponent(returnId)}/tracking` : ''),
     [returnId]
   );
 
@@ -31,7 +66,7 @@ export default function TrackReturnPage() {
   const [events, setEvents] = useState<TrackingEvent[]>([]);
 
   const loadTracking = async () => {
-    if (!returnId) return;
+    if (!returnId || !trackingGetUrl) return;
     setLoading(true);
     setError(null);
     try {
@@ -41,18 +76,12 @@ export default function TrackReturnPage() {
         throw new Error(data?.message || data?.error || 'Failed to fetch tracking');
       }
       const payload = data?.data ?? data;
-      setTrackingNumber(
-        payload?.tracking_number ||
-          payload?.tracking ||
-          payload?.tracking_no ||
-          payload?.tracking_no1 ||
-          payload?.trackingNo ||
-          null
-      );
-      setReturnCode(payload?.return_code || payload?.returnId || payload?.return_id || returnId);
-      setStatus(payload?.status || payload?.current_status || null);
-      const ev = payload?.events || payload?.history || [];
-      setEvents(Array.isArray(ev) ? ev : []);
+      const { tracking, returnCode: parsedReturnCode, status: parsedStatus, events: parsedEvents } =
+        parseTrackingPayload(payload, returnId);
+      setTrackingNumber(tracking);
+      setReturnCode(parsedReturnCode);
+      setStatus(parsedStatus);
+      setEvents(parsedEvents);
     } catch (err: any) {
       console.error('Error fetching tracking', err);
       setError(err?.message || 'Failed to fetch tracking');

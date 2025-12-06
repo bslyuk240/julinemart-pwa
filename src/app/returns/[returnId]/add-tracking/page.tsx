@@ -6,13 +6,46 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { ArrowLeft, Hash, Loader2 } from 'lucide-react';
 
+const extractTrackingPayload = (payload: any) => {
+  const tracking =
+    payload?.tracking_number ||
+    payload?.tracking ||
+    payload?.tracking_no ||
+    payload?.tracking_no1 ||
+    payload?.trackingNo ||
+    payload?.return_shipment?.tracking_number ||
+    payload?.return_shipment?.fez_tracking ||
+    payload?.return_shipments?.[0]?.tracking_number ||
+    payload?.return_shipments?.[0]?.fez_tracking ||
+    null;
+
+  const shipmentIdFromPayload =
+    payload?.shipment_id ||
+    payload?.return_shipment_id ||
+    payload?.shipmentId ||
+    payload?.returnShipmentId ||
+    payload?.return_shipment?.id ||
+    payload?.return_shipment?.shipment_id ||
+    payload?.shipment?.id ||
+    payload?.shipment?.shipment_id ||
+    payload?.return_shipments?.[0]?.id ||
+    payload?.return_shipments?.[0]?.shipment_id ||
+    payload?.shipments?.[0]?.id ||
+    payload?.shipments?.[0]?.shipment_id ||
+    null;
+
+  return {
+    tracking,
+    shipmentId: shipmentIdFromPayload ? String(shipmentIdFromPayload) : null,
+  };
+};
+
 export default function AddTrackingPage() {
   const params = useParams();
   const router = useRouter();
   const returnId = params?.returnId as string;
   const trackingGetUrl = useMemo(
-    () =>
-      `/.netlify/functions/get-return-tracking?return_request_id=${encodeURIComponent(returnId || '')}`,
+    () => (returnId ? `/api/returns/${encodeURIComponent(returnId)}/tracking` : ''),
     [returnId]
   );
   const [trackingNumber, setTrackingNumber] = useState('');
@@ -23,23 +56,16 @@ export default function AddTrackingPage() {
 
   useEffect(() => {
     const loadCurrent = async () => {
-      if (!returnId) return;
+      if (!returnId || !trackingGetUrl) return;
       setLoading(true);
       try {
         const res = await fetch(trackingGetUrl);
         if (res.ok) {
           const data = await res.json();
           const payload = data?.data ?? data;
-          const tn =
-            payload?.tracking_number ||
-            payload?.tracking ||
-            payload?.tracking_no ||
-            payload?.tracking_no1 ||
-            payload?.trackingNo;
-          if (tn) setCurrentTracking(tn);
-          if (payload?.shipment_id || payload?.return_shipment_id) {
-            setShipmentId(payload.shipment_id || payload.return_shipment_id);
-          }
+          const { tracking, shipmentId: foundShipmentId } = extractTrackingPayload(payload);
+          if (tracking) setCurrentTracking(tracking);
+          if (foundShipmentId) setShipmentId(foundShipmentId);
         }
       } catch (err) {
         console.error('Error loading tracking', err);
@@ -48,7 +74,7 @@ export default function AddTrackingPage() {
       }
     };
     loadCurrent();
-  }, [returnId]);
+  }, [returnId, trackingGetUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +89,7 @@ export default function AddTrackingPage() {
     try {
       setSubmitting(true);
       const res = await fetch(
-        `/.netlify/functions/add-return-tracking?return_shipment_id=${encodeURIComponent(shipmentId)}`,
+        `/api/return-shipments/${encodeURIComponent(shipmentId)}/tracking`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
