@@ -28,6 +28,7 @@ const RETURN_REASONS = [
 
 type Resolution = 'refund' | 'replacement';
 const JLO_RETURNS_URL = 'https://jlo.julinemart.com/api/returns-create';
+const DEFAULT_HUB_ID = '51a0aad5-c866-4ac5-83ef-22ab41ccd063'; // Warri Hub
 
 function canOrderBeReturned(status: string) {
   const eligible = ['delivered', 'completed'];
@@ -124,6 +125,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           reason_note: reasonNote,
           images,
           method,
+          hub_id: DEFAULT_HUB_ID,
         }),
       });
 
