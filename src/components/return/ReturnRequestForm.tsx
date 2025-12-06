@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowLeft, Package, AlertCircle, Loader2, Truck, MapPin, Image, Info } from 'lucide-react';
+import { ArrowLeft, Package, AlertCircle, Loader2, MapPin, Image, Info } from 'lucide-react';
 import { Order } from '@/types/order';
 import { formatPrice } from '@/lib/utils/format-price';
 import {
@@ -43,19 +43,6 @@ function latestReturn(returns: JloReturn[]): JloReturn | null {
   })[0];
 }
 
-function extractHubId(order: Order | null) {
-  if (!order?.line_items?.length) return '';
-  for (const item of order.line_items) {
-    const meta = (item as any)?.meta_data as { key: string; value: any }[] | undefined;
-    if (!meta) continue;
-    const hubMeta = meta.find(
-      (m) => m.key === 'hub_id' || m.key === '_hub_id' || m.key === 'hubId' || m.key === 'hubID'
-    );
-    if (hubMeta?.value) return String(hubMeta.value);
-  }
-  return '';
-}
-
 export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const router = useRouter();
 
@@ -69,8 +56,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const [reasonNote, setReasonNote] = useState('');
   const [imageUrls, setImageUrls] = useState('');
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
-  const [method, setMethod] = useState<'pickup' | 'dropoff'>('pickup');
-  const [hubId, setHubId] = useState('');
+  const method: 'dropoff' = 'dropoff';
 
   const currency = order?.currency || 'NGN';
   const activeReturn = useMemo(() => latestReturn(returns), [returns]);
@@ -98,7 +84,6 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
       }
       setOrder(data.order);
       setReturns(Array.isArray(data.returns) ? data.returns : []);
-      setHubId(extractHubId(data.order));
     } catch (error) {
       console.error('Error fetching order:', error);
       toast.error('Failed to load order details');
@@ -121,11 +106,6 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
       return;
     }
 
-    if (method === 'pickup' && !hubId.trim()) {
-      toast.error('Pickup hub missing for this order. Please contact support.');
-      return;
-    }
-
     try {
       setSubmitting(true);
       const urlImages = imageUrls
@@ -144,7 +124,6 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           reason_note: reasonNote,
           images,
           method,
-          hub_id: hubId || undefined,
         }),
       });
 
@@ -227,7 +206,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     return (
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-1">
         <div className="flex items-center gap-2 text-blue-900 font-semibold">
-          {shipment.method === 'pickup' ? <Truck className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
+          <MapPin className="w-4 h-4" />
           <span className="capitalize">{shipment.method || 'Return shipment'}</span>
         </div>
         {shipment.return_code ? <p className="text-sm text-blue-800">Return Code: {shipment.return_code}</p> : null}
@@ -274,6 +253,12 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   if (activeReturn) {
     const statusDisplay = formatJloReturnStatus(activeReturn.status);
     const shipment = activeReturn.return_shipments?.[0];
+    const returnCode =
+      shipment?.return_code ||
+      activeReturn.return_id ||
+      activeReturn.id ||
+      (typeof activeReturn?.order_number === 'string' ? activeReturn.order_number : '');
+    const returnIdForLinks = activeReturn.return_id || activeReturn.id;
     const refundDisplay = formatJloRefundStatus(activeReturn.refund_status || 'none');
 
     return (
@@ -342,10 +327,71 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                 <Info className="w-5 h-5 text-gray-500 mt-0.5" />
                 <div className="text-sm text-gray-700">
                   <p className="font-semibold text-gray-900">Return shipping</p>
-                  <p>We will schedule pickup or share drop-off details once the return is accepted.</p>
+                  <p>Ship the item via Fez Delivery and share the tracking number so we can monitor it.</p>
                 </div>
               </div>
             )}
+
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-indigo-800">Return Code</p>
+                  <p className="text-xl font-bold text-indigo-900">{returnCode || '—'}</p>
+                </div>
+                {returnIdForLinks ? (
+                  <div className="flex gap-2">
+                    <Link
+                      href={`/returns/${returnIdForLinks}/add-tracking`}
+                      className="px-3 py-2 rounded-md bg-white text-indigo-700 border border-indigo-200 text-sm font-semibold hover:bg-indigo-100"
+                    >
+                      Add tracking number
+                    </Link>
+                    <Link
+                      href={`/returns/${returnIdForLinks}/track`}
+                      className="px-3 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
+                    >
+                      Track return
+                    </Link>
+                  </div>
+                ) : null}
+              </div>
+              <div className="space-y-3 text-sm text-indigo-900">
+                <div>
+                  <p className="font-semibold">1) Package your item securely</p>
+                  <p>Include your return code inside the package.</p>
+                </div>
+                <div>
+                  <p className="font-semibold">2) Take it to the nearest Fez Delivery location</p>
+                  <p>Destination: JulineMart Warri Hub, No. 9 Jesus is Lord Street, Effurun, Warri, Delta</p>
+                  <a
+                    href="https://fezdelivery.co/locations"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-indigo-700 underline font-medium"
+                  >
+                    Find Fez locations: https://fezdelivery.co/locations
+                  </a>
+                </div>
+                <div>
+                  <p className="font-semibold">3) Get a tracking number from Fez</p>
+                  <p>They&apos;ll share it on the waybill/receipt.</p>
+                </div>
+                <div>
+                  <p className="font-semibold">4) Enter the tracking number</p>
+                  <p>Share it with us so we can monitor your return.</p>
+                </div>
+              </div>
+              {order?.shipping?.state || order?.billing?.state ? (
+                <div className="rounded-md border border-indigo-100 bg-white/70 p-3 text-sm text-indigo-900">
+                  <p className="font-semibold mb-1">Nearby Fez locations (suggested)</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Search Fez Delivery in {order.shipping?.state || order.billing?.state}</li>
+                    <li>Ask the attendant to tag destination as JulineMart Warri Hub</li>
+                    <li>Keep your waybill — it has your tracking number</li>
+                  </ul>
+                </div>
+              ) : null}
+            </div>
 
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-2">
               <p className="text-sm font-semibold text-emerald-900">Refund Status</p>
@@ -510,37 +556,13 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
           <div>
             <h2 className="font-semibold text-gray-900 mb-3">Return method</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setMethod('pickup')}
-                className={`border rounded-lg p-3 text-left transition ${
-                  method === 'pickup' ? 'border-primary-600 bg-primary-50' : 'border-gray-200 bg-white'
-                }`}
-              >
-                <p className="font-semibold text-gray-900">Pickup</p>
-                <p className="text-xs text-gray-600">Fez rider picks up from your address</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMethod('dropoff')}
-                className={`border rounded-lg p-3 text-left transition ${
-                  method === 'dropoff' ? 'border-primary-600 bg-primary-50' : 'border-gray-200 bg-white'
-                }`}
-              >
-                <p className="font-semibold text-gray-900">Dropoff</p>
-                <p className="text-xs text-gray-600">Take items to a Fez drop-off point</p>
-              </button>
+            <div className="grid grid-cols-1 gap-3">
+              <div className="border rounded-lg p-3 bg-primary-50 border-primary-600">
+                <p className="font-semibold text-gray-900">Ship via Courier</p>
+                <p className="text-xs text-gray-600">Take your item to any Fez Delivery location near you.</p>
+                <p className="text-xs text-gray-700 mt-2">💡 You&apos;ll get a tracking number to monitor your return.</p>
+              </div>
             </div>
-            {method === 'pickup' ? (
-              <p className="text-xs text-gray-600 mt-2">
-                Pickup will be arranged via the hub assigned to this order.
-              </p>
-            ) : (
-              <p className="text-xs text-gray-600 mt-2">
-                You&apos;ll get drop-off instructions after submitting.
-              </p>
-            )}
           </div>
 
           <div>
