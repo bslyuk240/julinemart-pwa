@@ -18,7 +18,8 @@ export default function TrackReturnPage() {
   const router = useRouter();
   const returnId = params?.returnId as string;
   const trackingGetUrl = useMemo(
-    () => `/api/returns/${encodeURIComponent(returnId || '')}/tracking`,
+    () =>
+      `/.netlify/functions/get-return-tracking?return_request_id=${encodeURIComponent(returnId || '')}`,
     [returnId]
   );
 
