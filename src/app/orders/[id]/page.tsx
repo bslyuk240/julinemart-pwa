@@ -170,7 +170,7 @@ export default function OrderDetailPage() {
   }
 
   const returnEligible = canOrderBeReturned(order.status) && !activeReturn;
-  const returnShipment = activeReturn?.return_shipments?.[0];
+  const returnShipment = activeReturn?.return_shipment;
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
@@ -399,14 +399,12 @@ export default function OrderDetailPage() {
                   )}
                   {returnShipment ? (
                     <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-1">
-                      <p className="font-semibold text-blue-900 capitalize">
-                        {returnShipment.method || 'Return shipment'}
-                      </p>
+                      <p className="font-semibold text-blue-900 capitalize">Return shipment</p>
                       {returnShipment.return_code ? (
                         <p className="text-sm text-blue-800">Return Code: {returnShipment.return_code}</p>
                       ) : null}
-                      {returnShipment.fez_tracking ? (
-                        <p className="text-sm text-blue-800">Tracking: {returnShipment.fez_tracking}</p>
+                      {returnShipment.tracking_number ? (
+                        <p className="text-sm text-blue-800">Tracking: {returnShipment.tracking_number}</p>
                       ) : null}
                       {returnShipment.status ? (
                         <p className="text-sm text-blue-800">Status: {returnShipment.status}</p>

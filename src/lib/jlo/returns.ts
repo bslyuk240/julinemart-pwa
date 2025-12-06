@@ -4,13 +4,12 @@ const RAW_JLO_BASE =
   'https://jlo.julinemart.com';
 
 export type JloReturnShipment = {
-  shipment_id?: string;
-  id?: string;
-  method?: 'pickup' | 'dropoff';
-  return_code?: string;
-  fez_tracking?: string | null;
-  tracking_url?: string | null;
-  status?: string;
+  return_shipment_id: string;
+  return_request_id: string;
+  return_code: string | null;
+  tracking_number: string | null;
+  status: string;
+  tracking_submitted_at?: string | null;
 };
 
 export type JloReturnLineItem = {
@@ -31,18 +30,19 @@ export type JloRefundInfo = {
 };
 
 export type JloReturn = {
-  return_id?: string;
-  id?: string;
+  return_request_id: string;
+  return_shipment_id: string;
+  return_code: string | null;
   order_id: number;
   order_number?: string;
-  status: string;
-  created_at?: string;
   preferred_resolution?: 'refund' | 'replacement';
   reason_code?: string;
   reason_note?: string;
   images?: string[];
+  status: string;
+  created_at?: string;
+  return_shipment?: JloReturnShipment;
   line_items?: JloReturnLineItem[];
-  return_shipments?: JloReturnShipment[];
 } & JloRefundInfo;
 
 export function getJloBaseUrl() {
@@ -54,7 +54,7 @@ export function formatJloReturnStatus(
 ): { label: string; color: string; bgColor: string } {
   const map: Record<string, { label: string; color: string; bgColor: string }> = {
     requested: { label: 'Requested', color: 'text-blue-700', bgColor: 'bg-blue-100' },
-    pickup_scheduled: { label: 'Pickup Scheduled', color: 'text-indigo-700', bgColor: 'bg-indigo-100' },
+    awaiting_tracking: { label: 'Awaiting Tracking', color: 'text-gray-700', bgColor: 'bg-gray-100' },
     in_transit: { label: 'In Transit', color: 'text-purple-700', bgColor: 'bg-purple-100' },
     delivered_to_hub: { label: 'At Hub', color: 'text-teal-700', bgColor: 'bg-teal-100' },
     inspection_in_progress: { label: 'Inspection', color: 'text-amber-700', bgColor: 'bg-amber-100' },
@@ -62,8 +62,10 @@ export function formatJloReturnStatus(
     rejected: { label: 'Rejected', color: 'text-red-700', bgColor: 'bg-red-100' },
     refund_processing: { label: 'Refund Processing', color: 'text-sky-700', bgColor: 'bg-sky-100' },
     refund_completed: { label: 'Refund Completed', color: 'text-emerald-700', bgColor: 'bg-emerald-100' },
+    refund_failed: { label: 'Refund Failed', color: 'text-red-700', bgColor: 'bg-red-100' },
   };
-  return status && map[status] ? map[status] : { label: status || 'Unknown', color: 'text-gray-700', bgColor: 'bg-gray-100' };
+
+  return map[status || ''] || { label: status || 'Unknown', color: 'text-gray-700', bgColor: 'bg-gray-100' };
 }
 
 export function formatJloRefundStatus(
@@ -75,7 +77,8 @@ export function formatJloRefundStatus(
     completed: { label: 'Refund Completed', color: 'text-emerald-700', bgColor: 'bg-emerald-100' },
     failed: { label: 'Refund Failed', color: 'text-red-700', bgColor: 'bg-red-100' },
   };
-  return status && map[status] ? map[status] : { label: status || 'Unknown', color: 'text-gray-700', bgColor: 'bg-gray-100' };
+
+  return map[status || 'none'];
 }
 
 export function buildFezTrackingUrl(tracking?: string | null) {

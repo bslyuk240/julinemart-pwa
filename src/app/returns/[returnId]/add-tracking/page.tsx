@@ -6,37 +6,18 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { ArrowLeft, Hash, Loader2 } from 'lucide-react';
 
-const extractTrackingPayload = (payload: any) => {
-  const tracking =
-    payload?.tracking_number ||
-    payload?.tracking ||
-    payload?.tracking_no ||
-    payload?.tracking_no1 ||
-    payload?.trackingNo ||
-    payload?.return_shipment?.tracking_number ||
-    payload?.return_shipment?.fez_tracking ||
-    payload?.return_shipments?.[0]?.tracking_number ||
-    payload?.return_shipments?.[0]?.fez_tracking ||
-    null;
+type TrackingPayload = {
+  return_shipment?: {
+    return_shipment_id: string;
+    tracking_number: string | null;
+  };
+};
 
-  const shipmentIdFromPayload =
-    payload?.shipment_id ||
-    payload?.return_shipment_id ||
-    payload?.shipmentId ||
-    payload?.returnShipmentId ||
-    payload?.return_shipment?.id ||
-    payload?.return_shipment?.shipment_id ||
-    payload?.shipment?.id ||
-    payload?.shipment?.shipment_id ||
-    payload?.return_shipments?.[0]?.id ||
-    payload?.return_shipments?.[0]?.shipment_id ||
-    payload?.shipments?.[0]?.id ||
-    payload?.shipments?.[0]?.shipment_id ||
-    null;
-
+const parseTrackingResponse = (payload: TrackingPayload) => {
+  const shipment = payload?.return_shipment;
   return {
-    tracking,
-    shipmentId: shipmentIdFromPayload ? String(shipmentIdFromPayload) : null,
+    tracking: shipment?.tracking_number || null,
+    shipmentId: shipment?.return_shipment_id || null,
   };
 };
 
@@ -44,10 +25,8 @@ export default function AddTrackingPage() {
   const params = useParams();
   const router = useRouter();
   const returnId = params?.returnId as string;
-  const trackingGetUrl = useMemo(
-    () => (returnId ? `/api/returns/${encodeURIComponent(returnId)}/tracking` : ''),
-    [returnId]
-  );
+  const trackingGetUrl = useMemo(() => (returnId ? `/api/returns/${encodeURIComponent(returnId)}/tracking` : ''), [returnId]);
+
   const [trackingNumber, setTrackingNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -56,16 +35,15 @@ export default function AddTrackingPage() {
 
   useEffect(() => {
     const loadCurrent = async () => {
-      if (!returnId || !trackingGetUrl) return;
+      if (!returnId) return;
       setLoading(true);
       try {
         const res = await fetch(trackingGetUrl);
-        if (res.ok) {
-          const data = await res.json();
-          const payload = data?.data ?? data;
-          const { tracking, shipmentId: foundShipmentId } = extractTrackingPayload(payload);
-          if (tracking) setCurrentTracking(tracking);
-          if (foundShipmentId) setShipmentId(foundShipmentId);
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.data) {
+          const parsed = parseTrackingResponse(data.data);
+          if (parsed.tracking) setCurrentTracking(parsed.tracking);
+          if (parsed.shipmentId) setShipmentId(parsed.shipmentId);
         }
       } catch (err) {
         console.error('Error loading tracking', err);
@@ -73,41 +51,35 @@ export default function AddTrackingPage() {
         setLoading(false);
       }
     };
+
     loadCurrent();
   }, [returnId, trackingGetUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!trackingNumber.trim()) {
-      toast.error('Enter a tracking number');
-      return;
+      return toast.error('Please enter a tracking number.');
     }
     if (!shipmentId) {
-      toast.error('Shipment ID not found yet. Please try again shortly.');
-      return;
+      return toast.error('Shipment ID not ready yet. Please try again.');
     }
+
     try {
       setSubmitting(true);
-      const res = await fetch(
-        `/api/return-shipments/${encodeURIComponent(shipmentId)}/tracking`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tracking_number: trackingNumber.trim(),
-            courier: 'fez',
-          }),
-        }
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) {
-        throw new Error(data?.message || data?.error || 'Failed to save tracking');
+      const response = await fetch(`/api/return-shipments/${encodeURIComponent(shipmentId)}/tracking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tracking_number: trackingNumber.trim() }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.message || result?.error || 'Failed to save tracking');
       }
-      toast.success('Tracking number saved');
+      toast.success('Tracking number saved successfully.');
       router.push(`/returns/${returnId}/track`);
     } catch (err: any) {
-      console.error('Error saving tracking', err);
-      toast.error(err?.message || 'Failed to save tracking');
+      console.error('Error saving tracking:', err);
+      toast.error(err?.message || 'Could not save tracking number.');
     } finally {
       setSubmitting(false);
     }
@@ -125,7 +97,7 @@ export default function AddTrackingPage() {
     <main className="min-h-screen bg-gray-50 pb-24">
       <div className="container mx-auto px-4 py-6 max-w-xl space-y-6">
         <div className="flex items-center gap-4">
-          <Link href="/account/returns" className="text-gray-600 hover:text-primary-600">
+          <Link href={`/returns/${returnId}/track`} className="text-gray-600 hover:text-primary-600">
             <ArrowLeft className="w-6 h-6" />
           </Link>
           <div>
@@ -140,7 +112,7 @@ export default function AddTrackingPage() {
             <Hash className="w-5 h-5 text-primary-600" />
             <div>
               <p className="font-semibold text-gray-900">Fez tracking number</p>
-              <p className="text-sm text-gray-600">This is on the receipt Fez gave you.</p>
+              <p className="text-sm text-gray-600">Found on the receipt Fez gave you.</p>
             </div>
           </div>
 
@@ -153,7 +125,9 @@ export default function AddTrackingPage() {
             <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">
               Current tracking on file: <span className="font-semibold">{currentTracking}</span>
             </div>
-          ) : null}
+          ) : (
+            <p className="text-sm text-gray-600">No tracking number saved yet. Please enter your Fez tracking number below.</p>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

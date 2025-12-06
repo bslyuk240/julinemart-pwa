@@ -3,56 +3,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, MapPin, Package, RefreshCw, Truck } from 'lucide-react';
+import { ArrowLeft, Loader2, MapPin, RefreshCw, Truck } from 'lucide-react';
 
 type TrackingEvent = {
   status?: string;
   description?: string;
   location?: string;
   timestamp?: string;
-  created_at?: string;
 };
 
-const parseTrackingPayload = (payload: any, fallbackReturnId: string) => {
-  const tracking =
-    payload?.tracking_number ||
-    payload?.tracking ||
-    payload?.tracking_no ||
-    payload?.tracking_no1 ||
-    payload?.trackingNo ||
-    payload?.return_shipment?.tracking_number ||
-    payload?.return_shipment?.fez_tracking ||
-    payload?.return_shipments?.[0]?.tracking_number ||
-    payload?.return_shipments?.[0]?.fez_tracking ||
-    null;
-
-  const returnCode =
-    payload?.return_code ||
-    payload?.returnId ||
-    payload?.return_id ||
-    payload?.return_shipments?.[0]?.return_code ||
-    fallbackReturnId;
-
-  const status =
-    payload?.status ||
-    payload?.current_status ||
-    payload?.return_shipment?.status ||
-    payload?.return_shipments?.[0]?.status ||
-    null;
-
-  const events = Array.isArray(payload?.events)
-    ? payload.events
-    : Array.isArray(payload?.history)
-    ? payload.history
-    : [];
-
-  return { tracking, returnCode, status, events };
+type TrackingPayload = {
+  return_shipment?: {
+    return_shipment_id: string;
+    return_code: string | null;
+    tracking_number: string | null;
+    status: string | null;
+    events?: TrackingEvent[];
+  };
 };
 
 export default function TrackReturnPage() {
   const params = useParams();
   const router = useRouter();
   const returnId = params?.returnId as string;
+
   const trackingGetUrl = useMemo(
     () => (returnId ? `/api/returns/${encodeURIComponent(returnId)}/tracking` : ''),
     [returnId]
@@ -65,8 +39,31 @@ export default function TrackReturnPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [events, setEvents] = useState<TrackingEvent[]>([]);
 
+  const statusLabel = useMemo(() => {
+    switch ((status || '').toLowerCase()) {
+      case 'awaiting_tracking':
+        return 'Awaiting tracking number';
+      case 'in_transit':
+        return 'In transit';
+      case 'delivered_to_hub':
+        return 'Delivered to Hub';
+      case 'inspection_in_progress':
+        return 'Inspection in progress';
+      case 'approved':
+        return 'Approved';
+      case 'rejected':
+        return 'Rejected';
+      case 'refund_processing':
+        return 'Refund processing';
+      case 'refund_completed':
+        return 'Refund completed';
+      default:
+        return status || 'ƒ?"';
+    }
+  }, [status]);
+
   const loadTracking = async () => {
-    if (!returnId || !trackingGetUrl) return;
+    if (!returnId) return;
     setLoading(true);
     setError(null);
     try {
@@ -75,16 +72,15 @@ export default function TrackReturnPage() {
       if (!res.ok || data?.success === false) {
         throw new Error(data?.message || data?.error || 'Failed to fetch tracking');
       }
-      const payload = data?.data ?? data;
-      const { tracking, returnCode: parsedReturnCode, status: parsedStatus, events: parsedEvents } =
-        parseTrackingPayload(payload, returnId);
-      setTrackingNumber(tracking);
-      setReturnCode(parsedReturnCode);
-      setStatus(parsedStatus);
-      setEvents(parsedEvents);
+      const payload: TrackingPayload = data?.data ?? {};
+      const shipment = payload.return_shipment;
+      setTrackingNumber(shipment?.tracking_number || null);
+      setReturnCode(shipment?.return_code || null);
+      setStatus(shipment?.status || null);
+      setEvents(Array.isArray(shipment?.events) ? shipment?.events : []);
     } catch (err: any) {
-      console.error('Error fetching tracking', err);
-      setError(err?.message || 'Failed to fetch tracking');
+      console.error('Tracking fetch error:', err);
+      setError(err?.message || 'Failed to load tracking');
     } finally {
       setLoading(false);
     }
@@ -92,19 +88,9 @@ export default function TrackReturnPage() {
 
   useEffect(() => {
     loadTracking();
-    const interval = setInterval(loadTracking, 120000); // 2 minutes
+    const interval = setInterval(loadTracking, 120000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [returnId]);
-
-  const statusLabel = useMemo(() => {
-    const s = (status || '').toLowerCase();
-    if (s.includes('deliver')) return 'Delivered';
-    if (s.includes('transit')) return 'In Transit';
-    if (s.includes('pickup')) return 'Pickup Scheduled';
-    if (s.includes('received') || s.includes('hub')) return 'Received at Hub';
-    return status || 'In Transit';
-  }, [status]);
 
   if (!returnId) {
     return (
@@ -118,11 +104,7 @@ export default function TrackReturnPage() {
     <main className="min-h-screen bg-gray-50 pb-24">
       <div className="container mx-auto px-4 py-6 max-w-3xl space-y-6">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.back()}
-            className="text-gray-600 hover:text-primary-600"
-            aria-label="Back"
-          >
+          <button onClick={() => router.back()} className="text-gray-600 hover:text-primary-600" aria-label="Back">
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div>
@@ -136,11 +118,11 @@ export default function TrackReturnPage() {
           <div className="flex flex-wrap items-center gap-4">
             <div>
               <p className="text-xs uppercase text-gray-500">Return code</p>
-              <p className="text-lg font-semibold text-gray-900">{returnCode || '—'}</p>
+              <p className="text-lg font-semibold text-gray-900">{returnCode || 'ƒ?"'}</p>
             </div>
             <div>
               <p className="text-xs uppercase text-gray-500">Tracking number</p>
-              <p className="text-lg font-semibold text-gray-900">{trackingNumber || 'Not provided'}</p>
+              <p className="text-lg font-semibold text-gray-900">{trackingNumber || 'Awaiting tracking'}</p>
             </div>
             <div className="ml-auto flex items-center gap-2 text-sm text-gray-700">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -152,7 +134,7 @@ export default function TrackReturnPage() {
           <div className="flex items-center gap-2 text-sm text-gray-800">
             <Truck className="w-4 h-4 text-primary-600" />
             <span className="font-semibold">{statusLabel}</span>
-            {status && <span className="text-gray-500">({status})</span>}
+            {status ? <span className="text-gray-500">({status})</span> : null}
           </div>
         </div>
 
@@ -164,7 +146,7 @@ export default function TrackReturnPage() {
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Fetching tracking...
+              Loading tracking...
             </div>
           ) : error ? (
             <p className="text-sm text-red-600">{error}</p>
@@ -172,16 +154,12 @@ export default function TrackReturnPage() {
             <ul className="space-y-3">
               {events.map((ev, idx) => (
                 <li key={idx} className="border border-gray-200 rounded-lg p-3">
-                  <p className="text-sm font-semibold text-gray-900">
-                    {ev.status || ev.description || 'Update'}
-                  </p>
-                  {ev.description && <p className="text-sm text-gray-700">{ev.description}</p>}
-                  {ev.location && <p className="text-xs text-gray-600">Location: {ev.location}</p>}
-                  {(ev.timestamp || ev.created_at) && (
-                    <p className="text-xs text-gray-500">
-                      {new Date(ev.timestamp || ev.created_at || '').toLocaleString()}
-                    </p>
-                  )}
+                  <p className="text-sm font-semibold text-gray-900">{ev.status || ev.description || 'Update'}</p>
+                  {ev.description ? <p className="text-sm text-gray-700">{ev.description}</p> : null}
+                  {ev.location ? <p className="text-xs text-gray-600">Location: {ev.location}</p> : null}
+                  {ev.timestamp ? (
+                    <p className="text-xs text-gray-500">{new Date(ev.timestamp).toLocaleString()}</p>
+                  ) : null}
                 </li>
               ))}
             </ul>

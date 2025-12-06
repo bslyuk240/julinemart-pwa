@@ -7,13 +7,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, Package, AlertCircle, Loader2, MapPin, Image, Info } from 'lucide-react';
 import { Order } from '@/types/order';
 import { formatPrice } from '@/lib/utils/format-price';
-import {
-  JloReturn,
-  JloReturnShipment,
-  formatJloRefundStatus,
-  formatJloReturnStatus,
-  buildFezTrackingUrl,
-} from '@/lib/jlo/returns';
+import { JloReturn, JloReturnShipment, formatJloRefundStatus, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
 
 interface ReturnRequestFormProps {
   orderId: number;
@@ -28,11 +22,10 @@ const RETURN_REASONS = [
 
 type Resolution = 'refund' | 'replacement';
 const JLO_RETURNS_URL = 'https://jlo.julinemart.com/api/returns-create';
-const DEFAULT_HUB_ID = '51a0aad5-c866-4ac5-83ef-22ab41ccd063'; // Warri Hub
+const DEFAULT_HUB_ID = '51a0aad5-c866-4ac5-83ef-22ab41ccd063';
 
 function canOrderBeReturned(status: string) {
-  const eligible = ['delivered', 'completed'];
-  return eligible.includes(status);
+  return ['delivered', 'completed'].includes(status);
 }
 
 function latestReturn(returns: JloReturn[]): JloReturn | null {
@@ -49,9 +42,7 @@ function extractHubId(order: Order | null) {
   for (const item of order.line_items) {
     const meta = (item as any)?.meta_data as { key: string; value: any }[] | undefined;
     if (!meta) continue;
-    const hubMeta = meta.find(
-      (m) => m.key === 'hub_id' || m.key === '_hub_id' || m.key === 'hubId' || m.key === 'hubID'
-    );
+    const hubMeta = meta.find((m) => m.key === 'hub_id' || m.key === '_hub_id' || m.key === 'hubId' || m.key === 'hubID');
     if (hubMeta?.value) return String(hubMeta.value);
   }
   return '';
@@ -59,7 +50,6 @@ function extractHubId(order: Order | null) {
 
 export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const router = useRouter();
-
   const [order, setOrder] = useState<Order | null>(null);
   const [returns, setReturns] = useState<JloReturn[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,11 +60,12 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const [reasonNote, setReasonNote] = useState('');
   const [imageUrls, setImageUrls] = useState('');
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+
   const method: 'dropoff' = 'dropoff';
   const hubId = useMemo(() => extractHubId(order) || DEFAULT_HUB_ID, [order]);
-
-  const currency = order?.currency || 'NGN';
   const activeReturn = useMemo(() => latestReturn(returns), [returns]);
+  const currency = order?.currency || 'NGN';
+
   const selectedAmount =
     order?.line_items?.reduce((sum, item) => {
       const qty = selectedItems[item.id] || 0;
@@ -92,11 +83,13 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
       const res = await fetch(`/api/orders/${orderId}`);
       if (!res.ok) throw new Error('Failed to fetch order');
       const data = await res.json();
+
       if (!data.order) {
         toast.error('Order not found');
         router.push('/orders');
         return;
       }
+
       setOrder(data.order);
       setReturns(Array.isArray(data.returns) ? data.returns : []);
     } catch (error) {
@@ -111,23 +104,13 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     e.preventDefault();
     if (!order) return;
 
-    if (!reasonCode) {
-      toast.error('Select a reason for your return');
-      return;
-    }
-
-    if (reasonCode === 'other' && !reasonNote.trim()) {
-      toast.error('Add details for your return');
-      return;
-    }
-
-    if (!hubId) {
-      toast.error('Hub not found for this order. Please contact support.');
-      return;
-    }
+    if (!reasonCode) return toast.error('Select a reason for your return');
+    if (reasonCode === 'other' && !reasonNote.trim()) return toast.error('Add details for your return');
+    if (!hubId) return toast.error('Hub not found for this order.');
 
     try {
       setSubmitting(true);
+
       const urlImages = imageUrls
         .split('\n')
         .map((url) => url.trim())
@@ -150,16 +133,13 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
       const result = await response.json();
       if (!response.ok || result?.success === false) {
-        throw new Error(result?.message || result?.error || 'Failed to submit return request');
+        throw new Error(result?.error || result?.message || 'Failed to submit return');
       }
 
       const payload = result?.data ?? result;
-      const createdReturn: JloReturn | null =
-        payload?.return_request ||
-        payload?.return ||
-        (payload?.return_id || payload?.id ? payload : null);
+      const createdReturn = payload?.return_request || payload;
 
-      toast.success('Return request submitted. We will update you soon.');
+      toast.success('Return request submitted successfully');
       if (createdReturn) {
         setReturns((prev) => [createdReturn, ...prev]);
       } else {
@@ -184,36 +164,27 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const handleImageUpload = async (files: FileList | null) => {
     if (!files?.length) return;
     const maxFiles = 5;
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSizeBytes = 8 * 1024 * 1024; // 8MB
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSize = 8 * 1024 * 1024;
 
-    const selectedFiles = Array.from(files).slice(0, maxFiles);
-    const validationErrors = selectedFiles
-      .map((file) => {
-        if (!allowedTypes.includes(file.type)) {
-          return `${file.name}: unsupported type`;
-        }
-        if (file.size > maxSizeBytes) {
-          return `${file.name}: exceeds 8MB`;
-        }
-        return null;
-      })
-      .filter(Boolean) as string[];
+    const validFiles = Array.from(files).slice(0, maxFiles);
+    const errors: string[] = [];
 
-    if (validationErrors.length) {
-      toast.error(`Image upload issue: ${validationErrors.join(', ')}`);
+    validFiles.forEach((file) => {
+      if (!allowed.includes(file.type)) errors.push(`${file.name}: invalid type`);
+      if (file.size > maxSize) errors.push(`${file.name}: above 8MB`);
+    });
+
+    if (errors.length) {
+      toast.error(errors.join('. '));
       return;
     }
 
     try {
-      const readFiles = await Promise.all(selectedFiles.map((file) => toBase64(file)));
-      setUploadedImages((prev) => {
-        const next = [...prev, ...readFiles].slice(0, maxFiles);
-        return next;
-      });
-    } catch (err) {
-      console.error('Error reading images', err);
-      toast.error('Could not load one or more images. Please try again.');
+      const base64 = await Promise.all(validFiles.map((f) => toBase64(f)));
+      setUploadedImages((prev) => [...prev, ...base64].slice(0, maxFiles));
+    } catch {
+      toast.error('Could not process images');
     }
   };
 
@@ -223,16 +194,18 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
   const renderShipment = (shipment: JloReturnShipment | undefined) => {
     if (!shipment) return null;
-    const trackingUrl = shipment.tracking_url || buildFezTrackingUrl(shipment.fez_tracking);
+    const tracking = shipment.tracking_number;
+    const trackingUrl = buildFezTrackingUrl(tracking);
+
     return (
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-1">
         <div className="flex items-center gap-2 text-blue-900 font-semibold">
           <MapPin className="w-4 h-4" />
-          <span className="capitalize">{shipment.method || 'Return shipment'}</span>
+          <span className="capitalize">Dropoff Shipment</span>
         </div>
-        {shipment.return_code ? <p className="text-sm text-blue-800">Return Code: {shipment.return_code}</p> : null}
-        {shipment.fez_tracking ? <p className="text-sm text-blue-800">Tracking: {shipment.fez_tracking}</p> : null}
-        {shipment.status ? <p className="text-sm text-blue-800">Status: {shipment.status}</p> : null}
+        {shipment.return_code && <p className="text-sm text-blue-800">Return Code: {shipment.return_code}</p>}
+        {tracking && <p className="text-sm text-blue-800">Tracking: {tracking}</p>}
+        {shipment.status && <p className="text-sm text-blue-800">Status: {shipment.status}</p>}
         {trackingUrl ? (
           <a
             href={trackingUrl}
@@ -270,16 +243,12 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   }
 
   const eligible = canOrderBeReturned(order.status);
+  const activeShipment = activeReturn?.return_shipment;
+  const returnCode = activeShipment?.return_code || activeReturn?.return_code || 'ƒ?"';
+  const returnId = activeReturn?.return_request_id;
 
   if (activeReturn) {
     const statusDisplay = formatJloReturnStatus(activeReturn.status);
-    const shipment = activeReturn.return_shipments?.[0];
-    const returnCode =
-      shipment?.return_code ||
-      activeReturn.return_id ||
-      activeReturn.id ||
-      (typeof activeReturn?.order_number === 'string' ? activeReturn.order_number : '');
-    const returnIdForLinks = activeReturn.return_id || activeReturn.id;
     const refundDisplay = formatJloRefundStatus(activeReturn.refund_status || 'none');
 
     return (
@@ -311,9 +280,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Resolution</span>
-                <span className="font-semibold capitalize">
-                  {activeReturn.preferred_resolution || 'refund'}
-                </span>
+                <span className="font-semibold capitalize">{activeReturn.preferred_resolution || 'refund'}</span>
               </div>
               {activeReturn.reason_code ? (
                 <div className="flex justify-between">
@@ -329,46 +296,24 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
               ) : null}
             </div>
 
-            {activeReturn.line_items?.length ? (
-              <div className="border-t pt-4">
-                <p className="font-semibold text-gray-900 mb-2">Items</p>
-                <ul className="space-y-2 text-sm text-gray-800">
-                  {activeReturn.line_items.map((item) => (
-                    <li key={item.wc_order_item_id} className="flex justify-between">
-                      <span>{item.name || `Item ${item.wc_order_item_id}`}</span>
-                      <span>x{item.qty}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {shipment ? renderShipment(shipment) : (
-              <div className="flex items-start gap-3 rounded-lg border border-gray-200 p-4 bg-gray-50">
-                <Info className="w-5 h-5 text-gray-500 mt-0.5" />
-                <div className="text-sm text-gray-700">
-                  <p className="font-semibold text-gray-900">Return shipping</p>
-                  <p>Ship the item via Fez Delivery and share the tracking number so we can monitor it.</p>
-                </div>
-              </div>
-            )}
+            {renderShipment(activeShipment)}
 
             <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-indigo-800">Return Code</p>
-                  <p className="text-xl font-bold text-indigo-900">{returnCode || '—'}</p>
+                  <p className="text-xl font-bold text-indigo-900">{returnCode}</p>
                 </div>
-                {returnIdForLinks ? (
+                {returnId ? (
                   <div className="flex gap-2">
                     <Link
-                      href={`/returns/${returnIdForLinks}/add-tracking`}
+                      href={`/returns/${returnId}/add-tracking`}
                       className="px-3 py-2 rounded-md bg-white text-indigo-700 border border-indigo-200 text-sm font-semibold hover:bg-indigo-100"
                     >
                       Add tracking number
                     </Link>
                     <Link
-                      href={`/returns/${returnIdForLinks}/track`}
+                      href={`/returns/${returnId}/track`}
                       className="px-3 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
                     >
                       Track return
@@ -408,7 +353,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                   <ul className="list-disc pl-5 space-y-1">
                     <li>Search Fez Delivery in {order.shipping?.state || order.billing?.state}</li>
                     <li>Ask the attendant to tag destination as JulineMart Warri Hub</li>
-                    <li>Keep your waybill — it has your tracking number</li>
+                    <li>Keep your waybill ƒ?" it has your tracking number</li>
                   </ul>
                 </div>
               ) : null}
@@ -460,9 +405,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
             <div className="text-center">
               <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-gray-900 mb-2">Not Eligible for Return</h2>
-              <p className="text-gray-600 mb-6">
-                Returns are available after your order is delivered/completed. We&apos;ll keep you updated.
-              </p>
+              <p className="text-gray-600 mb-6">Returns are available after your order is delivered/completed.</p>
               <Link
                 href={`/orders/${orderId}`}
                 className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
@@ -495,57 +438,8 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Order Date</span>
-              <span className="font-medium">
-                {new Date(order.date_created).toLocaleDateString()}
-              </span>
+              <span className="font-medium">{new Date(order.date_created).toLocaleDateString()}</span>
             </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Select items to return</h2>
-          <div className="space-y-4">
-            {order.line_items.map((item) => {
-              const selectedQty = selectedItems[item.id] || 0;
-              const unitPrice = item.quantity ? Number(item.total) / item.quantity : 0;
-              return (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-600">Ordered qty: {item.quantity}</p>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      {formatPrice(unitPrice, currency)} each
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm text-gray-700">Return qty</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={item.quantity}
-                      value={selectedQty}
-                      onChange={(e) => {
-                        const value = Math.min(
-                          Math.max(parseInt(e.target.value, 10) || 0, 0),
-                          item.quantity
-                        );
-                        setSelectedItems((prev) => ({ ...prev, [item.id]: value }));
-                      }}
-                      className="w-24 border border-gray-300 rounded-lg px-3 py-2"
-                    />
-                    <span className="text-sm text-gray-700">
-                      Value: {formatPrice(unitPrice * selectedQty, currency)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-4 flex justify-between text-sm text-gray-700">
-            <span>Estimated value</span>
-            <span className="font-semibold">{formatPrice(selectedAmount, currency)}</span>
           </div>
         </div>
 
@@ -559,16 +453,12 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                   type="button"
                   onClick={() => setPreferredResolution(option)}
                   className={`border rounded-lg p-3 text-left transition ${
-                    preferredResolution === option
-                      ? 'border-primary-600 bg-primary-50'
-                      : 'border-gray-200 bg-white'
+                    preferredResolution === option ? 'border-primary-600 bg-primary-50' : 'border-gray-200 bg-white'
                   }`}
                 >
                   <p className="font-semibold text-gray-900 capitalize">{option}</p>
                   <p className="text-xs text-gray-600">
-                    {option === 'refund'
-                      ? 'Refund after inspection'
-                      : 'Replacement if stock is available'}
+                    {option === 'refund' ? 'Refund after inspection' : 'Replacement if stock is available'}
                   </p>
                 </button>
               ))}
@@ -581,7 +471,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
               <div className="border rounded-lg p-3 bg-primary-50 border-primary-600">
                 <p className="font-semibold text-gray-900">Ship via Courier</p>
                 <p className="text-xs text-gray-600">Take your item to any Fez Delivery location near you.</p>
-                <p className="text-xs text-gray-700 mt-2">💡 You&apos;ll get a tracking number to monitor your return.</p>
+                <p className="text-xs text-gray-700 mt-2">You'll get a tracking number to monitor your return.</p>
               </div>
             </div>
           </div>
@@ -620,17 +510,12 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                 <Image className="w-5 h-5 text-gray-500" />
                 <div>
                   <p className="text-sm font-medium text-gray-900">Upload photos</p>
-                  <p className="text-xs text-gray-600">You can add up to 5 images (JPEG, PNG, WEBP, max 8MB each).</p>
+                  <p className="text-xs text-gray-600">Add up to 5 images (JPEG, PNG, WEBP, max 8MB each).</p>
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => handleImageUpload(e.target.files)}
-                  className="hidden"
-                />
+                <input type="file" accept="image/*" multiple onChange={(e) => handleImageUpload(e.target.files)} className="hidden" />
               </label>
-              {uploadedImages.length ? (
+
+              {uploadedImages.length > 0 && (
                 <div className="grid grid-cols-3 gap-3">
                   {uploadedImages.map((src, idx) => (
                     <div key={idx} className="relative rounded-lg overflow-hidden border border-gray-200">
@@ -646,7 +531,8 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                     </div>
                   ))}
                 </div>
-              ) : null}
+              )}
+
               <div className="flex items-start gap-3">
                 <Image className="w-5 h-5 text-gray-500 mt-1" />
                 <textarea
@@ -654,7 +540,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                   onChange={(e) => setImageUrls(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   rows={3}
-                  placeholder="Paste image URLs here (one per line)"
+                  placeholder="Paste image URLs (one per line)"
                 />
               </div>
             </div>
