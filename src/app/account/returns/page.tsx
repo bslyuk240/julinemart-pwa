@@ -99,12 +99,30 @@ export default function ReturnsPage() {
                         </p>
                       ) : null}
                     </div>
-                    <Link
-                      href={`/account/orders/${item.order_id}/return`}
-                      className="text-primary-600 text-sm font-medium hover:underline"
-                    >
-                      View
-                    </Link>
+                    <div className="flex flex-wrap gap-2 justify-end">
+                      <Link
+                        href={`/account/orders/${item.order_id}/return`}
+                        className="text-primary-600 text-sm font-medium hover:underline"
+                      >
+                        View
+                      </Link>
+                      {item.return_id || item.id ? (
+                        <>
+                          <Link
+                            href={`/returns/${item.return_id || item.id}/add-tracking`}
+                            className="text-primary-600 text-sm font-medium hover:underline"
+                          >
+                            Add tracking
+                          </Link>
+                          <Link
+                            href={`/returns/${item.return_id || item.id}/track`}
+                            className="text-primary-600 text-sm font-medium hover:underline"
+                          >
+                            Track
+                          </Link>
+                        </>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span
