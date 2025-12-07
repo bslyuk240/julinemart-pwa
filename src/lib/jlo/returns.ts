@@ -33,6 +33,7 @@ export type JloReturn = {
   return_request_id: string;
   return_shipment_id: string;
   return_code: string | null;
+  tracking_number?: string | null;
   order_id: number;
   order_number?: string;
   preferred_resolution?: 'refund' | 'replacement';
