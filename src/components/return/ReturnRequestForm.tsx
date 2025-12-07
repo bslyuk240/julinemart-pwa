@@ -20,6 +20,35 @@ const RETURN_REASONS = [
   { value: 'other', label: 'Other (add details)' },
 ];
 
+type FezHub = {
+  name: string;
+  address: string;
+  contact?: string;
+  city?: string;
+  state?: string;
+};
+
+const FEZ_HUBS: FezHub[] = [
+  { name: 'Fez Head Office', address: '6-10 Industrial Crescent, Ilupeju, Lagos', city: 'Lagos', state: 'Lagos', contact: '02017003077' },
+  { name: 'Ogba Hub', address: 'Shop i012, Ogba shopping mall, Abiodun Jagun Street, Off Wempco Road, Beside Sunday Market, Ogba, Lagos', city: 'Ogba', state: 'Lagos' },
+  { name: 'Ikoyi Hub', address: 'Shop D84, Dolphin Plaza, Cooperation Drive, Dolphin Estate, Ikoyi, Lagos', city: 'Ikoyi', state: 'Lagos' },
+  { name: 'Ipaja Hub', address: 'C6 Suite7, Ground Floor, Solomon Adeola Lane, Rauf Aregbesola Shopping Mall, Pako Bustop, Ipaja, Lagos', city: 'Ipaja', state: 'Lagos' },
+  { name: 'Ojota Hub', address: 'Shop 18, Winter Plaza, 57 Ogudu Road, Ojota, Lagos', city: 'Ojota', state: 'Lagos' },
+  { name: 'Ikota Hub', address: 'Shop E110, Road 2, Ikota Shopping Complex, Lagos', city: 'Ikota', state: 'Lagos' },
+  { name: 'Osapa London Hub', address: 'Q-Mall, Lekki Beach Rd, Jakande Roundabout, Lekki, Lagos', city: 'Lekki', state: 'Lagos' },
+  { name: 'Abuja Hub', address: 'Suite 64, De Avalon Plaza, Ajose Ade Ogun Crescent, Utako, Abuja', city: 'Abuja', state: 'FCT', contact: '+234 903 598 6582' },
+  { name: 'Asaba Hub', address: 'Shop 19, Jossy Plaza, Off Abraka Road, Asaba, Delta State', city: 'Asaba', state: 'Delta', contact: '+234 902 561 2043' },
+  { name: 'Warri Hub', address: 'Naomi Shopping Plaza, 7 Airport Road, Effurun, Warri, Delta', city: 'Warri', state: 'Delta' },
+  { name: 'Ibadan Hub', address: 'Shop F1, Tejumade Square, Ago Tapa, Mokola, Ibadan', city: 'Ibadan', state: 'Oyo', contact: '+234 702 547 8617' },
+  { name: 'Benin Hub', address: '16b Avielele Close, Off Ojomoh Street, Off Etete Road, GRA Benin', city: 'Benin', state: 'Edo', contact: '+234 708 271 3300 / +234 701 704 5055' },
+  { name: 'Enugu Hub', address: 'Shop C1, Coal City Mega Pavilion Plaza (Tecno Plaza), Market Road, by Egbuna Junction, Ogui Road, Enugu', city: 'Enugu', state: 'Enugu', contact: '+234 802 283 2704' },
+  { name: 'Ogun Hub', address: 'Shop 69, Omida Shopping Mall, Omida, Abeokuta, Ogun State', city: 'Abeokuta', state: 'Ogun', contact: '09064188120' },
+  { name: 'Port Harcourt Hub', address: 'Roxy Plaza, Opposite Polaris Bank, Rumuodara, Port Harcourt', city: 'Port Harcourt', state: 'Rivers', contact: '+234 703 760 7631' },
+  { name: 'Akure Hub', address: 'Cuda Complex, Opp GTBank Alagbaka, Akure', city: 'Akure', state: 'Ondo', contact: '+234 706 579 7706 / 08164928952' },
+  { name: 'Osun Hub', address: 'Jato Odedosu Shopping Complex, Ayetoro Road, Owode, Osogbo, Osun State', city: 'Osogbo', state: 'Osun' },
+  { name: 'Uyo Hub', address: 'Belderick House, 15 Mbaba Afia Street, Off Aka Road (Near IBB/Aka Road Junction), Uyo', city: 'Uyo', state: 'Akwa Ibom', contact: '+234 813 632 6573' },
+];
+
 type Resolution = 'refund' | 'replacement';
 const JLO_RETURNS_URL = 'https://jlo.julinemart.com/api/returns-create';
 const DEFAULT_HUB_ID = '51a0aad5-c866-4ac5-83ef-22ab41ccd063';
@@ -60,6 +89,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const [reasonNote, setReasonNote] = useState('');
   const [imageUrls, setImageUrls] = useState('');
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [hubSearch, setHubSearch] = useState('');
 
   const method: 'dropoff' = 'dropoff';
   const hubId = useMemo(() => extractHubId(order) || DEFAULT_HUB_ID, [order]);
@@ -72,6 +102,18 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
       const unitTotal = item.quantity ? Number(item.total) / item.quantity : 0;
       return sum + unitTotal * qty;
     }, 0) || 0;
+
+  const filteredHubs = useMemo(() => {
+    const term = hubSearch.toLowerCase();
+    if (!term) return FEZ_HUBS;
+    return FEZ_HUBS.filter(
+      (hub) =>
+        hub.name.toLowerCase().includes(term) ||
+        (hub.city || '').toLowerCase().includes(term) ||
+        (hub.state || '').toLowerCase().includes(term) ||
+        hub.address.toLowerCase().includes(term)
+    );
+  }, [hubSearch]);
 
   useEffect(() => {
     fetchOrder();
@@ -312,12 +354,23 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                     >
                       Add tracking number
                     </Link>
-                    <Link
-                      href={`/returns/${returnId}/track`}
-                      className="px-3 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
-                    >
-                      Track return
-                    </Link>
+                    {activeShipment?.tracking_number ? (
+                      <a
+                        href={buildFezTrackingUrl(activeShipment.tracking_number) || '#'}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
+                      >
+                        Track return
+                      </a>
+                    ) : (
+                      <Link
+                        href={`/returns/${returnId}/track`}
+                        className="px-3 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
+                      >
+                        Track return
+                      </Link>
+                    )}
                   </div>
                 ) : null}
               </div>
@@ -443,6 +496,46 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           </div>
         </div>
 
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <h2 className="font-semibold text-gray-900 mb-4">Select items to return</h2>
+          <div className="space-y-4">
+            {order.line_items.map((item) => {
+              const selectedQty = selectedItems[item.id] || 0;
+              const unitPrice = item.quantity ? Number(item.total) / item.quantity : 0;
+              return (
+                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-medium text-gray-900">{item.name}</p>
+                      <p className="text-sm text-gray-600">Ordered qty: {item.quantity}</p>
+                    </div>
+                    <p className="text-sm text-gray-600">{formatPrice(unitPrice, currency)} each</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-gray-700">Return qty</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={item.quantity}
+                      value={selectedQty}
+                      onChange={(e) => {
+                        const value = Math.min(Math.max(parseInt(e.target.value, 10) || 0, 0), item.quantity);
+                        setSelectedItems((prev) => ({ ...prev, [item.id]: value }));
+                      }}
+                      className="w-24 border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                    <span className="text-sm text-gray-700">Value: {formatPrice(unitPrice * selectedQty, currency)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 flex justify-between text-sm text-gray-700">
+            <span>Estimated value</span>
+            <span className="font-semibold">{formatPrice(selectedAmount, currency)}</span>
+          </div>
+        </div>
+
         <form className="bg-white rounded-xl shadow-sm p-6 space-y-5" onSubmit={handleSubmit}>
           <div>
             <h2 className="font-semibold text-gray-900 mb-3">Preferred resolution</h2>
@@ -473,6 +566,35 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                 <p className="text-xs text-gray-600">Take your item to any Fez Delivery location near you.</p>
                 <p className="text-xs text-gray-700 mt-2">You'll get a tracking number to monitor your return.</p>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6 space-y-3 border border-gray-100">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold text-gray-900">Nearby Fez Hubs</h2>
+              <input
+                value={hubSearch}
+                onChange={(e) => setHubSearch(e.target.value)}
+                placeholder="Search city/state"
+                className="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <p className="text-sm text-gray-600">Find the closest drop-off hub. Tap a hub to view on map.</p>
+            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+              {filteredHubs.map((hub, idx) => (
+                <a
+                  key={`${hub.name}-${idx}`}
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${hub.name}, ${hub.address}`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block border border-gray-200 rounded-lg p-3 hover:border-primary-300 hover:bg-primary-50/40 transition"
+                >
+                  <p className="font-semibold text-gray-900">{hub.name}</p>
+                  <p className="text-sm text-gray-700">{hub.address}</p>
+                  {hub.contact ? <p className="text-xs text-gray-600 mt-1">Contact: {hub.contact}</p> : null}
+                </a>
+              ))}
+              {filteredHubs.length === 0 ? <p className="text-sm text-gray-500">No hubs match your search.</p> : null}
             </div>
           </div>
 

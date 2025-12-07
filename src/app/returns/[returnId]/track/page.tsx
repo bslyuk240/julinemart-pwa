@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, MapPin, RefreshCw, Truck } from 'lucide-react';
+import { buildFezTrackingUrl } from '@/lib/jlo/returns';
 
 type TrackingEvent = {
   status?: string;
@@ -44,6 +45,7 @@ export default function TrackReturnPage() {
   const [returnCode, setReturnCode] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [events, setEvents] = useState<TrackingEvent[]>([]);
+  const fezTrackingUrl = trackingNumber ? buildFezTrackingUrl(trackingNumber) : null;
 
   const statusLabel = useMemo(() => {
     switch ((status || '').toLowerCase()) {
@@ -140,6 +142,16 @@ export default function TrackReturnPage() {
               <button onClick={loadTracking} className="underline font-medium">
                 Refresh
               </button>
+              {fezTrackingUrl ? (
+                <a
+                  href={fezTrackingUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline font-medium text-primary-700"
+                >
+                  Track on Fez
+                </a>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-800">
