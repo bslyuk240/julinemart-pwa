@@ -81,8 +81,16 @@ export default function ReturnsPage() {
               const returnRequestId = item.return_request_id;
               const statusDisplay = formatJloReturnStatus(item.status);
               const refundDisplay = formatJloRefundStatus(item.refund_status || 'none');
-              const returnCode = item.return_shipment?.return_code || item.return_code || '--';
-              const tracking = item.return_shipment?.tracking_number || null;
+              const returnCode =
+                item.return_shipment?.return_code ||
+                item.return_code ||
+                item.return_shipment_id ||
+                '--';
+
+              const tracking =
+                item.return_shipment?.tracking_number ||
+                item.tracking_number ||
+                null;
 
               return (
                 <div key={returnRequestId} className="bg-white rounded-xl shadow-sm p-4 md:p-5 border border-gray-100">
@@ -96,7 +104,7 @@ export default function ReturnsPage() {
                     </div>
                     <div className="flex flex-wrap gap-2 justify-end">
                       <Link
-                        href={`/account/orders/${item.order_id}/return`}
+                        href={`/returns/${returnRequestId}/track`}
                         className="text-primary-600 text-sm font-medium hover:underline"
                       >
                         View
