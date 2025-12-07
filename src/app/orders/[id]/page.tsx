@@ -463,7 +463,7 @@ export default function OrderDetailPage() {
                     </div>
                   ) : (
                     <p className="text-sm text-gray-600">
-                      We will share pickup or drop-off details once the return is scheduled.
+                      Thank you for dropping off your item. we shall process refund once return is confirmed in good condition.
                     </p>
                   )}
                   {refundStatusDisplay ? (
