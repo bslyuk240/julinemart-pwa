@@ -85,12 +85,14 @@ export default function ReturnsPage() {
                 item.return_shipment?.return_code ||
                 item.return_code ||
                 item.return_shipment_id ||
-                '--';
+                null;
 
               const tracking =
                 item.return_shipment?.tracking_number ||
                 item.tracking_number ||
                 null;
+
+              const shipmentLabel = tracking || returnCode || '--';
 
               return (
                 <div key={returnRequestId} className="bg-white rounded-xl shadow-sm p-4 md:p-5 border border-gray-100">
@@ -151,11 +153,9 @@ export default function ReturnsPage() {
                     </p>
                   ) : null}
 
-                  {tracking || returnCode ? (
-                    <p className="text-sm text-gray-700 mt-1">
-                      Shipment: <span className="font-semibold">{tracking ? tracking : returnCode}</span>
-                    </p>
-                  ) : null}
+                  <p className="text-sm text-gray-700 mt-1">
+                    Shipment: <span className="font-semibold">{shipmentLabel}</span>
+                  </p>
                 </div>
               );
             })}
