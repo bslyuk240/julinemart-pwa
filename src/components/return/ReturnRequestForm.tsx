@@ -14,7 +14,7 @@ interface ReturnRequestFormProps {
 }
 
 const RETURN_REASONS = [
-  { value: 'wrong_item', label: 'Wrong item delivered' },
+  { value: 'wrong_item', label: 'Wrong item' },
   { value: 'damaged', label: 'Item damaged' },
   { value: 'not_as_described', label: 'Not as described' },
   { value: 'other', label: 'Other (add details)' },
@@ -383,12 +383,12 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                   <p className="font-semibold">2) Take it to the nearest Fez Delivery location</p>
                   <p>Destination: JulineMart Warri Hub, No. 9 Jesus is Lord Street, Effurun, Warri, Delta</p>
                   <a
-                    href="https://fezdelivery.co/locations"
+                    href="https://www.fezdelivery.co/blogz/the-closest-fez-delivery-office-to-you-a-highlight-of-fez-delivery-hubs-nationwide"
                     target="_blank"
                     rel="noreferrer"
                     className="text-indigo-700 underline font-medium"
                   >
-                    Find Fez locations: https://fezdelivery.co/locations
+                    Find Fez location near you
                   </a>
                 </div>
                 <div>
