@@ -10,7 +10,7 @@ import PageLoading from '@/components/ui/page-loading';
 import { toast } from 'sonner';
 import { generateInvoicePDF } from '@/lib/invoice-generator';
 import OrderStatusTracker from '@/components/orders/order-status-tracker';
-import { JloReturn, formatJloRefundStatus, formatJloReturnStatus } from '@/lib/jlo/returns';
+import { JloReturn, formatJloRefundStatus, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
 import type { Order as WooOrder } from '@/types/order';
 
 type OrderDetail = WooOrder & {
@@ -75,7 +75,25 @@ export default function OrderDetailPage() {
           tax_total: taxTotal,
         });
         const payload = jloReturns?.data ?? jloReturns;
-        setReturns(Array.isArray(payload) ? payload : Array.isArray(payload?.returns) ? payload.returns : []);
+        const initialReturns = Array.isArray(payload) ? payload : Array.isArray(payload?.returns) ? payload.returns : [];
+        // Fallback: fetch returns by order_id if none came back on the order response
+        if (!initialReturns.length) {
+          try {
+            const fallbackRes = await fetch(`/api/returns?order_id=${orderId}`);
+            if (fallbackRes.ok) {
+              const fallbackJson = await fallbackRes.json();
+              const fbPayload = fallbackJson?.data ?? fallbackJson;
+              const fbReturns = Array.isArray(fbPayload) ? fbPayload : Array.isArray(fbPayload?.returns) ? fbPayload.returns : [];
+              setReturns(fbReturns);
+            } else {
+              setReturns([]);
+            }
+          } catch {
+            setReturns(initialReturns);
+          }
+        } else {
+          setReturns(initialReturns);
+        }
       } else {
         setOrder(null);
       }
@@ -169,7 +187,8 @@ export default function OrderDetailPage() {
     );
   }
 
-  const returnEligible = canOrderBeReturned(order.status) && !activeReturn;
+  const returnRequestsCount = returns.length;
+  const returnEligible = canOrderBeReturned(order.status) && !activeReturn && returnRequestsCount < 2;
   const returnShipment = activeReturn?.return_shipment;
 
   return (
@@ -373,7 +392,9 @@ export default function OrderDetailPage() {
                 )}
                 {!activeReturn && (
                   <p className="text-xs text-gray-500 text-center">
-                    Returns are available after delivery/completion.
+                    {returnRequestsCount >= 2
+                      ? 'Return limit reached for this order.'
+                      : 'Returns are available after delivery/completion.'}
                   </p>
                 )}
               </div>
@@ -404,7 +425,17 @@ export default function OrderDetailPage() {
                         <p className="text-sm text-blue-800">Return Code: {returnShipment.return_code}</p>
                       ) : null}
                       {returnShipment.tracking_number ? (
-                        <p className="text-sm text-blue-800">Tracking: {returnShipment.tracking_number}</p>
+                        <p className="text-sm text-blue-800">
+                          Tracking:{' '}
+                          <a
+                            href={buildFezTrackingUrl(returnShipment.tracking_number) || '#'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline text-blue-700"
+                          >
+                            {returnShipment.tracking_number}
+                          </a>
+                        </p>
                       ) : null}
                       {returnShipment.status ? (
                         <p className="text-sm text-blue-800">Status: {returnShipment.status}</p>
