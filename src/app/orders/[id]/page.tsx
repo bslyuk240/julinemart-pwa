@@ -485,7 +485,7 @@ export default function OrderDetailPage() {
               ) : (
                 <div className="text-sm text-gray-700 space-y-2">
                   <p>No return has been requested for this order.</p>
-                  <p>Returns are managed by JulineMart Logistics after delivery.</p>
+                  <p>Returns are managed by JulineMart Logistics in partnership with Fez Delivery after delivery.</p>
                 </div>
               )}
             </div>
