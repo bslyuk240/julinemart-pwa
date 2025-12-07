@@ -13,6 +13,7 @@ type TrackingEvent = {
 };
 
 type TrackingPayload = {
+  data?: any;
   return_shipment?: {
     return_shipment_id: string;
     return_code: string | null;
@@ -20,6 +21,11 @@ type TrackingPayload = {
     status: string | null;
     events?: TrackingEvent[];
   };
+  return_shipment_id?: string;
+  tracking_number?: string | null;
+  return_code?: string | null;
+  status?: string | null;
+  events?: TrackingEvent[];
 };
 
 export default function TrackReturnPage() {
@@ -72,12 +78,17 @@ export default function TrackReturnPage() {
       if (!res.ok || data?.success === false) {
         throw new Error(data?.message || data?.error || 'Failed to fetch tracking');
       }
-      const payload: TrackingPayload = data?.data ?? {};
-      const shipment = payload.return_shipment;
-      setTrackingNumber(shipment?.tracking_number || null);
-      setReturnCode(shipment?.return_code || null);
-      setStatus(shipment?.status || null);
-      setEvents(Array.isArray(shipment?.events) ? shipment?.events : []);
+      const payload: TrackingPayload = data?.data ?? data ?? {};
+      const shipment =
+        payload?.return_shipment ||
+        payload?.data?.return_shipment ||
+        (payload?.return_shipment_id ? (payload as any) : null);
+
+      setTrackingNumber(shipment?.tracking_number || payload?.tracking_number || null);
+      setReturnCode(shipment?.return_code || payload?.return_code || null);
+      setStatus(shipment?.status || payload?.status || null);
+      const timeline = shipment?.events || payload?.events || [];
+      setEvents(Array.isArray(timeline) ? timeline : []);
     } catch (err: any) {
       console.error('Tracking fetch error:', err);
       setError(err?.message || 'Failed to load tracking');

@@ -6,34 +6,23 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { ArrowLeft, Hash, Loader2 } from 'lucide-react';
 
-type TrackingPayload = {
-   return_request_id?: string;
-  return_shipment_id?: string;
-  return_shipment?: {
-    return_shipment_id: string;
-    tracking_number: string | null;
-  };
-   tracking_number?: string | null;
-};
-
-// Extract shipment ID from various possible response structures
-const extractShipmentId = (payload: TrackingPayload): string | null => {
-  // Check nested return_shipment first
-  if (payload?.return_shipment?.return_shipment_id) {
-    return payload.return_shipment.return_shipment_id;
-  }
-  // Check top-level return_shipment_id
-  if (payload?.return_shipment_id) {
-    return payload.return_shipment_id;
-  }
+const extractShipmentId = (candidate: any): string | null => {
+  if (!candidate) return null;
+  if (candidate.return_shipment_id) return String(candidate.return_shipment_id);
+  if (candidate.return_shipment?.return_shipment_id) return String(candidate.return_shipment.return_shipment_id);
   return null;
 };
 
-const parseTrackingResponse = (payload: TrackingPayload) => {
-  const shipment = payload?.return_shipment;
+const parseTrackingResponse = (raw: any) => {
+  const payload = raw?.data ?? raw;
+  const shipment =
+    payload?.return_shipment ||
+    payload?.data?.return_shipment ||
+    (payload?.return_shipment_id ? payload : null);
+
   return {
     tracking: shipment?.tracking_number || payload?.tracking_number || null,
-    shipmentId: extractShipmentId(payload),
+    shipmentId: extractShipmentId(shipment || payload),
   };
 };
 
