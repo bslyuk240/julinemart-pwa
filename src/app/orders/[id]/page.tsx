@@ -94,6 +94,26 @@ export default function OrderDetailPage() {
         } else {
           setReturns(initialReturns);
         }
+
+        // Backup: use customer returns and filter by order_id
+        if (!initialReturns.length && customerId) {
+          try {
+            const custRes = await fetch(`/api/returns?wc_customer_id=${customerId}`);
+            if (custRes.ok) {
+              const custJson = await custRes.json();
+              const cpayload = custJson?.data ?? custJson;
+              const clist = Array.isArray(cpayload)
+                ? cpayload
+                : Array.isArray(cpayload?.returns)
+                ? cpayload.returns
+                : [];
+              const filtered = clist.filter((r: any) => String(r.order_id) === String(orderId));
+              if (filtered.length) setReturns(filtered);
+            }
+          } catch {
+            /* ignore */
+          }
+        }
       } else {
         setOrder(null);
       }

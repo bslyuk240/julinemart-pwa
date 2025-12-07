@@ -14,6 +14,7 @@ export default function ReturnsPage() {
   const { customerId, isAuthenticated, isLoading } = useCustomerAuth();
   const [returns, setReturns] = useState<JloReturn[]>([]);
   const [loading, setLoading] = useState(true);
+  const [enriching, setEnriching] = useState(false);
 
   useEffect(() => {
     if (!isLoading) {
@@ -41,6 +42,46 @@ export default function ReturnsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const enrichMissingShipments = async () => {
+      const needsEnrich = returns.filter(
+        (r) =>
+          !r.return_shipment?.tracking_number &&
+          !r.return_shipment?.return_code
+      );
+      if (!needsEnrich.length) return;
+      setEnriching(true);
+      try {
+        const updated = await Promise.all(
+          needsEnrich.map(async (r) => {
+            try {
+              const res = await fetch(`/api/returns/${encodeURIComponent(r.return_request_id)}/tracking`);
+              const data = await res.json().catch(() => ({}));
+              const payload = data?.data ?? data;
+              const shipment = payload?.return_shipment;
+              if (res.ok && shipment?.return_shipment_id) {
+                return { ...r, return_shipment: shipment };
+              }
+            } catch {
+              /* ignore */
+            }
+            return r;
+          })
+        );
+        if (updated.length) {
+          setReturns((prev) =>
+            prev.map((r) => updated.find((u) => u.return_request_id === r.return_request_id) || r)
+          );
+        }
+      } finally {
+        setEnriching(false);
+      }
+    };
+    if (returns.length) {
+      enrichMissingShipments();
+    }
+  }, [returns]);
 
   if (isLoading || loading) {
     return (
@@ -92,7 +133,7 @@ export default function ReturnsPage() {
                 item.tracking_number ||
                 null;
 
-              const shipmentLabel = tracking || returnCode || 'View for details';
+              const shipmentLabel = tracking || returnCode || (enriching ? 'Loading…' : 'View for details');
               const fezTrackingUrl = tracking ? buildFezTrackingUrl(tracking) : null;
 
               return (
