@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, Package, ArrowLeft } from 'lucide-react';
 import { useCustomerAuth } from '@/context/customer-auth-context';
-import { JloReturn, formatJloRefundStatus, formatJloReturnStatus } from '@/lib/jlo/returns';
+import { JloReturn, formatJloRefundStatus, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
 import { formatPrice } from '@/lib/utils/format-price';
 import { toast } from 'sonner';
 
@@ -92,7 +92,8 @@ export default function ReturnsPage() {
                 item.tracking_number ||
                 null;
 
-              const shipmentLabel = tracking || returnCode || '--';
+              const shipmentLabel = tracking || returnCode || 'View for details';
+              const fezTrackingUrl = tracking ? buildFezTrackingUrl(tracking) : null;
 
               return (
                 <div key={returnRequestId} className="bg-white rounded-xl shadow-sm p-4 md:p-5 border border-gray-100">
@@ -119,12 +120,23 @@ export default function ReturnsPage() {
                           >
                             Add tracking
                           </Link>
-                          <Link
-                            href={`/returns/${returnRequestId}/track`}
-                            className="text-primary-600 text-sm font-medium hover:underline"
-                          >
-                            Track
-                          </Link>
+                          {fezTrackingUrl ? (
+                            <a
+                              href={fezTrackingUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary-600 text-sm font-medium hover:underline"
+                            >
+                              Track
+                            </a>
+                          ) : (
+                            <Link
+                              href={`/returns/${returnRequestId}/track`}
+                              className="text-primary-600 text-sm font-medium hover:underline"
+                            >
+                              Track
+                            </Link>
+                          )}
                         </>
                       ) : null}
                     </div>
@@ -154,7 +166,21 @@ export default function ReturnsPage() {
                   ) : null}
 
                   <p className="text-sm text-gray-700 mt-1">
-                    Shipment: <span className="font-semibold">{shipmentLabel}</span>
+                    Shipment:{' '}
+                    <span className="font-semibold">
+                      {fezTrackingUrl ? (
+                        <a
+                          href={fezTrackingUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary-600 hover:underline"
+                        >
+                          {shipmentLabel}
+                        </a>
+                      ) : (
+                        shipmentLabel
+                      )}
+                    </span>
                   </p>
                 </div>
               );
