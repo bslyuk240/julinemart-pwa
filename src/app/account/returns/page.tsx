@@ -149,7 +149,11 @@ export default function ReturnsPage() {
               const shipmentLabel =
                 tracking ||
                 returnCode ||
-                (enriching && !enrichedIds.has(item.return_request_id) ? 'Loading…' : 'Awaiting tracking');
+                (item.status && item.status.toLowerCase() === 'completed'
+                  ? 'Completed'
+                  : enriching && !enrichedIds.has(item.return_request_id)
+                  ? 'Loading…'
+                  : 'Awaiting tracking');
               const fezTrackingUrl = tracking ? buildFezTrackingUrl(tracking) : null;
 
               return (
