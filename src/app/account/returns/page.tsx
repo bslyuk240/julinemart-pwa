@@ -149,7 +149,7 @@ export default function ReturnsPage() {
               const shipmentLabel =
                 tracking ||
                 returnCode ||
-                (enriching && !enrichedIds.has(item.return_request_id) ? 'Loading…' : 'View for details');
+                (enriching && !enrichedIds.has(item.return_request_id) ? 'Loading…' : 'Awaiting tracking');
               const fezTrackingUrl = tracking ? buildFezTrackingUrl(tracking) : null;
 
               return (
@@ -206,6 +206,12 @@ export default function ReturnsPage() {
                     {item.preferred_resolution ? (
                       <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 capitalize">
                         {item.preferred_resolution}
+                      </span>
+                    ) : null}
+                    {item.refund_amount && item.refund_completed_at ? (
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                        Refunded {formatPrice(item.refund_amount, item.refund_currency || 'NGN')} on{' '}
+                        {new Date(item.refund_completed_at).toLocaleDateString()}
                       </span>
                     ) : null}
                   </div>
