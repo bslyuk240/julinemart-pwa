@@ -46,7 +46,7 @@ export default function DealsSection({
               {products.slice(0, 18).map((product) => (
                 <div
                   key={product.id}
-                  className="min-w-[170px] sm:min-w-[200px] md:min-w-[230px] lg:min-w-[260px] max-w-[260px] flex-shrink-0 snap-start"
+                  className="w-[170px] sm:w-[200px] md:w-[230px] lg:w-[260px] flex-shrink-0 snap-start"
                 >
                   <ProductCard product={product} fullWidth />
                 </div>
