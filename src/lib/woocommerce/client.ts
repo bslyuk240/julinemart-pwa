@@ -9,8 +9,8 @@ const scrubAuth = (value?: string) =>
 const serverApi = !isClient
   ? new WooCommerceRestApi({
       url: process.env.WC_BASE_URL?.replace('/wp-json/wc/v3', '') || '',
-      consumerKey: process.env.WC_KEY || '',
-      consumerSecret: process.env.WC_SECRET || '',
+      consumerKey: process.env.WC_CONSUMER_KEY || process.env.WC_KEY || '',
+      consumerSecret: process.env.WC_CONSUMER_SECRET || process.env.WC_SECRET || '',
       version: 'wc/v3',
       queryStringAuth: false,
     })

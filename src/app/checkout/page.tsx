@@ -194,6 +194,30 @@ export default function CheckoutPage() {
     }
   };
 
+  const syncPaystackReference = async (orderId: number, reference: string) => {
+    try {
+      const syncResponse = await fetch('/api/woo-sync-paystack-reference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, reference }),
+      });
+
+      const syncData = await syncResponse.json().catch(() => null);
+
+      if (!syncResponse.ok || !syncData?.success) {
+        console.warn('Paystack reference sync failed', {
+          orderId,
+          reference,
+          error: syncData?.error || syncResponse.statusText,
+        });
+      } else {
+        console.log('Paystack reference synced to WooCommerce', syncData);
+      }
+    } catch (error) {
+      console.warn('Paystack reference sync error', error);
+    }
+  };
+
   // NEW: Handle saved card payment (charge authorization)
   const handleSavedCardPayment = async (orderId: number) => {
     if (!defaultSavedCard || !isAuthenticated || !customerId) {
@@ -251,6 +275,7 @@ export default function CheckoutPage() {
         });
 
         if (updateResponse.ok) {
+          await syncPaystackReference(orderId, reference);
           setIsProcessing(false);
           clearCart();
           toast.success('Payment successful!');
@@ -369,6 +394,7 @@ export default function CheckoutPage() {
       });
 
       if (updateResponse.ok) {
+        await syncPaystackReference(orderId, response.reference);
         console.log('Order updated successfully');
         clearCart();
         toast.success('Payment successful!');
