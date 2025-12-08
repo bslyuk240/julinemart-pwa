@@ -164,6 +164,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           order_id: order.id,
+          refund_amount: selectedAmount,
           preferred_resolution: preferredResolution,
           reason_code: reasonCode,
           reason_note: reasonNote,
