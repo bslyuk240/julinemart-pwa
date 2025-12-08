@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getProducts } from '@/lib/woocommerce/products';
 import ProductGrid from '@/components/product/product-grid';
@@ -16,7 +16,7 @@ const sortFromParam = (value: string | null): 'date' | 'popularity' | 'rating' |
   return null;
 };
 
-export default function AllProductsPage() {
+function ProductsContent() {
   const searchParams = useSearchParams();
 
   const initialSort = sortFromParam(searchParams.get('sort')) || 'date';
@@ -256,5 +256,24 @@ export default function AllProductsPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function AllProductsPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
+          <div className="container mx-auto px-4 py-6">
+            <div className="text-center py-20">
+              <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading products...</p>
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <ProductsContent />
+    </Suspense>
   );
 }
