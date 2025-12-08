@@ -48,26 +48,18 @@ export default function TrackReturnPage() {
   const fezTrackingUrl = trackingNumber ? buildFezTrackingUrl(trackingNumber) : null;
 
   const statusLabel = useMemo(() => {
-    switch ((status || '').toLowerCase()) {
-      case 'awaiting_tracking':
-        return 'Awaiting tracking number';
-      case 'in_transit':
-        return 'In transit';
-      case 'delivered_to_hub':
-        return 'Delivered to Hub';
-      case 'inspection_in_progress':
-        return 'Inspection in progress';
-      case 'approved':
-        return 'Approved';
-      case 'rejected':
-        return 'Rejected';
-      case 'refund_processing':
-        return 'Refund processing';
-      case 'refund_completed':
-        return 'Refund completed';
-      default:
-        return status || '--';
-    }
+    const map: Record<string, string> = {
+      awaiting_tracking: 'Awaiting tracking number',
+      in_transit: 'In transit',
+      delivered_to_hub: 'Delivered to Hub',
+      inspection_in_progress: 'Inspection in progress',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      refund_processing: 'Refund processing',
+      refund_completed: 'Refund completed',
+    };
+    const key = (status || '').toLowerCase();
+    return map[key] || status || '--';
   }, [status]);
 
   const loadTracking = async () => {
@@ -157,7 +149,7 @@ export default function TrackReturnPage() {
           <div className="flex items-center gap-2 text-sm text-gray-800">
             <Truck className="w-4 h-4 text-primary-600" />
             <span className="font-semibold">{statusLabel}</span>
-            {status ? <span className="text-gray-500">({status})</span> : null}
+            {/* Hide raw status code with underscores */}
           </div>
         </div>
 
