@@ -12,6 +12,7 @@ import {
   Baby,
   Laptop
 } from 'lucide-react';
+import { decodeHtmlEntities } from '@/lib/utils/helpers';
 
 const categories = [
   { 
@@ -125,8 +126,8 @@ export default function CategoriesPage() {
           <p className="text-sm md:text-base text-gray-600">Browse all {categories.length} product categories</p>
         </div>
 
-        {/* Categories Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
+        {/* Categories Grid - mobile & desktop */}
+        <div className="grid grid-cols-2 gap-2 md:hidden lg:grid lg:grid-cols-4 lg:gap-3">
           {categories.map((category) => {
             const Icon = category.icon;
             return (
@@ -154,13 +155,47 @@ export default function CategoriesPage() {
                 {/* Category Info */}
                 <div className="p-3 md:p-4">
                   <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors leading-snug">
-                    {category.name}
+                    {decodeHtmlEntities(category.name)}
                   </h3>
                   <p className="text-xs md:text-sm text-gray-600">Browse products</p>
                 </div>
               </Link>
             );
           })}
+        </div>
+
+        {/* Tablet horizontal scroller */}
+        <div className="hidden md:block lg:hidden -mx-4">
+          <div className="overflow-x-auto px-4">
+            <div className="flex gap-3 min-w-max">
+              {categories.map((category) => {
+                const Icon = category.icon;
+                return (
+                  <Link
+                    key={category.id}
+                    href={`/category/${category.slug}`}
+                    className="flex flex-col items-center gap-2 group shrink-0 w-28"
+                  >
+                    <div className="relative w-24 h-24 rounded-full overflow-hidden shadow-md bg-gray-100 group-hover:shadow-lg transition-shadow">
+                      <div
+                        className="absolute inset-0 bg-cover bg-center opacity-80 group-hover:scale-110 transition-transform duration-300"
+                        style={{ backgroundImage: `url(${category.image})` }}
+                      />
+                      <div className="absolute inset-0 bg-black/30" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className={`${category.color} p-2 rounded-full`}>
+                          <Icon className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-center text-xs font-semibold text-gray-900 leading-tight">
+                      {decodeHtmlEntities(category.name)}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Popular Categories Banner */}

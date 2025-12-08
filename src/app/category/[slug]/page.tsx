@@ -7,6 +7,7 @@ import { Filter, ChevronDown } from 'lucide-react';
 import { getProducts } from '@/lib/woocommerce/products';
 import { getCategoryBySlug } from '@/lib/woocommerce/categories';
 import { Product } from '@/types/product';
+import { decodeHtmlEntities } from '@/lib/utils/helpers';
 
 export default function CategoryPage() {
   const params = useParams();
@@ -14,45 +15,52 @@ export default function CategoryPage() {
   
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [categoryName, setCategoryName] = useState('');
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'date' | 'popularity' | 'rating' | 'price'>('date');
+  const perPage = 24;
 
   useEffect(() => {
     fetchCategoryAndProducts();
   }, [slug]);
 
-  useEffect(() => {
-    if (categoryName) {
-      fetchProducts();
-    }
-  }, [sortBy, categoryName]);
-
   const fetchCategoryAndProducts = async () => {
     try {
       setLoading(true);
+      setHasMore(true);
+      setPage(1);
       
       const category = await getCategoryBySlug(slug);
       
       if (category) {
-        setCategoryName(category.name.replace(/&amp;/g, '&'));
+        setCategoryName(decodeHtmlEntities(category.name));
+        setCategoryId(category.id.toString());
         
-        const fetchedProducts = await getProducts({ 
+        const fetchedProducts = await getProducts({
           category: category.id.toString(),
-          per_page: 24,
+          per_page: perPage,
           orderby: sortBy,
-          order: 'desc'
+          order: 'desc',
+          page: 1,
         });
         
         setProducts(fetchedProducts);
+        setHasMore(fetchedProducts.length === perPage);
       } else {
+        setCategoryId(null);
         const fetchedProducts = await getProducts({ 
           category: slug,
-          per_page: 24,
+          per_page: perPage,
           orderby: sortBy,
-          order: 'desc'
+          order: 'desc',
+          page: 1,
         });
         
         setProducts(fetchedProducts);
+        setHasMore(fetchedProducts.length === perPage);
         setCategoryName(slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
       }
     } catch (error) {
@@ -62,22 +70,58 @@ export default function CategoryPage() {
     }
   };
 
-  const fetchProducts = async () => {
+  const loadMore = async () => {
     try {
-      const category = await getCategoryBySlug(slug);
-      if (category) {
-        const fetchedProducts = await getProducts({ 
-          category: category.id.toString(),
-          per_page: 24,
-          orderby: sortBy,
-          order: 'desc'
-        });
-        setProducts(fetchedProducts);
+      setLoadingMore(true);
+      const nextPage = page + 1;
+      const categoryParam = categoryId ?? slug;
+      const fetchedProducts = await getProducts({
+        category: categoryParam,
+        per_page: perPage,
+        orderby: sortBy,
+        order: 'desc',
+        page: nextPage,
+      });
+
+      if (fetchedProducts.length > 0) {
+        setProducts((prev) => [...prev, ...fetchedProducts]);
+        setPage(nextPage);
+        setHasMore(fetchedProducts.length === perPage);
+      } else {
+        setHasMore(false);
       }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const refetchCurrentPage = async () => {
+    try {
+      const categoryParam = categoryId ?? slug;
+      const fetchedProducts = await getProducts({
+        category: categoryParam,
+        per_page: perPage,
+        orderby: sortBy,
+        order: 'desc',
+        page: 1,
+      });
+      setProducts(fetchedProducts);
+      setPage(1);
+      setHasMore(fetchedProducts.length === perPage);
     } catch (error) {
       console.error('Error fetching products:', error);
     }
   };
+
+  // Refetch when sort changes after initial load
+  useEffect(() => {
+    if (!loading && categoryName) {
+      refetchCurrentPage();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortBy]);
 
   if (loading) {
     return (
@@ -140,7 +184,21 @@ export default function CategoryPage() {
         </div>
 
         {hasProducts ? (
-          <ProductGrid products={products} columns={4} />
+          <>
+            <ProductGrid products={products} columns={4} />
+
+            {hasMore && (
+              <div className="text-center mt-8">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
+                >
+                  {loadingMore ? 'Loading...' : 'View More Products'}
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="text-center py-16 bg-white rounded-lg">
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-4">

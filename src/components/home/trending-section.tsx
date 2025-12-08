@@ -26,7 +26,7 @@ export default function TrendingSection({ products }: TrendingSectionProps) {
           </div>
 
           <Link 
-            href="/products" 
+            href="/products?tag=best-seller" 
             className="flex items-center gap-1 text-secondary-500 hover:text-secondary-600 font-medium text-xs md:text-sm group"
           >
             See All

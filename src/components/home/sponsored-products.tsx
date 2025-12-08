@@ -31,7 +31,7 @@ export default function SponsoredProducts({ products }: SponsoredProductsProps) 
           </div>
 
           <Link 
-            href="/products?sponsored=true" 
+            href="/products?tag=sponsored" 
             className="flex items-center gap-1 text-purple-600 hover:text-purple-700 font-medium text-xs md:text-sm group"
           >
             View All

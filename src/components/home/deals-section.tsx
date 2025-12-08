@@ -32,7 +32,7 @@ export default function DealsSection({
           </div>
 
           <Link 
-            href="/products" 
+            href="/products?tag=deal" 
             className="flex items-center gap-1 text-secondary-500 hover:text-secondary-600 font-medium text-xs md:text-sm group"
           >
             View All

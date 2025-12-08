@@ -61,7 +61,7 @@ export default function Footer() {
             Privacy Policy
           </Link>
           <Link href="/page/refund_returns" className="block text-gray-200 hover:text-primary-200">
-            Refund &amp; Returns
+            Refund & Returns
           </Link>
           <Link href="/page/terms-of-service" className="block text-gray-200 hover:text-primary-200">
             Terms of Service

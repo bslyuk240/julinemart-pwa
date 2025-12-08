@@ -191,6 +191,39 @@ export function generateId(): string {
 }
 
 /**
+ * Decode common HTML entities (covers names coming from WooCommerce like "Fashion &amp; Accessories")
+ */
+export function decodeHtmlEntities(value: string | undefined | null): string {
+  if (!value) return '';
+
+  const entityMap: Record<string, string> = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&#x27;': "'",
+    '&#x2F;': '/',
+  };
+
+  return value.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match) => {
+    if (entityMap[match]) return entityMap[match];
+
+    // Numeric entities
+    if (match.startsWith('&#x')) {
+      const codePoint = parseInt(match.slice(3, -1), 16);
+      return String.fromCodePoint(codePoint);
+    }
+    if (match.startsWith('&#')) {
+      const codePoint = parseInt(match.slice(2, -1), 10);
+      return String.fromCodePoint(codePoint);
+    }
+
+    return match;
+  });
+}
+
+/**
  * Deep clone object
  */
 export function deepClone<T>(obj: T): T {

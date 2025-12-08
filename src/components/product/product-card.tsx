@@ -8,6 +8,7 @@ import { Product } from '@/types/product';
 import { useCart } from '@/hooks/use-cart';
 import { useWishlist } from '@/hooks/use-wishlist';
 import { toast } from 'sonner';
+import { decodeHtmlEntities } from '@/lib/utils/helpers';
 
 interface ProductCardProps {
   product: Product;
@@ -22,6 +23,7 @@ export default function ProductCard({
   fullWidth = false,
   floatingBadge 
 }: ProductCardProps) {
+  const decodedName = decodeHtmlEntities(product.name);
   const { addItem } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -165,7 +167,7 @@ export default function ProductCard({
         <div className="relative aspect-square overflow-hidden rounded-t-lg bg-gray-50">
           <Image
             src={product.images[0]?.src || '/images/placeholder.jpg'}
-            alt={product.name}
+            alt={decodedName}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 220px"
             className="object-cover transition-transform duration-200 group-hover:scale-105"
@@ -187,7 +189,7 @@ export default function ProductCard({
           text-xs md:text-sm 
           font-semibold text-gray-900 leading-tight 
           min-h-[32px] md:min-h-[40px]">
-          {product.name}
+          {decodedName}
         </h3>
 
         {/* Price */}

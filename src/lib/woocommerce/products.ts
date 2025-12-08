@@ -40,7 +40,7 @@ async function getTagIdBySlug(slug: string): Promise<number | null> {
     }
     return null;
   } catch (error) {
-    console.error(`Error fetching tag ID for slug "${slug}":`, error);
+    handleApiError(error, `Error fetching tag ID for slug "${slug}"`);
     return null;
   }
 }

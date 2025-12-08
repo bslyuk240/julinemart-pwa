@@ -2,6 +2,10 @@ import WooCommerceRestApi from '@woocommerce/woocommerce-rest-api';
 
 const isClient = typeof window !== 'undefined';
 
+// Utility: scrub credentials from URLs/headers before logging
+const scrubAuth = (value?: string) =>
+  value?.replace(/\/\/([^:]+):([^@]+)@/g, '//***:***@');
+
 const serverApi = !isClient
   ? new WooCommerceRestApi({
       url: process.env.WC_BASE_URL?.replace('/wp-json/wc/v3', '') || '',
@@ -59,13 +63,19 @@ export const wcApi = {
 
 // Helper function for error handling
 // Log API errors but do not throw so callers can gracefully fall back.
-export const handleApiError = (error: any) => {
+export const handleApiError = (error: any, context?: string) => {
+  const baseInfo = {
+    message: error?.message,
+    status: error?.response?.status,
+    url: scrubAuth(error?.config?.url || error?.request?.path),
+  };
+
   if (error?.response) {
-    console.error('API Error:', error.response.data);
+    console.error(context || 'API Error:', baseInfo);
   } else if (error?.request) {
-    console.error('Network Error:', error.request);
+    console.error(context || 'Network Error (sanitized):', baseInfo);
   } else {
-    console.error('Error:', error?.message || error);
+    console.error(context || 'Error:', error?.message || error);
   }
   return error;
 };

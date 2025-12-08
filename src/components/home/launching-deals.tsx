@@ -42,7 +42,7 @@ export default function LaunchingDeals({ products }: LaunchingDealsProps) {
           </div>
 
           <Link 
-            href="/products?launching=true" 
+            href="/products?tag=launching-deal" 
             className="flex items-center gap-1 text-green-600 hover:text-green-700 font-medium text-xs md:text-sm group"
           >
             View All

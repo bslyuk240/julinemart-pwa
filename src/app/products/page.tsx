@@ -1,19 +1,77 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { getProducts } from '@/lib/woocommerce/products';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown } from 'lucide-react';
 import { Product } from '@/types/product';
 
+const sortFromParam = (value: string | null): 'date' | 'popularity' | 'rating' | 'price' | 'price-desc' | null => {
+  if (!value) return null;
+  if (value === 'price-desc') return 'price-desc';
+  if (['date', 'popularity', 'rating', 'price'].includes(value)) {
+    return value as 'date' | 'popularity' | 'rating' | 'price';
+  }
+  return null;
+};
+
 export default function AllProductsPage() {
+  const searchParams = useSearchParams();
+
+  const initialSort = sortFromParam(searchParams.get('sort')) || 'date';
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [sortBy, setSortBy] = useState<'date' | 'popularity' | 'rating' | 'price' | 'price-desc'>('date');
+  const [sortBy, setSortBy] = useState<'date' | 'popularity' | 'rating' | 'price' | 'price-desc'>(initialSort);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const tagFilter = searchParams.get('tag');
+  const searchKey = searchParams.toString();
+
+  const sectionMeta = useMemo(() => {
+    const map: Record<
+      string,
+      { title: string; description: string }
+    > = {
+      'flash-sale': {
+        title: 'Flash Sale Items',
+        description: 'Limited-time deals available right now',
+      },
+      'deal': {
+        title: "Today's Deals",
+        description: 'Handpicked discounts curated for you',
+      },
+      'best-seller': {
+        title: 'Trending Products',
+        description: 'Most popular items right now',
+      },
+      'top-seller': {
+        title: 'Top Sellers',
+        description: 'Best selling products this month',
+      },
+      'sponsored': {
+        title: 'Sponsored Products',
+        description: 'Featured picks from premium brands',
+      },
+      'launching-deal': {
+        title: 'Launching Deals',
+        description: 'Exclusive launch discounts - limited time',
+      },
+    };
+
+    if (tagFilter && map[tagFilter]) {
+      return map[tagFilter];
+    }
+
+    return {
+      title: 'All Products',
+      description: `Browse our complete collection of ${products.length}+ products`,
+    };
+  }, [tagFilter, products.length]);
 
   const computeSortParams = (sort: typeof sortBy) => {
     if (sort === 'price-desc') {
@@ -25,42 +83,56 @@ export default function AllProductsPage() {
     return { orderby: sort as 'date' | 'popularity' | 'rating', order: 'desc' as const };
   };
 
-  // Fetch products
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+  const buildFetchParams = (pageNumber: number, overrideSort?: typeof sortBy) => {
+    const activeSort = overrideSort || sortBy;
+    const sortParams = computeSortParams(activeSort);
+    const params: Record<string, any> = {
+      per_page: 20,
+      page: pageNumber,
+      orderby: sortParams.orderby,
+      order: sortParams.order,
+    };
 
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const sortParams = computeSortParams(sortBy);
-      const fetchedProducts = await getProducts({ 
-        per_page: 20,
-        page: 1,
-        orderby: sortParams.orderby,
-        order: sortParams.order
-      });
-      setProducts(fetchedProducts);
-      setPage(1);
-      setHasMore(fetchedProducts.length === 20);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    } finally {
-      setLoading(false);
+    if (tagFilter) {
+      params.tag = tagFilter;
     }
+
+    return params;
   };
+
+  // Sync sort with URL param on navigation changes
+  useEffect(() => {
+    const urlSort = sortFromParam(searchParams.get('sort'));
+    if (urlSort && urlSort !== sortBy) {
+      setSortBy(urlSort);
+    }
+  }, [searchParams, sortBy]);
+
+  // Fetch products when filters or sort change
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const fetchedProducts = await getProducts(buildFetchParams(1));
+        setProducts(fetchedProducts);
+        setPage(1);
+        setHasMore(fetchedProducts.length === 20);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchKey, sortBy]);
 
   const loadMore = async () => {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const sortParams = computeSortParams(sortBy);
-      const moreProducts = await getProducts({ 
-        per_page: 20,
-        page: nextPage,
-        orderby: sortParams.orderby,
-        order: sortParams.order
-      });
+      const moreProducts = await getProducts(buildFetchParams(nextPage));
       
       if (moreProducts.length > 0) {
         setProducts([...products, ...moreProducts]);
@@ -83,12 +155,7 @@ export default function AllProductsPage() {
       setSortBy(newSortBy);
       setSortOrder(order);
       
-      const sortedProducts = await getProducts({ 
-        per_page: 20,
-        page: 1,
-        orderby,
-        order
-      });
+      const sortedProducts = await getProducts(buildFetchParams(1, newSortBy));
       
       setProducts(sortedProducts);
       setPage(1);
@@ -118,9 +185,9 @@ export default function AllProductsPage() {
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-1">All Products</h1>
+          <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-1">{sectionMeta.title}</h1>
           <p className="text-sm md:text-base text-gray-600">
-            Browse our complete collection of {products.length}+ products
+            {sectionMeta.description}
           </p>
         </div>
 

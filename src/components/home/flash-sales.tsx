@@ -25,7 +25,7 @@ export default function FlashSales({ products }: FlashSalesProps) {
             </div>
           </div>
           <Link
-            href="/products"
+            href="/products?tag=flash-sale"
             className="flex items-center gap-1 text-xs md:text-sm font-semibold text-secondary-600 transition hover:text-secondary-700"
           >
             View all

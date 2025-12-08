@@ -26,7 +26,7 @@ export default function TopSellers({ products }: TopSellersProps) {
           </div>
 
           <Link 
-            href="/products?sort=popularity" 
+            href="/products?tag=top-seller&sort=popularity" 
             className="flex items-center gap-1 text-secondary-500 hover:text-secondary-600 font-medium text-xs md:text-sm group"
           >
             View All

@@ -14,6 +14,7 @@ import { useCartStore } from '@/store/cart-store';
 import { useWishlist } from '@/hooks/use-wishlist';
 import { Product, ProductVariation, ProductReview } from '@/types/product';
 import { toast } from 'sonner';
+import { decodeHtmlEntities } from '@/lib/utils/helpers';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -451,6 +452,13 @@ export default function ProductDetailPage() {
 
   const inWishlist = isInWishlist(product.id);
   const reviewsAllowed = product.reviews_allowed;
+  const decodedProductName = decodeHtmlEntities(product.name);
+  const primaryCategoryName = product.categories?.[0]?.name
+    ? decodeHtmlEntities(product.categories[0].name)
+    : '';
+  const primaryBrandName = product.brands?.[0]?.name
+    ? decodeHtmlEntities(product.brands[0].name)
+    : '';
 
   return (
     <main className="min-h-screen bg-white pb-24 md:pb-8">
@@ -462,12 +470,12 @@ export default function ProductDetailPage() {
           {product.categories && product.categories.length > 0 && (
             <>
               <a href={`/category/${product.categories[0].slug}`} className="hover:text-primary-600">
-                {product.categories[0].name}
+                {decodeHtmlEntities(product.categories[0].name)}
               </a>
               <span className="mx-2">/</span>
             </>
           )}
-          <span className="text-gray-900">{product.name}</span>
+          <span className="text-gray-900">{decodedProductName}</span>
         </nav>
 
         {/* ==================== PRODUCT BADGES (LIKE JUMIA) ==================== */}
@@ -502,7 +510,7 @@ export default function ProductDetailPage() {
         <div className="grid md:grid-cols-2 gap-6 md:gap-8 mb-10">
           {/* Product Gallery */}
           <div>
-            <ProductGallery images={galleryImages} productName={product.name} />
+            <ProductGallery images={galleryImages} productName={decodedProductName} />
           </div>
 
           {/* Product Info */}
@@ -522,7 +530,7 @@ export default function ProductDetailPage() {
               )}
 
               <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2">
-                {product.name}
+                {decodedProductName}
               </h1>
               
               {/* Rating */}
@@ -681,7 +689,7 @@ export default function ProductDetailPage() {
         href={`/brand/${product.brands[0].slug}`}
         className="text-primary-600 hover:text-primary-700 font-medium transition-colors"
       >
-        {product.brands[0].name}
+        {primaryBrandName}
       </Link>
     </div>
   )}
@@ -694,7 +702,7 @@ export default function ProductDetailPage() {
         href={`/category/${product.categories[0].slug}`}
         className="text-primary-600 hover:text-primary-700 font-medium transition-colors"
       >
-        {product.categories[0].name}
+        {primaryCategoryName}
       </Link>
     </div>
   )}
