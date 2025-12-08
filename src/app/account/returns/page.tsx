@@ -212,45 +212,7 @@ export default function ReturnsPage() {
                         {item.preferred_resolution}
                       </span>
                     ) : null}
-                    {item.refund_amount && item.refund_completed_at ? (
-                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                        Refunded {formatPrice(item.refund_amount, item.refund_currency || 'NGN')} on{' '}
-                        {new Date(item.refund_completed_at).toLocaleDateString()}
-                      </span>
-                    ) : null}
                   </div>
-
-                  {item.refund_amount ? (
-                    <p className="text-sm text-gray-700 mt-2">
-                      Refund:{' '}
-                      <span className="font-semibold">
-                        {formatPrice(item.refund_amount, item.refund_currency || 'NGN')}
-                      </span>
-                      {item.refund_completed_at ? (
-                        <span className="text-xs text-gray-500 ml-2">
-                          Refunded {new Date(item.refund_completed_at).toLocaleString()}
-                        </span>
-                      ) : null}
-                    </p>
-                  ) : null}
-
-                  <p className="text-sm text-gray-700 mt-1">
-                    Shipment:{' '}
-                    <span className="font-semibold">
-                      {fezTrackingUrl ? (
-                        <a
-                          href={fezTrackingUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary-600 hover:underline"
-                        >
-                          {shipmentLabel}
-                        </a>
-                      ) : (
-                        shipmentLabel
-                      )}
-                    </span>
-                  </p>
                 </div>
               );
             })}
