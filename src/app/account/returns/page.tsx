@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, Package, ArrowLeft } from 'lucide-react';
 import { useCustomerAuth } from '@/context/customer-auth-context';
-import { JloReturn, formatJloRefundStatus, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
+import { JloReturn, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
 import { formatPrice } from '@/lib/utils/format-price';
 import { toast } from 'sonner';
 
@@ -135,7 +135,6 @@ export default function ReturnsPage() {
             {returns.map((item) => {
               const returnRequestId = item.return_request_id;
               const statusDisplay = formatJloReturnStatus(item.status);
-              const refundDisplay = formatJloRefundStatus(item.refund_status || 'none');
               const returnCode =
                 item.return_shipment?.return_code ||
                 item.return_code ||
@@ -204,9 +203,6 @@ export default function ReturnsPage() {
                     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusDisplay.bgColor} ${statusDisplay.color}`}>
                       {statusDisplay.label}
                     </span>
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${refundDisplay.bgColor} ${refundDisplay.color}`}>
-                      Refund: {refundDisplay.label}
-                    </span>
                     {item.preferred_resolution ? (
                       <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 capitalize">
                         {item.preferred_resolution}
@@ -216,10 +212,15 @@ export default function ReturnsPage() {
 
                   {item.refund_amount ? (
                     <p className="text-sm text-gray-700 mt-2">
-                      Refund Amount:{' '}
+                      Refund:{' '}
                       <span className="font-semibold">
                         {formatPrice(item.refund_amount, item.refund_currency || 'NGN')}
                       </span>
+                      {item.refund_completed_at ? (
+                        <span className="text-xs text-gray-500 ml-2">
+                          Refunded {new Date(item.refund_completed_at).toLocaleString()}
+                        </span>
+                      ) : null}
                     </p>
                   ) : null}
 
