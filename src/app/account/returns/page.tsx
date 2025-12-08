@@ -46,12 +46,16 @@ export default function ReturnsPage() {
 
   useEffect(() => {
     const enrichMissingShipments = async () => {
-      const needsEnrich = returns.filter(
-        (r) =>
-          !enrichedIds.has(r.return_request_id) &&
-          !r.return_shipment?.tracking_number &&
-          !r.return_shipment?.return_code
-      );
+      const needsEnrich = returns.filter((r) => {
+        if (enrichedIds.has(r.return_request_id)) return false;
+        const missingShipment = !r.return_shipment?.tracking_number && !r.return_shipment?.return_code;
+        const inProgress = ['awaiting_tracking', 'in_transit', 'delivered_to_hub', 'inspection_in_progress'].includes(
+          (r.status || '').toLowerCase()
+        );
+        const maybeCompletedWithNoShipment =
+          (r.status || '').toLowerCase() === 'completed' && !r.return_shipment?.tracking_number;
+        return missingShipment || inProgress || maybeCompletedWithNoShipment;
+      });
       if (!needsEnrich.length) return;
       setEnriching(true);
       try {
@@ -62,8 +66,15 @@ export default function ReturnsPage() {
               const data = await res.json().catch(() => ({}));
               const payload = data?.data ?? data;
               const shipment = payload?.return_shipment;
-              if (res.ok && shipment?.return_shipment_id) {
-                return { ...r, return_shipment: shipment };
+              if (res.ok && (shipment?.return_shipment_id || payload?.status)) {
+                return {
+                  ...r,
+                  return_shipment: shipment || r.return_shipment,
+                  status: payload?.status || shipment?.status || r.status,
+                  refund_status: payload?.refund_status ?? r.refund_status,
+                  refund_amount: payload?.refund_amount ?? r.refund_amount,
+                  refund_currency: payload?.refund_currency ?? r.refund_currency,
+                };
               }
             } catch {
               /* ignore */
