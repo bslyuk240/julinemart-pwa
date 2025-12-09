@@ -42,29 +42,29 @@ export default function CategoryStrip({ categories = defaultCategories }: { cate
           </Link>
         </div>
 
-        {/* Mobile: Horizontal Scrollable Category List */}
-        <div className="md:hidden overflow-x-auto scrollbar-hide -mx-4 px-4">
-          <div className="flex gap-3 pb-1">
+        {/* Mobile & Tablet: Horizontal Scrollable Category List */}
+        <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 lg:hidden">
+          <div className="flex flex-nowrap gap-3 md:gap-4 pb-1">
             {categories.map((category) => (
               <Link
                 key={category.id}
                 href={`/category/${category.slug}`}
-                className="flex flex-col items-center group min-w-[60px]"
+                className="flex flex-col items-center group min-w-[60px] md:min-w-[72px]"
               >
-                {/* Icon Circle - Mobile */}
+                {/* Icon Circle - Mobile & Tablet */}
                 <div className={`
-                  w-12 h-12 rounded-full ${category.color} 
+                  w-12 h-12 md:w-14 md:h-14 rounded-full ${category.color} 
                   flex items-center justify-center text-white
                   transform transition-all duration-200 
                   group-hover:scale-110 group-hover:shadow-lg
                 `}>
-                  <div className="w-5 h-5">
+                  <div className="w-5 h-5 md:w-6 md:h-6">
                     {category.icon}
                   </div>
                 </div>
 
-                {/* Category Name - Mobile */}
-                <span className="text-[10px] font-medium text-gray-700 group-hover:text-primary-600 text-center transition-colors mt-1.5 line-clamp-2">
+                {/* Category Name - Mobile & Tablet */}
+                <span className="text-[10px] md:text-xs font-medium text-gray-700 group-hover:text-primary-600 text-center transition-colors mt-1.5 line-clamp-2">
                   {category.name}
                 </span>
               </Link>
@@ -73,7 +73,7 @@ export default function CategoryStrip({ categories = defaultCategories }: { cate
         </div>
 
         {/* Desktop: Normal Grid Layout */}
-        <div className="hidden md:flex md:flex-wrap gap-4 md:gap-6">
+        <div className="hidden lg:flex lg:flex-wrap gap-4 md:gap-6">
           {categories.map((category) => (
             <Link
               key={category.id}
