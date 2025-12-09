@@ -717,21 +717,31 @@ export default function CheckoutPage() {
           country: formData.country,
           company: '',
         },
-        line_items: items.map((item: any) => ({
-          product_id: item.productId,
-          quantity: item.quantity,
-          variation_id: item.variation?.id || 0,
-          meta_data: [
-            {
-              key: '_hub_id',
-              value: item.hubId || DEFAULT_HUB_ID,
-            },
-            {
-              key: '_hub_name',
-              value: item.hubName || 'Default Hub',
-            }
-          ],
-        })),
+        line_items: items.map((item: any) => {
+          const attributeMeta = item.variation?.attributes
+            ? Object.entries(item.variation.attributes).map(([key, value]) => ({
+                key,
+                value,
+              }))
+            : [];
+
+          return {
+            product_id: item.productId,
+            quantity: item.quantity,
+            variation_id: item.variation?.id || 0,
+            meta_data: [
+              {
+                key: '_hub_id',
+                value: item.hubId || DEFAULT_HUB_ID,
+              },
+              {
+                key: '_hub_name',
+                value: item.hubName || 'Default Hub',
+              },
+              ...attributeMeta,
+            ],
+          };
+        }),
         shipping_lines: selectedShipping ? [{
           method_id: selectedOption?.methodId || 'flat_rate',
           method_title: selectedOption?.title || 'Shipping',
@@ -1241,11 +1251,16 @@ export default function CheckoutPage() {
               
               <div className="space-y-3 mb-4 pb-4 border-b max-h-64 overflow-y-auto">
                 {items.map((item: any) => (
-                  <div key={item.id} className="flex justify-between text-sm">
-                    <span className="text-gray-600">
+                  <div
+                    key={item.id}
+                    className="grid grid-cols-[1fr_auto] gap-2 text-sm items-start"
+                  >
+                    <span className="text-gray-600 leading-snug">
                       {item.name} x{item.quantity}
                     </span>
-                    <span className="font-medium">{formatPrice(item.price * item.quantity)}</span>
+                    <span className="font-medium text-right whitespace-nowrap">
+                      {formatPrice(item.price * item.quantity)}
+                    </span>
                   </div>
                 ))}
               </div>
