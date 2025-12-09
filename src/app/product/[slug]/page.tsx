@@ -461,7 +461,7 @@ export default function ProductDetailPage() {
     : '';
 
   return (
-    <main className="min-h-screen bg-white pb-24 md:pb-8">
+    <main className="min-h-screen bg-white pb-24 md:pb-8 overflow-x-hidden">
       <div className="container mx-auto px-4 py-4 md:py-6">
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-600 mb-4">
@@ -711,7 +711,7 @@ export default function ProductDetailPage() {
             {/* Short Description */}
             {product.short_description && (
               <div 
-                className="prose prose-sm text-gray-700 border-t pt-5 line-clamp-4 overflow-hidden"
+                className="prose prose-sm text-gray-700 border-t pt-5 line-clamp-4 overflow-hidden break-words max-w-full [overflow-wrap:anywhere] [&_table]:w-full [&_table]:max-w-full [&_table]:block [&_table]:overflow-x-auto [&_table]:whitespace-nowrap [&_img]:max-w-full [&_img]:h-auto"
                 dangerouslySetInnerHTML={{ __html: product.short_description }}
               />
             )}
@@ -931,7 +931,7 @@ export default function ProductDetailPage() {
 
           {activeTab === 'description' && product.description && (
             <div 
-              className="prose max-w-none"
+              className="prose max-w-none break-words [overflow-wrap:anywhere] [&>table]:w-full [&>table]:max-w-full [&>table]:block [&>table]:overflow-x-auto [&>table]:whitespace-nowrap [&_img]:max-w-full [&_img]:h-auto"
               dangerouslySetInnerHTML={{ __html: product.description }}
             />
           )}

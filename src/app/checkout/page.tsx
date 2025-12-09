@@ -194,27 +194,68 @@ export default function CheckoutPage() {
     }
   };
 
-  const syncPaystackReference = async (orderId: number, reference: string) => {
+  // 🔥 NEW: Updated payment verification handler
+  const handlePaymentSuccess = async (response: any) => {
+    console.log('✅ Paystack payment successful:', response);
+    
     try {
-      const syncResponse = await fetch('/api/woo-sync-paystack-reference', {
+      if (!currentOrderRef.current) {
+        console.error('❌ No order reference found');
+        toast.error('Order reference missing');
+        setIsProcessing(false);
+        return;
+      }
+
+      const orderId = currentOrderRef.current;
+      
+      // Show verification message
+      toast.loading('Verifying payment...', { id: 'payment-verify' });
+
+      // Call backend to verify payment and update order
+      const verifyResponse = await fetch('/api/verify-payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, reference }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reference: response.reference,
+          orderId: orderId,
+          saveCard: saveCard && isAuthenticated, // Pass save card preference
+          customerId: customerId,
+        }),
       });
 
-      const syncData = await syncResponse.json().catch(() => null);
+      const verifyData = await verifyResponse.json();
 
-      if (!syncResponse.ok || !syncData?.success) {
-        console.warn('Paystack reference sync failed', {
-          orderId,
-          reference,
-          error: syncData?.error || syncResponse.statusText,
-        });
-      } else {
-        console.log('Paystack reference synced to WooCommerce', syncData);
+      console.log('🔍 Verification response:', verifyData);
+
+      if (!verifyResponse.ok || !verifyData.success) {
+        toast.error('Payment verification failed', { id: 'payment-verify' });
+        console.error('Verification failed:', verifyData);
+        setIsProcessing(false);
+        return;
       }
-    } catch (error) {
-      console.warn('Paystack reference sync error', error);
+
+      // Success! Clear cart and redirect
+      toast.success('Payment verified successfully!', { id: 'payment-verify' });
+      console.log('✅ Payment verified, clearing cart...');
+      
+      // If card was saved, update local state
+      if (verifyData.cardSaved) {
+        toast.success('Payment card saved for future use!');
+        await refreshCustomer(); // Refresh customer data to get saved card
+      }
+      
+      clearCart();
+      currentOrderRef.current = null;
+      
+      // Redirect to success page
+      router.push(`/order-success?order=${orderId}`);
+      
+    } catch (error: any) {
+      console.error('❌ Payment verification error:', error);
+      toast.error(error.message || 'Payment verification failed', { id: 'payment-verify' });
+      setIsProcessing(false);
     }
   };
 
@@ -262,20 +303,21 @@ export default function CheckoutPage() {
       if (chargeData.success && chargeData.data?.status === 'success') {
         console.log('Saved card charged successfully');
         
-        // Update order status via server API to avoid client-side CORS
+        // Use the verification API to update order
         const reference = chargeData.data?.reference || chargeData.data?.id || 'paystack-charge';
-        const updateResponse = await fetch(`/api/orders/${orderId}`, {
-          method: 'PUT',
+        
+        const verifyResponse = await fetch('/api/verify-payment', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            set_paid: true,
-            transaction_id: reference,
-            status: 'processing',
+            reference: reference,
+            orderId: orderId,
+            saveCard: false, // Card already saved
+            customerId: customerId,
           }),
         });
 
-        if (updateResponse.ok) {
-          await syncPaystackReference(orderId, reference);
+        if (verifyResponse.ok) {
           setIsProcessing(false);
           clearCart();
           toast.success('Payment successful!');
@@ -290,130 +332,6 @@ export default function CheckoutPage() {
       console.error('Saved card payment error:', error);
       toast.error(error.message || 'Payment failed. Please try another payment method.');
       setIsProcessing(false);
-    }
-  };
-
-  // Separate payment success handler
-  const handlePaymentSuccess = async (response: any) => {
-    console.log('Processing payment success...');
-    
-    // Validate environment variables - using correct variable names
-    const wpUrl = process.env.NEXT_PUBLIC_WP_URL;
-    const wcKey = process.env.WC_KEY;
-    const wcSecret = process.env.WC_SECRET;
-
-    if (!wpUrl || !wcKey || !wcSecret) {
-      console.error('Missing environment variables:', {
-        wpUrl: wpUrl || 'MISSING',
-        wcKey: wcKey ? 'SET' : 'MISSING',
-        wcSecret: wcSecret ? 'SET' : 'MISSING',
-      });
-      toast.error('Configuration error. Please contact support with reference: ' + response.reference);
-      if (currentOrderRef.current?.id) {
-        clearCart();
-        router.push(`/order-success?order=${currentOrderRef.current.id}`);
-      }
-      return;
-    }
-    
-    try {
-      const orderId = currentOrderRef.current?.id;
-      
-      if (!orderId) {
-        throw new Error('Order ID not found');
-      }
-
-      // NEW: If user chose to save card, verify and save it
-      if (saveCard && isAuthenticated && customerId) {
-        try {
-          console.log('Verifying transaction to save card...');
-          const verifyResponse = await fetch('/api/payments/verify-paystack', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reference: response.reference }),
-          });
-
-          if (verifyResponse.ok) {
-            const verifyData = await verifyResponse.json();
-            
-            if (verifyData.success && verifyData.authorization) {
-              const auth = verifyData.authorization;
-              
-              // Create new card object
-              const newCard: SavedCard = {
-                id: `card_${Date.now()}`,
-                authorization_code: auth.authorization_code,
-                card_type: auth.card_type || auth.brand || 'card',
-                last4: auth.last4,
-                exp_month: auth.exp_month,
-                exp_year: auth.exp_year,
-                bank: auth.bank,
-                country_code: auth.country_code,
-                is_default: savedCards.length === 0, // Make default if it's the first card
-              };
-
-              // Update cards array
-              const updatedCards = [...savedCards, newCard];
-
-              // Save to WooCommerce
-              const saveResponse = await fetch('/api/customers/save-card', {
-                method: 'POST',
-                headers: { 
-                  'Content-Type': 'application/json',
-                  'x-customer-id': customerId.toString(),
-                },
-                body: JSON.stringify({ customerId, cards: updatedCards }),
-              });
-
-              if (saveResponse.ok) {
-                console.log('Card saved successfully');
-                setSavedCards(updatedCards);
-                setDefaultSavedCard(updatedCards.find((c) => c.is_default) || updatedCards[0]);
-                toast.success('Payment card saved for future use!');
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error saving card:', error);
-          // Don't fail the order if card saving fails
-        }
-      }
-
-      console.log('Updating order:', orderId);
-      console.log('WordPress URL:', wpUrl);
-
-      // Update order status via server API to avoid client-side CORS
-      const updateResponse = await fetch(`/api/orders/${orderId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          set_paid: true,
-          transaction_id: response.reference,
-          status: 'processing',
-        }),
-      });
-
-      if (updateResponse.ok) {
-        await syncPaystackReference(orderId, response.reference);
-        console.log('Order updated successfully');
-        clearCart();
-        toast.success('Payment successful!');
-        router.push(`/order-success?order=${orderId}`);
-      } else {
-        const errorData = await updateResponse.json();
-        console.error('Order update failed:', errorData);
-        throw new Error('Failed to update order');
-      }
-    } catch (error) {
-      console.error('Error in payment success handler:', error);
-      toast.error('Payment received but order update failed. Please contact support with reference: ' + response.reference);
-      if (currentOrderRef.current?.id) {
-        clearCart();
-        router.push(`/order-success?order=${currentOrderRef.current.id}`);
-      }
-    } finally {
-      setIsProcessing(false);
-      currentOrderRef.current = null;
     }
   };
 
@@ -738,6 +656,15 @@ export default function CheckoutPage() {
                 key: '_hub_name',
                 value: item.hubName || 'Default Hub',
               },
+              // 🔥 CRITICAL: Add vendor information for WCFM
+              {
+                key: '_vendor_id',
+                value: item.vendorId?.toString() || '1',
+              },
+              {
+                key: '_vendor_name',
+                value: item.vendorName || 'JulineMart',
+              },
               ...attributeMeta,
             ],
           };
@@ -750,7 +677,8 @@ export default function CheckoutPage() {
         customer_note: formData.notes,
       };
 
-      console.log('   Creating order...');
+      console.log('📦 Creating order with vendor info:', orderData);
+
       const createOrderResponse = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -764,7 +692,7 @@ export default function CheckoutPage() {
       const order = await createOrderResponse.json();
 
       if (order && order.id) {
-        console.log('  Order created:', order.id);
+        console.log('✅ Order created:', order.id);
         await persistAddressIfNeeded();
         
         // Check if payment method requires online payment
@@ -787,7 +715,7 @@ export default function CheckoutPage() {
             await handleSavedCardPayment(order.id);
           } else {
             // Store order in ref for callback
-            currentOrderRef.current = order;
+            currentOrderRef.current = order.id;
             
             // Build Paystack config
             const paystackConfig = {
@@ -831,7 +759,7 @@ export default function CheckoutPage() {
         throw new Error('Failed to create order');
       }
     } catch (error: any) {
-      console.error('  Order creation error:', error);
+      console.error('❌ Order creation error:', error);
       toast.error(error.message || 'Failed to place order. Please try again.');
       setIsProcessing(false);
     }
