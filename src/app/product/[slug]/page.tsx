@@ -462,7 +462,7 @@ export default function ProductDetailPage() {
 
   return (
     <main className="min-h-screen bg-white pb-24 md:pb-8 overflow-x-hidden">
-      <div className="container mx-auto px-4 py-4 md:py-6">
+      <div className="container mx-auto px-4 py-4 md:py-6 max-w-full overflow-hidden">
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-600 mb-4">
           <a href="/" className="hover:text-primary-600">Home</a>
@@ -507,14 +507,14 @@ export default function ProductDetailPage() {
         )}
         {/* ====================================================================== */}
 
-        <div className="grid md:grid-cols-2 gap-6 md:gap-8 mb-10">
+        <div className="grid md:grid-cols-2 gap-6 md:gap-8 mb-10 max-w-full">
           {/* Product Gallery */}
-          <div>
+          <div className="min-w-0">
             <ProductGallery images={galleryImages} productName={decodedProductName} />
           </div>
 
           {/* Product Info */}
-          <div className="space-y-5">
+          <div className="space-y-5 min-w-0">
             <div>
               {/* Vendor Badge */}
               {product.store && (
@@ -555,7 +555,7 @@ export default function ProductDetailPage() {
               )}
 
               {/* Price */}
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex flex-wrap items-center gap-2 mb-3">
                 <span className="text-xl md:text-2xl font-bold text-primary-600">
                   {formatPrice(selectedPrice.toString())}
                 </span>
@@ -573,7 +573,7 @@ export default function ProductDetailPage() {
 
               {/* Stock Status */}
               {effectiveStockStatus === 'instock' ? (
-                <div className="flex items-center gap-2 mb-4 md:mb-5">
+                <div className="flex flex-wrap items-center gap-2 mb-4 md:mb-5">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <p className="text-green-600 font-medium text-sm md:text-base">In Stock</p>
                   {effectiveStockQty !== null && (
@@ -581,7 +581,7 @@ export default function ProductDetailPage() {
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2 mb-4 md:mb-5">
+                <div className="flex flex-wrap items-center gap-2 mb-4 md:mb-5">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                   <p className="text-red-600 font-medium text-sm md:text-base">Out of Stock</p>
                 </div>
@@ -613,7 +613,7 @@ export default function ProductDetailPage() {
 
                   return (
                     <div key={attr.id || attr.name} className="space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <p className="text-sm font-medium text-gray-900">
                           {attr.name}
                         </p>
@@ -750,7 +750,7 @@ export default function ProductDetailPage() {
 
             {/* Add to Cart Section */}
             <div className="space-y-3 md:space-y-4 border-t pt-4 md:pt-6">
-              <div className="flex gap-3 md:gap-4">
+              <div className="flex gap-3 md:gap-4 flex-wrap md:flex-nowrap">
                 <Button
                   onClick={handleAddToCart}
                   variant="primary"
@@ -906,7 +906,7 @@ export default function ProductDetailPage() {
 
         {/* Tabs */}
         <div className="border-t pt-8 mb-12">
-          <div className="flex gap-8 border-b mb-6">
+          <div className="flex gap-4 md:gap-8 border-b mb-6 overflow-x-auto pb-1 md:overflow-visible">
             <button
               onClick={() => setActiveTab('description')}
               className={`pb-3 font-semibold transition-colors ${

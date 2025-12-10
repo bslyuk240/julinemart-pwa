@@ -606,6 +606,31 @@ export default function CheckoutPage() {
     setIsProcessing(true);
 
     try {
+      const orderVendorMeta = (() => {
+        const vendorBuckets: Record<number, { vendor_id: number; vendor_name: string; items: number[] }> = {};
+
+        items.forEach((item: any, idx: number) => {
+          const vid = item.vendorId ? Number(item.vendorId) : undefined;
+          const vname = item.vendorName || 'Vendor';
+          if (!vid) return;
+          if (!vendorBuckets[vid]) {
+            vendorBuckets[vid] = { vendor_id: vid, vendor_name: vname, items: [] };
+          }
+          vendorBuckets[vid].items.push(idx);
+        });
+
+        const vendorsMetaValue = Object.values(vendorBuckets);
+
+        return vendorsMetaValue.length
+          ? [
+              {
+                key: '_wcfmmp_order_vendors',
+                value: vendorsMetaValue,
+              },
+            ]
+          : [];
+      })();
+
       const orderData = {
         customer_id: isAuthenticated && customerId ? customerId : undefined,
         payment_method: selectedPayment,
@@ -636,6 +661,8 @@ export default function CheckoutPage() {
           company: '',
         },
         line_items: items.map((item: any) => {
+          const vendorId = item.vendorId ? Number(item.vendorId) : undefined;
+          const vendorName = item.vendorName || 'JulineMart Vendor';
           const attributeMeta = item.variation?.attributes
             ? Object.entries(item.variation.attributes).map(([key, value]) => ({
                 key,
@@ -656,19 +683,42 @@ export default function CheckoutPage() {
                 key: '_hub_name',
                 value: item.hubName || 'Default Hub',
               },
-              // 🔥 CRITICAL: Add vendor information for WCFM
-              {
-                key: '_vendor_id',
-                value: item.vendorId?.toString() || '1',
-              },
-              {
-                key: '_vendor_name',
-                value: item.vendorName || 'JulineMart',
-              },
+              // Vendor metadata for WCFM/WCFMMP
+              ...(vendorId
+                ? [
+                    { key: '_vendor_id', value: vendorId.toString() },
+                    { key: '_wcfm_vendor_id', value: vendorId.toString() },
+                    { key: '_wcfmmp_vendor_id', value: vendorId.toString() },
+                    { key: '_wcfmmp_product_author', value: vendorId.toString() },
+                    { key: '_wcfmmp_sold_by', value: vendorId.toString() },
+                  ]
+                : []),
+              ...(vendorName
+                ? [
+                    { key: '_vendor_name', value: vendorName },
+                    { key: '_wcfm_vendor_name', value: vendorName },
+                  ]
+                : []),
               ...attributeMeta,
             ],
           };
         }),
+        // Order-level vendor attribution for WCFM
+        meta_data: [
+          ...orderVendorMeta,
+          {
+            key: 'wcfm_order_vendors',
+            value: Array.from(new Set(items.map((item: any) => item.vendorId).filter(Boolean))).join(','),
+          },
+          {
+            key: '_hub_id',
+            value: items[0]?.hubId || DEFAULT_HUB_ID,
+          },
+          {
+            key: '_hub_name',
+            value: items[0]?.hubName || 'Default Hub',
+          },
+        ],
         shipping_lines: selectedShipping ? [{
           method_id: selectedOption?.methodId || 'flat_rate',
           method_title: selectedOption?.title || 'Shipping',
@@ -1248,3 +1298,4 @@ export default function CheckoutPage() {
     </main>
   );
 }
+

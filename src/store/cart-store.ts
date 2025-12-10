@@ -134,6 +134,37 @@ const numericWeight =
     ? parseFloat(String(product.weight))
     : undefined;
 
+        // Extract vendor info from WCFM-friendly fields
+        const getVendorInfo = () => {
+          // Prefer explicit store object from API
+          if (product.store?.id) {
+            return {
+              id: product.store.id,
+              name: product.store.name || product.store.shop_name || 'Vendor',
+            };
+          }
+
+          // Fall back to meta_data commonly used by WCFM
+          const vendorMeta =
+            product.meta_data?.find((m) =>
+              ['_wcfm_vendor_id', '_wcfmmp_vendor_id', '_vendor_id', 'vendor_id'].includes(m.key)
+            ) || null;
+
+          const vendorNameMeta =
+            product.meta_data?.find((m) =>
+              ['_vendor_name', 'vendor_name', '_wcfm_vendor_name'].includes(m.key)
+            ) || null;
+
+          const id = vendorMeta?.value ? Number(vendorMeta.value) : undefined;
+
+          return {
+            id,
+            name: vendorNameMeta?.value || 'Vendor',
+          };
+        };
+
+        const vendorInfo = getVendorInfo();
+
         const displayPrice =
           variation?.salePrice ??
           variation?.price ??
@@ -158,8 +189,8 @@ const numericWeight =
   stockStatus: effectiveStockStatus,
   stockQuantity: effectiveStockQty,
   sku: variation?.sku || product.sku,
-  vendorId: product.store?.id,
-  vendorName: product.store?.name,
+  vendorId: vendorInfo.id,
+  vendorName: product.store?.name || product.store?.shop_name || vendorInfo.name,
   hubId: hubId,          // ✅ Now extracts correctly
   hubName: hubName,      
   weight: numericWeight,
