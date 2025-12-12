@@ -12,7 +12,7 @@ const serverApi = !isClient
       consumerKey: process.env.WC_CONSUMER_KEY || process.env.WC_KEY || '',
       consumerSecret: process.env.WC_CONSUMER_SECRET || process.env.WC_SECRET || '',
       version: 'wc/v3',
-      queryStringAuth: false,
+      queryStringAuth: true,
     })
   : null;
 
