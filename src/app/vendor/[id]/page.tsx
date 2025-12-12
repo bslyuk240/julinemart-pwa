@@ -2,13 +2,44 @@
 
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Store, MapPin, Star, Phone, Mail } from 'lucide-react';
+import { Store, MapPin, Star, Mail } from 'lucide-react';
 import ProductGrid from '@/components/product/product-grid';
 import { getProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
 import { getStorePolicies, StorePolicies } from '@/lib/woocommerce/policies';
 import { formatPrice } from '@/lib/utils/format-price';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
+import { getVendorById } from '@/lib/woocommerce/vendors';
+import type { Vendor, VendorAddress } from '@/types/vendor';
+
+const formatVendorAddress = (address?: VendorAddress | string) => {
+  if (!address) {
+    return 'Address not available';
+  }
+
+  if (typeof address === 'string') {
+    return address;
+  }
+
+  const parts = [
+    address.street_1,
+    address.street_2,
+    address.city,
+    address.state,
+    address.zip,
+    address.country,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(', ') : 'Address not available';
+};
+
+const humanizeSlug = (value?: string) => {
+  if (!value) {
+    return undefined;
+  }
+  return value
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (l: string) => l.toUpperCase());
+};
 
 export default function VendorStorePage() {
   const params = useParams();
@@ -17,58 +48,77 @@ export default function VendorStorePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [vendorInfo, setVendorInfo] = useState<any>(null);
+  const [vendorDetails, setVendorDetails] = useState<Vendor | null>(null);
   const [policies, setPolicies] = useState<StorePolicies | null>(null);
   const [policyLoading, setPolicyLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchPolicies = async (forceRefresh = false, opts: { silent?: boolean } = {}) => {
-    const { silent = false } = opts;
-    try {
-      if (!silent) setPolicyLoading(true);
-      const data = await getStorePolicies(forceRefresh);
-      setPolicies(data);
-    } catch (error) {
-      console.error('Error fetching store policies:', error);
-    } finally {
-      if (!silent) setPolicyLoading(false);
-    }
-  };
-
-  const fetchVendorProducts = async (opts: { silent?: boolean } = {}) => {
-    const { silent = false } = opts;
-    try {
-      if (!silent) setLoading(true);
-
-      // Fetch all products and filter by vendor
-      const allProducts = await getProducts({ per_page: 100 });
-      
-      // Filter products by this vendor
-      const vendorProducts = allProducts.filter(product => 
-        product.store && product.store.id === parseInt(vendorId)
-      );
-      
-      setProducts(vendorProducts);
-      
-      // Get vendor info from first product
-      if (vendorProducts.length > 0 && vendorProducts[0].store) {
-        setVendorInfo(vendorProducts[0].store);
+  const fetchPolicies = useCallback(
+    async (forceRefresh = false, opts: { silent?: boolean } = {}) => {
+      const { silent = false } = opts;
+      try {
+        if (!silent) setPolicyLoading(true);
+        const data = await getStorePolicies(forceRefresh);
+        setPolicies(data);
+      } catch (error) {
+        console.error('Error fetching store policies:', error);
+      } finally {
+        if (!silent) setPolicyLoading(false);
       }
-      
-    } catch (error) {
-      console.error('Error fetching vendor products:', error);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
+    },
+    []
+  );
 
-  useEffect(() => {
-    fetchVendorProducts();
+  const fetchVendorProducts = useCallback(
+    async (opts: { silent?: boolean } = {}) => {
+      const { silent = false } = opts;
+      try {
+        if (!silent) setLoading(true);
+
+        const numericVendorId = parseInt(vendorId, 10);
+        const allProducts = await getProducts({ per_page: 100 });
+
+        const vendorProducts = allProducts.filter(
+          (product) => product.store && product.store.id === numericVendorId
+        );
+
+        setProducts(vendorProducts);
+
+        if (vendorProducts.length > 0 && vendorProducts[0].store) {
+          setVendorInfo(vendorProducts[0].store);
+        }
+      } catch (error) {
+        console.error('Error fetching vendor products:', error);
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [vendorId]
+  );
+
+  const fetchVendorDetails = useCallback(async () => {
+    const numericVendorId = Number(vendorId);
+    if (!numericVendorId || Number.isNaN(numericVendorId)) {
+      setVendorDetails(null);
+      return;
+    }
+    try {
+      const data = await getVendorById(numericVendorId);
+      setVendorDetails(data);
+    } catch (error) {
+      console.error('Error fetching vendor details:', error);
+    }
   }, [vendorId]);
 
   useEffect(() => {
+    fetchVendorProducts();
+    fetchVendorDetails();
+  }, [fetchVendorProducts, fetchVendorDetails]);
+
+  useEffect(() => {
     fetchPolicies();
-  }, []);
+  }, [fetchPolicies]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -76,11 +126,12 @@ export default function VendorStorePage() {
       await Promise.all([
         fetchVendorProducts({ silent: true }),
         fetchPolicies(true, { silent: true }),
+        fetchVendorDetails(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [vendorId]);
+  }, [fetchVendorDetails, fetchVendorProducts, fetchPolicies]);
 
   const { pullDistance, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -101,9 +152,42 @@ export default function VendorStorePage() {
     );
   }
 
-  const vendorName = vendorInfo?.shop_name || vendorInfo?.name || 
-    vendorInfo?.url?.split('/').pop()?.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 
+  const vendorSlugFromInfo = vendorInfo?.url?.split('/').pop();
+  const friendlySlugName = humanizeSlug(vendorDetails?.store_slug) || humanizeSlug(vendorSlugFromInfo);
+  const vendorName =
+    vendorDetails?.store_name ||
+    vendorDetails?.vendor_shop_name ||
+    vendorDetails?.vendor_display_name ||
+    vendorInfo?.shop_name ||
+    vendorInfo?.name ||
+    friendlySlugName ||
     'Vendor Store';
+  const vendorEmailLabel =
+    vendorDetails?.vendor_email ||
+    vendorDetails?.email ||
+    vendorDetails?.store_email ||
+    'Email not available';
+  const vendorAddressRaw =
+    vendorDetails?.vendor_address ||
+    vendorDetails?.store_address ||
+    vendorDetails?.address;
+  const vendorAddressText = formatVendorAddress(vendorAddressRaw);
+  const ratingAverage = vendorDetails?.rating?.avg || vendorDetails?.rating?.rating || null;
+  const ratingValue = ratingAverage ? Math.min(5, Math.max(0, Number(ratingAverage))) : 0;
+  const ratingDisplay = ratingAverage ? ratingAverage : 'N/A';
+  const vendorImage =
+    vendorDetails?.banner ||
+    vendorDetails?.gravatar ||
+    vendorDetails?.store_logo ||
+    vendorDetails?.logo ||
+    null;
+  const vendorAvatarStyle = vendorImage
+    ? {
+        backgroundImage: `url(${vendorImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
+    : undefined;
   const freeShippingThreshold = policies?.shippingPolicy?.freeShippingThreshold ?? 0;
   const shippingDescription = policies?.shippingPolicy?.description;
   const shippingText = policies?.shippingPolicy
@@ -155,8 +239,17 @@ export default function VendorStorePage() {
           <div className="flex flex-col md:flex-row gap-6">
             {/* Vendor Logo/Icon */}
             <div className="flex-shrink-0">
-              <div className="w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center">
-                <Store className="w-12 h-12 md:w-16 md:h-16 text-white" />
+              <div
+                className={`w-24 h-24 md:w-32 md:h-32 rounded-full flex items-center justify-center ${
+                  vendorImage
+                    ? 'bg-white shadow-sm border border-gray-200'
+                    : 'bg-gradient-to-br from-primary-500 to-primary-700'
+                }`}
+                style={vendorAvatarStyle}
+              >
+                {!vendorImage && (
+                  <Store className="w-12 h-12 md:w-16 md:h-16 text-white" />
+                )}
               </div>
             </div>
 
@@ -167,21 +260,17 @@ export default function VendorStorePage() {
               </h1>
               
               <div className="flex items-center gap-2 mb-4">
-                <div className="flex items-center gap-1">
-                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <Star className="w-5 h-5 text-gray-300" />
-                </div>
-                <span className="text-sm text-gray-600">(4.0 rating)</span>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: 5 }).map((_, idx) => (
+                  <Star
+                    key={idx}
+                    className={`w-5 h-5 ${ratingValue > idx ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                  />
+                ))}
               </div>
-
-              <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <div className="flex items-center gap-3 text-gray-700">
-                  <Store className="w-5 h-5 text-primary-600" />
-                  <span className="text-sm">{products.length} Products</span>
-                </div>
+              <span className="text-sm text-gray-600">
+                {ratingAverage ? `(${ratingAverage} rating)` : '(No ratings yet)'}
+              </span>
               </div>
 
               {/* Quick Stats */}
@@ -191,7 +280,7 @@ export default function VendorStorePage() {
                   <p className="text-xs text-gray-600">Products</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-primary-600">4.0</p>
+                  <p className="text-2xl font-bold text-primary-600">{ratingDisplay}</p>
                   <p className="text-xs text-gray-600">Rating</p>
                 </div>
                 <div className="text-center">
@@ -201,6 +290,24 @@ export default function VendorStorePage() {
                 <div className="text-center">
                   <p className="text-2xl font-bold text-primary-600">24h</p>
                   <p className="text-xs text-gray-600">Response</p>
+                </div>
+              </div>
+              <div className="border-t border-gray-100 mt-6 pt-4">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="flex items-start gap-3">
+                    <Mail className="w-5 h-5 text-primary-600 mt-1" />
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Email</p>
+                      <p className="text-sm font-medium text-gray-900">{vendorEmailLabel}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-5 h-5 text-primary-600 mt-1" />
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Address</p>
+                      <p className="text-sm font-medium text-gray-900">{vendorAddressText}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -280,4 +387,3 @@ export default function VendorStorePage() {
     </main>
   );
 }
-
