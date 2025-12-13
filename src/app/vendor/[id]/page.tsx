@@ -122,7 +122,7 @@ export default function VendorStorePage() {
   const { pullDistance, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
     threshold: 70,
-    scrollableRef: scrollRef,
+    targetRef: scrollRef,
   });
 
   if (loading && !refreshing) {
