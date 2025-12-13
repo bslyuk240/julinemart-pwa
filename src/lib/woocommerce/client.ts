@@ -2,10 +2,6 @@ import WooCommerceRestApi from '@woocommerce/woocommerce-rest-api';
 
 const isClient = typeof window !== 'undefined';
 
-// Utility: scrub credentials from URLs/headers before logging
-const scrubAuth = (value?: string) =>
-  value?.replace(/\/\/([^:]+):([^@]+)@/g, '//***:***@');
-
 const serverApi = !isClient
   ? new WooCommerceRestApi({
       url: process.env.WC_BASE_URL?.replace('/wp-json/wc/v3', '') || '',
@@ -13,50 +9,28 @@ const serverApi = !isClient
       consumerSecret: process.env.WC_CONSUMER_SECRET || process.env.WC_SECRET || '',
       version: 'wc/v3',
       queryStringAuth: true,
-      timeout: 60000, // Increase timeout to 60 seconds
+      timeout: 60000,
     })
   : null;
 
-async function callProxy(method: 'get' | 'post' | 'put' | 'delete', endpoint: string, payload?: any, retries = 2) {
-  let lastError;
+async function callProxy(method: 'get' | 'post' | 'put' | 'delete', endpoint: string, payload?: any) {
+  // Use Netlify function instead of Next.js API route
+  const proxyUrl = '/.netlify/functions/woocommerce-proxy';
   
-  // Retry logic for ECONNRESET errors
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch('/api/woocommerce/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method, endpoint, payload }),
-        signal: AbortSignal.timeout(60000), // 60 second timeout
-      });
-      
-      const json = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(json?.message || 'WooCommerce proxy request failed');
-      }
-      
-      return json;
-    } catch (error: any) {
-      lastError = error;
-      
-      // If it's a connection reset and we have retries left, try again
-      if ((error.message?.includes('ECONNRESET') || error.message?.includes('fetch failed')) && attempt < retries) {
-        console.log(`Connection reset, retrying (${attempt + 1}/${retries})...`);
-        // Wait a bit before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-        continue;
-      }
-      
-      // If it's not a retryable error or we're out of retries, throw
-      throw error;
-    }
+  const res = await fetch(proxyUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method, endpoint, payload }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error?.message || 'WooCommerce proxy request failed');
   }
-  
-  throw lastError;
+
+  return res.json();
 }
 
-// Client-safe wrapper: uses server API directly on the server, proxy route on the client
 export const wcApi = {
   get: async (endpoint: string, params?: any) => {
     if (serverApi) {
@@ -88,26 +62,16 @@ export const wcApi = {
   },
 };
 
-// Helper function for error handling
-// Log API errors but do not throw so callers can gracefully fall back.
 export const handleApiError = (error: any, context?: string) => {
   const baseInfo = {
     message: error?.message,
     status: error?.response?.status,
-    url: scrubAuth(error?.config?.url || error?.request?.path),
   };
 
-  if (error?.response) {
-    console.error(context || 'API Error:', baseInfo);
-  } else if (error?.request) {
-    console.error(context || 'Network Error (sanitized):', baseInfo);
-  } else {
-    console.error(context || 'Error:', error?.message || error);
-  }
+  console.error(context || 'API Error:', baseInfo);
   return error;
 };
 
-// Types for API responses
 export interface WooCommerceResponse<T> {
   data: T;
   headers: Record<string, string>;
