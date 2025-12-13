@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { wcApi, handleApiError } from '@/lib/woocommerce/client';
 
-export const maxDuration = 60; // Vercel: allow up to 60 seconds
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
