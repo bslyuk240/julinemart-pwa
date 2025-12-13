@@ -40,10 +40,17 @@ export interface TermsConditions {
   content: string;
 }
 
+export interface CancellationPolicy {
+  enabled: boolean;
+  description: string;
+  conditions?: string[];
+ }
+
 export interface StorePolicies {
   returnPolicy: ReturnPolicy;
   refundPolicy: RefundPolicy;
   shippingPolicy: ShippingPolicy;
+  cancellationPolicy?: CancellationPolicy;
   privacyPolicy: PrivacyPolicy;
   termsConditions: TermsConditions;
 }
@@ -117,6 +124,14 @@ export async function getStorePolicies(forceRefresh = false): Promise<StorePolic
           'Partial refunds may apply to damaged items',
         ],
       },
+      cancellationPolicy: {
+        enabled: true,
+        description: 'Orders can be canceled within 24 hours before shipment if no tracking number has been generated.',
+        conditions: [
+          'Cancellation requests must be submitted via support',
+          'Items already shipped cannot be canceled',
+        ],
+      },
       shippingPolicy: {
         freeShippingThreshold: freeShippingThreshold,
         description: freeShippingThreshold > 0 
@@ -176,6 +191,11 @@ export async function getStorePolicies(forceRefresh = false): Promise<StorePolic
           'Item must meet return policy conditions',
           'Refunds issued to original payment method',
         ],
+      },
+      cancellationPolicy: {
+        enabled: true,
+        description: 'Orders can be canceled before shipment is confirmed.',
+        conditions: ['Contact support to cancel', 'Cancellations after shipping are not possible'],
       },
       shippingPolicy: {
         freeShippingThreshold: 0,

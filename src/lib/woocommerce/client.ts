@@ -13,20 +13,47 @@ const serverApi = !isClient
       consumerSecret: process.env.WC_CONSUMER_SECRET || process.env.WC_SECRET || '',
       version: 'wc/v3',
       queryStringAuth: true,
+      timeout: 60000, // Increase timeout to 60 seconds
     })
   : null;
 
-async function callProxy(method: 'get' | 'post' | 'put' | 'delete', endpoint: string, payload?: any) {
-  const res = await fetch('/api/woocommerce/proxy', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ method, endpoint, payload }),
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json?.message || 'WooCommerce proxy request failed');
+async function callProxy(method: 'get' | 'post' | 'put' | 'delete', endpoint: string, payload?: any, retries = 2) {
+  let lastError;
+  
+  // Retry logic for ECONNRESET errors
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch('/api/woocommerce/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method, endpoint, payload }),
+        signal: AbortSignal.timeout(60000), // 60 second timeout
+      });
+      
+      const json = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(json?.message || 'WooCommerce proxy request failed');
+      }
+      
+      return json;
+    } catch (error: any) {
+      lastError = error;
+      
+      // If it's a connection reset and we have retries left, try again
+      if ((error.message?.includes('ECONNRESET') || error.message?.includes('fetch failed')) && attempt < retries) {
+        console.log(`Connection reset, retrying (${attempt + 1}/${retries})...`);
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        continue;
+      }
+      
+      // If it's not a retryable error or we're out of retries, throw
+      throw error;
+    }
   }
-  return json;
+  
+  throw lastError;
 }
 
 // Client-safe wrapper: uses server API directly on the server, proxy route on the client
