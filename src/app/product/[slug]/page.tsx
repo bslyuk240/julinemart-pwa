@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       title: decodeHtmlEntities(product.name),
       description,
       url: canonicalUrl,
-      type: 'product',
+      type: 'website',
       images: [
         {
           url: imageUrl,
