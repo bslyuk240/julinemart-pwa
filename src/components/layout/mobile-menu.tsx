@@ -44,7 +44,7 @@ export default function MobileMenu({ isOpen, onClose, showOnDesktop = false }: M
 
   const handleRegisterClick = () => {
     onClose();
-    router.push('/register');
+    router.push('/signup');
   };
 
   // Authenticated menu items
