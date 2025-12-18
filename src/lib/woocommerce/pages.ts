@@ -21,7 +21,7 @@ export async function getPageBySlug(slug: string): Promise<WooPage | null> {
     for (const endpoint of endpoints) {
       const response = await fetch(
         `${baseUrl}/wp-json/wp/v2/${endpoint}?slug=${slug}`,
-        { next: { revalidate: 3600 } } // Cache 1 hour
+        { next: { revalidate: 60 } } // Cache 1 minute to keep policy pages fresh
       );
 
       if (!response.ok) continue;
