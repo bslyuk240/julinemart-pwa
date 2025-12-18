@@ -57,6 +57,12 @@ export default function Footer() {
 
         <div className="space-y-1.5">
           <h3 className="font-semibold text-white text-sm">Policies</h3>
+          <Link
+            href="/page/acceptable-use-policy"
+            className="block text-gray-200 hover:text-primary-200"
+          >
+            Acceptable Use Policy
+          </Link>
           <Link href="/page/privacy-policy" className="block text-gray-200 hover:text-primary-200">
             Privacy Policy
           </Link>
@@ -73,16 +79,20 @@ export default function Footer() {
           <Link href="/page/become-a-vendor" className="block text-gray-200 hover:text-primary-200">
             Become a Vendor
           </Link>
-          <Link href="/page/vendor-benefits" className="block text-gray-200 hover:text-primary-200">
-            Vendor Benefits
-          </Link>
-          <Link href="/page/vendor-membership" className="block text-gray-200 hover:text-primary-200">
-            Vendor Membership
-          </Link>
-          <Link href="/page/vendor-policy-guidelines" className="block text-gray-200 hover:text-primary-200">
-            Vendor Guidelines
-          </Link>
-        </div>
+          <div className="mt-3 border-t border-white/10 pt-3 text-xs uppercase tracking-wider text-gray-400">
+            Partnering with
+            <div className="mt-2 flex items-center gap-2">
+              <span className="block h-12 w-auto">
+                <img
+                  src="https://res.cloudinary.com/dupgdbwrt/image/upload/v1764293124/icon-512x512.png_2_er5opu.png"
+                  alt="FEZ Delivery logo"
+                  className="h-12 w-auto object-contain"
+                />
+              </span>
+              <span className="text-sm font-semibold text-white">FEZ Delivery</span>
+            </div>
+          </div>
+       </div>
       </div>
 
       <div className="border-t border-white/10 py-3">

@@ -27,14 +27,17 @@ export default async function DynamicPage({ params }: PageProps) {
     notFound();
   }
 
-  // Normalize internal links to open within this app (strip WP base URL if present)
+  // Normalize internal links to open within this app (only rewrite /page/ links)
   const wpBase = process.env.NEXT_PUBLIC_WP_URL?.replace(/\/+$/, '');
   let normalizedContent = page.content;
   if (wpBase) {
     try {
-      const escaped = wpBase.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const pattern = new RegExp(escaped, 'gi');
-      normalizedContent = page.content.replace(pattern, '');
+      const escapedBase = wpBase.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const pageLinkPattern = new RegExp(`href=(['"])${escapedBase}(/page/[^'"]+)\\1`, 'gi');
+      normalizedContent = normalizedContent.replace(
+        pageLinkPattern,
+        'href=$1$2$1'
+      );
     } catch (error) {
       console.error('Error normalizing page links', error);
     }
