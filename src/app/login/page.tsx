@@ -1,3 +1,4 @@
+// Updated Login Page with Google Sign-In
 'use client';
 
 import { Suspense, useState } from 'react';
@@ -11,6 +12,7 @@ import { useCustomerAuth } from '@/context/customer-auth-context';
 import { authenticateCustomer } from '@/lib/woocommerce/auth';
 import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
+import GoogleSignInButton from '@/components/auth/google-sign-in-button';
 
 function LoginContent() {
   const router = useRouter();
@@ -115,6 +117,24 @@ function LoginContent() {
 
         {/* Login Form */}
         <div className="bg-white rounded-lg shadow-md p-8">
+          {/* Google Sign-In Button */}
+          <div className="mb-6">
+            <GoogleSignInButton 
+              text="signin"
+              redirectTo={redirect}
+            />
+          </div>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white text-gray-500">Or continue with email</span>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email Input */}
             <div>
