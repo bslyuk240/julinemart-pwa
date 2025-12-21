@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    ignore:
+      - dependency-name: "eslint-config-next"
+      - dependency-name: "@next/bundle-analyzer"
