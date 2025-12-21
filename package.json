@@ -20,7 +20,7 @@
     "next": "^14.2.35",
     "next-auth": "^4.24.10",
     "pdfkit": "^0.17.2",
-    "react": "^18.3.1",
+    "react": "^19.2.3",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.2",
     "react-paystack": "^6.0.0",
@@ -34,7 +34,7 @@
   "devDependencies": {
     "@next/bundle-analyzer": "^14.2.18",
     "@types/node": "^22",
-    "@types/react": "^18",
+    "@types/react": "^19",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.20",
     "cross-env": "^10.1.0",
