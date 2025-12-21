@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 import Header from '@/components/layout/header';
 import BottomNav from '@/components/layout/bottom-nav';
@@ -65,6 +66,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         
         {/* Theme Color */}
         <meta name="theme-color" content="#77088a" />
+
+        {/* Google Analytics */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-T0X3ZR08FD"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-T0X3ZR08FD', {
+              page_path: window.location.pathname,
+            });
+          `}
+        </Script>
       </head>
       <body className={inter.className}>
         <CustomerAuthProvider>
