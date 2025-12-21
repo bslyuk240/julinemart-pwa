@@ -1,3 +1,4 @@
+// Updated Signup Page with Google Sign-In
 'use client';
 
 import { useState } from 'react';
@@ -10,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { registerCustomer } from '@/lib/woocommerce/auth';
 import { toast } from 'sonner';
+import GoogleSignInButton from '@/components/auth/google-sign-in-button';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -161,6 +163,24 @@ export default function SignupPage() {
 
         {/* Signup Form */}
         <div className="bg-white rounded-lg shadow-md p-8">
+          {/* Google Sign-In Button */}
+          <div className="mb-6">
+            <GoogleSignInButton 
+              text="signup"
+              redirectTo="/account"
+            />
+          </div>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white text-gray-500">Or sign up with email</span>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Name Fields */}
             <div className="grid grid-cols-2 gap-4">
