@@ -609,9 +609,10 @@ export default function CheckoutPage() {
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-          },
+  'Content-Type': 'application/json',
+  apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+},
           body: JSON.stringify({
             coupon_code: couponCode.toUpperCase(),
             cart_total: subtotal,
