@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CreditCard, Truck, Package, MapPin } from 'lucide-react';
+import { ArrowLeft, CreditCard, Truck, Package, MapPin, Tag } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { Button } from '@/components/ui/button';
@@ -60,11 +60,11 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const currentOrderRef = useRef<any>(null);
   
-  // NEW: Saved card state
+  // Saved card state
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [defaultSavedCard, setDefaultSavedCard] = useState<SavedCard | null>(null);
   const [useSavedCard, setUseSavedCard] = useState(false);
-  const [saveCard, setSaveCard] = useState(true); // Default checked
+  const [saveCard, setSaveCard] = useState(true);
   
   // Shipping & Payment
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
@@ -80,6 +80,13 @@ export default function CheckoutPage() {
   const [shippingError, setShippingError] = useState<string | null>(null);
   const [useDifferentAddress, setUseDifferentAddress] = useState(false);
   const [saveNewAddress, setSaveNewAddress] = useState(false);
+
+  // NEW: Influencer coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [couponError, setCouponError] = useState('');
+  const [shippingDiscount, setShippingDiscount] = useState(0);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -140,7 +147,10 @@ export default function CheckoutPage() {
   }, [customer]);
 
   const formatPrice = (price: number) => `NGN ${price.toLocaleString()}`;
-  const total = subtotal + (shippingCost || 0) + taxAmount;
+  
+  // NEW: Updated total calculation with discount
+  const discountedShipping = Math.max(0, (shippingCost || 0) - shippingDiscount);
+  const total = subtotal + discountedShipping + taxAmount;
 
   // Load Paystack script
   useEffect(() => {
@@ -194,7 +204,6 @@ export default function CheckoutPage() {
     }
   };
 
-  // 🔥 NEW: Updated payment verification handler
   const handlePaymentSuccess = async (response: any) => {
     console.log('✅ Paystack payment successful:', response);
     
@@ -208,10 +217,8 @@ export default function CheckoutPage() {
 
       const orderId = currentOrderRef.current;
       
-      // Show verification message
       toast.loading('Verifying payment...', { id: 'payment-verify' });
 
-      // Call backend to verify payment and update order
       const verifyResponse = await fetch('/api/verify-payment', {
         method: 'POST',
         headers: {
@@ -220,7 +227,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           reference: response.reference,
           orderId: orderId,
-          saveCard: saveCard && isAuthenticated, // Pass save card preference
+          saveCard: saveCard && isAuthenticated,
           customerId: customerId,
         }),
       });
@@ -236,20 +243,17 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Success! Clear cart and redirect
       toast.success('Payment verified successfully!', { id: 'payment-verify' });
       console.log('✅ Payment verified, clearing cart...');
       
-      // If card was saved, update local state
       if (verifyData.cardSaved) {
         toast.success('Payment card saved for future use!');
-        await refreshCustomer(); // Refresh customer data to get saved card
+        await refreshCustomer();
       }
       
       clearCart();
       currentOrderRef.current = null;
       
-      // Redirect to success page
       router.push(`/order-success?order=${orderId}`);
       
     } catch (error: any) {
@@ -259,7 +263,6 @@ export default function CheckoutPage() {
     }
   };
 
-  // NEW: Handle saved card payment (charge authorization)
   const handleSavedCardPayment = async (orderId: number) => {
     if (!defaultSavedCard || !isAuthenticated || !customerId) {
       toast.error('Unable to process payment with saved card');
@@ -284,7 +287,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           customerId,
           email: formData.email || customer?.email,
-          amount: amountKobo, // Convert to kobo
+          amount: amountKobo,
           authorization_code: defaultSavedCard.authorization_code,
           metadata: {
             order_id: orderId,
@@ -303,7 +306,6 @@ export default function CheckoutPage() {
       if (chargeData.success && chargeData.data?.status === 'success') {
         console.log('Saved card charged successfully');
         
-        // Use the verification API to update order
         const reference = chargeData.data?.reference || chargeData.data?.id || 'paystack-charge';
         
         const verifyResponse = await fetch('/api/verify-payment', {
@@ -312,7 +314,7 @@ export default function CheckoutPage() {
           body: JSON.stringify({
             reference: reference,
             orderId: orderId,
-            saveCard: false, // Card already saved
+            saveCard: false,
             customerId: customerId,
           }),
         });
@@ -391,10 +393,8 @@ export default function CheckoutPage() {
     }
   }, [items]);
 
-  // NEW: Load saved cards and prefill checkout form when customer data is available
   useEffect(() => {
     if (customer) {
-      // Load saved cards
       const savedCardsMeta = (customer as any)?.meta_data?.find((m: any) => m.key === 'saved_payment_cards');
       if (savedCardsMeta?.value) {
         try {
@@ -411,7 +411,6 @@ export default function CheckoutPage() {
         }
       }
 
-      // Prefill form with saved shipping first, then billing
       if (customer.shipping) {
         applyShippingAddress();
         setUseDifferentAddress(false);
@@ -425,7 +424,6 @@ export default function CheckoutPage() {
     }
   }, [customer]);
 
-  // If user switches back to saved address, re-apply it
   useEffect(() => {
     if (!useDifferentAddress && customer?.shipping) {
       applyShippingAddress();
@@ -439,7 +437,6 @@ export default function CheckoutPage() {
     }
   }, [defaultSavedCard, selectedPayment]);
 
-  // Update tax amount
   useEffect(() => {
     const updateTaxAmount = async () => {
       if (subtotal <= 0) {
@@ -586,6 +583,78 @@ export default function CheckoutPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // NEW: Apply influencer coupon
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error('Please enter a coupon code');
+      return;
+    }
+
+    if (!formData.state || !formData.city) {
+      toast.error('Please enter your delivery address first');
+      return;
+    }
+
+    if (shippingCost === null) {
+      toast.error('Please wait for shipping to be calculated');
+      return;
+    }
+
+    setIsApplyingCoupon(true);
+    setCouponError('');
+
+    try {
+      const response = await fetch(
+        'https://gfikkrwhsedhwmkxybzm.supabase.co/functions/v1/influencers/validate-coupon',
+        {
+          method: 'POST',
+          headers: {
+  'Content-Type': 'application/json',
+  apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+},
+          body: JSON.stringify({
+            coupon_code: couponCode.toUpperCase(),
+            cart_total: subtotal,
+            shipping_cost: shippingCost,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        setCouponError(result.error || 'Invalid coupon code');
+        return;
+      }
+
+      setAppliedCoupon({
+        code: couponCode.toUpperCase(),
+        influencer_id: result.data.influencer_id,
+        influencer_name: result.data.influencer_name,
+        shipping_discount: result.data.shipping_discount,
+        message: result.data.message,
+      });
+
+      setShippingDiscount(result.data.shipping_discount);
+      toast.success(result.data.message);
+      setCouponCode('');
+
+    } catch (error: any) {
+      console.error('Coupon validation error:', error);
+      setCouponError('Failed to validate coupon. Please try again.');
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
+
+  // NEW: Remove applied coupon
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setShippingDiscount(0);
+    toast.info('Coupon removed');
+  };
+
   const handlePlaceOrder = async () => {
     if (!validateForm()) {
       toast.error('Please fill in all required fields correctly');
@@ -683,7 +752,6 @@ export default function CheckoutPage() {
                 key: '_hub_name',
                 value: item.hubName || 'Default Hub',
               },
-              // Vendor metadata for WCFM/WCFMMP
               ...(vendorId
                 ? [
                     { key: '_vendor_id', value: vendorId.toString() },
@@ -703,7 +771,6 @@ export default function CheckoutPage() {
             ],
           };
         }),
-        // Order-level vendor attribution for WCFM
         meta_data: [
           ...orderVendorMeta,
           {
@@ -718,16 +785,47 @@ export default function CheckoutPage() {
             key: '_hub_name',
             value: items[0]?.hubName || 'Default Hub',
           },
+          // NEW: Influencer coupon data
+          ...(appliedCoupon ? [
+            {
+              key: '_influencer_coupon_code',
+              value: appliedCoupon.code,
+            },
+            {
+              key: '_influencer_id',
+              value: appliedCoupon.influencer_id,
+            },
+            {
+              key: '_shipping_discount',
+              value: shippingDiscount.toString(),
+            },
+          ] : []),
         ],
         shipping_lines: selectedShipping ? [{
           method_id: selectedOption?.methodId || 'flat_rate',
           method_title: selectedOption?.title || 'Shipping',
-          total: (shippingCost ?? 0).toString(),
+          total: discountedShipping.toString(),
+          meta_data: shippingDiscount > 0 ? [
+            {
+              key: '_original_shipping_cost',
+              value: shippingCost?.toString() || '0',
+            },
+            {
+              key: '_shipping_discount',
+              value: shippingDiscount.toString(),
+            },
+          ] : [],
+        }] : [],
+        // NEW: Add coupon_lines for webhook detection
+        coupon_lines: appliedCoupon ? [{
+          code: appliedCoupon.code,
+          discount: shippingDiscount.toString(),
+          discount_type: 'shipping',
         }] : [],
         customer_note: formData.notes,
       };
 
-      console.log('📦 Creating order with vendor info:', orderData);
+      console.log('📦 Creating order with coupon info:', orderData);
 
       const createOrderResponse = await fetch('/api/orders', {
         method: 'POST',
@@ -745,7 +843,6 @@ export default function CheckoutPage() {
         console.log('✅ Order created:', order.id);
         await persistAddressIfNeeded();
         
-        // Check if payment method requires online payment
         const selectedGateway = paymentGateways.find(g => g.id === selectedPayment);
         const requiresPayment = selectedGateway?.id !== 'cod' && 
                                selectedGateway?.id !== 'bacs' && 
@@ -759,19 +856,15 @@ export default function CheckoutPage() {
             return;
           }
 
-          // NEW: Check if using saved card
           if (useSavedCard && defaultSavedCard && isAuthenticated) {
-            // Charge saved card
             await handleSavedCardPayment(order.id);
           } else {
-            // Store order in ref for callback
             currentOrderRef.current = order.id;
             
-            // Build Paystack config
             const paystackConfig = {
               reference: `JLM_${order.id}_${Date.now()}`,
               email: formData.email,
-              amount: amountKobo, // Convert to kobo
+              amount: amountKobo,
               publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
               metadata: {
                 order_id: order.id,
@@ -793,13 +886,11 @@ export default function CheckoutPage() {
 
             toast.success('Opening payment window...');
             
-            // Small delay to ensure toast shows
             setTimeout(() => {
               initializePaystackPayment(paystackConfig);
             }, 500);
           }
         } else {
-          // For Cash on Delivery and other offline methods
           clearCart();
           toast.success('Order placed successfully!');
           router.push(`/order-success?order=${order.id}`);
@@ -1132,6 +1223,67 @@ export default function CheckoutPage() {
               </div>
             )}
 
+            {/* NEW: Influencer Coupon Section */}
+            {shippingCost !== null && shippingCost > 0 && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Tag className="w-6 h-6 text-primary-600" />
+                  <h2 className="text-xl font-semibold text-gray-900">Discount Code</h2>
+                </div>
+
+                {appliedCoupon ? (
+                  <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-green-900">
+                          {appliedCoupon.code} Applied
+                        </p>
+                        <p className="text-sm text-green-700 mt-1">
+                          {appliedCoupon.message}
+                        </p>
+                      </div>
+                      <button
+                        onClick={removeCoupon}
+                        type="button"
+                        className="text-red-600 hover:text-red-700 text-sm font-medium"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Enter influencer code"
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        disabled={isApplyingCoupon}
+                        fullWidth
+                      />
+                      <Button
+                        onClick={applyCoupon}
+                        disabled={!couponCode || isApplyingCoupon}
+                        isLoading={isApplyingCoupon}
+                        variant="secondary"
+                        size="md"
+                        className="whitespace-nowrap"
+                        type="button"
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                    {couponError && (
+                      <p className="text-sm text-red-600">{couponError}</p>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      💡 Have an influencer code? Save on shipping!
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Payment Method */}
             {paymentGateways.length > 0 && (
               <div className="bg-white rounded-lg shadow-sm p-6">
@@ -1140,7 +1292,6 @@ export default function CheckoutPage() {
                   <h2 className="text-xl font-semibold text-gray-900">Payment Method</h2>
                 </div>
 
-                {/* NEW: Saved Card Option */}
                 {isAuthenticated && defaultSavedCard && isPaystackGateway && (
                   <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
                     <label className="flex items-start gap-3 cursor-pointer">
@@ -1166,7 +1317,6 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                {/* Payment Gateways - Hidden when using saved card */}
                 {(!useSavedCard || !isPaystackGateway) && (
                   <div className="space-y-3">
                     {paymentGateways.map((gateway) => (
@@ -1197,7 +1347,6 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                {/* NEW: Save Card Checkbox - Only show when NOT using saved card and Paystack is selected */}
                 {isAuthenticated && !useSavedCard && isPaystackGateway && (
                   <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                     <label className="flex items-start gap-3 cursor-pointer">
@@ -1258,6 +1407,13 @@ export default function CheckoutPage() {
                         : 'Calculated at checkout'}
                   </span>
                 </div>
+                {/* NEW: Show shipping discount if applied */}
+                {shippingDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Shipping Discount</span>
+                    <span className="font-medium">-{formatPrice(shippingDiscount)}</span>
+                  </div>
+                )}
                 {taxRate > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Tax ({taxRate}%)</span>
@@ -1298,4 +1454,3 @@ export default function CheckoutPage() {
     </main>
   );
 }
-
