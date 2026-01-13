@@ -1,5 +1,4 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 interface InvoiceData {
   order: {
@@ -20,6 +19,95 @@ interface InvoiceData {
     billing: any;
   };
 }
+
+type LineItemRow = {
+  item: string;
+  qty: string;
+  price: string;
+  total: string;
+};
+
+const renderLineItemsTable = (
+  doc: jsPDF,
+  rows: LineItemRow[],
+  startY: number,
+  colors: {
+    primary: [number, number, number];
+    text: [number, number, number];
+    highlight: [number, number, number];
+  }
+) => {
+  const marginLeft = 20;
+  const marginRight = 20;
+  const pageWidth = doc.internal.pageSize.width;
+  const tableWidth = pageWidth - marginLeft - marginRight;
+  const columnRatios = [0.55, 0.15, 0.15, 0.15];
+  const columnWidths = columnRatios.map((ratio) => tableWidth * ratio);
+  const columnX: number[] = [];
+  columnWidths.forEach((width, index) => {
+    if (index === 0) {
+      columnX.push(marginLeft);
+    } else {
+      columnX.push(columnX[index - 1] + columnWidths[index - 1]);
+    }
+  });
+
+  let currentY = startY;
+  const headerHeight = 9;
+
+  doc.setFillColor(...colors.primary);
+  doc.rect(marginLeft, currentY - 1, tableWidth, headerHeight, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(255, 255, 255);
+  const headerTextY = currentY + headerHeight - 3;
+  doc.text('Item', columnX[0] + 2, headerTextY);
+  doc.text('Qty', columnX[1] + columnWidths[1] / 2, headerTextY, { align: 'center' });
+  doc.text('Price', columnX[2] + columnWidths[2] - 2, headerTextY, { align: 'right' });
+  doc.text('Total', columnX[3] + columnWidths[3] - 2, headerTextY, { align: 'right' });
+
+  currentY += headerHeight + 3;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...colors.text);
+  doc.setDrawColor(229, 231, 235);
+  doc.setLineWidth(0.1);
+  doc.line(marginLeft, currentY - 2, marginLeft + tableWidth, currentY - 2);
+
+  const lineHeight = 4.4;
+  const rowPadding = 2.4;
+
+  rows.forEach((row, index) => {
+    const itemLines = doc.splitTextToSize(row.item, columnWidths[0] - 4);
+    const rowHeight = Math.max(itemLines.length, 1) * lineHeight + rowPadding * 2;
+
+    if (index % 2 === 1) {
+      doc.setFillColor(...colors.highlight);
+      doc.rect(marginLeft, currentY, tableWidth, rowHeight, 'F');
+    }
+
+    doc.setDrawColor(229, 231, 235);
+    doc.line(marginLeft, currentY, marginLeft + tableWidth, currentY);
+    doc.line(marginLeft, currentY + rowHeight, marginLeft + tableWidth, currentY + rowHeight);
+
+    const textStartY = currentY + rowPadding + lineHeight / 2 + 1;
+    itemLines.forEach((line: string, lineIndex: number) => {
+      doc.text(line, columnX[0] + 2, textStartY + lineIndex * lineHeight);
+    });
+
+    const centerY = currentY + rowHeight / 2 + 1;
+    doc.text(row.qty, columnX[1] + columnWidths[1] / 2, centerY, { align: 'center' });
+    doc.text(row.price, columnX[2] + columnWidths[2] - 2, centerY, { align: 'right' });
+    doc.text(row.total, columnX[3] + columnWidths[3] - 2, centerY, { align: 'right' });
+
+    currentY += rowHeight;
+  });
+
+  doc.line(marginLeft, currentY, marginLeft + tableWidth, currentY);
+  return currentY;
+};
 
 // Function to load image and convert to base64
 const loadImageAsBase64 = async (url: string): Promise<string> => {
@@ -197,53 +285,21 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   yPos = Math.max(leftY + 18, yPos + 35);
 
   // ===== ORDER ITEMS TABLE (COMPACT) =====
-  const tableData = order.line_items.map((item: any) => {
+  const tableData: LineItemRow[] = order.line_items.map((item: any) => {
     const productName = item.name.length > 50 ? item.name.substring(0, 47) + '...' : item.name;
-    return [
-      productName,
-      item.quantity.toString(),
-      formatPrice(item.price.toString()),
-      formatPrice(item.total),
-    ];
+    return {
+      item: productName,
+      qty: item.quantity.toString(),
+      price: formatPrice(item.price.toString()),
+      total: formatPrice(item.total),
+    };
   });
 
-  autoTable(doc, {
-    startY: yPos,
-    head: [['Item', 'Qty', 'Price', 'Total']],
-    body: tableData,
-    theme: 'striped',
-    headStyles: {
-      fillColor: primaryColor,
-      textColor: [255, 255, 255],
-      fontSize: 8,
-      fontStyle: 'bold',
-      halign: 'left',
-      cellPadding: 2,
-    },
-    bodyStyles: {
-      textColor: textColor,
-      fontSize: 7,
-      cellPadding: 2,
-    },
-    alternateRowStyles: {
-      fillColor: [249, 250, 251],
-    },
-    columnStyles: {
-      0: { cellWidth: 95, halign: 'left' },
-      1: { cellWidth: 15, halign: 'center' },
-      2: { cellWidth: 37, halign: 'right' },
-      3: { cellWidth: 38, halign: 'right' },
-    },
-    margin: { left: 20, right: 20 },
-    styles: {
-      overflow: 'linebreak',
-      cellWidth: 'wrap',
-      lineWidth: 0.1,
-      lineColor: [229, 231, 235],
-    },
+  const finalY = renderLineItemsTable(doc, tableData, yPos, {
+    primary: primaryColor,
+    text: textColor,
+    highlight: lightGray,
   });
-
-  const finalY = (doc as any).lastAutoTable.finalY || yPos + 30;
   yPos = finalY + 8;
 
   // ===== TOTALS BOX (COMPACT, RIGHT ALIGNED) =====
