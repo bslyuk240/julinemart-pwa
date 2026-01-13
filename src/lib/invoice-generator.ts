@@ -93,7 +93,7 @@ const renderLineItemsTable = (
     doc.line(marginLeft, currentY + rowHeight, marginLeft + tableWidth, currentY + rowHeight);
 
     const textStartY = currentY + rowPadding + lineHeight / 2 + 1;
-    itemLines.forEach((line, lineIndex) => {
+    itemLines.forEach((line: string, lineIndex: number) => {
       doc.text(line, columnX[0] + 2, textStartY + lineIndex * lineHeight);
     });
 
