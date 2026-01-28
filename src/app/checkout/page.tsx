@@ -44,6 +44,9 @@ interface SavedCard {
 
 const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
 const DEFAULT_WEIGHT = 0.5;
+const VOUCHER_VALIDATION_URL =
+  process.env.NEXT_PUBLIC_VOUCHER_VALIDATION_URL ||
+  'https://julinemart-pwa.netlify.app/.netlify/functions/helpers/voucherHelpers';
 
 // Declare Paystack type
 declare global {
@@ -87,6 +90,11 @@ export default function CheckoutPage() {
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [couponError, setCouponError] = useState('');
   const [shippingDiscount, setShippingDiscount] = useState(0);
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
+  const [voucherError, setVoucherError] = useState('');
+  const [voucherDiscount, setVoucherDiscount] = useState(0);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -149,7 +157,8 @@ export default function CheckoutPage() {
   const formatPrice = (price: number) => `NGN ${price.toLocaleString()}`;
   
   // NEW: Updated total calculation with discount
-  const discountedShipping = Math.max(0, (shippingCost || 0) - shippingDiscount);
+  const activeShippingDiscount = appliedVoucher ? voucherDiscount : shippingDiscount;
+  const discountedShipping = Math.max(0, (shippingCost || 0) - activeShippingDiscount);
   const total = subtotal + discountedShipping + taxAmount;
 
   // Load Paystack script
@@ -600,6 +609,11 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (appliedVoucher) {
+      toast.error('Remove the campaign voucher to use an influencer code');
+      return;
+    }
+
     setIsApplyingCoupon(true);
     setCouponError('');
 
@@ -648,11 +662,96 @@ export default function CheckoutPage() {
     }
   };
 
+  const applyVoucher = async () => {
+    if (!voucherCode.trim()) {
+      toast.error('Please enter a voucher code');
+      return;
+    }
+
+    if (!formData.state || !formData.city) {
+      toast.error('Please enter your delivery address first');
+      return;
+    }
+
+    if (shippingCost === null) {
+      toast.error('Please wait for shipping to be calculated');
+      return;
+    }
+
+    setIsApplyingVoucher(true);
+    setVoucherError('');
+
+    try {
+      const response = await fetch(VOUCHER_VALIDATION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          coupon_code: voucherCode.trim().toUpperCase(),
+          cart_total: subtotal,
+          shipping_cost: shippingCost ?? 0,
+          customer_email: formData.email || customer?.email || '',
+          items: items.map((item: any) => ({
+            product_id: item.productId,
+            variation_id: item.variation?.id,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        setVoucherError(result.error || result.message || 'Invalid voucher code');
+        return;
+      }
+
+      const rawDiscount =
+        result.data?.shipping_discount ??
+        result.data?.discount_value ??
+        0;
+      const normalizedDiscount =
+        typeof rawDiscount === 'string'
+          ? parseFloat(rawDiscount)
+          : rawDiscount;
+      const voucherValue = Number.isFinite(normalizedDiscount)
+        ? normalizedDiscount
+        : 0;
+
+      setAppliedVoucher(result.data);
+      setVoucherDiscount(voucherValue);
+      setVoucherError('');
+      setVoucherCode('');
+      removeCoupon({ showToast: false });
+      toast.success(result.data.message || 'Voucher applied');
+    } catch (error: any) {
+      console.error('Voucher validation error:', error);
+      setVoucherError(
+        error?.message || 'Failed to validate voucher. Please try again.'
+      );
+    } finally {
+      setIsApplyingVoucher(false);
+    }
+  };
+
+  const removeVoucher = () => {
+    setAppliedVoucher(null);
+    setVoucherDiscount(0);
+    setVoucherError('');
+    setVoucherCode('');
+    setShippingDiscount(0);
+    toast.info('Voucher removed');
+  };
+
   // NEW: Remove applied coupon
-  const removeCoupon = () => {
+  const removeCoupon = ({ showToast = true } = {}) => {
     setAppliedCoupon(null);
     setShippingDiscount(0);
-    toast.info('Coupon removed');
+    if (showToast) {
+      toast.info('Coupon removed');
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -699,6 +798,14 @@ export default function CheckoutPage() {
             ]
           : [];
       })();
+
+      const orderShippingDiscount = appliedVoucher
+        ? voucherDiscount
+        : shippingDiscount;
+      const shippingLineTotal = Math.max(
+        0,
+        (shippingCost ?? 0) - orderShippingDiscount
+      );
 
       const orderData = {
         customer_id: isAuthenticated && customerId ? customerId : undefined,
@@ -800,24 +907,42 @@ export default function CheckoutPage() {
               value: shippingDiscount.toString(),
             },
           ] : []),
+          ...(appliedVoucher ? [
+            {
+              key: '_campaign_voucher_id',
+              value: appliedVoucher.id,
+            },
+            {
+              key: '_campaign_voucher_code',
+              value: appliedVoucher.code,
+            },
+            {
+              key: '_voucher_discount',
+              value: voucherDiscount.toString(),
+            },
+          ] : []),
         ],
         shipping_lines: selectedShipping ? [{
           method_id: selectedOption?.methodId || 'flat_rate',
           method_title: selectedOption?.title || 'Shipping',
-          total: discountedShipping.toString(),
-          meta_data: shippingDiscount > 0 ? [
+          total: shippingLineTotal.toString(),
+          meta_data: orderShippingDiscount > 0 ? [
             {
               key: '_original_shipping_cost',
               value: shippingCost?.toString() || '0',
             },
             {
               key: '_shipping_discount',
-              value: shippingDiscount.toString(),
+              value: orderShippingDiscount.toString(),
             },
           ] : [],
         }] : [],
         // NEW: Add coupon_lines for webhook detection
-        coupon_lines: appliedCoupon ? [{
+        coupon_lines: appliedVoucher ? [{
+          code: appliedVoucher.code,
+          discount: voucherDiscount.toString(),
+          discount_type: appliedVoucher.discount_type || 'shipping',
+        }] : appliedCoupon ? [{
           code: appliedCoupon.code,
           discount: shippingDiscount.toString(),
           discount_type: 'shipping',
@@ -1223,7 +1348,7 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* NEW: Influencer Coupon Section */}
+            {/* NEW: Discount Code + Voucher */}
             {shippingCost !== null && shippingCost > 0 && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-center gap-3 mb-4">
@@ -1231,56 +1356,124 @@ export default function CheckoutPage() {
                   <h2 className="text-xl font-semibold text-gray-900">Discount Code</h2>
                 </div>
 
-                {appliedCoupon ? (
-                  <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-green-900">
-                          {appliedCoupon.code} Applied
-                        </p>
-                        <p className="text-sm text-green-700 mt-1">
-                          {appliedCoupon.message}
+                <div className="space-y-5">
+                  <div className="space-y-3">
+                    {appliedVoucher ? (
+                      <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-green-900">
+                              {appliedVoucher.code} Applied
+                            </p>
+                            <p className="text-sm text-green-700 mt-1">
+                              {appliedVoucher.message}
+                            </p>
+                            {voucherDiscount > 0 && (
+                              <p className="text-xs text-gray-600 mt-1">
+                                Shipping discount: -{formatPrice(voucherDiscount)}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={removeVoucher}
+                            className="text-red-600 hover:text-red-700 text-sm font-medium"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter campaign voucher"
+                            value={voucherCode}
+                            onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                            disabled={isApplyingVoucher}
+                            fullWidth
+                          />
+                          <Button
+                            onClick={applyVoucher}
+                            disabled={
+                              !voucherCode.trim() ||
+                              isApplyingVoucher ||
+                              shippingCost === null
+                            }
+                            isLoading={isApplyingVoucher}
+                            variant="secondary"
+                            size="md"
+                            className="whitespace-nowrap"
+                            type="button"
+                          >
+                            Apply
+                          </Button>
+                        </div>
+                        {voucherError && (
+                          <p className="text-sm text-red-600">{voucherError}</p>
+                        )}
+                        <p className="text-xs text-gray-500">
+                          Vouchers are validated once shipping has been calculated.
                         </p>
                       </div>
-                      <button
-                        onClick={removeCoupon}
-                        type="button"
-                        className="text-red-600 hover:text-red-700 text-sm font-medium"
-                      >
-                        Remove
-                      </button>
-                    </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Enter influencer code"
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                        disabled={isApplyingCoupon}
-                        fullWidth
-                      />
-                      <Button
-                        onClick={applyCoupon}
-                        disabled={!couponCode || isApplyingCoupon}
-                        isLoading={isApplyingCoupon}
-                        variant="secondary"
-                        size="md"
-                        className="whitespace-nowrap"
-                        type="button"
-                      >
-                        Apply
-                      </Button>
-                    </div>
-                    {couponError && (
-                      <p className="text-sm text-red-600">{couponError}</p>
+
+                  <div className="border-t pt-4 space-y-3">
+                    {appliedCoupon ? (
+                      <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-green-900">
+                              {appliedCoupon.code} Applied
+                            </p>
+                            <p className="text-sm text-green-700 mt-1">
+                              {appliedCoupon.message}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => removeCoupon()}
+                            type="button"
+                            className="text-red-600 hover:text-red-700 text-sm font-medium"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter influencer code"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            disabled={isApplyingCoupon || Boolean(appliedVoucher)}
+                            fullWidth
+                          />
+                          <Button
+                            onClick={applyCoupon}
+                            disabled={!couponCode || isApplyingCoupon || Boolean(appliedVoucher)}
+                            isLoading={isApplyingCoupon}
+                            variant="secondary"
+                            size="md"
+                            className="whitespace-nowrap"
+                            type="button"
+                          >
+                            Apply
+                          </Button>
+                        </div>
+                        {couponError && (
+                          <p className="text-sm text-red-600">{couponError}</p>
+                        )}
+                      </div>
                     )}
                     <p className="text-xs text-gray-500">
-                      💡 Have an influencer code? Save on shipping!
+                      {appliedVoucher
+                        ? 'Remove the campaign voucher to use an influencer code.'
+                        : '💡 Have an influencer code? Save on shipping!'}
                     </p>
                   </div>
-                )}
+                </div>
               </div>
             )}
 
@@ -1408,10 +1601,10 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 {/* NEW: Show shipping discount if applied */}
-                {shippingDiscount > 0 && (
+                {activeShippingDiscount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Shipping Discount</span>
-                    <span className="font-medium">-{formatPrice(shippingDiscount)}</span>
+                    <span className="font-medium">-{formatPrice(activeShippingDiscount)}</span>
                   </div>
                 )}
                 {taxRate > 0 && (
