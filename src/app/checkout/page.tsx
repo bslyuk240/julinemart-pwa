@@ -46,7 +46,7 @@ const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
 const DEFAULT_WEIGHT = 0.5;
 const VOUCHER_VALIDATION_URL =
   process.env.NEXT_PUBLIC_VOUCHER_VALIDATION_URL ||
-  'https://julinemart-pwa.netlify.app/.netlify/functions/voucherHelpers';
+  'https://jlo.julinemart.com/.netlify/functions/voucherHelpers';
 
 // Declare Paystack type
 declare global {
