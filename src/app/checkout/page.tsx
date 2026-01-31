@@ -156,10 +156,11 @@ export default function CheckoutPage() {
 
   const formatPrice = (price: number) => `NGN ${price.toLocaleString()}`;
   
-  // NEW: Updated total calculation with discount
-  const activeShippingDiscount = appliedVoucher ? voucherDiscount : shippingDiscount;
+  // ✅ FIXED: Correct calculation - vouchers discount products, coupons discount shipping
+  const activeShippingDiscount = appliedCoupon ? shippingDiscount : 0; // Only influencer coupons discount shipping
   const discountedShipping = Math.max(0, (shippingCost || 0) - activeShippingDiscount);
-  const total = subtotal + discountedShipping + taxAmount;
+  const discountedSubtotal = Math.max(0, subtotal - voucherDiscount); // Vouchers discount products
+  const total = discountedSubtotal + discountedShipping + taxAmount;
 
   // Load Paystack script
   useEffect(() => {
@@ -623,10 +624,10 @@ export default function CheckoutPage() {
         {
           method: 'POST',
           headers: {
-  'Content-Type': 'application/json',
-  apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-},
+            'Content-Type': 'application/json',
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
           body: JSON.stringify({
             coupon_code: couponCode.toUpperCase(),
             cart_total: subtotal,
@@ -694,9 +695,11 @@ export default function CheckoutPage() {
           customer_email: formData.email || customer?.email || '',
           items: items.map((item: any) => ({
             product_id: item.productId,
+            sku: item.sku || item.variation?.sku || '',
             variation_id: item.variation?.id,
             quantity: item.quantity,
             price: item.price,
+            vendor_id: item.vendorId,
           })),
         }),
       });
@@ -708,14 +711,12 @@ export default function CheckoutPage() {
         return;
       }
 
-      const rawDiscount =
-        result.data?.shipping_discount ??
-        result.data?.discount_value ??
-        0;
+      // ✅ FIXED: Extract product_discount, not shipping_discount
+      const productDiscount = result.data?.product_discount ?? result.data?.discount_value ?? 0;
       const normalizedDiscount =
-        typeof rawDiscount === 'string'
-          ? parseFloat(rawDiscount)
-          : rawDiscount;
+        typeof productDiscount === 'string'
+          ? parseFloat(productDiscount)
+          : productDiscount;
       const voucherValue = Number.isFinite(normalizedDiscount)
         ? normalizedDiscount
         : 0;
@@ -725,7 +726,15 @@ export default function CheckoutPage() {
       setVoucherError('');
       setVoucherCode('');
       removeCoupon({ showToast: false });
-      toast.success(result.data.message || 'Voucher applied');
+      
+      // ✅ Better success message
+      const matchingItems = result.data?.matching_items_count || items.length;
+      const totalItems = result.data?.total_items_count || items.length;
+      toast.success(
+        matchingItems === totalItems
+          ? `Voucher applied! ${formatPrice(voucherValue)} discount`
+          : `Voucher applied to ${matchingItems} of ${totalItems} items! ${formatPrice(voucherValue)} discount`
+      );
     } catch (error: any) {
       console.error('Voucher validation error:', error);
       setVoucherError(
@@ -741,7 +750,6 @@ export default function CheckoutPage() {
     setVoucherDiscount(0);
     setVoucherError('');
     setVoucherCode('');
-    setShippingDiscount(0);
     toast.info('Voucher removed');
   };
 
@@ -799,13 +807,9 @@ export default function CheckoutPage() {
           : [];
       })();
 
-      const orderShippingDiscount = appliedVoucher
-        ? voucherDiscount
-        : shippingDiscount;
-      const shippingLineTotal = Math.max(
-        0,
-        (shippingCost ?? 0) - orderShippingDiscount
-      );
+      // ✅ FIXED: Only influencer coupons discount shipping
+      const orderShippingDiscount = appliedCoupon ? shippingDiscount : 0;
+      const shippingLineTotal = Math.max(0, (shippingCost ?? 0) - orderShippingDiscount);
 
       const orderData = {
         customer_id: isAuthenticated && customerId ? customerId : undefined,
@@ -941,7 +945,7 @@ export default function CheckoutPage() {
         coupon_lines: appliedVoucher ? [{
           code: appliedVoucher.code,
           discount: voucherDiscount.toString(),
-          discount_type: appliedVoucher.discount_type || 'shipping',
+          discount_type: appliedVoucher.discount_type || 'fixed_cart',
         }] : appliedCoupon ? [{
           code: appliedCoupon.code,
           discount: shippingDiscount.toString(),
@@ -1370,7 +1374,10 @@ export default function CheckoutPage() {
                             </p>
                             {voucherDiscount > 0 && (
                               <p className="text-xs text-gray-600 mt-1">
-                                Shipping discount: -{formatPrice(voucherDiscount)}
+                                Product discount: -{formatPrice(voucherDiscount)}
+                                {appliedVoucher?.matching_items_count < appliedVoucher?.total_items_count && 
+                                  ` (applied to ${appliedVoucher.matching_items_count} of ${appliedVoucher.total_items_count} items)`
+                                }
                               </p>
                             )}
                           </div>
@@ -1590,6 +1597,15 @@ export default function CheckoutPage() {
                   <span className="text-gray-600">Subtotal</span>
                   <span className="font-medium">{formatPrice(subtotal)}</span>
                 </div>
+                
+                {/* ✅ Show product discount from voucher */}
+                {voucherDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Product Discount</span>
+                    <span className="font-medium">-{formatPrice(voucherDiscount)}</span>
+                  </div>
+                )}
+                
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
                   <span className="font-medium">
@@ -1600,19 +1616,22 @@ export default function CheckoutPage() {
                         : 'Calculated at checkout'}
                   </span>
                 </div>
-                {/* NEW: Show shipping discount if applied */}
+                
+                {/* ✅ Show shipping discount from influencer coupon */}
                 {activeShippingDiscount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Shipping Discount</span>
                     <span className="font-medium">-{formatPrice(activeShippingDiscount)}</span>
                   </div>
                 )}
+                
                 {taxRate > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Tax ({taxRate}%)</span>
                     <span className="font-medium">{formatPrice(taxAmount)}</span>
                   </div>
                 )}
+                
                 <div className="flex justify-between pt-2 border-t text-lg font-bold">
                   <span>Total</span>
                   <span className="text-primary-600">{formatPrice(total)}</span>
