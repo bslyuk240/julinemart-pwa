@@ -663,78 +663,80 @@ export default function CheckoutPage() {
   };
 
   const applyVoucher = async () => {
-    if (!voucherCode.trim()) {
-      toast.error('Please enter a voucher code');
+  if (!voucherCode.trim()) {
+    toast.error('Please enter a voucher code');
+    return;
+  }
+
+  if (!formData.state || !formData.city) {
+    toast.error('Please enter your delivery address first');
+    return;
+  }
+
+  if (shippingCost === null) {
+    toast.error('Please wait for shipping to be calculated');
+    return;
+  }
+
+  setIsApplyingVoucher(true);
+  setVoucherError('');
+
+  try {
+    const response = await fetch(VOUCHER_VALIDATION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        coupon_code: voucherCode.trim().toUpperCase(),
+        cart_total: subtotal,
+        shipping_cost: shippingCost ?? 0,
+        customer_email: formData.email || customer?.email || '',
+        items: items.map((item: any) => ({
+          product_id: item.productId,
+          sku: item.sku || item.variation?.sku || '', // ✅ ADD THIS
+          variation_id: item.variation?.id,
+          quantity: item.quantity,
+          price: item.price,
+          vendor_id: item.vendorId, // ✅ Also add vendor_id for vendor-specific vouchers
+        })),
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      setVoucherError(result.error || result.message || 'Invalid voucher code');
       return;
     }
 
-    if (!formData.state || !formData.city) {
-      toast.error('Please enter your delivery address first');
-      return;
-    }
+    const rawDiscount =
+      result.data?.shipping_discount ??
+      result.data?.discount_value ??
+      0;
+    const normalizedDiscount =
+      typeof rawDiscount === 'string'
+        ? parseFloat(rawDiscount)
+        : rawDiscount;
+    const voucherValue = Number.isFinite(normalizedDiscount)
+      ? normalizedDiscount
+      : 0;
 
-    if (shippingCost === null) {
-      toast.error('Please wait for shipping to be calculated');
-      return;
-    }
-
-    setIsApplyingVoucher(true);
+    setAppliedVoucher(result.data);
+    setVoucherDiscount(voucherValue);
     setVoucherError('');
-
-    try {
-      const response = await fetch(VOUCHER_VALIDATION_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          coupon_code: voucherCode.trim().toUpperCase(),
-          cart_total: subtotal,
-          shipping_cost: shippingCost ?? 0,
-          customer_email: formData.email || customer?.email || '',
-          items: items.map((item: any) => ({
-            product_id: item.productId,
-            variation_id: item.variation?.id,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        setVoucherError(result.error || result.message || 'Invalid voucher code');
-        return;
-      }
-
-      const rawDiscount =
-        result.data?.shipping_discount ??
-        result.data?.discount_value ??
-        0;
-      const normalizedDiscount =
-        typeof rawDiscount === 'string'
-          ? parseFloat(rawDiscount)
-          : rawDiscount;
-      const voucherValue = Number.isFinite(normalizedDiscount)
-        ? normalizedDiscount
-        : 0;
-
-      setAppliedVoucher(result.data);
-      setVoucherDiscount(voucherValue);
-      setVoucherError('');
-      setVoucherCode('');
-      removeCoupon({ showToast: false });
-      toast.success(result.data.message || 'Voucher applied');
-    } catch (error: any) {
-      console.error('Voucher validation error:', error);
-      setVoucherError(
-        error?.message || 'Failed to validate voucher. Please try again.'
-      );
-    } finally {
-      setIsApplyingVoucher(false);
-    }
-  };
+    setVoucherCode('');
+    removeCoupon({ showToast: false });
+    toast.success(result.data.message || 'Voucher applied');
+  } catch (error: any) {
+    console.error('Voucher validation error:', error);
+    setVoucherError(
+      error?.message || 'Failed to validate voucher. Please try again.'
+    );
+  } finally {
+    setIsApplyingVoucher(false);
+  }
+};
 
   const removeVoucher = () => {
     setAppliedVoucher(null);
