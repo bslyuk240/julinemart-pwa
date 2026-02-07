@@ -117,7 +117,6 @@ function ProductsContent() {
       try {
         setLoading(true);
         const { products: fetchedProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(1));
-        console.log(`📄 Products page: loaded ${fetchedProducts.length} products, totalPages = ${pages}`);
         setProducts(fetchedProducts);
         setPage(1);
         setTotalPages(pages || 999);

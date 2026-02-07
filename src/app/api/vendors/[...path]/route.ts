@@ -10,6 +10,11 @@ import { NextRequest, NextResponse } from 'next/server';
  * GET /api/vendors/32 → /wp-json/julinemart/v1/vendors/32
  * GET /api/vendors/status/32 → /wp-json/julinemart/v1/vendor-status/32
  */
+
+// Force dynamic rendering - don't cache vendor data
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { path: string[] } }
@@ -66,7 +71,13 @@ export async function GET(
     
     const data = await response.json();
     
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
     
   } catch (error: any) {
     console.error('❌ Vendor proxy error:', error);

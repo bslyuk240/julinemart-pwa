@@ -35,7 +35,6 @@ async function callProxy(
   // Forward WooCommerce pagination headers so list pages can load all items (e.g. 300+ products)
   const total = res.headers.get("X-WP-Total");
   const totalPages = res.headers.get("X-WP-TotalPages");
-  console.log(`🌐 Client callProxy: X-WP-Total=${total}, X-WP-TotalPages=${totalPages}`);
   return {
     data: json,
     ...(total != null && { total: parseInt(total, 10) }),

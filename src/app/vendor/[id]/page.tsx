@@ -249,15 +249,36 @@ export default function VendorStorePage() {
   const ratingValue = ratingAverage ? Math.min(5, Math.max(0, Number(ratingAverage))) : 0;
   const ratingDisplay = ratingAverage ? ratingAverage : 'N/A';
   
-  // ✅ SOLUTION 3: Avatar/Logo Priority (circular profile picture)
+  // Debug: Log ALL vendor fields to find custom avatar/banner
+  console.log('🖼️ Vendor Full Data:', vendorDetails);
+  console.log('🖼️ Vendor Image Fields:', {
+    vendorId: vendorDetails?.id,
+    gravatar: vendorDetails?.gravatar,
+    avatar: vendorDetails?.avatar,
+    logo: vendorDetails?.logo,
+    store_logo: vendorDetails?.store_logo,
+    banner: vendorDetails?.banner,
+    allImageKeys: vendorDetails ? Object.keys(vendorDetails).filter(k => 
+      k.toLowerCase().includes('banner') || 
+      k.toLowerCase().includes('logo') || 
+      k.toLowerCase().includes('gravatar') || 
+      k.toLowerCase().includes('avatar') || 
+      k.toLowerCase().includes('image') ||
+      k.toLowerCase().includes('icon')
+    ) : []
+  });
+
+  // ✅ Avatar/Logo Priority (circular profile picture)
+  // Custom uploaded logo takes priority over default Gravatar
   const vendorAvatar =
-    vendorDetails?.gravatar ||     // Gravatar (profile picture)
-    vendorDetails?.logo ||          // Store logo
+    vendorDetails?.logo ||          // Store logo (highest priority - custom uploaded)
     vendorDetails?.store_logo ||    // Alternative logo field
+    vendorDetails?.avatar ||        // Avatar field
+    vendorDetails?.gravatar ||      // Gravatar (fallback - often default icon)
     null;
   
-  // ✅ NEW: Banner Image (cover/header image)
-  const vendorBanner = vendorDetails?.banner || null;
+  // ✅ Banner Image (cover/header image)
+  const vendorBanner = vendorDetails?.banner || (vendorDetails as any)?.store_banner || null;
 
   const freeShippingThreshold = policies?.shippingPolicy?.freeShippingThreshold ?? 0;
   const shippingDescription = policies?.shippingPolicy?.description;
