@@ -35,8 +35,8 @@ async function getAllVendorsStatusServer(): Promise<Array<{
       headers: {
         'Content-Type': 'application/json',
       },
-      // Don't cache on server - always get fresh data
-      cache: 'no-store',
+      // Revalidate every 60s so static build works; fresh enough for vendor status
+      next: { revalidate: 60 },
     });
 
     if (!response.ok) {
