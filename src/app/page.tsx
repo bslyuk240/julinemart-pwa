@@ -7,6 +7,7 @@ import TopSellers from '@/components/home/top-sellers';
 import SponsoredProducts from '@/components/home/sponsored-products';
 import LaunchingDeals from '@/components/home/launching-deals';
 import { getProducts } from '@/lib/woocommerce/products';
+import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 
 // Simple fisher-yates shuffle so each render surfaces different items
 function shuffle<T>(items: T[]) {
@@ -30,37 +31,55 @@ export default async function HomePage() {
   let launchingProducts: any[] = [];
 
   try {
-    flashSaleProducts = shuffle(await getProducts({ tag: 'flash-sale', per_page: 12 }));
+    const rawProducts = await getProducts({ tag: 'flash-sale', per_page: 12 });
+    // ✅ Filter out disabled vendor products
+    const filtered = await filterActiveVendorProducts(rawProducts);
+    flashSaleProducts = shuffle(filtered);
   } catch (error) {
     console.error('Flash sale fetch failed:', error);
   }
 
   try {
-    dealProducts = shuffle(await getProducts({ tag: 'deal', per_page: 12 }));
+    const rawProducts = await getProducts({ tag: 'deal', per_page: 12 });
+    // ✅ Filter out disabled vendor products
+    const filtered = await filterActiveVendorProducts(rawProducts);
+    dealProducts = shuffle(filtered);
   } catch (error) {
     console.error('Deals fetch failed:', error);
   }
 
   try {
-    trendingProducts = shuffle(await getProducts({ tag: 'best-seller', per_page: 12 }));
+    const rawProducts = await getProducts({ tag: 'best-seller', per_page: 12 });
+    // ✅ Filter out disabled vendor products
+    const filtered = await filterActiveVendorProducts(rawProducts);
+    trendingProducts = shuffle(filtered);
   } catch (error) {
     console.error('Best sellers fetch failed:', error);
   }
 
   try {
-    topSellerProducts = shuffle(await getProducts({ tag: 'top-seller', per_page: 12 }));
+    const rawProducts = await getProducts({ tag: 'top-seller', per_page: 12 });
+    // ✅ Filter out disabled vendor products
+    const filtered = await filterActiveVendorProducts(rawProducts);
+    topSellerProducts = shuffle(filtered);
   } catch (error) {
     console.error('Top sellers fetch failed:', error);
   }
 
   try {
-    sponsoredProducts = shuffle(await getProducts({ tag: 'sponsored', per_page: 12 }));
+    const rawProducts = await getProducts({ tag: 'sponsored', per_page: 12 });
+    // ✅ Filter out disabled vendor products
+    const filtered = await filterActiveVendorProducts(rawProducts);
+    sponsoredProducts = shuffle(filtered);
   } catch (error) {
     console.error('Sponsored fetch failed:', error);
   }
 
   try {
-    launchingProducts = shuffle(await getProducts({ tag: 'launching-deal', per_page: 12 }));
+    const rawProducts = await getProducts({ tag: 'launching-deal', per_page: 12 });
+    // ✅ Filter out disabled vendor products
+    const filtered = await filterActiveVendorProducts(rawProducts);
+    launchingProducts = shuffle(filtered);
   } catch (error) {
     console.error('Launching deals fetch failed:', error);
   }

@@ -30,6 +30,32 @@ export async function getProducts(
 }
 
 /**
+ * Get products with pagination metadata (total, totalPages).
+ * Use this on list pages so "Load more" can show until all pages are loaded (e.g. 300+ products).
+ */
+export async function getProductsWithPagination(
+  params: ProductsQueryParams = {}
+): Promise<{ products: Product[]; total: number; totalPages: number }> {
+  const { filterActiveVendorProducts } = await import('@/lib/utils/vendor-filters');
+  try {
+    if (params.tag && isNaN(Number(params.tag))) {
+      const tagId = await getTagIdBySlug(params.tag);
+      if (tagId) params.tag = tagId.toString();
+      else return { products: [], total: 0, totalPages: 0 };
+    }
+    const response = await wcApi.get('products', params);
+    const raw = response.data ?? [];
+    const products = await filterActiveVendorProducts(raw);
+    const total = typeof (response as any).total === 'number' ? (response as any).total : parseInt(String((response as any).total ?? 0), 10) || 0;
+    const totalPages = typeof (response as any).totalPages === 'number' ? (response as any).totalPages : parseInt(String((response as any).totalPages ?? 0), 10) || 0;
+    return { products, total, totalPages };
+  } catch (error) {
+    handleApiError(error);
+    return { products: [], total: 0, totalPages: 0 };
+  }
+}
+
+/**
  * Helper: Get tag ID by slug
  */
 async function getTagIdBySlug(slug: string): Promise<number | null> {
