@@ -75,9 +75,10 @@ export const STORAGE_KEYS = {
 };
 
 // API Endpoints (WCFM)
+export const WCFM_API_PREFIXES = ['/wcfm/v1', '/wcfmmp/v1'];
 export const WCFM_ENDPOINTS = {
-  VENDORS: '/wcfm/v1/vendors',
-  VENDOR_PRODUCTS: '/wcfm/v1/vendors/:id/products',
+  VENDORS: '/vendors',
+  VENDOR_PRODUCTS: '/vendors/:id/products',
 };
 
 // Social Links (Update with your actual links)

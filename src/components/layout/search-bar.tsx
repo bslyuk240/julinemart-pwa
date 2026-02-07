@@ -6,6 +6,7 @@ import { Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { searchProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
+import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 
 export default function SearchBar() {
   const [query, setQuery] = useState('');
@@ -24,7 +25,10 @@ export default function SearchBar() {
       try {
         setIsSearching(true);
         const data = await searchProducts(query.trim(), { per_page: 6 });
-        setResults(data);
+        
+        // ✅ SOLUTION 2: Filter out disabled vendors
+        const filtered = await filterActiveVendorProducts(data);
+        setResults(filtered);
       } catch {
         setResults([]);
       } finally {

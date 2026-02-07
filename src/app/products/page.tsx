@@ -6,6 +6,7 @@ import { getProducts } from '@/lib/woocommerce/products';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown } from 'lucide-react';
 import { Product } from '@/types/product';
+import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 
 const sortFromParam = (value: string | null): 'date' | 'popularity' | 'rating' | 'price' | 'price-desc' | null => {
   if (!value) return null;
@@ -114,9 +115,12 @@ function ProductsContent() {
       try {
         setLoading(true);
         const fetchedProducts = await getProducts(buildFetchParams(1));
-        setProducts(fetchedProducts);
+        
+        // ✅ SOLUTION 2: Filter out disabled vendors
+        const filtered = await filterActiveVendorProducts(fetchedProducts);
+        setProducts(filtered);
         setPage(1);
-        setHasMore(fetchedProducts.length === 20);
+        setHasMore(filtered.length === 20);
       } catch (error) {
         console.error('Error fetching products:', error);
       } finally {
@@ -134,10 +138,13 @@ function ProductsContent() {
       const nextPage = page + 1;
       const moreProducts = await getProducts(buildFetchParams(nextPage));
       
-      if (moreProducts.length > 0) {
-        setProducts([...products, ...moreProducts]);
+      // ✅ SOLUTION 2: Filter out disabled vendors
+      const filtered = await filterActiveVendorProducts(moreProducts);
+      
+      if (filtered.length > 0) {
+        setProducts([...products, ...filtered]);
         setPage(nextPage);
-        setHasMore(moreProducts.length === 20);
+        setHasMore(filtered.length === 20);
       } else {
         setHasMore(false);
       }
@@ -157,9 +164,11 @@ function ProductsContent() {
       
       const sortedProducts = await getProducts(buildFetchParams(1, newSortBy));
       
-      setProducts(sortedProducts);
+      // ✅ SOLUTION 2: Filter out disabled vendors
+      const filtered = await filterActiveVendorProducts(sortedProducts);
+      setProducts(filtered);
       setPage(1);
-      setHasMore(sortedProducts.length === 20);
+      setHasMore(filtered.length === 20);
     } catch (error) {
       console.error('Error sorting products:', error);
     } finally {
