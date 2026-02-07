@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import { Inter } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
 import Header from '@/components/layout/header';
-import BottomNav from '@/components/layout/bottom-nav';
 import { Toaster } from 'sonner';
 import { CustomerAuthProvider } from '@/context/customer-auth-context';
 import WhatsAppFloat from '@/components/layout/whatsapp-float';
@@ -12,6 +12,11 @@ import Footer from '@/components/layout/footer';
 import GlobalPullToRefresh from '@/components/layout/global-pull-to-refresh';
 
 const inter = Inter({ subsets: ['latin'] });
+
+const BottomNav = dynamic(
+  () => import('@/components/layout/bottom-nav'),
+  { ssr: false }
+);
 
 export const metadata: Metadata = {
   title: 'JulineMart - Your One-Stop Marketplace',

@@ -8,6 +8,7 @@ import { getProducts } from '@/lib/woocommerce/products';
 import { getCategoryBySlug } from '@/lib/woocommerce/categories';
 import { Product } from '@/types/product';
 import { decodeHtmlEntities } from '@/lib/utils/helpers';
+import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 
 export default function CategoryPage() {
   const params = useParams();
@@ -47,8 +48,10 @@ export default function CategoryPage() {
           page: 1,
         });
         
-        setProducts(fetchedProducts);
-        setHasMore(fetchedProducts.length === perPage);
+        // ✅ SOLUTION 2: Filter out disabled vendors
+        const filtered = await filterActiveVendorProducts(fetchedProducts);
+        setProducts(filtered);
+        setHasMore(filtered.length === perPage);
       } else {
         setCategoryId(null);
         const fetchedProducts = await getProducts({ 
@@ -59,8 +62,10 @@ export default function CategoryPage() {
           page: 1,
         });
         
-        setProducts(fetchedProducts);
-        setHasMore(fetchedProducts.length === perPage);
+        // ✅ SOLUTION 2: Filter out disabled vendors
+        const filtered = await filterActiveVendorProducts(fetchedProducts);
+        setProducts(filtered);
+        setHasMore(filtered.length === perPage);
         setCategoryName(slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
       }
     } catch (error) {
@@ -83,10 +88,13 @@ export default function CategoryPage() {
         page: nextPage,
       });
 
-      if (fetchedProducts.length > 0) {
-        setProducts((prev) => [...prev, ...fetchedProducts]);
+      // ✅ SOLUTION 2: Filter out disabled vendors
+      const filtered = await filterActiveVendorProducts(fetchedProducts);
+
+      if (filtered.length > 0) {
+        setProducts((prev) => [...prev, ...filtered]);
         setPage(nextPage);
-        setHasMore(fetchedProducts.length === perPage);
+        setHasMore(filtered.length === perPage);
       } else {
         setHasMore(false);
       }
@@ -107,9 +115,12 @@ export default function CategoryPage() {
         order: 'desc',
         page: 1,
       });
-      setProducts(fetchedProducts);
+      
+      // ✅ SOLUTION 2: Filter out disabled vendors
+      const filtered = await filterActiveVendorProducts(fetchedProducts);
+      setProducts(filtered);
       setPage(1);
-      setHasMore(fetchedProducts.length === perPage);
+      setHasMore(filtered.length === perPage);
     } catch (error) {
       console.error('Error fetching products:', error);
     }
