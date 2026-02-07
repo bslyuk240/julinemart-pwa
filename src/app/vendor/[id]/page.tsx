@@ -341,75 +341,141 @@ export default function VendorStorePage() {
 
         {/* Vendor Header Card */}
         <div className="bg-white rounded-lg shadow-sm p-6 md:p-8 mb-8">
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Vendor Avatar/Logo */}
-            <div className="flex-shrink-0">
-              <div
-                className={`w-24 h-24 md:w-32 md:h-32 rounded-full flex items-center justify-center overflow-hidden ${
-                  vendorAvatar
-                    ? 'bg-white shadow-sm border-2 border-gray-200'
-                    : 'bg-gradient-to-br from-primary-500 to-primary-700'
-                }`}
-              >
-                {vendorAvatar ? (
-                  <img 
-                    src={vendorAvatar} 
-                    alt={vendorName}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      // Fallback if image fails to load
-                      e.currentTarget.style.display = 'none';
-                      e.currentTarget.parentElement!.classList.add('bg-gradient-to-br', 'from-primary-500', 'to-primary-700');
-                      const icon = document.createElement('div');
-                      icon.innerHTML = '<svg class="w-12 h-12 md:w-16 md:h-16 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 10a2 2 0 114 0 2 2 0 01-4 0zm0 4a2 2 0 104 0 2 2 0 00-4 0z" clip-rule="evenodd"/></svg>';
-                      e.currentTarget.parentElement!.appendChild(icon);
-                    }}
-                  />
-                ) : (
-                  <Store className="w-12 h-12 md:w-16 md:h-16 text-white" />
-                )}
+          {/* Mobile Layout */}
+          <div className="md:hidden">
+            {/* Logo and Store Name - Inline */}
+            <div className="flex items-center gap-3 mb-3">
+              {/* Vendor Avatar/Logo */}
+              <div className="flex-shrink-0">
+                <div
+                  className={`w-16 h-16 rounded-full flex items-center justify-center overflow-hidden ${
+                    vendorAvatar
+                      ? 'bg-white shadow-sm border-2 border-gray-200'
+                      : 'bg-gradient-to-br from-primary-500 to-primary-700'
+                  }`}
+                >
+                  {vendorAvatar ? (
+                    <img 
+                      src={vendorAvatar} 
+                      alt={vendorName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.parentElement!.classList.add('bg-gradient-to-br', 'from-primary-500', 'to-primary-700');
+                        const icon = document.createElement('div');
+                        icon.innerHTML = '<svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 10a2 2 0 114 0 2 2 0 01-4 0zm0 4a2 2 0 104 0 2 2 0 00-4 0z" clip-rule="evenodd"/></svg>';
+                        e.currentTarget.parentElement!.appendChild(icon);
+                      }}
+                    />
+                  ) : (
+                    <Store className="w-10 h-10 text-white" />
+                  )}
+                </div>
               </div>
-            </div>
-
-            {/* Vendor Info */}
-            <div className="flex-1">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+              
+              {/* Store Name - 15px */}
+              <h1 className="font-bold text-gray-900" style={{ fontSize: '15px' }}>
                 {vendorName}
               </h1>
-              
-              <div className="flex items-center gap-2 mb-4">
+            </div>
+
+            {/* Rating Line - 10px */}
+            <div className="flex items-center gap-2 mb-2 pl-[76px]">
               <div className="flex items-center gap-1">
                 {Array.from({ length: 5 }).map((_, idx) => (
                   <Star
                     key={idx}
-                    className={`w-5 h-5 ${ratingValue > idx ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                    className={`w-3 h-3 ${ratingValue > idx ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
                   />
                 ))}
               </div>
-              <span className="text-sm text-gray-600">
-                {ratingAverage ? `(${ratingAverage} rating)` : '(No ratings yet)'}
+              <span className="text-gray-600" style={{ fontSize: '10px' }}>
+                {ratingAverage ? `${ratingAverage} rating` : 'No ratings yet'}
               </span>
+            </div>
+
+            {/* Product Count Line - 13px */}
+            <div className="pl-[76px] mb-4">
+              <p className="text-gray-700" style={{ fontSize: '13px' }}>
+                <span className="font-semibold text-primary-600">
+                  {productCount != null ? productCount : products.length}
+                </span>
+                {' '}Products · 95% Positive · 24h Response
+              </p>
+            </div>
+          </div>
+
+          {/* Desktop Layout */}
+          <div className="hidden md:flex md:flex-col md:gap-6">
+            <div className="flex gap-6">
+              {/* Vendor Avatar/Logo */}
+              <div className="flex-shrink-0">
+                <div
+                  className={`w-32 h-32 rounded-full flex items-center justify-center overflow-hidden ${
+                    vendorAvatar
+                      ? 'bg-white shadow-sm border-2 border-gray-200'
+                      : 'bg-gradient-to-br from-primary-500 to-primary-700'
+                  }`}
+                >
+                  {vendorAvatar ? (
+                    <img 
+                      src={vendorAvatar} 
+                      alt={vendorName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.parentElement!.classList.add('bg-gradient-to-br', 'from-primary-500', 'to-primary-700');
+                        const icon = document.createElement('div');
+                        icon.innerHTML = '<svg class="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 10a2 2 0 114 0 2 2 0 01-4 0zm0 4a2 2 0 104 0 2 2 0 00-4 0z" clip-rule="evenodd"/></svg>';
+                        e.currentTarget.parentElement!.appendChild(icon);
+                      }}
+                    />
+                  ) : (
+                    <Store className="w-16 h-16 text-white" />
+                  )}
+                </div>
               </div>
 
-              {/* Quick Stats */}
-              <div className="flex flex-wrap gap-4 pt-4 border-t">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-primary-600">
-                    {productCount != null ? productCount : products.length}
-                  </p>
-                  <p className="text-xs text-gray-600">Products</p>
+              {/* Vendor Info */}
+              <div className="flex-1">
+                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                  {vendorName}
+                </h1>
+                
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 5 }).map((_, idx) => (
+                      <Star
+                        key={idx}
+                        className={`w-5 h-5 ${ratingValue > idx ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm text-gray-600">
+                    {ratingAverage ? `(${ratingAverage} rating)` : '(No ratings yet)'}
+                  </span>
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-primary-600">{ratingDisplay}</p>
-                  <p className="text-xs text-gray-600">Rating</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-primary-600">95%</p>
-                  <p className="text-xs text-gray-600">Positive</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-primary-600">24h</p>
-                  <p className="text-xs text-gray-600">Response</p>
+
+                {/* Quick Stats */}
+                <div className="flex flex-wrap gap-4 pt-4 border-t">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-primary-600">
+                      {productCount != null ? productCount : products.length}
+                    </p>
+                    <p className="text-xs text-gray-600">Products</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-primary-600">{ratingDisplay}</p>
+                    <p className="text-xs text-gray-600">Rating</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-primary-600">95%</p>
+                    <p className="text-xs text-gray-600">Positive</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-primary-600">24h</p>
+                    <p className="text-xs text-gray-600">Response</p>
+                  </div>
                 </div>
               </div>
             </div>
