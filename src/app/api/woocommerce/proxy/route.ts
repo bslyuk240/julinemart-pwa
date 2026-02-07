@@ -137,10 +137,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Unsupported method" }, { status: 400 });
     }
 
-    return NextResponse.json(response.data, {
-      status: 200,
-      headers: { "Cache-Control": "no-store" },
-    });
+    // Forward WooCommerce pagination headers so client can load all pages (e.g. 300+ products)
+    const total = response.headers?.["x-wp-total"] ?? response.headers?.["X-WP-Total"];
+    const totalPages = response.headers?.["x-wp-totalpages"] ?? response.headers?.["X-WP-TotalPages"];
+    const headers: Record<string, string> = { "Cache-Control": "no-store" };
+    if (total != null) headers["X-WP-Total"] = String(total);
+    if (totalPages != null) headers["X-WP-TotalPages"] = String(totalPages);
+
+    return NextResponse.json(response.data, { status: 200, headers });
   } catch (error: any) {
     handleApiError(error);
 

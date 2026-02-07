@@ -2,11 +2,10 @@
 
 import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getProducts } from '@/lib/woocommerce/products';
+import { getProductsWithPagination } from '@/lib/woocommerce/products';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown } from 'lucide-react';
 import { Product } from '@/types/product';
-import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 
 const sortFromParam = (value: string | null): 'date' | 'popularity' | 'rating' | 'price' | 'price-desc' | null => {
   if (!value) return null;
@@ -26,6 +25,7 @@ function ProductsContent() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [sortBy, setSortBy] = useState<'date' | 'popularity' | 'rating' | 'price' | 'price-desc'>(initialSort);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -116,13 +116,13 @@ function ProductsContent() {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const fetchedProducts = await getProducts(buildFetchParams(1));
-        
-        // ✅ SOLUTION 2: Filter out disabled vendors
-        const filtered = await filterActiveVendorProducts(fetchedProducts);
-        setProducts(filtered);
+        const { products: fetchedProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(1));
+        console.log(`📄 Products page: loaded ${fetchedProducts.length} products, totalPages = ${pages}`);
+        setProducts(fetchedProducts);
         setPage(1);
-        setHasMore(filtered.length === PER_PAGE);
+        setTotalPages(pages || 999);
+        // Always show "Load More" if we have products - only hide when next page returns 0
+        setHasMore(fetchedProducts.length > 0);
       } catch (error) {
         console.error('Error fetching products:', error);
       } finally {
@@ -138,18 +138,13 @@ function ProductsContent() {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const moreProducts = await getProducts(buildFetchParams(nextPage));
+      const { products: moreProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(nextPage));
       
-      // ✅ SOLUTION 2: Filter out disabled vendors
-      const filtered = await filterActiveVendorProducts(moreProducts);
-      
-      if (filtered.length > 0) {
-        setProducts([...products, ...filtered]);
-        setPage(nextPage);
-        setHasMore(filtered.length === PER_PAGE);
-      } else {
-        setHasMore(false);
-      }
+      setProducts((prev) => [...prev, ...moreProducts]);
+      setPage(nextPage);
+      if (pages > 0) setTotalPages(pages);
+      // Hide button only when we get 0 products (reached the end)
+      setHasMore(moreProducts.length > 0);
     } catch (error) {
       console.error('Error loading more products:', error);
     } finally {
@@ -164,13 +159,11 @@ function ProductsContent() {
       setSortBy(newSortBy);
       setSortOrder(order);
       
-      const sortedProducts = await getProducts(buildFetchParams(1, newSortBy));
-      
-      // ✅ SOLUTION 2: Filter out disabled vendors
-      const filtered = await filterActiveVendorProducts(sortedProducts);
-      setProducts(filtered);
+      const { products: sortedProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(1, newSortBy));
+      setProducts(sortedProducts);
       setPage(1);
-      setHasMore(filtered.length === PER_PAGE);
+      setTotalPages(pages || 999);
+      setHasMore(sortedProducts.length > 0);
     } catch (error) {
       console.error('Error sorting products:', error);
     } finally {

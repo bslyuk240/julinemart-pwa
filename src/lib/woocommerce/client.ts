@@ -32,15 +32,32 @@ async function callProxy(
   if (!res.ok) {
     throw new Error(json?.message || "Proxy request failed");
   }
-  return json;
+  // Forward WooCommerce pagination headers so list pages can load all items (e.g. 300+ products)
+  const total = res.headers.get("X-WP-Total");
+  const totalPages = res.headers.get("X-WP-TotalPages");
+  console.log(`🌐 Client callProxy: X-WP-Total=${total}, X-WP-TotalPages=${totalPages}`);
+  return {
+    data: json,
+    ...(total != null && { total: parseInt(total, 10) }),
+    ...(totalPages != null && { totalPages: parseInt(totalPages, 10) }),
+  };
 }
 
 // Client-safe wrapper for WooCommerce endpoints (wc/v3)
 export const wcApi = {
   get: async (endpoint: string, params?: any) => {
-    if (serverApi) return serverApi.get(endpoint, params);
-    const data = await callProxy("get", endpoint, { params });
-    return { data };
+    if (serverApi) {
+      const res = await serverApi.get(endpoint, params);
+      // Normalize: server returns axios-style { data, headers }; add total/totalPages for parity
+      const total = res.headers?.["x-wp-total"] ?? res.headers?.["X-WP-Total"];
+      const totalPages = res.headers?.["x-wp-totalpages"] ?? res.headers?.["X-WP-TotalPages"];
+      return {
+        data: res.data,
+        ...(total != null && { total: parseInt(String(total), 10) }),
+        ...(totalPages != null && { totalPages: parseInt(String(totalPages), 10) }),
+      };
+    }
+    return callProxy("get", endpoint, { params });
   },
   post: async (endpoint: string, data?: any) => {
     if (serverApi) return serverApi.post(endpoint, data);
