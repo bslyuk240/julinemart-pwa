@@ -15,6 +15,7 @@ export interface Vendor {
   phone?: string;
   banner?: string;
   gravatar?: string;
+  avatar?: string;
   store_logo?: string;
   logo?: string;
   shop_description?: string;
@@ -23,11 +24,11 @@ export interface Vendor {
     count?: number;
     avg?: string;
   };
-  enabled?: boolean;
+  enabled?: boolean;              // ✅ REQUIRED for Solution 2
   registered?: string;
   payment?: any;
-  is_store_vacation?: boolean;
-  vacation_message?: string;
+  is_store_vacation?: boolean;    // ✅ REQUIRED for Solution 2
+  vacation_message?: string;      // ✅ REQUIRED for Solution 2
   show_min_order_type?: string;
   store_seo?: StoreSEO;
 }

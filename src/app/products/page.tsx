@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getProducts } from '@/lib/woocommerce/products';
+import { getProductsWithPagination } from '@/lib/woocommerce/products';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown } from 'lucide-react';
 import { Product } from '@/types/product';
@@ -25,6 +25,7 @@ function ProductsContent() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [sortBy, setSortBy] = useState<'date' | 'popularity' | 'rating' | 'price' | 'price-desc'>(initialSort);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -83,11 +84,13 @@ function ProductsContent() {
     return { orderby: sort as 'date' | 'popularity' | 'rating', order: 'desc' as const };
   };
 
+  const PER_PAGE = 48;
+
   const buildFetchParams = (pageNumber: number, overrideSort?: typeof sortBy) => {
     const activeSort = overrideSort || sortBy;
     const sortParams = computeSortParams(activeSort);
     const params: Record<string, any> = {
-      per_page: 20,
+      per_page: PER_PAGE,
       page: pageNumber,
       orderby: sortParams.orderby,
       order: sortParams.order,
@@ -113,10 +116,12 @@ function ProductsContent() {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const fetchedProducts = await getProducts(buildFetchParams(1));
+        const { products: fetchedProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(1));
         setProducts(fetchedProducts);
         setPage(1);
-        setHasMore(fetchedProducts.length === 20);
+        setTotalPages(pages || 999);
+        // Always show "Load More" if we have products - only hide when next page returns 0
+        setHasMore(fetchedProducts.length > 0);
       } catch (error) {
         console.error('Error fetching products:', error);
       } finally {
@@ -132,15 +137,13 @@ function ProductsContent() {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const moreProducts = await getProducts(buildFetchParams(nextPage));
+      const { products: moreProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(nextPage));
       
-      if (moreProducts.length > 0) {
-        setProducts([...products, ...moreProducts]);
-        setPage(nextPage);
-        setHasMore(moreProducts.length === 20);
-      } else {
-        setHasMore(false);
-      }
+      setProducts((prev) => [...prev, ...moreProducts]);
+      setPage(nextPage);
+      if (pages > 0) setTotalPages(pages);
+      // Hide button only when we get 0 products (reached the end)
+      setHasMore(moreProducts.length > 0);
     } catch (error) {
       console.error('Error loading more products:', error);
     } finally {
@@ -155,11 +158,11 @@ function ProductsContent() {
       setSortBy(newSortBy);
       setSortOrder(order);
       
-      const sortedProducts = await getProducts(buildFetchParams(1, newSortBy));
-      
+      const { products: sortedProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(1, newSortBy));
       setProducts(sortedProducts);
       setPage(1);
-      setHasMore(sortedProducts.length === 20);
+      setTotalPages(pages || 999);
+      setHasMore(sortedProducts.length > 0);
     } catch (error) {
       console.error('Error sorting products:', error);
     } finally {
@@ -243,7 +246,7 @@ function ProductsContent() {
               </div>
             )}
 
-            {!hasMore && products.length > 20 && (
+            {!hasMore && products.length > PER_PAGE && (
               <div className="text-center mt-8">
                 <p className="text-gray-600">You've reached the end of the catalog</p>
               </div>
