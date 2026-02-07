@@ -94,10 +94,41 @@ export async function getVendorProductCount(vendorId: number): Promise<{
 /**
  * Get full vendor details (for vendor page)
  * Uses existing /julinemart/v1/vendors/{id} endpoint
+ * Also tries WCFM endpoint as fallback for missing logo/banner data
  */
 export async function getVendorById(id: number): Promise<Vendor | null> {
   try {
     const data = await apiCall(`${id}`);
+    
+    // Only try WCFM fallback if BOTH logo AND banner are missing
+    // (If we have at least one, the julinemart API is working)
+    if (!data.logo && !data.banner) {
+      try {
+        console.log('🔍 Logo or banner missing from julinemart API, trying WCFM...');
+        const { getVendorById: getVendorByIdWCFM } = await import('./vendors');
+        const wcfmData = await getVendorByIdWCFM(id);
+        if (wcfmData) {
+          console.log('🔄 Merging WCFM data for missing images:', {
+            logo: wcfmData.logo,
+            gravatar: wcfmData.gravatar,
+            banner: wcfmData.banner,
+            avatar: (wcfmData as any).avatar,
+          });
+          // Merge WCFM data for missing fields
+          return {
+            ...data,
+            logo: data.logo || wcfmData.logo || '',
+            gravatar: data.gravatar || wcfmData.gravatar || '',
+            banner: data.banner || wcfmData.banner || '',
+            avatar: data.avatar || (wcfmData as any).avatar,
+            store_logo: data.store_logo || wcfmData.store_logo || '',
+          } as Vendor;
+        }
+      } catch (wcfmError) {
+        console.log('⚠️ WCFM fallback failed, using julinemart data only:', wcfmError);
+      }
+    }
+    
     return data as Vendor;
   } catch (error) {
     handleApiError(error, `Error fetching vendor ${id}`);

@@ -138,8 +138,19 @@ export async function POST(request: Request) {
     }
 
     // Forward WooCommerce pagination headers so client can load all pages (e.g. 300+ products)
-    const total = response.headers?.["x-wp-total"] ?? response.headers?.["X-WP-Total"];
-    const totalPages = response.headers?.["x-wp-totalpages"] ?? response.headers?.["X-WP-TotalPages"];
+    const allHeaders = response.headers || {};
+    const headerKeys = Object.keys(allHeaders);
+    console.log(`📊 WC Response headers for ${endpoint}:`, { 
+      hasHeaders: !!response.headers,
+      headerKeys,
+      'x-wp-total': allHeaders['x-wp-total'],
+      'X-WP-Total': allHeaders['X-WP-Total'],
+      'x-wp-totalpages': allHeaders['x-wp-totalpages'],
+      'X-WP-TotalPages': allHeaders['X-WP-TotalPages']
+    });
+    
+    const total = allHeaders["x-wp-total"] ?? allHeaders["X-WP-Total"];
+    const totalPages = allHeaders["x-wp-totalpages"] ?? allHeaders["X-WP-TotalPages"];
     const headers: Record<string, string> = { "Cache-Control": "no-store" };
     if (total != null) headers["X-WP-Total"] = String(total);
     if (totalPages != null) headers["X-WP-TotalPages"] = String(totalPages);
@@ -150,7 +161,6 @@ export async function POST(request: Request) {
 
     const status = error?.response?.status || 500;
 
-    // Better messaging for axios/WP errors
     const message =
       error?.response?.data?.message ||
       error?.response?.data?.error ||

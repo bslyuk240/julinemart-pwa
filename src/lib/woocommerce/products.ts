@@ -48,7 +48,6 @@ export async function getProductsWithPagination(
     const products = await filterActiveVendorProducts(raw);
     const total = typeof (response as any).total === 'number' ? (response as any).total : parseInt(String((response as any).total ?? 0), 10) || 0;
     const totalPages = typeof (response as any).totalPages === 'number' ? (response as any).totalPages : parseInt(String((response as any).totalPages ?? 0), 10) || 0;
-    console.log(`🔍 getProductsWithPagination: raw=${raw.length}, filtered=${products.length}, total=${total}, totalPages=${totalPages}, response.totalPages=${(response as any).totalPages}`);
     return { products, total, totalPages };
   } catch (error) {
     handleApiError(error);
