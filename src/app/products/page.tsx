@@ -84,11 +84,13 @@ function ProductsContent() {
     return { orderby: sort as 'date' | 'popularity' | 'rating', order: 'desc' as const };
   };
 
+  const PER_PAGE = 48;
+
   const buildFetchParams = (pageNumber: number, overrideSort?: typeof sortBy) => {
     const activeSort = overrideSort || sortBy;
     const sortParams = computeSortParams(activeSort);
     const params: Record<string, any> = {
-      per_page: 20,
+      per_page: PER_PAGE,
       page: pageNumber,
       orderby: sortParams.orderby,
       order: sortParams.order,
@@ -120,7 +122,7 @@ function ProductsContent() {
         const filtered = await filterActiveVendorProducts(fetchedProducts);
         setProducts(filtered);
         setPage(1);
-        setHasMore(filtered.length === 20);
+        setHasMore(filtered.length === PER_PAGE);
       } catch (error) {
         console.error('Error fetching products:', error);
       } finally {
@@ -144,7 +146,7 @@ function ProductsContent() {
       if (filtered.length > 0) {
         setProducts([...products, ...filtered]);
         setPage(nextPage);
-        setHasMore(filtered.length === 20);
+        setHasMore(filtered.length === PER_PAGE);
       } else {
         setHasMore(false);
       }
@@ -168,7 +170,7 @@ function ProductsContent() {
       const filtered = await filterActiveVendorProducts(sortedProducts);
       setProducts(filtered);
       setPage(1);
-      setHasMore(filtered.length === 20);
+      setHasMore(filtered.length === PER_PAGE);
     } catch (error) {
       console.error('Error sorting products:', error);
     } finally {
@@ -252,7 +254,7 @@ function ProductsContent() {
               </div>
             )}
 
-            {!hasMore && products.length > 20 && (
+            {!hasMore && products.length > PER_PAGE && (
               <div className="text-center mt-8">
                 <p className="text-gray-600">You've reached the end of the catalog</p>
               </div>

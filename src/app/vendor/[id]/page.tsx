@@ -5,12 +5,11 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Store, Star } from 'lucide-react';
 import ProductGrid from '@/components/product/product-grid';
-import { getProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
 import { getStorePolicies, StorePolicies } from '@/lib/woocommerce/policies';
 import { formatPrice } from '@/lib/utils/format-price';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
-import { getVendorById } from '@/lib/woocommerce/vendors-custom';
+import { getVendorById, getVendorProducts, getVendorProductCount } from '@/lib/woocommerce/vendors-custom';
 import type { Vendor } from '@/types/vendor';
 
 const humanizeSlug = (value?: string) => {
@@ -27,6 +26,7 @@ export default function VendorStorePage() {
   const vendorId = params.id as string;
   
   const [products, setProducts] = useState<Product[]>([]);
+  const [productCount, setProductCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [vendorInfo, setVendorInfo] = useState<any>(null);
   const [vendorDetails, setVendorDetails] = useState<Vendor | null>(null);
@@ -68,29 +68,43 @@ export default function VendorStorePage() {
           if (vendorData.enabled === false) {
             console.log('⚠️ Vendor is disabled');
             setProducts([]);
+            setProductCount(0);
             if (!silent) setLoading(false);
             return;
           }
-          
+
           if (vendorData.is_store_vacation === true) {
             console.log('🏖️ Vendor is on vacation');
             setProducts([]);
+            setProductCount(0);
             if (!silent) setLoading(false);
             return;
           }
         }
 
-        // Only fetch products if vendor is active
-        const allProducts = await getProducts({ per_page: 100 });
+        // Use backend vendor product count for accurate count, then fetch by product IDs
+        const [countData, vendorProducts] = await Promise.all([
+          getVendorProductCount(numericVendorId),
+          getVendorProducts(numericVendorId),
+        ]);
 
-        const vendorProducts = allProducts.filter(
-          (product) => product.store && product.store.id === numericVendorId
-        );
+        if (countData?.product_count != null) {
+          setProductCount(countData.product_count);
+        } else {
+          setProductCount(vendorProducts.length);
+        }
 
         setProducts(vendorProducts);
 
         if (vendorProducts.length > 0 && vendorProducts[0].store) {
           setVendorInfo(vendorProducts[0].store);
+        } else if (vendorData) {
+          setVendorInfo({
+            id: vendorData.id,
+            name: vendorData.store_name,
+            shop_name: vendorData.store_name,
+            url: vendorData.store_slug ? `/store/${vendorData.store_slug}` : '',
+          });
         }
       } catch (error) {
         console.error('Error fetching vendor products:', error);
@@ -359,7 +373,9 @@ export default function VendorStorePage() {
               {/* Quick Stats */}
               <div className="flex flex-wrap gap-4 pt-4 border-t">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-primary-600">{products.length}</p>
+                  <p className="text-2xl font-bold text-primary-600">
+                    {productCount != null ? productCount : products.length}
+                  </p>
                   <p className="text-xs text-gray-600">Products</p>
                 </div>
                 <div className="text-center">
@@ -383,7 +399,7 @@ export default function VendorStorePage() {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-900">
-              All Products ({products.length})
+              All Products ({productCount != null ? productCount : products.length})
             </h2>
             
             <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm">
