@@ -1,12 +1,14 @@
 /**
  * Updated Vendor Service for PWA - API ROUTE VERSION
  * Uses Next.js API routes to avoid CORS issues
- * 
+ *
  * Location: src/lib/woocommerce/vendors-custom.ts
  */
 
 import { handleApiError } from './client';
 import { Vendor } from '@/types/vendor';
+import { getProducts } from './products';
+import type { Product } from '@/types/product';
 
 /**
  * Call Next.js API route (no CORS issues)
@@ -100,5 +102,47 @@ export async function getVendorById(id: number): Promise<Vendor | null> {
   } catch (error) {
     handleApiError(error, `Error fetching vendor ${id}`);
     return null;
+  }
+}
+
+const VENDOR_PRODUCTS_CHUNK = 100;
+
+/**
+ * Get all products for a vendor.
+ * Uses backend vendor-product-count (returns product_ids) then fetches products by ID
+ * so vendor pages show the correct products even when WooCommerce list doesn't include store data.
+ * Falls back to fetching pages and filtering by product.store.id if backend has no product_ids.
+ */
+export async function getVendorProducts(vendorId: number): Promise<Product[]> {
+  try {
+    const countData = await getVendorProductCount(vendorId);
+    if (countData?.product_ids?.length) {
+      const ids = countData.product_ids;
+      const chunks: number[][] = [];
+      for (let i = 0; i < ids.length; i += VENDOR_PRODUCTS_CHUNK) {
+        chunks.push(ids.slice(i, i + VENDOR_PRODUCTS_CHUNK));
+      }
+      const results: Product[] = [];
+      for (const chunk of chunks) {
+        const products = await getProducts({ include: chunk, per_page: chunk.length });
+        results.push(...products);
+      }
+      const byId = new Map(results.map((p) => [p.id, p]));
+      return ids.map((id) => byId.get(id)).filter((p): p is Product => p != null);
+    }
+    // Fallback: fetch products in pages and filter by store.id (for backends without product_ids)
+    const maxPages = 20;
+    const perPage = 100;
+    const collected: Product[] = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const batch = await getProducts({ per_page: perPage, page });
+      const forVendor = batch.filter((p) => p.store?.id === vendorId);
+      collected.push(...forVendor);
+      if (batch.length < perPage) break;
+    }
+    return collected;
+  } catch (error) {
+    handleApiError(error, `Error fetching products for vendor ${vendorId}`);
+    return [];
   }
 }
