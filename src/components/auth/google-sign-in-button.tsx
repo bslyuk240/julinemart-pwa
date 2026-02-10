@@ -320,11 +320,18 @@ export default function GoogleSignInButton({
   }
 
   function base64URLEncode(buffer: Uint8Array): string {
-    const base64 = btoa(String.fromCharCode(...buffer));
+    // Convert buffer to base64 in chunks to avoid call stack issues
+    let binary = '';
+    const len = buffer.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(buffer[i]);
+    }
+    const base64 = btoa(binary);
+    // Convert to base64url format (RFC 4648)
     return base64
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
-      .replace(/=/g, '');
+      .replace(/=+$/, ''); // Remove padding
   }
 
   return (
