@@ -191,21 +191,19 @@ export default function GoogleSignInButton({
     try {
       const { Browser } = await import('@capacitor/browser');
 
-      const clientId =
-        process.env.NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID ||
-        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-      if (!clientId) {
-        const errorMsg = 'Google client ID is missing';
-        toast.error(errorMsg);
-        if (onError) onError(errorMsg);
-        return;
-      }
-
-      const appId = process.env.NEXT_PUBLIC_CAP_APP_ID || 'com.julinemart.app';
-      const redirectUri =
-        process.env.NEXT_PUBLIC_GOOGLE_NATIVE_REDIRECT_URI || `${appId}:/oauth2redirect`;
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID || '700183414398-mvagtt83dw92fcon8dhufg8mkjvqk8.apps.googleusercontent.com';
+      
+      // Google's Android OAuth requires this specific redirect URI format
+      // Extract the reversed client ID part (before .apps.googleusercontent.com)
+      const reversedClientId = clientId.split('.apps.googleusercontent.com')[0];
+      const redirectUri = `com.googleusercontent.apps.${reversedClientId}:/oauth2redirect`;
+      
       const scope = encodeURIComponent('openid email profile');
       const nonce = Math.random().toString(36).slice(2);
+      
+      console.log('🔐 Native Google Sign-In');
+      console.log('Client ID:', clientId);
+      console.log('Redirect URI:', redirectUri);
 
       oauthUrl =
         `https://accounts.google.com/o/oauth2/v2/auth` +
