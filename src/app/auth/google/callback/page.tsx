@@ -1,19 +1,29 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 // Disable static generation for this page
 export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+export const revalidate = 0;
 
 export default function GoogleCallbackPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    // Get search params from window.location in browser
+    const urlParams = new URLSearchParams(window.location.search);
     const handleCallback = async () => {
-      const code = searchParams.get('code');
-      const error = searchParams.get('error');
+      const code = urlParams.get('code');
+      const error = urlParams.get('error');
 
       if (error) {
         console.error('OAuth error:', error);
@@ -111,7 +121,7 @@ export default function GoogleCallbackPage() {
     };
 
     handleCallback();
-  }, [searchParams, router]);
+  }, [mounted, router]);
 
   return (
     <div className="flex min-h-screen items-center justify-center">
