@@ -3,11 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-// Disable static generation for this page
-export const dynamic = 'force-dynamic';
-export const dynamicParams = true;
-export const revalidate = 0;
-
 export default function GoogleCallbackPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
