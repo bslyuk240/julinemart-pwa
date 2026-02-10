@@ -186,6 +186,8 @@ export default function GoogleSignInButton({
   };
 
   const handleNativeGoogleSignIn = async () => {
+    let oauthUrl = '';
+
     try {
       const { Browser } = await import('@capacitor/browser');
 
@@ -205,7 +207,7 @@ export default function GoogleSignInButton({
       const scope = encodeURIComponent('openid email profile');
       const nonce = Math.random().toString(36).slice(2);
 
-      const oauthUrl =
+      oauthUrl =
         `https://accounts.google.com/o/oauth2/v2/auth` +
         `?client_id=${encodeURIComponent(clientId)}` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -214,13 +216,18 @@ export default function GoogleSignInButton({
         `&prompt=select_account` +
         `&nonce=${encodeURIComponent(nonce)}`;
 
-      await Browser.open({
-        url: oauthUrl,
-        presentationStyle: 'popover',
-      });
+      await Browser.open({ url: oauthUrl });
     } catch (error: any) {
       console.error('Native Google sign-in launch error:', error);
-      const errorMsg = 'Failed to open Google sign-in';
+      if (oauthUrl) {
+        // Fallback: if Capacitor Browser bridge fails, use direct navigation.
+        window.location.href = oauthUrl;
+        return;
+      }
+
+      const errorMsg = `Failed to open Google sign-in${
+        error?.message ? `: ${error.message}` : ''
+      }`;
       toast.error(errorMsg);
       if (onError) onError(errorMsg);
     }
