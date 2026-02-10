@@ -27,7 +27,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="com.googleusercontent.apps.700183414398-mvagtt83dw92fcon8dhufg8mkjvqk8"
+                    android:scheme="com.googleusercontent.apps.700183414398-mvagts5l3d9029tccn689ufg8mkjvqk5"
                     android:pathPrefix="/oauth2redirect" />
             </intent-filter>
 

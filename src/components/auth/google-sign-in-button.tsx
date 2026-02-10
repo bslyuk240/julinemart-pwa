@@ -191,7 +191,7 @@ export default function GoogleSignInButton({
     try {
       const { Browser } = await import('@capacitor/browser');
 
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID || '700183414398-mvagtt83dw92fcon8dhufg8mkjvqk8.apps.googleusercontent.com';
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID || '700183414398-mvagts5l3d9029tccn689ufg8mkjvqk5.apps.googleusercontent.com';
       
       // Google's Android OAuth requires this specific redirect URI format
       // Extract the reversed client ID part (before .apps.googleusercontent.com)
