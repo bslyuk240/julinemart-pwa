@@ -10,7 +10,8 @@
     "analyze": "cross-env NODE_OPTIONS=--max-http-header-size=262144 ANALYZE=true next build",
     "cap:sync": "npm run build && npx cap sync android",
     "cap:open": "npx cap open android",
-    "cap:build": "npm run build && npx cap sync android && npx cap open android"
+    "cap:build": "npm run build && npx cap sync android && npx cap open android",
+    "postinstall": "node scripts/fix-capacitor-proguard.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.2",
