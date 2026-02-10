@@ -58,9 +58,10 @@ export default function GoogleCallbackPage() {
             throw new Error('PKCE verifier not found');
           }
 
+          // Use Android client for Capacitor, fallback to regular web client
           const clientId =
-            process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-            process.env.NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID;
+            process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+            process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
           const redirectUri = `${window.location.origin}/auth/google/callback`;
 
           console.log('🔄 Exchanging code for tokens...');
