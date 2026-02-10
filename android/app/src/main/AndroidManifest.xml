@@ -26,7 +26,9 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="com.julinemart.app" />
+                <data
+                    android:scheme="com.googleusercontent.apps.700183414398-mvagts5l3d9029tccn689ufg8mkjvqk5"
+                    android:pathPrefix="/oauth2redirect" />
             </intent-filter>
 
         </activity>
