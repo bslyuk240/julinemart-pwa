@@ -208,8 +208,8 @@ export default function GoogleSignInButton({
     try {
       const { Browser } = await import('@capacitor/browser');
 
-      // Use Web OAuth client for Android with HTTPS redirect (App Links)
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '700183414398-ij42qe11gp86i2puuptag185eh6una16.apps.googleusercontent.com';
+      // Use Android-specific Web OAuth client for Capacitor app
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '700183414398-un1b0ieej54djahu2pdsk8rim257luij.apps.googleusercontent.com';
       
       // Use HTTPS redirect URI (App Links) - modern approach for Android
       const redirectUri = 'https://dev-lab--julinemart-pwa.netlify.app/auth/google/callback';
@@ -266,7 +266,8 @@ export default function GoogleSignInButton({
         throw new Error('PKCE verifier not found');
       }
 
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '700183414398-ij42qe11gp86i2puuptag185eh6una16.apps.googleusercontent.com';
+      // Use Android-specific client for token exchange
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '700183414398-un1b0ieej54djahu2pdsk8rim257luij.apps.googleusercontent.com';
       const redirectUri = 'https://dev-lab--julinemart-pwa.netlify.app/auth/google/callback';
 
       console.log('🔄 Exchanging code for tokens...');
