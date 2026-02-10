@@ -98,6 +98,13 @@ export default function GoogleSignInButton({
         try {
           console.log('📱 Deep link received:', url);
           const parsedUrl = new URL(url);
+          
+          // Check if this is a Google OAuth callback
+          if (!parsedUrl.pathname.includes('/auth/google/callback')) {
+            console.log('⚠️ Not a Google OAuth callback, ignoring');
+            return;
+          }
+          
           const queryParams = new URLSearchParams(parsedUrl.search);
           
           // Handle authorization code flow
@@ -201,12 +208,11 @@ export default function GoogleSignInButton({
     try {
       const { Browser } = await import('@capacitor/browser');
 
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID || '700183414398-mvagts5l3d9029tccn689ufg8mkjvqk5.apps.googleusercontent.com';
+      // Use Web OAuth client for Android with HTTPS redirect (App Links)
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '700183414398-k0hqs5h7ck8t2nm4ngulotgg5e6p2iem.apps.googleusercontent.com';
       
-      // Google's Android OAuth requires this specific redirect URI format
-      // Extract the reversed client ID part (before .apps.googleusercontent.com)
-      const reversedClientId = clientId.split('.apps.googleusercontent.com')[0];
-      const redirectUri = `com.googleusercontent.apps.${reversedClientId}:/oauth2redirect`;
+      // Use HTTPS redirect URI (App Links) - modern approach for Android
+      const redirectUri = 'https://dev-lab--julinemart-pwa.netlify.app/auth/google/callback';
       
       const scope = encodeURIComponent('openid email profile');
       
@@ -260,9 +266,8 @@ export default function GoogleSignInButton({
         throw new Error('PKCE verifier not found');
       }
 
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID || '700183414398-mvagts5l3d9029tccn689ufg8mkjvqk5.apps.googleusercontent.com';
-      const reversedClientId = clientId.split('.apps.googleusercontent.com')[0];
-      const redirectUri = `com.googleusercontent.apps.${reversedClientId}:/oauth2redirect`;
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '700183414398-k0hqs5h7ck8t2nm4ngulotgg5e6p2iem.apps.googleusercontent.com';
+      const redirectUri = 'https://dev-lab--julinemart-pwa.netlify.app/auth/google/callback';
 
       console.log('🔄 Exchanging code for tokens...');
       
