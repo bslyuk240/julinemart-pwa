@@ -1,7 +1,7 @@
 // src/components/auth/google-sign-in-button.tsx
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { toast } from 'sonner';
@@ -22,8 +22,36 @@ export default function GoogleSignInButton({
   const buttonRef = useRef<HTMLDivElement>(null);
   const { login } = useCustomerAuth();
   const router = useRouter();
+  const [isNativePlatform, setIsNativePlatform] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
+    const detectPlatform = async () => {
+      try {
+        const { Capacitor } = await import('@capacitor/core');
+        if (mounted) {
+          setIsNativePlatform(Capacitor.isNativePlatform());
+        }
+      } catch {
+        if (mounted) {
+          setIsNativePlatform(false);
+        }
+      }
+    };
+
+    detectPlatform();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isNativePlatform) {
+      return;
+    }
+
     // Load Google Sign-In script
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
@@ -55,7 +83,58 @@ export default function GoogleSignInButton({
     return () => {
       document.body.removeChild(script);
     };
-  }, [text]);
+  }, [isNativePlatform, text]);
+
+  useEffect(() => {
+    if (!isNativePlatform) {
+      return;
+    }
+
+    let removeListener: (() => void) | undefined;
+
+    const setupDeepLinkListener = async () => {
+      const { App } = await import('@capacitor/app');
+      const listener = await App.addListener('appUrlOpen', async ({ url }) => {
+        try {
+          const parsedUrl = new URL(url);
+          const hashParams = new URLSearchParams(parsedUrl.hash.replace('#', ''));
+          const queryParams = new URLSearchParams(parsedUrl.search);
+          const credential =
+            hashParams.get('id_token') ||
+            queryParams.get('id_token') ||
+            hashParams.get('credential') ||
+            queryParams.get('credential');
+
+          if (!credential) {
+            return;
+          }
+
+          try {
+            const { Browser } = await import('@capacitor/browser');
+            await Browser.close();
+          } catch {
+            // Ignore Browser.close errors; some Android versions auto-close.
+          }
+
+          await handleCredentialResponse({ credential });
+        } catch (error) {
+          console.error('Deep link auth handling error:', error);
+        }
+      });
+
+      removeListener = () => {
+        listener.remove();
+      };
+    };
+
+    setupDeepLinkListener();
+
+    return () => {
+      if (removeListener) {
+        removeListener();
+      }
+    };
+  }, [isNativePlatform]);
 
   const handleCredentialResponse = async (response: any) => {
     try {
@@ -106,9 +185,60 @@ export default function GoogleSignInButton({
     }
   };
 
+  const handleNativeGoogleSignIn = async () => {
+    try {
+      const { Browser } = await import('@capacitor/browser');
+
+      const clientId =
+        process.env.NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID ||
+        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        const errorMsg = 'Google client ID is missing';
+        toast.error(errorMsg);
+        if (onError) onError(errorMsg);
+        return;
+      }
+
+      const appId = process.env.NEXT_PUBLIC_CAP_APP_ID || 'com.julinemart.app';
+      const redirectUri =
+        process.env.NEXT_PUBLIC_GOOGLE_NATIVE_REDIRECT_URI || `${appId}:/oauth2redirect`;
+      const scope = encodeURIComponent('openid email profile');
+      const nonce = Math.random().toString(36).slice(2);
+
+      const oauthUrl =
+        `https://accounts.google.com/o/oauth2/v2/auth` +
+        `?client_id=${encodeURIComponent(clientId)}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&response_type=id_token` +
+        `&scope=${scope}` +
+        `&prompt=select_account` +
+        `&nonce=${encodeURIComponent(nonce)}`;
+
+      await Browser.open({
+        url: oauthUrl,
+        presentationStyle: 'popover',
+      });
+    } catch (error: any) {
+      console.error('Native Google sign-in launch error:', error);
+      const errorMsg = 'Failed to open Google sign-in';
+      toast.error(errorMsg);
+      if (onError) onError(errorMsg);
+    }
+  };
+
   return (
     <div>
-      <div ref={buttonRef} className="w-full" />
+      {isNativePlatform ? (
+        <button
+          type="button"
+          onClick={handleNativeGoogleSignIn}
+          className="w-full h-11 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Continue with Google
+        </button>
+      ) : (
+        <div ref={buttonRef} className="w-full" />
+      )}
     </div>
   );
 }
