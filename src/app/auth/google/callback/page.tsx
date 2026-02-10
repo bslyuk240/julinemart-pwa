@@ -3,6 +3,9 @@
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+// Disable static generation for this page
+export const dynamic = 'force-dynamic';
+
 export default function GoogleCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -26,6 +29,11 @@ export default function GoogleCallbackPage() {
       }
 
       console.log('✅ Authorization code received in callback');
+
+      // Ensure we're in the browser
+      if (typeof window === 'undefined') {
+        return;
+      }
 
       // Broadcast the code to the opener window or handle it directly
       if (window.opener && !window.opener.closed) {
