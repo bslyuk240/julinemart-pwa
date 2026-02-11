@@ -99,7 +99,27 @@ export default function GoogleSignInButton({
           console.log('📱 Deep link received:', url);
           const parsedUrl = new URL(url);
           
-          // Check if this is a Google OAuth callback
+          // Handle custom URI scheme (julinemart://oauth)
+          if (parsedUrl.protocol === 'julinemart:' && parsedUrl.hostname === 'oauth') {
+            console.log('✅ Custom URI OAuth callback detected');
+            const queryParams = new URLSearchParams(parsedUrl.search);
+            const code = queryParams.get('code');
+            
+            if (code) {
+              try {
+                const { Browser } = await import('@capacitor/browser');
+                await Browser.close();
+              } catch {
+                // Ignore errors
+              }
+              
+              console.log('✅ Authorization code received via custom URI, exchanging for token...');
+              await handleAuthorizationCode(code);
+            }
+            return;
+          }
+          
+          // Check if this is a Google OAuth callback (HTTPS App Link)
           if (!parsedUrl.pathname.includes('/auth/google/callback')) {
             console.log('⚠️ Not a Google OAuth callback, ignoring');
             return;

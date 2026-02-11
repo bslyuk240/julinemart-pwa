@@ -47,7 +47,25 @@ export default function GoogleCallbackPage() {
         return;
       }
 
-      // Broadcast the code to the opener window or handle it directly
+      // Check if we're running inside Capacitor
+      const isCapacitor = window.location.href.includes('capacitor://') || 
+                         (window as any).Capacitor?.isNativePlatform?.();
+
+      // If in external browser (not Capacitor WebView), use custom URI to return to app
+      if (!isCapacitor) {
+        console.log('📲 Redirecting to app via custom URI...');
+        // Use custom URI scheme to reliably return to app
+        const appUri = `julinemart://oauth?code=${encodeURIComponent(code)}&state=google`;
+        window.location.href = appUri;
+        
+        // Show message in case redirect doesn't work
+        setTimeout(() => {
+          alert('Please return to the JulineMart app to complete sign-in');
+        }, 1000);
+        return;
+      }
+
+      // If already in Capacitor WebView, handle directly
       if (window.opener && !window.opener.closed) {
         window.opener.postMessage(
           {
