@@ -10,6 +10,7 @@ import PWAInstallPrompt from '@/components/pwa/pwa-install-prompt';
 import Footer from '@/components/layout/footer';
 import GlobalPullToRefresh from '@/components/layout/global-pull-to-refresh';
 import BottomNav from '@/components/layout/BottomNavClient';
+import { StatusBarManager } from '@/components/native/status-bar-manager';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -84,6 +85,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </Script>
       </head>
       <body className={inter.className}>
+        <StatusBarManager />
         <CustomerAuthProvider>
           <GlobalPullToRefresh>
             <Header />
