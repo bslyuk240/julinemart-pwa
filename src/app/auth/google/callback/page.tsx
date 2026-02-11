@@ -16,20 +16,27 @@ export default function GoogleCallbackPage() {
 
     // Get search params from window.location in browser
     const urlParams = new URLSearchParams(window.location.search);
+    
+    // If no parameters, just show waiting state (for direct URL access)
+    if (!urlParams.toString()) {
+      console.log('⏳ Waiting for OAuth redirect...');
+      return;
+    }
+    
     const handleCallback = async () => {
       const code = urlParams.get('code');
       const error = urlParams.get('error');
 
       if (error) {
         console.error('OAuth error:', error);
-        // Redirect back to login with error
-        router.push(`/auth/signin?error=${encodeURIComponent(error)}`);
+        // Redirect back to home with error toast
+        router.push(`/?auth_error=${encodeURIComponent(error)}`);
         return;
       }
 
       if (!code) {
         console.error('No authorization code received');
-        router.push('/auth/signin?error=no_code');
+        router.push('/?auth_error=no_code');
         return;
       }
 
