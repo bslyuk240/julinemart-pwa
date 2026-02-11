@@ -44,10 +44,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if customer already exists in WooCommerce
+    console.log('🔍 Searching for customer with email:', email);
     let customer = await searchCustomerByEmail(email);
+    console.log('🔍 Search result:', customer ? `Found customer ID ${customer.id}` : 'No customer found');
 
     if (customer) {
       // Customer exists - log them in
+      console.log('✅ Logging in existing customer:', customer.id);
       const result: AuthResult = {
         success: true,
         customerId: customer.id,
@@ -59,6 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Customer doesn't exist - create new account
+    console.log('👤 Creating new customer for:', email);
     // Split full name if first/last name not provided
     let userFirstName = firstName || '';
     let userLastName = lastName || '';
@@ -79,6 +83,7 @@ export async function POST(request: NextRequest) {
       'A1!';
 
     // Create new WooCommerce customer
+    console.log('📝 Calling createCustomer with username:', username);
     const newCustomer = await createCustomer({
       email: email,
       first_name: userFirstName,
@@ -112,6 +117,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (!newCustomer) {
+      console.error('❌ Failed to create customer for:', email);
+      console.error('❌ This usually means the email already exists in WooCommerce');
       return NextResponse.json(
         { success: false, message: 'Failed to create account' },
         { status: 500 }
