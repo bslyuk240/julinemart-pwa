@@ -237,8 +237,8 @@ export default function GoogleSignInButton({
       // Use Android-specific Web OAuth client for Capacitor app
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '700183414398-un1b0ieej54djahu2pdsk8rim257luij.apps.googleusercontent.com';
       
-      // Use HTTPS redirect URI (App Links) - modern approach for Android
-      const redirectUri = 'https://dev-lab--julinemart-pwa.netlify.app/auth/google/callback';
+      // Use HTTPS redirect URI (App Links) - production URL
+      const redirectUri = 'https://julinemart-pwa.netlify.app/auth/google/callback';
       
       const scope = encodeURIComponent('openid email profile');
       
@@ -276,7 +276,7 @@ export default function GoogleSignInButton({
   // Handle authorization code exchange
   async function handleAuthorizationCode(code: string) {
     try {
-      const redirectUri = 'https://dev-lab--julinemart-pwa.netlify.app/auth/google/callback';
+      const redirectUri = 'https://julinemart-pwa.netlify.app/auth/google/callback';
 
       console.log('🔄 Exchanging code for tokens via backend...');
       
