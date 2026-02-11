@@ -6,6 +6,10 @@ export async function POST(request: NextRequest) {
   try {
     const { code, redirectUri } = await request.json();
 
+    console.log('📥 Token exchange request received');
+    console.log('Code present:', !!code);
+    console.log('RedirectUri:', redirectUri);
+
     if (!code || !redirectUri) {
       return NextResponse.json(
         { error: 'Missing code or redirectUri' },
@@ -17,10 +21,17 @@ export async function POST(request: NextRequest) {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_ANDROID_CLIENT_SECRET;
 
+    console.log('Has clientId:', !!clientId);
+    console.log('Has clientSecret:', !!clientSecret);
+    console.log('ClientId length:', clientId?.length);
+
     if (!clientId || !clientSecret) {
-      console.error('Missing Google OAuth credentials');
+      console.error('❌ Missing Google OAuth credentials', {
+        hasClientId: !!clientId,
+        hasClientSecret: !!clientSecret,
+      });
       return NextResponse.json(
-        { error: 'Server configuration error' },
+        { error: 'Server configuration error', details: { hasClientId: !!clientId, hasClientSecret: !!clientSecret } },
         { status: 500 }
       );
     }
