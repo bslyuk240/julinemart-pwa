@@ -201,7 +201,8 @@ export async function createCustomer(data: {
   try {
     const response = await wcApi.post('customers', data);
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
+    console.error('❌ WooCommerce createCustomer error:', error?.response?.data || error?.message || error);
     handleApiError(error);
     return null;
   }
@@ -212,9 +213,15 @@ export async function createCustomer(data: {
  */
 export async function searchCustomerByEmail(email: string): Promise<Customer | null> {
   try {
+    console.log('🔍 searchCustomerByEmail: Searching for', email);
     const customers = await getCustomers({ email, per_page: 1 });
+    console.log('🔍 searchCustomerByEmail: Found', customers.length, 'customer(s)');
+    if (customers.length > 0) {
+      console.log('🔍 searchCustomerByEmail: Customer ID', customers[0].id, 'Email', customers[0].email);
+    }
     return customers.length > 0 ? customers[0] : null;
-  } catch (error) {
+  } catch (error: any) {
+    console.error('❌ searchCustomerByEmail error:', error?.response?.data || error?.message || error);
     handleApiError(error);
     return null;
   }
