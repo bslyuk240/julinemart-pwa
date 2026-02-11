@@ -53,11 +53,14 @@ export default function GoogleCallbackPage() {
 
       // If in external browser (e.g. Chrome Custom Tabs from Capacitor Browser), redirect to app
       if (!isCapacitor) {
-        console.log('📲 Redirecting to app via custom URI...');
-        const appUri = `julinemart://oauth?code=${encodeURIComponent(code)}&state=google`;
-        // Try replace first (no alert so intent can fire immediately)
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        // On Android, Intent URL forces opening our app from Chrome Custom Tabs
+        const appUri = isAndroid
+          ? `intent://oauth?code=${encodeURIComponent(code)}&state=google#Intent;scheme=julinemart;package=com.julinemart.app;end`
+          : `julinemart://oauth?code=${encodeURIComponent(code)}&state=google`;
+        console.log('📲 Redirecting to app...', isAndroid ? '(Intent URL)' : '(custom URI)');
         window.location.replace(appUri);
-        // Fallback: link click works on some Android browsers when replace() is blocked
+        // Fallback: programmatic link click (required on some Chrome Custom Tabs)
         setTimeout(() => {
           const a = document.createElement('a');
           a.href = appUri;
@@ -65,13 +68,13 @@ export default function GoogleCallbackPage() {
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
-        }, 300);
-        // Only show alert if still on page after 2.5s
+        }, 200);
+        // Only show alert if still on page after 3s
         setTimeout(() => {
           if (document.visibilityState === 'visible') {
             alert('Please return to the JulineMart app to complete sign-in');
           }
-        }, 2500);
+        }, 3000);
         return;
       }
 
