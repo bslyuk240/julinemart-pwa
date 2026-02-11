@@ -9,7 +9,7 @@ export function StatusBarManager() {
       if (typeof window === 'undefined') return;
       
       try {
-        const { StatusBar } = await import('@capacitor/status-bar');
+        const { StatusBar, Style } = await import('@capacitor/status-bar');
         const { Capacitor } = await import('@capacitor/core');
         
         // Check if running on a native platform
@@ -19,7 +19,7 @@ export function StatusBarManager() {
           
           // Set status bar to match your purple theme
           await StatusBar.setBackgroundColor({ color: '#77088a' }); // Match banner purple
-          await StatusBar.setStyle({ style: 'LIGHT' }); // White text/icons
+          await StatusBar.setStyle({ style: Style.Light }); // White text/icons
           
           // Show the status bar (in case it was hidden)
           await StatusBar.show();
