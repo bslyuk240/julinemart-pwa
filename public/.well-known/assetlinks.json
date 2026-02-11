@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.julinemart.app",
+    "sha256_cert_fingerprints": [
+      "38:0D:64:03:C9:92:0F:69:0A:DF:8F:C7:47:12:34:EA:18:40:7A:53:79:D2:17:EB:45:B3:9C:71:57:35:E8:9E"
+    ]
+  }
+}]

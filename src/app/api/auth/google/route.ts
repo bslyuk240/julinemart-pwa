@@ -44,10 +44,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if customer already exists in WooCommerce
+    console.log('🔍 Searching for customer with email:', email);
     let customer = await searchCustomerByEmail(email);
+    console.log('🔍 Search result:', customer ? `Found customer ID ${customer.id}` : 'No customer found');
 
     if (customer) {
-      // Customer exists - log them in
+      // Customer exists - log them in (account linking)
+      console.log('✅ Logging in existing customer:', customer.id);
+      console.log('🔗 Account linking: Google account linked to existing email/password account');
       const result: AuthResult = {
         success: true,
         customerId: customer.id,
@@ -59,6 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Customer doesn't exist - create new account
+    console.log('👤 Creating new customer for:', email);
     // Split full name if first/last name not provided
     let userFirstName = firstName || '';
     let userLastName = lastName || '';
@@ -79,6 +84,7 @@ export async function POST(request: NextRequest) {
       'A1!';
 
     // Create new WooCommerce customer
+    console.log('📝 Calling createCustomer with username:', username);
     const newCustomer = await createCustomer({
       email: email,
       first_name: userFirstName,
@@ -112,8 +118,27 @@ export async function POST(request: NextRequest) {
     });
 
     if (!newCustomer) {
+      console.error('❌ Failed to create customer for:', email);
+      console.error('❌ This usually means the email already exists in WooCommerce');
+      console.log('🔄 Attempting to search for existing customer again...');
+      
+      // Try searching again - maybe the customer exists but wasn't found initially
+      const existingCustomer = await searchCustomerByEmail(email);
+      if (existingCustomer) {
+        console.log('✅ Found existing customer on retry:', existingCustomer.id);
+        console.log('🔗 Linking Google account to existing account');
+        const result: AuthResult = {
+          success: true,
+          customerId: existingCustomer.id,
+          customer: existingCustomer,
+          message: 'Login successful',
+        };
+        return NextResponse.json(result);
+      }
+      
+      console.error('❌ Customer still not found after retry');
       return NextResponse.json(
-        { success: false, message: 'Failed to create account' },
+        { success: false, message: 'Failed to create account. Please try again or contact support.' },
         { status: 500 }
       );
     }
