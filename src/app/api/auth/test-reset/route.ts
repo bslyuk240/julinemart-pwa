@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Test endpoint to verify WordPress password reset API connectivity
-// Visit: https://julinemart-pwa.netlify.app/api/auth/test-reset
+// Visit: https://julinemart.com/api/auth/test-reset
 
 export async function GET(request: NextRequest) {
   const WP_URL = process.env.NEXT_PUBLIC_WP_URL;
