@@ -29,7 +29,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="dev-lab--julinemart-pwa.netlify.app"
+                    android:host="julinemart-pwa.netlify.app"
                     android:pathPrefix="/auth/google/callback" />
             </intent-filter>
 
