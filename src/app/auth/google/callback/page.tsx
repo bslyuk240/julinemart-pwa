@@ -78,11 +78,6 @@ export default function GoogleCallbackPage() {
       } else {
         // If no opener, handle the token exchange here
         try {
-          const codeVerifier = sessionStorage.getItem('pkce_code_verifier');
-          if (!codeVerifier) {
-            throw new Error('PKCE verifier not found');
-          }
-
           const redirectUri = `${window.location.origin}/auth/google/callback`;
 
           console.log('🔄 Exchanging code for tokens via backend...');

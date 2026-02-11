@@ -236,28 +236,17 @@ export default function GoogleSignInButton({
       
       const scope = encodeURIComponent('openid email profile');
       
-      // Generate PKCE challenge for secure mobile OAuth
-      const codeVerifier = generateCodeVerifier();
-      const codeChallenge = await generateCodeChallenge(codeVerifier);
-      
-      // Store code verifier for later use in callback
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('pkce_code_verifier', codeVerifier);
-      }
-      
-      console.log('🔐 Native Google Sign-In (Authorization Code Flow + PKCE)');
+      console.log('🔐 Native Google Sign-In (Authorization Code Flow)');
       console.log('Client ID:', clientId);
       console.log('Redirect URI:', redirectUri);
 
-      // Use authorization code flow with PKCE (more secure for mobile)
+      // Use authorization code flow (backend handles token exchange securely)
       oauthUrl =
         `https://accounts.google.com/o/oauth2/v2/auth` +
         `?client_id=${encodeURIComponent(clientId)}` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&response_type=code` +
         `&scope=${scope}` +
-        `&code_challenge=${encodeURIComponent(codeChallenge)}` +
-        `&code_challenge_method=S256` +
         `&prompt=select_account`;
 
       console.log('🌐 Opening Google OAuth...');
@@ -316,35 +305,6 @@ export default function GoogleSignInButton({
       toast.error('Failed to complete sign-in');
       if (onError) onError(error instanceof Error ? error.message : 'Token exchange failed');
     }
-  }
-
-  // PKCE helper functions
-  function generateCodeVerifier(): string {
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    return base64URLEncode(array);
-  }
-
-  async function generateCodeChallenge(verifier: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(verifier);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return base64URLEncode(new Uint8Array(hash));
-  }
-
-  function base64URLEncode(buffer: Uint8Array): string {
-    // Convert buffer to base64 in chunks to avoid call stack issues
-    let binary = '';
-    const len = buffer.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(buffer[i]);
-    }
-    const base64 = btoa(binary);
-    // Convert to base64url format (RFC 4648)
-    return base64
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, ''); // Remove padding
   }
 
   return (
