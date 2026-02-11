@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
 import { Inter } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
@@ -10,13 +9,9 @@ import WhatsAppFloat from '@/components/layout/whatsapp-float';
 import PWAInstallPrompt from '@/components/pwa/pwa-install-prompt';
 import Footer from '@/components/layout/footer';
 import GlobalPullToRefresh from '@/components/layout/global-pull-to-refresh';
+import BottomNav from '@/components/layout/BottomNavClient';
 
 const inter = Inter({ subsets: ['latin'] });
-
-const BottomNav = dynamic(
-  () => import('@/components/layout/bottom-nav'),
-  { ssr: false }
-);
 
 export const metadata: Metadata = {
   title: 'JulineMart - Your One-Stop Marketplace',
