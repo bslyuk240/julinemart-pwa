@@ -5,8 +5,8 @@ const config: CapacitorConfig = {
   appName: 'JulineMart',
   webDir: 'out',
   server: {
-    // Use production deployment for Android app
-    url: 'https://julinemart-pwa.netlify.app',
+    // Use dev-lab deployment for testing Android OAuth
+    url: 'https://dev-lab--julinemart-pwa.netlify.app',
     cleartext: true,
     androidScheme: 'https'
   }
