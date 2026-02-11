@@ -190,7 +190,7 @@ export default function GoogleSignInButton({
 
       const data = await result.json();
       
-      console.log('📊 Backend response:', { success: data.success, hasCustomerId: !!data.customerId });
+      console.log('📊 Backend response:', JSON.stringify(data, null, 2));
 
       if (data.success && data.customerId) {
         // Login the customer
@@ -209,7 +209,7 @@ export default function GoogleSignInButton({
         
         router.push(redirectTo);
       } else {
-        console.error('❌ Backend sign-in failed:', data);
+        console.error('❌ Backend sign-in failed:', JSON.stringify(data, null, 2));
         const errorMsg = data.message || data.error || 'Google sign-in failed';
         toast.error(errorMsg);
         
