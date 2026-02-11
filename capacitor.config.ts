@@ -3,10 +3,12 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.julinemart.app',
   appName: 'JulineMart',
-  webDir: 'www',
+  webDir: 'out',
   server: {
-    url: 'https://julinemart.com',
-    cleartext: false
+    // Use production deployment for Android app
+    url: 'https://julinemart-pwa.netlify.app',
+    cleartext: true,
+    androidScheme: 'https'
   }
 };
 

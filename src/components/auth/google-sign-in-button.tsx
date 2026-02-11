@@ -96,16 +96,29 @@ export default function GoogleSignInButton({
       const { App } = await import('@capacitor/app');
       const listener = await App.addListener('appUrlOpen', async ({ url }) => {
         try {
+          console.log('📱 Deep link received:', url);
           const parsedUrl = new URL(url);
-          const hashParams = new URLSearchParams(parsedUrl.hash.replace('#', ''));
+          
+          // Check if this is a Google OAuth callback
+          if (!parsedUrl.pathname.includes('/auth/google/callback')) {
+            console.log('⚠️ Not a Google OAuth callback, ignoring');
+            return;
+          }
+          
           const queryParams = new URLSearchParams(parsedUrl.search);
-          const credential =
-            hashParams.get('id_token') ||
-            queryParams.get('id_token') ||
-            hashParams.get('credential') ||
-            queryParams.get('credential');
+          
+          // Handle authorization code flow
+          const code = queryParams.get('code');
+          const error = queryParams.get('error');
+          
+          if (error) {
+            console.error('❌ OAuth error:', error);
+            toast.error(`Sign-in failed: ${error}`);
+            return;
+          }
 
-          if (!credential) {
+          if (!code) {
+            console.log('⚠️ No authorization code in URL');
             return;
           }
 
@@ -116,9 +129,13 @@ export default function GoogleSignInButton({
             // Ignore Browser.close errors; some Android versions auto-close.
           }
 
-          await handleCredentialResponse({ credential });
+          console.log('✅ Authorization code received, exchanging for token...');
+          
+          // Exchange authorization code for tokens
+          await handleAuthorizationCode(code);
         } catch (error) {
           console.error('Deep link auth handling error:', error);
+          toast.error('Authentication failed');
         }
       });
 
@@ -191,31 +208,39 @@ export default function GoogleSignInButton({
     try {
       const { Browser } = await import('@capacitor/browser');
 
-      const clientId =
-        process.env.NEXT_PUBLIC_GOOGLE_NATIVE_CLIENT_ID ||
-        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-      if (!clientId) {
-        const errorMsg = 'Google client ID is missing';
-        toast.error(errorMsg);
-        if (onError) onError(errorMsg);
-        return;
-      }
-
-      const appId = process.env.NEXT_PUBLIC_CAP_APP_ID || 'com.julinemart.app';
-      const redirectUri =
-        process.env.NEXT_PUBLIC_GOOGLE_NATIVE_REDIRECT_URI || `${appId}:/oauth2redirect`;
+      // Use Android-specific Web OAuth client for Capacitor app
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '700183414398-un1b0ieej54djahu2pdsk8rim257luij.apps.googleusercontent.com';
+      
+      // Use HTTPS redirect URI (App Links) - modern approach for Android
+      const redirectUri = 'https://julinemart-pwa.netlify.app/auth/google/callback';
+      
       const scope = encodeURIComponent('openid email profile');
-      const nonce = Math.random().toString(36).slice(2);
+      
+      // Generate PKCE challenge for secure mobile OAuth
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+      
+      // Store code verifier for later use in callback
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('pkce_code_verifier', codeVerifier);
+      }
+      
+      console.log('🔐 Native Google Sign-In (Authorization Code Flow + PKCE)');
+      console.log('Client ID:', clientId);
+      console.log('Redirect URI:', redirectUri);
 
+      // Use authorization code flow with PKCE (more secure for mobile)
       oauthUrl =
         `https://accounts.google.com/o/oauth2/v2/auth` +
         `?client_id=${encodeURIComponent(clientId)}` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-        `&response_type=id_token` +
+        `&response_type=code` +
         `&scope=${scope}` +
-        `&prompt=select_account` +
-        `&nonce=${encodeURIComponent(nonce)}`;
+        `&code_challenge=${encodeURIComponent(codeChallenge)}` +
+        `&code_challenge_method=S256` +
+        `&prompt=select_account`;
 
+      console.log('🌐 Opening Google OAuth...');
       await Browser.open({ url: oauthUrl });
     } catch (error: any) {
       console.error('Native Google sign-in launch error:', error);
@@ -232,6 +257,88 @@ export default function GoogleSignInButton({
       if (onError) onError(errorMsg);
     }
   };
+
+  // Handle authorization code exchange
+  async function handleAuthorizationCode(code: string) {
+    try {
+      const codeVerifier = sessionStorage.getItem('pkce_code_verifier');
+      if (!codeVerifier) {
+        throw new Error('PKCE verifier not found');
+      }
+
+      // Use Android-specific client for token exchange
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '700183414398-un1b0ieej54djahu2pdsk8rim257luij.apps.googleusercontent.com';
+      const redirectUri = 'https://julinemart-pwa.netlify.app/auth/google/callback';
+
+      console.log('🔄 Exchanging code for tokens...');
+      
+      // Exchange code for tokens
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          code,
+          client_id: clientId,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+          code_verifier: codeVerifier,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json();
+        throw new Error(errorData.error_description || 'Token exchange failed');
+      }
+
+      const tokens = await tokenResponse.json();
+      console.log('✅ Tokens received');
+      
+      // Clean up verifier
+      sessionStorage.removeItem('pkce_code_verifier');
+
+      // Use the ID token with NextAuth
+      if (tokens.id_token) {
+        await handleCredentialResponse({ credential: tokens.id_token });
+      } else {
+        throw new Error('No ID token in response');
+      }
+    } catch (error) {
+      console.error('❌ Token exchange error:', error);
+      toast.error('Failed to complete sign-in');
+      if (onError) onError(error instanceof Error ? error.message : 'Token exchange failed');
+    }
+  }
+
+  // PKCE helper functions
+  function generateCodeVerifier(): string {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return base64URLEncode(array);
+  }
+
+  async function generateCodeChallenge(verifier: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return base64URLEncode(new Uint8Array(hash));
+  }
+
+  function base64URLEncode(buffer: Uint8Array): string {
+    // Convert buffer to base64 in chunks to avoid call stack issues
+    let binary = '';
+    const len = buffer.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(buffer[i]);
+    }
+    const base64 = btoa(binary);
+    // Convert to base64url format (RFC 4648)
+    return base64
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, ''); // Remove padding
+  }
 
   return (
     <div>
