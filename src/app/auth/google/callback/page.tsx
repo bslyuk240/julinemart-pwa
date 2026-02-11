@@ -83,34 +83,27 @@ export default function GoogleCallbackPage() {
             throw new Error('PKCE verifier not found');
           }
 
-          // Use Android client for Capacitor, fallback to regular web client
-          const clientId =
-            process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
-            process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
           const redirectUri = `${window.location.origin}/auth/google/callback`;
 
-          console.log('🔄 Exchanging code for tokens...');
+          console.log('🔄 Exchanging code for tokens via backend...');
 
-          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          const tokenResponse = await fetch('/api/auth/google/token-exchange', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
+              'Content-Type': 'application/json',
             },
-            body: new URLSearchParams({
+            body: JSON.stringify({
               code,
-              client_id: clientId!,
-              redirect_uri: redirectUri,
-              grant_type: 'authorization_code',
-              code_verifier: codeVerifier,
+              redirectUri,
             }),
           });
 
           if (!tokenResponse.ok) {
             const errorData = await tokenResponse.json();
-            throw new Error(errorData.error_description || 'Token exchange failed');
+            throw new Error(errorData.error || 'Token exchange failed');
           }
 
-          const tokens = await tokenResponse.json();
+          const data = await tokenResponse.json();
           console.log('✅ Tokens received, signing in...');
 
           // Sign in with NextAuth using the ID token
@@ -120,12 +113,11 @@ export default function GoogleCallbackPage() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              credential: tokens.id_token,
+              credential: data.id_token,
             }),
           });
 
           if (signInResponse.ok) {
-            sessionStorage.removeItem('pkce_code_verifier');
             router.push('/');
           } else {
             throw new Error('Sign in failed');
@@ -133,7 +125,7 @@ export default function GoogleCallbackPage() {
         } catch (error) {
           console.error('Token exchange error:', error);
           router.push(
-            `/auth/signin?error=${encodeURIComponent(
+            `/?auth_error=${encodeURIComponent(
               error instanceof Error ? error.message : 'Token exchange failed'
             )}`
           );

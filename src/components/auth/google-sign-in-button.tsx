@@ -281,46 +281,33 @@ export default function GoogleSignInButton({
   // Handle authorization code exchange
   async function handleAuthorizationCode(code: string) {
     try {
-      const codeVerifier = sessionStorage.getItem('pkce_code_verifier');
-      if (!codeVerifier) {
-        throw new Error('PKCE verifier not found');
-      }
-
-      // Use Android-specific client for token exchange
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '700183414398-un1b0ieej54djahu2pdsk8rim257luij.apps.googleusercontent.com';
       const redirectUri = 'https://dev-lab--julinemart-pwa.netlify.app/auth/google/callback';
 
-      console.log('🔄 Exchanging code for tokens...');
+      console.log('🔄 Exchanging code for tokens via backend...');
       
-      // Exchange code for tokens
-      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      // Use backend endpoint for secure token exchange
+      const tokenResponse = await fetch('/api/auth/google/token-exchange', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({
+        body: JSON.stringify({
           code,
-          client_id: clientId,
-          redirect_uri: redirectUri,
-          grant_type: 'authorization_code',
-          code_verifier: codeVerifier,
+          redirectUri,
         }),
       });
 
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.json();
-        throw new Error(errorData.error_description || 'Token exchange failed');
+        throw new Error(errorData.error || 'Token exchange failed');
       }
 
-      const tokens = await tokenResponse.json();
-      console.log('✅ Tokens received');
-      
-      // Clean up verifier
-      sessionStorage.removeItem('pkce_code_verifier');
+      const data = await tokenResponse.json();
+      console.log('✅ Tokens received from backend');
 
       // Use the ID token with NextAuth
-      if (tokens.id_token) {
-        await handleCredentialResponse({ credential: tokens.id_token });
+      if (data.id_token) {
+        await handleCredentialResponse({ credential: data.id_token });
       } else {
         throw new Error('No ID token in response');
       }
