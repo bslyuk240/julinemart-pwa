@@ -175,6 +175,8 @@ export default function GoogleSignInButton({
 
   const handleCredentialResponse = async (response: any) => {
     try {
+      console.log('🔑 Processing Google credential...');
+      
       // Send credential to our backend
       const result = await fetch('/api/auth/google', {
         method: 'POST',
@@ -187,9 +189,12 @@ export default function GoogleSignInButton({
       });
 
       const data = await result.json();
+      
+      console.log('📊 Backend response:', { success: data.success, hasCustomerId: !!data.customerId });
 
       if (data.success && data.customerId) {
         // Login the customer
+        console.log('✅ Logging in customer:', data.customerId);
         await login(data.customerId);
         
         toast.success(
@@ -204,7 +209,8 @@ export default function GoogleSignInButton({
         
         router.push(redirectTo);
       } else {
-        const errorMsg = data.message || 'Google sign-in failed';
+        console.error('❌ Backend sign-in failed:', data);
+        const errorMsg = data.message || data.error || 'Google sign-in failed';
         toast.error(errorMsg);
         
         if (onError) {
@@ -212,8 +218,8 @@ export default function GoogleSignInButton({
         }
       }
     } catch (error: any) {
-      console.error('Google sign-in error:', error);
-      const errorMsg = 'Failed to sign in with Google';
+      console.error('❌ Google sign-in error:', error);
+      const errorMsg = error?.message || 'Failed to sign in with Google';
       toast.error(errorMsg);
       
       if (onError) {
@@ -296,8 +302,10 @@ export default function GoogleSignInButton({
 
       // Use the ID token with NextAuth
       if (data.id_token) {
+        console.log('🎫 Signing in with ID token...');
         await handleCredentialResponse({ credential: data.id_token });
       } else {
+        console.error('❌ No ID token in backend response:', data);
         throw new Error('No ID token in response');
       }
     } catch (error) {
