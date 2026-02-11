@@ -51,17 +51,27 @@ export default function GoogleCallbackPage() {
       const isCapacitor = window.location.href.includes('capacitor://') || 
                          (window as any).Capacitor?.isNativePlatform?.();
 
-      // If in external browser (not Capacitor WebView), use custom URI to return to app
+      // If in external browser (e.g. Chrome Custom Tabs from Capacitor Browser), redirect to app
       if (!isCapacitor) {
         console.log('📲 Redirecting to app via custom URI...');
-        // Use custom URI scheme to reliably return to app
         const appUri = `julinemart://oauth?code=${encodeURIComponent(code)}&state=google`;
-        window.location.href = appUri;
-        
-        // Show message in case redirect doesn't work
+        // Try replace first (no alert so intent can fire immediately)
+        window.location.replace(appUri);
+        // Fallback: link click works on some Android browsers when replace() is blocked
         setTimeout(() => {
-          alert('Please return to the JulineMart app to complete sign-in');
-        }, 1000);
+          const a = document.createElement('a');
+          a.href = appUri;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }, 300);
+        // Only show alert if still on page after 2.5s
+        setTimeout(() => {
+          if (document.visibilityState === 'visible') {
+            alert('Please return to the JulineMart app to complete sign-in');
+          }
+        }, 2500);
         return;
       }
 
