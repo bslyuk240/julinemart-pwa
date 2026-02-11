@@ -51,16 +51,11 @@ export default function GoogleCallbackPage() {
       const isCapacitor = window.location.href.includes('capacitor://') || 
                          (window as any).Capacitor?.isNativePlatform?.();
 
-      // If in external browser (e.g. Chrome Custom Tabs from Capacitor Browser), redirect to app
+      // If in external browser (Chrome Custom Tabs), redirect back to app with custom scheme
       if (!isCapacitor) {
-        const isAndroid = /Android/i.test(navigator.userAgent);
-        // On Android, Intent URL forces opening our app from Chrome Custom Tabs
-        const appUri = isAndroid
-          ? `intent://oauth?code=${encodeURIComponent(code)}&state=google#Intent;scheme=julinemart;package=com.julinemart.app;end`
-          : `julinemart://oauth?code=${encodeURIComponent(code)}&state=google`;
-        console.log('📲 Redirecting to app...', isAndroid ? '(Intent URL)' : '(custom URI)');
+        const appUri = `julinemart://oauth?code=${encodeURIComponent(code)}&state=google`;
+        console.log('📲 Redirecting to app via julinemart://...');
         window.location.replace(appUri);
-        // Fallback: programmatic link click (required on some Chrome Custom Tabs)
         setTimeout(() => {
           const a = document.createElement('a');
           a.href = appUri;
@@ -68,11 +63,10 @@ export default function GoogleCallbackPage() {
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
-        }, 200);
-        // Only show alert if still on page after 3s
+        }, 250);
         setTimeout(() => {
           if (document.visibilityState === 'visible') {
-            alert('Please return to the JulineMart app to complete sign-in');
+            alert('If the app didn\'t open, tap "Open with" and choose JulineMart, or open the JulineMart app from your home screen.');
           }
         }, 3000);
         return;
