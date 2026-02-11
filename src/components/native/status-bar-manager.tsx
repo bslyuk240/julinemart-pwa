@@ -14,14 +14,17 @@ export function StatusBarManager() {
         
         // Check if running on a native platform
         if (Capacitor.isNativePlatform()) {
+          // Disable overlay mode so status bar doesn't overlap content
+          await StatusBar.setOverlaysWebView({ overlay: false });
+          
           // Set status bar to match your purple theme
-          await StatusBar.setBackgroundColor({ color: '#6b21a8' }); // purple-700
+          await StatusBar.setBackgroundColor({ color: '#77088a' }); // Match banner purple
           await StatusBar.setStyle({ style: 'LIGHT' }); // White text/icons
           
           // Show the status bar (in case it was hidden)
           await StatusBar.show();
           
-          console.log('✅ Status bar configured');
+          console.log('✅ Status bar configured (non-overlay mode)');
         }
       } catch (error) {
         // Silently fail if status bar plugin is not available
