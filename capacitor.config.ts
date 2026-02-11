@@ -5,8 +5,8 @@ const config: CapacitorConfig = {
   appName: 'JulineMart',
   webDir: 'out',
   server: {
-    // Production URL for better performance and stability
-    url: 'https://julinemart-pwa.netlify.app',
+    // Production: Use custom domain
+    url: 'https://julinemart.com',
     cleartext: true,
     androidScheme: 'https'
   },
