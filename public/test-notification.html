@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Push Notifications - JulineMart</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #77088a;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        button {
+            background: #77088a;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background: #6b21a8;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #bee5eb;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Test Push Notifications</h1>
+        
+        <div class="info">
+            <strong>Instructions:</strong>
+            <ol>
+                <li>Enter your customer ID (the ID from WooCommerce)</li>
+                <li>Compose your test notification</li>
+                <li>Click "Send Notification"</li>
+                <li>Check your phone for the notification!</li>
+            </ol>
+        </div>
+
+        <form id="notificationForm">
+            <div class="form-group">
+                <label for="customerId">Customer ID:</label>
+                <input type="text" id="customerId" required placeholder="e.g., 123">
+            </div>
+
+            <div class="form-group">
+                <label for="notificationType">Notification Type:</label>
+                <select id="notificationType">
+                    <option value="general">General</option>
+                    <option value="order_update">Order Update</option>
+                    <option value="promotion">Promotion</option>
+                    <option value="product">New Product</option>
+                    <option value="abandoned_cart">Abandoned Cart</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="title">Title:</label>
+                <input type="text" id="title" required placeholder="e.g., Welcome to JulineMart!" value="Test Notification 🎉">
+            </div>
+
+            <div class="form-group">
+                <label for="message">Message:</label>
+                <textarea id="message" required placeholder="e.g., Thank you for signing up!">This is a test notification from JulineMart. If you see this, push notifications are working!</textarea>
+            </div>
+
+            <button type="submit" id="sendBtn">Send Notification</button>
+        </form>
+
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('notificationForm');
+        const resultDiv = document.getElementById('result');
+        const sendBtn = document.getElementById('sendBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const customerId = document.getElementById('customerId').value;
+            const type = document.getElementById('notificationType').value;
+            const title = document.getElementById('title').value;
+            const message = document.getElementById('message').value;
+
+            // Show loading state
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Sending...';
+            resultDiv.style.display = 'none';
+
+            try {
+                // First, check if device is registered
+                const checkResponse = await fetch(`/api/notifications/register-device?customerId=${customerId}`);
+                const checkData = await checkResponse.json();
+
+                console.log('Device check:', checkData);
+
+                if (!checkData.success || checkData.count === 0) {
+                    throw new Error('No device registered for this customer ID. Make sure you signed in on the app!');
+                }
+
+                // Send notification
+                const response = await fetch('/api/notifications/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        customerId,
+                        title,
+                        message,
+                        type,
+                        data: {
+                            orderId: type === 'order_update' ? '12345' : undefined,
+                            productId: type === 'product' ? '67890' : undefined,
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Send result:', data);
+
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <strong>✅ Success!</strong><br>
+                        Notification sent to ${data.sent || data.totalDevices} device(s).<br>
+                        ${data.simulated ? '<br><strong>Note:</strong> FCM is not fully configured, so this was simulated.' : ''}
+                        <br><br>
+                        <strong>Check your phone now!</strong> 📱
+                    `;
+                } else {
+                    throw new Error(data.message || 'Failed to send notification');
+                }
+
+                resultDiv.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <strong>❌ Error:</strong><br>
+                    ${error.message}
+                `;
+                resultDiv.style.display = 'block';
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send Notification';
+            }
+        });
+    </script>
+</body>
+</html>
