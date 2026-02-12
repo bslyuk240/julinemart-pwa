@@ -2,13 +2,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://gfikkrwhsedhwmkxybzm.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmaWtrcndoc2VkaHdta3h5YnptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2NDYyOTIsImV4cCI6MjA3ODIyMjI5Mn0.1jkYz1x43YjQZP4V8Y26fbtVGQOkfDMlnPf5s73JAB4';
-const supabase = createClient(supabaseUrl, supabaseKey);
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Supabase environment variables are not configured');
+  }
+
+  return createClient(supabaseUrl, supabaseKey);
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient();
     const body = await request.json();
     const { customerId, fcmToken, platform } = body;
 
@@ -19,12 +26,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`📱 Registering device token for customer ${customerId}`);
-    console.log(`   Token: ${fcmToken.substring(0, 20)}...`);
-    console.log(`   Platform: ${platform || 'android'}`);
+    console.log(`Registering device token for customer ${customerId}`);
+    console.log(`Token prefix: ${String(fcmToken).substring(0, 20)}...`);
+    console.log(`Platform: ${platform || 'android'}`);
 
-    // Upsert device token into Supabase (handles duplicates automatically)
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('device_tokens')
       .upsert(
         {
@@ -38,39 +44,41 @@ export async function POST(request: NextRequest) {
           onConflict: 'customer_id,fcm_token',
           ignoreDuplicates: false,
         }
-      )
-      .select();
+      );
 
     if (error) {
-      console.error('❌ Supabase error:', error);
       throw new Error(`Database error: ${error.message}`);
     }
 
-    // Count total devices for this customer
-    const { count } = await supabase
+    const { count, error: countError } = await supabase
       .from('device_tokens')
       .select('*', { count: 'exact', head: true })
       .eq('customer_id', customerId);
 
-    console.log(`✅ Token registered. Customer ${customerId} now has ${count || 1} device(s)`);
+    if (countError) {
+      throw new Error(`Database error: ${countError.message}`);
+    }
+
+    console.log(
+      `Token registered. Customer ${customerId} now has ${count || 1} device(s)`
+    );
 
     return NextResponse.json({
       success: true,
       message: 'Device registered successfully',
       tokenCount: count || 1,
     });
-  } catch (error: any) {
-    console.error('❌ Register device error:', error);
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to register device' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to register device';
+    console.error('Register device error:', error);
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
 
-// Helper function to get tokens for a customer
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient();
     const customerId = request.nextUrl.searchParams.get('customerId');
 
     if (!customerId) {
@@ -80,7 +88,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch all tokens for this customer from Supabase
     const { data, error } = await supabase
       .from('device_tokens')
       .select('fcm_token, platform, created_at, updated_at')
@@ -88,7 +95,6 @@ export async function GET(request: NextRequest) {
       .order('updated_at', { ascending: false });
 
     if (error) {
-      console.error('❌ Supabase error:', error);
       throw new Error(`Database error: ${error.message}`);
     }
 
@@ -100,11 +106,11 @@ export async function GET(request: NextRequest) {
       count: tokens.length,
       updatedAt: data?.[0]?.updated_at || null,
     });
-  } catch (error: any) {
-    console.error('❌ Get device tokens error:', error);
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to get device tokens' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to get device tokens';
+    console.error('Get device tokens error:', error);
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
+

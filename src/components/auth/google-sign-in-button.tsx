@@ -235,7 +235,10 @@ export default function GoogleSignInButton({
       const { Browser } = await import('@capacitor/browser');
 
       // Use Android-specific Web OAuth client for Capacitor app
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '700183414398-un1b0ieej54djahu2pdsk8rim257luij.apps.googleusercontent.com';
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+      if (!clientId) {
+        throw new Error('Missing NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID');
+      }
       
       // Use HTTPS redirect URI (App Links) - custom domain
       const redirectUri = 'https://julinemart.com/auth/google/callback';
