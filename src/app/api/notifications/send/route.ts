@@ -102,10 +102,12 @@ export async function POST(request: NextRequest) {
       failed: failureCount,
       totalDevices: tokensData.tokens.length,
     });
-  } catch (error: Error) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to send notification';
     console.error('❌ Send notification error:', error);
     return NextResponse.json(
-      { success: false, message: error.message || 'Failed to send notification' },
+      { success: false, message },
       { status: 500 }
     );
   }
