@@ -1,14 +1,65 @@
 // src/app/api/notifications/register-device/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { getCustomer, updateCustomerMeta } from '@/lib/woocommerce/customers';
 
-// Store for FCM tokens (in production, use a database)
-// Format: { customerId: string, tokens: string[], updatedAt: Date }
-const deviceTokens = new Map<string, { tokens: Set<string>; updatedAt: Date }>();
+const TOKEN_META_KEY = 'fcm_device_tokens';
+const MAX_TOKENS_PER_CUSTOMER = 10;
+
+type RegisterDevicePayload = {
+  customerId?: string | number;
+  fcmToken?: string;
+  platform?: string;
+};
+
+function normalizeCustomerId(value: unknown): number | null {
+  const customerId = Number(value);
+  if (!Number.isInteger(customerId) || customerId <= 0) {
+    return null;
+  }
+  return customerId;
+}
+
+function normalizeToken(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const token = value.trim();
+  return token.length > 0 ? token : null;
+}
+
+function parseStoredTokens(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      return parseStoredTokens(parsed);
+    } catch {
+      return [trimmed];
+    }
+  }
+
+  return [];
+}
+
+function upsertToken(tokens: string[], newToken: string): string[] {
+  const withoutToken = tokens.filter((token) => token !== newToken);
+  const updated = [...withoutToken, newToken];
+  return updated.slice(-MAX_TOKENS_PER_CUSTOMER);
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { customerId, fcmToken, platform } = body;
+    const body = (await request.json()) as RegisterDevicePayload;
+    const customerId = normalizeCustomerId(body.customerId);
+    const fcmToken = normalizeToken(body.fcmToken);
+    const platform = typeof body.platform === 'string' ? body.platform : 'unknown';
 
     if (!customerId || !fcmToken) {
       return NextResponse.json(
@@ -17,49 +68,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`📱 Registering device token for customer ${customerId}`);
-    console.log(`   Token: ${fcmToken.substring(0, 20)}...`);
-    console.log(`   Platform: ${platform}`);
-
-    // Get or create token set for customer
-    let customerTokens = deviceTokens.get(customerId);
-    if (!customerTokens) {
-      customerTokens = { tokens: new Set(), updatedAt: new Date() };
-      deviceTokens.set(customerId, customerTokens);
+    const customer = await getCustomer(customerId);
+    if (!customer) {
+      return NextResponse.json(
+        { success: false, message: 'Customer not found' },
+        { status: 404 }
+      );
     }
 
-    // Add token to set (Set automatically handles duplicates)
-    customerTokens.tokens.add(fcmToken);
-    customerTokens.updatedAt = new Date();
+    const existingMeta = customer.meta_data?.find((meta) => meta.key === TOKEN_META_KEY);
+    const existingTokens = parseStoredTokens(existingMeta?.value);
+    const nextTokens = upsertToken(existingTokens, fcmToken);
 
-    console.log(`✅ Token registered. Customer ${customerId} now has ${customerTokens.tokens.size} device(s)`);
+    const updated = await updateCustomerMeta(customerId, TOKEN_META_KEY, nextTokens);
+    if (!updated) {
+      return NextResponse.json(
+        { success: false, message: 'Failed to persist device token' },
+        { status: 500 }
+      );
+    }
 
-    // TODO: In production, save to your database
-    // Example:
-    // await db.deviceTokens.upsert({
-    //   where: { customerId },
-    //   update: { tokens: Array.from(customerTokens.tokens), updatedAt: new Date() },
-    //   create: { customerId, tokens: [fcmToken], createdAt: new Date() }
-    // });
+    console.log(
+      `Registered push token for customer ${customerId} on ${platform}. Count=${nextTokens.length}`
+    );
 
     return NextResponse.json({
       success: true,
       message: 'Device registered successfully',
-      tokenCount: customerTokens.tokens.size,
+      tokenCount: nextTokens.length,
     });
-  } catch (error: any) {
-    console.error('❌ Register device error:', error);
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to register device' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to register device';
+    console.error('Register device error:', error);
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
 
-// Helper function to get tokens for a customer
 export async function GET(request: NextRequest) {
   try {
-    const customerId = request.nextUrl.searchParams.get('customerId');
+    const customerId = normalizeCustomerId(
+      request.nextUrl.searchParams.get('customerId')
+    );
 
     if (!customerId) {
       return NextResponse.json(
@@ -68,9 +118,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const customerTokens = deviceTokens.get(customerId);
-
-    if (!customerTokens) {
+    const customer = await getCustomer(customerId);
+    if (!customer) {
       return NextResponse.json({
         success: true,
         tokens: [],
@@ -78,17 +127,18 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const tokenMeta = customer.meta_data?.find((meta) => meta.key === TOKEN_META_KEY);
+    const tokens = parseStoredTokens(tokenMeta?.value);
+
     return NextResponse.json({
       success: true,
-      tokens: Array.from(customerTokens.tokens),
-      count: customerTokens.tokens.size,
-      updatedAt: customerTokens.updatedAt,
+      tokens,
+      count: tokens.length,
     });
-  } catch (error: any) {
-    console.error('❌ Get device tokens error:', error);
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to get device tokens' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to get device tokens';
+    console.error('Get device tokens error:', error);
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }

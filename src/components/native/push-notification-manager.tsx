@@ -11,6 +11,7 @@ export default function PushNotificationManager() {
 
   useEffect(() => {
     let mounted = true;
+    const pendingTokenKey = 'jm_pending_fcm_token';
 
     const setupPushNotifications = async () => {
       try {
@@ -28,33 +29,37 @@ export default function PushNotificationManager() {
         const { PushNotifications } = await import('@capacitor/push-notifications');
         console.log('Initializing push notifications...');
 
-        const permResult = await PushNotifications.requestPermissions();
-        if (permResult.receive === 'granted') {
-          console.log('Push notification permission granted');
-          await PushNotifications.register();
-        } else {
-          console.log('Push notification permission denied');
-        }
+        const registerTokenForCustomer = async (tokenValue: string) => {
+          if (!mounted) return;
 
+          if (!customer) {
+            localStorage.setItem(pendingTokenKey, tokenValue);
+            console.log('Push token pending: waiting for signed-in customer');
+            return;
+          }
+
+          try {
+            await fetch('/api/notifications/register-device', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                customerId: customer.id,
+                fcmToken: tokenValue,
+                platform: 'android',
+              }),
+            });
+            localStorage.removeItem(pendingTokenKey);
+            console.log('FCM token saved to backend');
+          } catch (error) {
+            console.error('Failed to save FCM token:', error);
+          }
+        };
+
+        // Register listeners before calling register(), or fast devices can emit
+        // the registration event before listeners are attached.
         await PushNotifications.addListener('registration', async (token) => {
           console.log('Push registration success, token:', token.value);
-
-          if (customer && mounted) {
-            try {
-              await fetch('/api/notifications/register-device', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  customerId: customer.id,
-                  fcmToken: token.value,
-                  platform: 'android',
-                }),
-              });
-              console.log('FCM token saved to backend');
-            } catch (error) {
-              console.error('Failed to save FCM token:', error);
-            }
-          }
+          await registerTokenForCustomer(token.value);
         });
 
         await PushNotifications.addListener('registrationError', (error) => {
@@ -83,6 +88,19 @@ export default function PushNotificationManager() {
             }
           }
         );
+
+        const pendingToken = localStorage.getItem(pendingTokenKey);
+        if (pendingToken && customer) {
+          await registerTokenForCustomer(pendingToken);
+        }
+
+        const permResult = await PushNotifications.requestPermissions();
+        if (permResult.receive === 'granted') {
+          console.log('Push notification permission granted');
+          await PushNotifications.register();
+        } else {
+          console.log('Push notification permission denied');
+        }
       } catch (error) {
         console.error('Push notification setup error:', error);
       }
