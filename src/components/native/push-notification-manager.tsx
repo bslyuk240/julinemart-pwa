@@ -6,7 +6,8 @@ import { useCustomerAuth } from '@/context/customer-auth-context';
 
 export default function PushNotificationManager() {
   const { customer } = useCustomerAuth();
-  const enableNativePush = process.env.NEXT_PUBLIC_ENABLE_NATIVE_PUSH === 'true';
+  // Default to enabled on native. Set NEXT_PUBLIC_ENABLE_NATIVE_PUSH=false to turn it off.
+  const enableNativePush = process.env.NEXT_PUBLIC_ENABLE_NATIVE_PUSH !== 'false';
 
   useEffect(() => {
     let mounted = true;
@@ -20,9 +21,7 @@ export default function PushNotificationManager() {
         }
 
         if (!enableNativePush) {
-          console.log(
-            'Push notifications: disabled (NEXT_PUBLIC_ENABLE_NATIVE_PUSH is not true)'
-          );
+          console.log('Push notifications: disabled via NEXT_PUBLIC_ENABLE_NATIVE_PUSH=false');
           return;
         }
 
