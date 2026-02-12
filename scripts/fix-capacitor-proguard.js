@@ -6,6 +6,7 @@ const pluginsToFix = [
   'node_modules/@capacitor/app/android/build.gradle',
   'node_modules/@capacitor/browser/android/build.gradle',
   'node_modules/@capacitor/status-bar/android/build.gradle',
+  'node_modules/@capacitor/push-notifications/android/build.gradle',
 ];
 
 console.log('🔧 Fixing Capacitor ProGuard configuration...');

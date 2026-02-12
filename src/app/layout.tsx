@@ -11,6 +11,7 @@ import Footer from '@/components/layout/footer';
 import GlobalPullToRefresh from '@/components/layout/global-pull-to-refresh';
 import BottomNav from '@/components/layout/BottomNavClient';
 import { StatusBarManager } from '@/components/native/status-bar-manager';
+import PushNotificationManager from '@/components/native/push-notification-manager';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -87,6 +88,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         <StatusBarManager />
         <CustomerAuthProvider>
+          <PushNotificationManager />
           <GlobalPullToRefresh>
             <Header />
             {children}
