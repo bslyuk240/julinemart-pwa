@@ -39,7 +39,7 @@ export default function PushNotificationManager() {
           }
 
           try {
-            await fetch('/api/notifications/register-device', {
+            const response = await fetch('/api/notifications/register-device', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -48,9 +48,17 @@ export default function PushNotificationManager() {
                 platform: 'android',
               }),
             });
+
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || !payload?.success) {
+              const reason = payload?.message || `HTTP ${response.status}`;
+              throw new Error(`register-device failed: ${reason}`);
+            }
+
             localStorage.removeItem(pendingTokenKey);
             console.log('FCM token saved to backend');
           } catch (error) {
+            localStorage.setItem(pendingTokenKey, tokenValue);
             console.error('Failed to save FCM token:', error);
           }
         };
