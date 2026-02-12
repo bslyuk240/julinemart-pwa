@@ -1,4 +1,4 @@
-﻿/node_modules
+/node_modules
 /.next
 /.turbo
 /.vercel
@@ -16,3 +16,6 @@ pnpm-debug.log*
 .idea/
 .vscode/
 *.local
+
+# Firebase config (contains secrets)
+android/app/google-services.json
