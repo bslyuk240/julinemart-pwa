@@ -2,35 +2,15 @@
 
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Store, MapPin, Star, Mail } from 'lucide-react';
+import Link from 'next/link';
+import { Store, Star } from 'lucide-react';
 import ProductGrid from '@/components/product/product-grid';
-import { getProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
 import { getStorePolicies, StorePolicies } from '@/lib/woocommerce/policies';
 import { formatPrice } from '@/lib/utils/format-price';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
-import { getVendorById } from '@/lib/woocommerce/vendors';
-import type { Vendor, VendorAddress } from '@/types/vendor';
-
-const formatVendorAddress = (address?: VendorAddress | string) => {
-  if (!address) {
-    return 'Address not available';
-  }
-
-  if (typeof address === 'string') {
-    return address;
-  }
-
-  const parts = [
-    address.street_1,
-    address.street_2,
-    address.city,
-    address.state,
-    address.zip,
-    address.country,
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(', ') : 'Address not available';
-};
+import { getVendorById, getVendorProducts, getVendorProductCount } from '@/lib/woocommerce/vendors-custom';
+import type { Vendor } from '@/types/vendor';
 
 const humanizeSlug = (value?: string) => {
   if (!value) {
@@ -46,6 +26,7 @@ export default function VendorStorePage() {
   const vendorId = params.id as string;
   
   const [products, setProducts] = useState<Product[]>([]);
+  const [productCount, setProductCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [vendorInfo, setVendorInfo] = useState<any>(null);
   const [vendorDetails, setVendorDetails] = useState<Vendor | null>(null);
@@ -77,16 +58,53 @@ export default function VendorStorePage() {
         if (!silent) setLoading(true);
 
         const numericVendorId = parseInt(vendorId, 10);
-        const allProducts = await getProducts({ per_page: 100 });
+        
+        // ✅ Check vendor status first
+        const vendorData = await getVendorById(numericVendorId);
+        setVendorDetails(vendorData);
+        
+        // ✅ If vendor is disabled or on vacation, don't fetch products
+        if (vendorData) {
+          if (vendorData.enabled === false) {
+            console.log('⚠️ Vendor is disabled');
+            setProducts([]);
+            setProductCount(0);
+            if (!silent) setLoading(false);
+            return;
+          }
 
-        const vendorProducts = allProducts.filter(
-          (product) => product.store && product.store.id === numericVendorId
-        );
+          if (vendorData.is_store_vacation === true) {
+            console.log('🏖️ Vendor is on vacation');
+            setProducts([]);
+            setProductCount(0);
+            if (!silent) setLoading(false);
+            return;
+          }
+        }
+
+        // Use backend vendor product count for accurate count, then fetch by product IDs
+        const [countData, vendorProducts] = await Promise.all([
+          getVendorProductCount(numericVendorId),
+          getVendorProducts(numericVendorId),
+        ]);
+
+        if (countData?.product_count != null) {
+          setProductCount(countData.product_count);
+        } else {
+          setProductCount(vendorProducts.length);
+        }
 
         setProducts(vendorProducts);
 
         if (vendorProducts.length > 0 && vendorProducts[0].store) {
           setVendorInfo(vendorProducts[0].store);
+        } else if (vendorData) {
+          setVendorInfo({
+            id: vendorData.id,
+            name: vendorData.store_name,
+            shop_name: vendorData.store_name,
+            url: vendorData.store_slug ? `/store/${vendorData.store_slug}` : '',
+          });
         }
       } catch (error) {
         console.error('Error fetching vendor products:', error);
@@ -105,6 +123,20 @@ export default function VendorStorePage() {
     }
     try {
       const data = await getVendorById(numericVendorId);
+      
+      // Debug logging for avatar/banner
+      console.log('🖼️ Vendor Images:', {
+        id: data?.id,
+        name: data?.store_name,
+        // Avatar/Logo fields
+        gravatar: data?.gravatar,
+        logo: data?.logo,
+        store_logo: data?.store_logo,
+        // Banner field
+        banner: data?.banner,
+        enabled: data?.enabled,
+      });
+      
       setVendorDetails(data);
     } catch (error) {
       console.error('Error fetching vendor details:', error);
@@ -139,6 +171,7 @@ export default function VendorStorePage() {
     targetRef: scrollRef,
   });
 
+  // Loading state
   if (loading) {
     return (
       <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
@@ -146,6 +179,55 @@ export default function VendorStorePage() {
           <div className="text-center py-20">
             <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-gray-600">Loading store...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // ✅ Check if vendor is disabled
+  if (vendorDetails && vendorDetails.enabled === false) {
+    return (
+      <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
+        <div className="container mx-auto px-4 py-6">
+          <div className="text-center py-20">
+            <Store className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Store Unavailable</h2>
+            <p className="text-gray-600 mb-6">
+              This store is currently not accepting orders. Please check back later.
+            </p>
+            <Link 
+              href="/"
+              className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              Browse Other Stores
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // ✅ Check vacation mode
+  if (vendorDetails && vendorDetails.is_store_vacation === true) {
+    return (
+      <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
+        <div className="container mx-auto px-4 py-6">
+          <div className="text-center py-20">
+            <Store className="w-16 h-16 mx-auto text-yellow-500 mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Store on Vacation</h2>
+            <div className="max-w-md mx-auto">
+              <p className="text-gray-600 mb-6">
+                {vendorDetails.vacation_message || 
+                  'This store is temporarily closed for vacation. Please check back soon!'}
+              </p>
+            </div>
+            <Link 
+              href="/"
+              className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              Browse Other Stores
+            </Link>
           </div>
         </div>
       </main>
@@ -162,32 +244,42 @@ export default function VendorStorePage() {
     vendorInfo?.name ||
     friendlySlugName ||
     'Vendor Store';
-  const vendorEmailLabel =
-    vendorDetails?.vendor_email ||
-    vendorDetails?.email ||
-    vendorDetails?.store_email ||
-    'Email not available';
-  const vendorAddressRaw =
-    vendorDetails?.vendor_address ||
-    vendorDetails?.store_address ||
-    vendorDetails?.address;
-  const vendorAddressText = formatVendorAddress(vendorAddressRaw);
+  
   const ratingAverage = vendorDetails?.rating?.avg || vendorDetails?.rating?.rating || null;
   const ratingValue = ratingAverage ? Math.min(5, Math.max(0, Number(ratingAverage))) : 0;
   const ratingDisplay = ratingAverage ? ratingAverage : 'N/A';
-  const vendorImage =
-    vendorDetails?.banner ||
-    vendorDetails?.gravatar ||
-    vendorDetails?.store_logo ||
-    vendorDetails?.logo ||
+  
+  // Debug: Log ALL vendor fields to find custom avatar/banner
+  console.log('🖼️ Vendor Full Data:', vendorDetails);
+  console.log('🖼️ Vendor Image Fields:', {
+    vendorId: vendorDetails?.id,
+    gravatar: vendorDetails?.gravatar,
+    avatar: vendorDetails?.avatar,
+    logo: vendorDetails?.logo,
+    store_logo: vendorDetails?.store_logo,
+    banner: vendorDetails?.banner,
+    allImageKeys: vendorDetails ? Object.keys(vendorDetails).filter(k => 
+      k.toLowerCase().includes('banner') || 
+      k.toLowerCase().includes('logo') || 
+      k.toLowerCase().includes('gravatar') || 
+      k.toLowerCase().includes('avatar') || 
+      k.toLowerCase().includes('image') ||
+      k.toLowerCase().includes('icon')
+    ) : []
+  });
+
+  // ✅ Avatar/Logo Priority (circular profile picture)
+  // Custom uploaded logo takes priority over default Gravatar
+  const vendorAvatar =
+    vendorDetails?.logo ||          // Store logo (highest priority - custom uploaded)
+    vendorDetails?.store_logo ||    // Alternative logo field
+    vendorDetails?.avatar ||        // Avatar field
+    vendorDetails?.gravatar ||      // Gravatar (fallback - often default icon)
     null;
-  const vendorAvatarStyle = vendorImage
-    ? {
-        backgroundImage: `url(${vendorImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }
-    : undefined;
+  
+  // ✅ Banner Image (cover/header image)
+  const vendorBanner = vendorDetails?.banner || (vendorDetails as any)?.store_banner || null;
+
   const freeShippingThreshold = policies?.shippingPolicy?.freeShippingThreshold ?? 0;
   const shippingDescription = policies?.shippingPolicy?.description;
   const shippingText = policies?.shippingPolicy
@@ -234,79 +326,191 @@ export default function VendorStorePage() {
           <span className="text-gray-900">Store: {vendorName}</span>
         </nav>
 
+        {/* ✅ NEW: Banner Image (if available) */}
+        {vendorBanner && (
+          <div className="mb-6 rounded-lg overflow-hidden shadow-sm">
+            <div 
+              className="w-full h-48 md:h-64 bg-cover bg-center"
+              style={{ 
+                backgroundImage: `url(${vendorBanner})`,
+                backgroundColor: '#f3f4f6' // Fallback color
+              }}
+            />
+          </div>
+        )}
+
         {/* Vendor Header Card */}
-        <div className="bg-white rounded-lg shadow-sm p-6 md:p-8 mb-8">
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Vendor Logo/Icon */}
-            <div className="flex-shrink-0">
-              <div
-                className={`w-24 h-24 md:w-32 md:h-32 rounded-full flex items-center justify-center ${
-                  vendorImage
-                    ? 'bg-white shadow-sm border border-gray-200'
-                    : 'bg-gradient-to-br from-primary-500 to-primary-700'
-                }`}
-                style={vendorAvatarStyle}
-              >
-                {!vendorImage && (
-                  <Store className="w-12 h-12 md:w-16 md:h-16 text-white" />
-                )}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
+          {/* Mobile Layout */}
+          <div className="md:hidden">
+            {/* Header Section */}
+            <div className="p-4 pb-3 border-b border-gray-100">
+              {/* Logo and Store Name - Inline */}
+              <div className="flex items-center gap-3 mb-3">
+                {/* Vendor Avatar/Logo */}
+                <div className="flex-shrink-0">
+                  <div
+                    className={`w-14 h-14 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-gray-100 ${
+                      vendorAvatar
+                        ? 'bg-white'
+                        : 'bg-gradient-to-br from-primary-500 to-primary-700'
+                    }`}
+                  >
+                    {vendorAvatar ? (
+                      <img 
+                        src={vendorAvatar} 
+                        alt={vendorName}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.parentElement!.classList.add('bg-gradient-to-br', 'from-primary-500', 'to-primary-700');
+                          const icon = document.createElement('div');
+                          icon.innerHTML = '<svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 10a2 2 0 114 0 2 2 0 01-4 0zm0 4a2 2 0 104 0 2 2 0 00-4 0z" clip-rule="evenodd"/></svg>';
+                          e.currentTarget.parentElement!.appendChild(icon);
+                        }}
+                      />
+                    ) : (
+                      <Store className="w-8 h-8 text-white" />
+                    )}
+                  </div>
+                </div>
+                
+                {/* Store Name & Rating */}
+                <div className="flex-1 min-w-0">
+                  <h1 className="font-bold text-gray-900 mb-1 truncate" style={{ fontSize: '16px', lineHeight: '1.3' }}>
+                    {vendorName}
+                  </h1>
+                  
+                  {/* Rating - Compact */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-0.5">
+                      {Array.from({ length: 5 }).map((_, idx) => (
+                        <Star
+                          key={idx}
+                          className={`w-3 h-3 ${ratingValue > idx ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-200 text-gray-200'}`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-gray-500" style={{ fontSize: '11px' }}>
+                      {ratingAverage ? `${ratingAverage}` : 'No ratings'}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Vendor Info */}
-            <div className="flex-1">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-                {vendorName}
-              </h1>
-              
-              <div className="flex items-center gap-2 mb-4">
-              <div className="flex items-center gap-1">
-                {Array.from({ length: 5 }).map((_, idx) => (
-                  <Star
-                    key={idx}
-                    className={`w-5 h-5 ${ratingValue > idx ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
-                  />
-                ))}
+            {/* Stats Section */}
+            <div className="px-4 py-3 bg-gray-50">
+              <div className="flex items-center justify-between text-center">
+                {/* Products */}
+                <div className="flex-1">
+                  <div className="font-bold text-primary-600" style={{ fontSize: '18px' }}>
+                    {productCount != null ? productCount : products.length}
+                  </div>
+                  <div className="text-gray-600" style={{ fontSize: '11px' }}>
+                    Products
+                  </div>
+                </div>
+                
+                {/* Divider */}
+                <div className="h-8 w-px bg-gray-200"></div>
+                
+                {/* Positive */}
+                <div className="flex-1">
+                  <div className="font-bold text-green-600" style={{ fontSize: '18px' }}>
+                    95%
+                  </div>
+                  <div className="text-gray-600" style={{ fontSize: '11px' }}>
+                    Positive
+                  </div>
+                </div>
+                
+                {/* Divider */}
+                <div className="h-8 w-px bg-gray-200"></div>
+                
+                {/* Response */}
+                <div className="flex-1">
+                  <div className="font-bold text-blue-600" style={{ fontSize: '18px' }}>
+                    24h
+                  </div>
+                  <div className="text-gray-600" style={{ fontSize: '11px' }}>
+                    Response
+                  </div>
+                </div>
               </div>
-              <span className="text-sm text-gray-600">
-                {ratingAverage ? `(${ratingAverage} rating)` : '(No ratings yet)'}
-              </span>
+            </div>
+          </div>
+
+          {/* Desktop Layout */}
+          <div className="hidden md:flex md:flex-col md:gap-6">
+            <div className="flex gap-6">
+              {/* Vendor Avatar/Logo */}
+              <div className="flex-shrink-0">
+                <div
+                  className={`w-32 h-32 rounded-full flex items-center justify-center overflow-hidden ${
+                    vendorAvatar
+                      ? 'bg-white shadow-sm border-2 border-gray-200'
+                      : 'bg-gradient-to-br from-primary-500 to-primary-700'
+                  }`}
+                >
+                  {vendorAvatar ? (
+                    <img 
+                      src={vendorAvatar} 
+                      alt={vendorName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.parentElement!.classList.add('bg-gradient-to-br', 'from-primary-500', 'to-primary-700');
+                        const icon = document.createElement('div');
+                        icon.innerHTML = '<svg class="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 10a2 2 0 114 0 2 2 0 01-4 0zm0 4a2 2 0 104 0 2 2 0 00-4 0z" clip-rule="evenodd"/></svg>';
+                        e.currentTarget.parentElement!.appendChild(icon);
+                      }}
+                    />
+                  ) : (
+                    <Store className="w-16 h-16 text-white" />
+                  )}
+                </div>
               </div>
 
-              {/* Quick Stats */}
-              <div className="flex flex-wrap gap-4 pt-4 border-t">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-primary-600">{products.length}</p>
-                  <p className="text-xs text-gray-600">Products</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-primary-600">{ratingDisplay}</p>
-                  <p className="text-xs text-gray-600">Rating</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-primary-600">95%</p>
-                  <p className="text-xs text-gray-600">Positive</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-primary-600">24h</p>
-                  <p className="text-xs text-gray-600">Response</p>
-                </div>
-              </div>
-              <div className="border-t border-gray-100 mt-6 pt-4">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="flex items-start gap-3">
-                    <Mail className="w-5 h-5 text-primary-600 mt-1" />
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Email</p>
-                      <p className="text-sm font-medium text-gray-900">{vendorEmailLabel}</p>
-                    </div>
+              {/* Vendor Info */}
+              <div className="flex-1">
+                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                  {vendorName}
+                </h1>
+                
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 5 }).map((_, idx) => (
+                      <Star
+                        key={idx}
+                        className={`w-5 h-5 ${ratingValue > idx ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                      />
+                    ))}
                   </div>
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-primary-600 mt-1" />
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Address</p>
-                      <p className="text-sm font-medium text-gray-900">{vendorAddressText}</p>
-                    </div>
+                  <span className="text-sm text-gray-600">
+                    {ratingAverage ? `(${ratingAverage} rating)` : '(No ratings yet)'}
+                  </span>
+                </div>
+
+                {/* Quick Stats */}
+                <div className="flex flex-wrap gap-4 pt-4 border-t">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-primary-600">
+                      {productCount != null ? productCount : products.length}
+                    </p>
+                    <p className="text-xs text-gray-600">Products</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-primary-600">{ratingDisplay}</p>
+                    <p className="text-xs text-gray-600">Rating</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-primary-600">95%</p>
+                    <p className="text-xs text-gray-600">Positive</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-primary-600">24h</p>
+                    <p className="text-xs text-gray-600">Response</p>
                   </div>
                 </div>
               </div>
@@ -318,7 +522,7 @@ export default function VendorStorePage() {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-900">
-              All Products ({products.length})
+              All Products ({productCount != null ? productCount : products.length})
             </h2>
             
             <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm">
@@ -340,12 +544,12 @@ export default function VendorStorePage() {
               <p className="text-gray-600 mb-6">
                 This store hasn't added any products yet. Check back soon!
               </p>
-              <a
+              <Link
                 href="/"
                 className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
               >
                 Browse Other Stores
-              </a>
+              </Link>
             </div>
           )}
         </div>

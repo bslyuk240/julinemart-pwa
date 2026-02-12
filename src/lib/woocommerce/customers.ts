@@ -201,7 +201,8 @@ export async function createCustomer(data: {
   try {
     const response = await wcApi.post('customers', data);
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
+    console.error('❌ WooCommerce createCustomer error:', error?.response?.data || error?.message || error);
     handleApiError(error);
     return null;
   }
@@ -209,12 +210,42 @@ export async function createCustomer(data: {
 
 /**
  * Search customers by email
+ * More robust search that tries multiple methods
  */
 export async function searchCustomerByEmail(email: string): Promise<Customer | null> {
   try {
-    const customers = await getCustomers({ email, per_page: 1 });
-    return customers.length > 0 ? customers[0] : null;
-  } catch (error) {
+    console.log('🔍 searchCustomerByEmail: Searching for', email);
+    
+    // Method 1: Search by email parameter (exact match)
+    let customers = await getCustomers({ email, per_page: 1 });
+    console.log('🔍 Method 1 (email param): Found', customers.length, 'customer(s)');
+    
+    // Method 2: If not found, try search parameter (broader search)
+    if (customers.length === 0) {
+      console.log('🔍 Trying Method 2 (search param)...');
+      customers = await getCustomers({ search: email, per_page: 100 });
+      console.log('🔍 Method 2 (search param): Found', customers.length, 'customer(s)');
+      
+      // Filter to exact email match (case-insensitive)
+      customers = customers.filter(
+        c => c.email.toLowerCase().trim() === email.toLowerCase().trim()
+      );
+      console.log('🔍 After exact match filter:', customers.length, 'customer(s)');
+    }
+    
+    if (customers.length > 0) {
+      console.log('✅ Found customer:', {
+        id: customers[0].id,
+        email: customers[0].email,
+        username: customers[0].username
+      });
+      return customers[0];
+    }
+    
+    console.log('❌ No customer found with email:', email);
+    return null;
+  } catch (error: any) {
+    console.error('❌ searchCustomerByEmail error:', error?.response?.data || error?.message || error);
     handleApiError(error);
     return null;
   }

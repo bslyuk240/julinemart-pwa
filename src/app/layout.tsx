@@ -1,14 +1,17 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 import Header from '@/components/layout/header';
-import BottomNav from '@/components/layout/bottom-nav';
 import { Toaster } from 'sonner';
 import { CustomerAuthProvider } from '@/context/customer-auth-context';
 import WhatsAppFloat from '@/components/layout/whatsapp-float';
 import PWAInstallPrompt from '@/components/pwa/pwa-install-prompt';
 import Footer from '@/components/layout/footer';
 import GlobalPullToRefresh from '@/components/layout/global-pull-to-refresh';
+import BottomNav from '@/components/layout/BottomNavClient';
+import { StatusBarManager } from '@/components/native/status-bar-manager';
+import PushNotificationManager from '@/components/native/push-notification-manager';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -65,9 +68,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         
         {/* Theme Color */}
         <meta name="theme-color" content="#77088a" />
+
+        {/* Google Analytics */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-T0X3ZR08FD"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-T0X3ZR08FD', {
+              page_path: window.location.pathname,
+            });
+          `}
+        </Script>
       </head>
       <body className={inter.className}>
+        <StatusBarManager />
         <CustomerAuthProvider>
+          <PushNotificationManager />
           <GlobalPullToRefresh>
             <Header />
             {children}

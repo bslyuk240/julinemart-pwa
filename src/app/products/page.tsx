@@ -2,7 +2,8 @@
 
 import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getProducts } from '@/lib/woocommerce/products';
+import Link from 'next/link';
+import { getProductsWithPagination } from '@/lib/woocommerce/products';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown } from 'lucide-react';
 import { Product } from '@/types/product';
@@ -25,9 +26,11 @@ function ProductsContent() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [sortBy, setSortBy] = useState<'date' | 'popularity' | 'rating' | 'price' | 'price-desc'>(initialSort);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showFilters, setShowFilters] = useState(false);
 
   const tagFilter = searchParams.get('tag');
   const searchKey = searchParams.toString();
@@ -83,11 +86,13 @@ function ProductsContent() {
     return { orderby: sort as 'date' | 'popularity' | 'rating', order: 'desc' as const };
   };
 
+  const PER_PAGE = 48;
+
   const buildFetchParams = (pageNumber: number, overrideSort?: typeof sortBy) => {
     const activeSort = overrideSort || sortBy;
     const sortParams = computeSortParams(activeSort);
     const params: Record<string, any> = {
-      per_page: 20,
+      per_page: PER_PAGE,
       page: pageNumber,
       orderby: sortParams.orderby,
       order: sortParams.order,
@@ -113,10 +118,12 @@ function ProductsContent() {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const fetchedProducts = await getProducts(buildFetchParams(1));
+        const { products: fetchedProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(1));
         setProducts(fetchedProducts);
         setPage(1);
-        setHasMore(fetchedProducts.length === 20);
+        setTotalPages(pages || 999);
+        // Always show "Load More" if we have products - only hide when next page returns 0
+        setHasMore(fetchedProducts.length > 0);
       } catch (error) {
         console.error('Error fetching products:', error);
       } finally {
@@ -132,15 +139,13 @@ function ProductsContent() {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const moreProducts = await getProducts(buildFetchParams(nextPage));
+      const { products: moreProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(nextPage));
       
-      if (moreProducts.length > 0) {
-        setProducts([...products, ...moreProducts]);
-        setPage(nextPage);
-        setHasMore(moreProducts.length === 20);
-      } else {
-        setHasMore(false);
-      }
+      setProducts((prev) => [...prev, ...moreProducts]);
+      setPage(nextPage);
+      if (pages > 0) setTotalPages(pages);
+      // Hide button only when we get 0 products (reached the end)
+      setHasMore(moreProducts.length > 0);
     } catch (error) {
       console.error('Error loading more products:', error);
     } finally {
@@ -149,19 +154,23 @@ function ProductsContent() {
   };
 
   const handleSort = async (newSortBy: 'date' | 'popularity' | 'rating' | 'price' | 'price-desc') => {
+    console.log('🔄 Sorting products by:', newSortBy);
     try {
       setLoading(true);
       const { orderby, order } = computeSortParams(newSortBy);
       setSortBy(newSortBy);
       setSortOrder(order);
       
-      const sortedProducts = await getProducts(buildFetchParams(1, newSortBy));
+      console.log('📊 Sort params:', { orderby, order });
+      const { products: sortedProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(1, newSortBy));
+      console.log('✅ Sorted products loaded:', sortedProducts.length);
       
       setProducts(sortedProducts);
       setPage(1);
-      setHasMore(sortedProducts.length === 20);
+      setTotalPages(pages || 999);
+      setHasMore(sortedProducts.length > 0);
     } catch (error) {
-      console.error('Error sorting products:', error);
+      console.error('❌ Error sorting products:', error);
     } finally {
       setLoading(false);
     }
@@ -194,7 +203,14 @@ function ProductsContent() {
         {/* Filter Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-white p-3 md:p-4 rounded-lg shadow-sm">
           <div className="flex items-center gap-3 md:gap-4">
-            <button className="flex items-center gap-2 px-3 py-2 md:px-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm md:text-base">
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-3 py-2 md:px-4 border rounded-lg transition-colors text-sm md:text-base ${
+                showFilters 
+                  ? 'border-primary-600 bg-primary-50 text-primary-700' 
+                  : 'border-gray-300 hover:bg-gray-50'
+              }`}
+            >
               <Filter className="w-4 h-4" />
               <span className="font-medium">Filters</span>
             </button>
@@ -210,10 +226,12 @@ function ProductsContent() {
           <div className="relative">
             <select
               value={sortBy}
-              onChange={(e) =>
-                handleSort(e.target.value as 'date' | 'popularity' | 'rating' | 'price' | 'price-desc')
-              }
-              className="flex items-center gap-2 px-3 py-2 md:px-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors appearance-none pr-8 cursor-pointer text-sm md:text-base"
+              disabled={loading}
+              onChange={(e) => {
+                console.log('Sort changed to:', e.target.value);
+                handleSort(e.target.value as 'date' | 'popularity' | 'rating' | 'price' | 'price-desc');
+              }}
+              className="flex items-center gap-2 px-3 py-2 md:px-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors appearance-none pr-8 cursor-pointer text-sm md:text-base bg-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="date">Latest</option>
               <option value="popularity">Most Popular</option>
@@ -221,9 +239,94 @@ function ProductsContent() {
               <option value="price">Price: Low to High</option>
               <option value="price-desc">Price: High to Low</option>
             </select>
-            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            {loading ? (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : (
+              <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            )}
           </div>
         </div>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <h3 className="font-semibold text-gray-900 mb-3">Filter by Category</h3>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/products"
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                  !tagFilter 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Products
+              </Link>
+              <Link
+                href="/products?tag=flash-sale"
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                  tagFilter === 'flash-sale' 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Flash Sale
+              </Link>
+              <Link
+                href="/products?tag=deal"
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                  tagFilter === 'deal' 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Deals
+              </Link>
+              <Link
+                href="/products?tag=best-seller"
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                  tagFilter === 'best-seller' 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Best Sellers
+              </Link>
+              <Link
+                href="/products?tag=top-seller"
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                  tagFilter === 'top-seller' 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Top Sellers
+              </Link>
+              <Link
+                href="/products?tag=sponsored"
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                  tagFilter === 'sponsored' 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Sponsored
+              </Link>
+              <Link
+                href="/products?tag=launching-deal"
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                  tagFilter === 'launching-deal' 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Launching Deals
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Products Grid */}
         {products.length > 0 ? (
@@ -243,7 +346,7 @@ function ProductsContent() {
               </div>
             )}
 
-            {!hasMore && products.length > 20 && (
+            {!hasMore && products.length > PER_PAGE && (
               <div className="text-center mt-8">
                 <p className="text-gray-600">You've reached the end of the catalog</p>
               </div>
