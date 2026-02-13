@@ -1,9 +1,28 @@
 // src/app/api/notifications/send/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
+type SendPayload = {
+  customerId?: string | number;
+  title?: string;
+  message?: string;
+  data?: Record<string, unknown>;
+  type?: string;
+};
+
+type FcmLegacyResult = {
+  message_id?: string;
+  error?: string;
+};
+
+type FcmLegacyResponse = {
+  success?: number;
+  failure?: number;
+  results?: FcmLegacyResult[];
+};
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as SendPayload;
     const { customerId, title, message, data, type } = body;
 
     if (!customerId || !title || !message) {
@@ -13,50 +32,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`📤 Sending notification to customer ${customerId}`);
-    console.log(`   Title: ${title}`);
-    console.log(`   Message: ${message}`);
-    console.log(`   Type: ${type || 'general'}`);
+    console.log(`Sending notification to customer ${customerId}`);
+    console.log(`Title: ${title}`);
+    console.log(`Type: ${type || 'general'}`);
 
-    // Get customer's FCM tokens
     const tokensResponse = await fetch(
       `${request.nextUrl.origin}/api/notifications/register-device?customerId=${customerId}`,
       { method: 'GET' }
     );
-
-    const tokensData = await tokensResponse.json();
+    const tokensData = (await tokensResponse.json()) as {
+      success?: boolean;
+      tokens?: string[];
+    };
 
     if (!tokensData.success || !tokensData.tokens || tokensData.tokens.length === 0) {
-      console.log('⚠️  No devices registered for this customer');
       return NextResponse.json({
         success: false,
         message: 'No devices registered for this customer',
       });
     }
 
-    console.log(`📱 Found ${tokensData.tokens.length} device(s) for customer ${customerId}`);
-
-    // Firebase Cloud Messaging requires a server key
-    // This is a placeholder - you'll need to implement actual FCM sending
-    // after setting up Firebase
-    
     const fcmServerKey = process.env.FCM_SERVER_KEY;
-
     if (!fcmServerKey) {
-      console.warn('⚠️  FCM_SERVER_KEY not configured. Skipping actual notification send.');
-      console.log('   (Notification would be sent in production)');
-      
-      return NextResponse.json({
-        success: true,
-        message: 'FCM not configured. Add FCM_SERVER_KEY to environment variables.',
-        simulated: true,
-        deviceCount: tokensData.tokens.length,
-      });
+      return NextResponse.json(
+        { success: false, message: 'FCM_SERVER_KEY is not configured on the server' },
+        { status: 500 }
+      );
     }
 
-    // Send notification to each device via FCM
     const results = await Promise.allSettled(
-      tokensData.tokens.map(async (token: string) => {
+      tokensData.tokens.map(async (token) => {
         const fcmPayload = {
           to: token,
           notification: {
@@ -64,11 +69,11 @@ export async function POST(request: NextRequest) {
             body: message,
             sound: 'default',
             icon: 'ic_launcher',
-            color: '#77088a', // JulineMart purple
+            color: '#77088a',
           },
           data: {
             type: type || 'general',
-            ...data,
+            ...(data || {}),
           },
           priority: 'high',
         };
@@ -82,33 +87,62 @@ export async function POST(request: NextRequest) {
           body: JSON.stringify(fcmPayload),
         });
 
+        const rawText = await response.text();
         if (!response.ok) {
-          throw new Error(`FCM error: ${response.statusText}`);
+          throw new Error(`FCM HTTP ${response.status}: ${rawText || response.statusText}`);
         }
 
-        return await response.json();
+        let parsed: FcmLegacyResponse;
+        try {
+          parsed = JSON.parse(rawText) as FcmLegacyResponse;
+        } catch {
+          throw new Error(`FCM returned non-JSON response: ${rawText}`);
+        }
+
+        if ((parsed.failure || 0) > 0) {
+          const err = parsed.results?.[0]?.error || 'unknown_error';
+          throw new Error(`FCM rejected token: ${err}`);
+        }
+
+        return {
+          token,
+          messageId: parsed.results?.[0]?.message_id || null,
+        };
       })
     );
 
     const successCount = results.filter((r) => r.status === 'fulfilled').length;
-    const failureCount = results.filter((r) => r.status === 'rejected').length;
+    const failureReasons = results
+      .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)));
+    const failureCount = failureReasons.length;
 
-    console.log(`✅ Notification sent: ${successCount} success, ${failureCount} failed`);
+    if (successCount === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'FCM rejected all target tokens',
+          sent: 0,
+          failed: failureCount,
+          totalDevices: tokensData.tokens.length,
+          errors: failureReasons,
+        },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({
-      success: true,
-      message: 'Notifications sent',
+      success: failureCount === 0,
+      message: failureCount === 0 ? 'Notifications sent' : 'Notifications partially sent',
       sent: successCount,
       failed: failureCount,
       totalDevices: tokensData.tokens.length,
+      errors: failureReasons,
     });
   } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to send notification';
-    console.error('❌ Send notification error:', error);
-    return NextResponse.json(
-      { success: false, message },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Failed to send notification';
+    console.error('Send notification error:', error);
+    return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
+
