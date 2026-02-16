@@ -1,5 +1,6 @@
 // src/app/api/notifications/send/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { createSign } from 'node:crypto';
 
 type SendPayload = {
   customerId?: string | number;
@@ -9,16 +10,125 @@ type SendPayload = {
   type?: string;
 };
 
-type FcmLegacyResult = {
-  message_id?: string;
-  error?: string;
+type ServiceAccountConfig = {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
 };
 
-type FcmLegacyResponse = {
-  success?: number;
-  failure?: number;
-  results?: FcmLegacyResult[];
+type GoogleTokenResponse = {
+  access_token?: string;
+  expires_in?: number;
+  token_type?: string;
 };
+
+const GOOGLE_TOKEN_AUDIENCE = 'https://oauth2.googleapis.com/token';
+const GOOGLE_OAUTH_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
+
+let cachedAccessToken: { token: string; expiresAtMs: number } | null = null;
+
+function toBase64Url(input: Buffer | string) {
+  return Buffer.from(input)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function getServiceAccountConfig(): ServiceAccountConfig {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
+
+  if (!projectId || !clientEmail || !privateKeyRaw) {
+    throw new Error(
+      'Missing Firebase service account env vars. Required: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY'
+    );
+  }
+
+  return {
+    projectId,
+    clientEmail,
+    // Netlify/env files usually store newlines as \n.
+    privateKey: privateKeyRaw.replace(/\\n/g, '\n'),
+  };
+}
+
+function createServiceAccountJwt(config: ServiceAccountConfig) {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: config.clientEmail,
+    scope: GOOGLE_OAUTH_SCOPE,
+    aud: GOOGLE_TOKEN_AUDIENCE,
+    iat: issuedAt,
+    exp: issuedAt + 3600,
+  };
+
+  const encodedHeader = toBase64Url(JSON.stringify(header));
+  const encodedPayload = toBase64Url(JSON.stringify(payload));
+  const unsignedJwt = `${encodedHeader}.${encodedPayload}`;
+
+  const signer = createSign('RSA-SHA256');
+  signer.update(unsignedJwt);
+  signer.end();
+  const signature = signer.sign(config.privateKey);
+
+  return `${unsignedJwt}.${toBase64Url(signature)}`;
+}
+
+async function getGoogleAccessToken(config: ServiceAccountConfig) {
+  const now = Date.now();
+  if (cachedAccessToken && cachedAccessToken.expiresAtMs - 60_000 > now) {
+    return cachedAccessToken.token;
+  }
+
+  const assertion = createServiceAccountJwt(config);
+  const body = new URLSearchParams({
+    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+    assertion,
+  });
+
+  const tokenRes = await fetch(GOOGLE_TOKEN_AUDIENCE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  const raw = await tokenRes.text();
+  if (!tokenRes.ok) {
+    throw new Error(`Failed to get Google access token: HTTP ${tokenRes.status} ${raw}`);
+  }
+
+  let parsed: GoogleTokenResponse;
+  try {
+    parsed = JSON.parse(raw) as GoogleTokenResponse;
+  } catch {
+    throw new Error(`Token endpoint returned non-JSON response: ${raw}`);
+  }
+
+  if (!parsed.access_token || !parsed.expires_in) {
+    throw new Error(`Token endpoint response missing access_token/expires_in: ${raw}`);
+  }
+
+  cachedAccessToken = {
+    token: parsed.access_token,
+    expiresAtMs: now + parsed.expires_in * 1000,
+  };
+
+  return parsed.access_token;
+}
+
+function normalizeDataPayload(data?: Record<string, unknown>) {
+  if (!data) return undefined;
+
+  const normalized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined || value === null) continue;
+    normalized[key] = typeof value === 'string' ? value : JSON.stringify(value);
+  }
+  return Object.keys(normalized).length ? normalized : undefined;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,61 +162,60 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const fcmServerKey = process.env.FCM_SERVER_KEY;
-    if (!fcmServerKey) {
-      return NextResponse.json(
-        { success: false, message: 'FCM_SERVER_KEY is not configured on the server' },
-        { status: 500 }
-      );
-    }
+    const serviceAccount = getServiceAccountConfig();
+    const accessToken = await getGoogleAccessToken(serviceAccount);
+    const normalizedData = normalizeDataPayload({
+      type: type || 'general',
+      ...(data || {}),
+    });
 
     const results = await Promise.allSettled(
       tokensData.tokens.map(async (token) => {
         const fcmPayload = {
-          to: token,
-          notification: {
-            title,
-            body: message,
-            sound: 'default',
-            icon: 'ic_launcher',
-            color: '#77088a',
+          message: {
+            token,
+            notification: {
+              title,
+              body: message,
+            },
+            data: normalizedData,
+            android: {
+              priority: 'HIGH',
+              notification: {
+                sound: 'default',
+                color: '#77088a',
+              },
+            },
           },
-          data: {
-            type: type || 'general',
-            ...(data || {}),
-          },
-          priority: 'high',
         };
 
-        const response = await fetch('https://fcm.googleapis.com/fcm/send', {
+        const response = await fetch(
+          `https://fcm.googleapis.com/v1/projects/${serviceAccount.projectId}/messages:send`,
+          {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `key=${fcmServerKey}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify(fcmPayload),
-        });
+        }
+        );
 
         const rawText = await response.text();
         if (!response.ok) {
           throw new Error(`FCM HTTP ${response.status}: ${rawText || response.statusText}`);
         }
 
-        let parsed: FcmLegacyResponse;
+        let parsed: { name?: string };
         try {
-          parsed = JSON.parse(rawText) as FcmLegacyResponse;
+          parsed = JSON.parse(rawText) as { name?: string };
         } catch {
           throw new Error(`FCM returned non-JSON response: ${rawText}`);
         }
 
-        if ((parsed.failure || 0) > 0) {
-          const err = parsed.results?.[0]?.error || 'unknown_error';
-          throw new Error(`FCM rejected token: ${err}`);
-        }
-
         return {
           token,
-          messageId: parsed.results?.[0]?.message_id || null,
+          messageId: parsed.name || null,
         };
       })
     );
@@ -145,4 +254,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
-
