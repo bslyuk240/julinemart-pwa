@@ -1,6 +1,7 @@
 // src/app/api/notifications/send/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createSign } from 'node:crypto';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 type SendPayload = {
   customerId?: string | number;
@@ -22,8 +23,58 @@ type GoogleTokenResponse = {
   token_type?: string;
 };
 
+type LegacyFcmResponse = {
+  success?: number;
+  failure?: number;
+  results?: Array<{
+    message_id?: string;
+    error?: string;
+  }>;
+};
+
+type FcmErrorPayload = {
+  error?: {
+    code?: number;
+    status?: string;
+    message?: string;
+    details?: Array<{
+      '@type'?: string;
+      errorCode?: string;
+    }>;
+  };
+};
+
+type TokenSendSuccess = {
+  ok: true;
+  token: string;
+  messageId: string | null;
+};
+
+type TokenSendFailure = {
+  ok: false;
+  token: string;
+  tokenPreview: string;
+  httpStatus: number;
+  fcmStatus?: string;
+  fcmErrorCode?: string;
+  message: string;
+  invalidToken: boolean;
+};
+
+type TokenSendResult = TokenSendSuccess | TokenSendFailure;
+
 const GOOGLE_TOKEN_AUDIENCE = 'https://oauth2.googleapis.com/token';
 const GOOGLE_OAUTH_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
+const INVALID_TOKEN_ERROR_CODES = new Set([
+  'UNREGISTERED',
+  'INVALID_REGISTRATION',
+  'REGISTRATION_TOKEN_NOT_REGISTERED',
+]);
+const LEGACY_INVALID_TOKEN_ERROR_CODES = new Set([
+  'InvalidRegistration',
+  'NotRegistered',
+  'MissingRegistration',
+]);
 
 let cachedAccessToken: { token: string; expiresAtMs: number } | null = null;
 
@@ -51,6 +102,128 @@ function getServiceAccountConfig(): ServiceAccountConfig {
     clientEmail,
     // Netlify/env files usually store newlines as \n.
     privateKey: privateKeyRaw.replace(/\\n/g, '\n'),
+  };
+}
+
+function hasServiceAccountConfig() {
+  return Boolean(
+    process.env.FIREBASE_PROJECT_ID &&
+      process.env.FIREBASE_CLIENT_EMAIL &&
+      process.env.FIREBASE_PRIVATE_KEY
+  );
+}
+
+function getSupabaseClient() {
+  try {
+    return getSupabaseServerClient();
+  } catch {
+    return null;
+  }
+}
+
+function getTokenPreview(token: string) {
+  if (token.length <= 24) return token;
+  return `${token.slice(0, 12)}...${token.slice(-8)}`;
+}
+
+function parseFcmFailure(rawText: string, httpStatus: number) {
+  let parsed: FcmErrorPayload | null = null;
+  try {
+    parsed = JSON.parse(rawText) as FcmErrorPayload;
+  } catch {
+    parsed = null;
+  }
+
+  const fcmStatus = parsed?.error?.status;
+  const fcmErrorCode = parsed?.error?.details?.find((detail) => Boolean(detail?.errorCode))
+    ?.errorCode;
+  const message = parsed?.error?.message || rawText || `FCM HTTP ${httpStatus}`;
+  const upperMessage = message.toUpperCase();
+
+  const invalidByCode = Boolean(fcmErrorCode && INVALID_TOKEN_ERROR_CODES.has(fcmErrorCode));
+  const invalidByMessage =
+    upperMessage.includes('REGISTRATION TOKEN') &&
+    (upperMessage.includes('NOT REGISTERED') ||
+      upperMessage.includes('NOT VALID') ||
+      upperMessage.includes('UNREGISTERED'));
+
+  return {
+    httpStatus,
+    fcmStatus,
+    fcmErrorCode,
+    message,
+    invalidToken: invalidByCode || invalidByMessage,
+  };
+}
+
+function parseLegacyFcmFailure(rawText: string, httpStatus: number) {
+  let parsed: LegacyFcmResponse | null = null;
+  try {
+    parsed = JSON.parse(rawText) as LegacyFcmResponse;
+  } catch {
+    parsed = null;
+  }
+
+  if (httpStatus === 404) {
+    return {
+      httpStatus,
+      fcmStatus: 'LEGACY_FCM',
+      fcmErrorCode: 'LEGACY_ENDPOINT_UNAVAILABLE',
+      message:
+        'Legacy FCM endpoint is unavailable (HTTP 404). Configure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY to use FCM HTTP v1.',
+      invalidToken: false,
+    };
+  }
+
+  const errorCode = parsed?.results?.[0]?.error;
+  const message = errorCode
+    ? `Legacy FCM error: ${errorCode}`
+    : rawText || `Legacy FCM HTTP ${httpStatus}`;
+
+  return {
+    httpStatus,
+    fcmStatus: 'LEGACY_FCM',
+    fcmErrorCode: errorCode,
+    message,
+    invalidToken: Boolean(
+      errorCode && LEGACY_INVALID_TOKEN_ERROR_CODES.has(errorCode)
+    ),
+  };
+}
+
+async function cleanupInvalidTokens(customerId: string | number, tokens: string[]) {
+  if (!tokens.length) {
+    return { attempted: false, deleted: 0 as number, error: null as string | null };
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return {
+      attempted: false,
+      deleted: 0 as number,
+      error: 'Supabase env vars are missing, cannot auto-clean stale device tokens',
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('device_tokens')
+    .delete()
+    .eq('customer_id', customerId)
+    .in('fcm_token', tokens)
+    .select('fcm_token');
+
+  if (error) {
+    return {
+      attempted: true,
+      deleted: 0 as number,
+      error: `Failed to remove stale tokens: ${error.message}`,
+    };
+  }
+
+  return {
+    attempted: true,
+    deleted: data?.length ?? 0,
+    error: null as string | null,
   };
 }
 
@@ -152,8 +325,21 @@ export async function POST(request: NextRequest) {
     );
     const tokensData = (await tokensResponse.json()) as {
       success?: boolean;
+      message?: string;
       tokens?: string[];
     };
+
+    if (!tokensResponse.ok || !tokensData.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            tokensData.message ||
+            `Failed to load device tokens (HTTP ${tokensResponse.status})`,
+        },
+        { status: 502 }
+      );
+    }
 
     if (!tokensData.success || !tokensData.tokens || tokensData.tokens.length === 0) {
       return NextResponse.json({
@@ -162,81 +348,220 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const serviceAccount = getServiceAccountConfig();
-    const accessToken = await getGoogleAccessToken(serviceAccount);
+    const useFcmV1 = hasServiceAccountConfig();
+    const legacyServerKey = process.env.FCM_SERVER_KEY;
+
+    if (!useFcmV1 && !legacyServerKey) {
+      throw new Error(
+        'Missing Firebase configuration. Set FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY (HTTP v1) or FCM_SERVER_KEY (legacy).'
+      );
+    }
+
+    const serviceAccount = useFcmV1 ? getServiceAccountConfig() : null;
+    const accessToken = serviceAccount
+      ? await getGoogleAccessToken(serviceAccount)
+      : null;
+
     const normalizedData = normalizeDataPayload({
       type: type || 'general',
       ...(data || {}),
     });
 
-    const results = await Promise.allSettled(
+    const results: TokenSendResult[] = await Promise.all(
       tokensData.tokens.map(async (token) => {
-        const fcmPayload = {
-          message: {
-            token,
+        try {
+          if (useFcmV1 && serviceAccount && accessToken) {
+            const fcmPayload = {
+              message: {
+                token,
+                notification: {
+                  title,
+                  body: message,
+                },
+                data: normalizedData,
+                android: {
+                  priority: 'HIGH',
+                  notification: {
+                    sound: 'default',
+                    color: '#77088a',
+                  },
+                },
+              },
+            };
+
+            const response = await fetch(
+              `https://fcm.googleapis.com/v1/projects/${serviceAccount.projectId}/messages:send`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify(fcmPayload),
+              }
+            );
+
+            const rawText = await response.text();
+            if (!response.ok) {
+              const parsedFailure = parseFcmFailure(rawText, response.status);
+              return {
+                ok: false,
+                token,
+                tokenPreview: getTokenPreview(token),
+                ...parsedFailure,
+              } satisfies TokenSendFailure;
+            }
+
+            let parsed: { name?: string };
+            try {
+              parsed = JSON.parse(rawText) as { name?: string };
+            } catch {
+              return {
+                ok: false,
+                token,
+                tokenPreview: getTokenPreview(token),
+                httpStatus: response.status,
+                fcmStatus: undefined,
+                fcmErrorCode: undefined,
+                message: `FCM returned non-JSON response: ${rawText}`,
+                invalidToken: false,
+              } satisfies TokenSendFailure;
+            }
+
+            return {
+              ok: true,
+              token,
+              messageId: parsed.name || null,
+            } satisfies TokenSendSuccess;
+          }
+
+          const legacyPayload = {
+            to: token,
+            priority: 'high',
             notification: {
               title,
               body: message,
+              sound: 'default',
             },
             data: normalizedData,
-            android: {
-              priority: 'HIGH',
-              notification: {
-                sound: 'default',
-                color: '#77088a',
-              },
+          };
+
+          const response = await fetch('https://fcm.googleapis.com/fcm/send', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `key=${legacyServerKey}`,
             },
-          },
-        };
+            body: JSON.stringify(legacyPayload),
+          });
 
-        const response = await fetch(
-          `https://fcm.googleapis.com/v1/projects/${serviceAccount.projectId}/messages:send`,
-          {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify(fcmPayload),
+          const rawText = await response.text();
+          if (!response.ok) {
+            const parsedFailure = parseLegacyFcmFailure(rawText, response.status);
+            return {
+              ok: false,
+              token,
+              tokenPreview: getTokenPreview(token),
+              ...parsedFailure,
+            } satisfies TokenSendFailure;
+          }
+
+          let parsed: LegacyFcmResponse;
+          try {
+            parsed = JSON.parse(rawText) as LegacyFcmResponse;
+          } catch {
+            return {
+              ok: false,
+              token,
+              tokenPreview: getTokenPreview(token),
+              httpStatus: response.status,
+              fcmStatus: 'LEGACY_FCM',
+              fcmErrorCode: undefined,
+              message: `Legacy FCM returned non-JSON response: ${rawText}`,
+              invalidToken: false,
+            } satisfies TokenSendFailure;
+          }
+
+          const firstResult = parsed.results?.[0];
+          if (firstResult?.error) {
+            return {
+              ok: false,
+              token,
+              tokenPreview: getTokenPreview(token),
+              httpStatus: response.status,
+              fcmStatus: 'LEGACY_FCM',
+              fcmErrorCode: firstResult.error,
+              message: `Legacy FCM error: ${firstResult.error}`,
+              invalidToken: LEGACY_INVALID_TOKEN_ERROR_CODES.has(firstResult.error),
+            } satisfies TokenSendFailure;
+          }
+
+          return {
+            ok: true,
+            token,
+            messageId: firstResult?.message_id || null,
+          } satisfies TokenSendSuccess;
+        } catch (error: unknown) {
+          const errMessage =
+            error instanceof Error ? error.message : 'Unexpected send failure';
+          return {
+            ok: false,
+            token,
+            tokenPreview: getTokenPreview(token),
+            httpStatus: 0,
+            fcmStatus: undefined,
+            fcmErrorCode: undefined,
+            message: errMessage,
+            invalidToken: false,
+          } satisfies TokenSendFailure;
         }
-        );
-
-        const rawText = await response.text();
-        if (!response.ok) {
-          throw new Error(`FCM HTTP ${response.status}: ${rawText || response.statusText}`);
-        }
-
-        let parsed: { name?: string };
-        try {
-          parsed = JSON.parse(rawText) as { name?: string };
-        } catch {
-          throw new Error(`FCM returned non-JSON response: ${rawText}`);
-        }
-
-        return {
-          token,
-          messageId: parsed.name || null,
-        };
       })
     );
 
-    const successCount = results.filter((r) => r.status === 'fulfilled').length;
-    const failureReasons = results
-      .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-      .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)));
-    const failureCount = failureReasons.length;
+    const successfulSends = results.filter(
+      (result): result is TokenSendSuccess => result.ok
+    );
+    const failedSends = results.filter(
+      (result): result is TokenSendFailure => !result.ok
+    );
+
+    const successCount = successfulSends.length;
+    const failureCount = failedSends.length;
+    const invalidFailures = failedSends.filter((result) => result.invalidToken);
+
+    const cleanupResult = await cleanupInvalidTokens(
+      customerId,
+      invalidFailures.map((result) => result.token)
+    );
+
+    const errorDetails = failedSends.map((failure) => ({
+      token: failure.tokenPreview,
+      httpStatus: failure.httpStatus || null,
+      status: failure.fcmStatus || null,
+      errorCode: failure.fcmErrorCode || null,
+      invalidToken: failure.invalidToken,
+      message: failure.message,
+    }));
 
     if (successCount === 0) {
+      const allFailuresAreInvalidTokens =
+        failureCount > 0 && invalidFailures.length === failureCount;
+
       return NextResponse.json(
         {
           success: false,
-          message: 'FCM rejected all target tokens',
+          message: allFailuresAreInvalidTokens
+            ? 'All registered device tokens are invalid or expired. Ask the user to open the app and sign in again to refresh push token registration.'
+            : 'FCM rejected all target tokens',
           sent: 0,
           failed: failureCount,
           totalDevices: tokensData.tokens.length,
-          errors: failureReasons,
+          invalidTokenCount: invalidFailures.length,
+          cleanedUpInvalidTokens: cleanupResult.deleted,
+          cleanupWarning: cleanupResult.error,
+          errors: errorDetails,
         },
-        { status: 502 }
+        { status: allFailuresAreInvalidTokens ? 410 : 502 }
       );
     }
 
@@ -246,7 +571,10 @@ export async function POST(request: NextRequest) {
       sent: successCount,
       failed: failureCount,
       totalDevices: tokensData.tokens.length,
-      errors: failureReasons,
+      invalidTokenCount: invalidFailures.length,
+      cleanedUpInvalidTokens: cleanupResult.deleted,
+      cleanupWarning: cleanupResult.error,
+      errors: errorDetails,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to send notification';
