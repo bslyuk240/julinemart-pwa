@@ -1,0 +1,513 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import {
+  ArrowLeft,
+  Bell,
+  RefreshCcw,
+  Smartphone,
+  ShieldAlert,
+  ShieldCheck,
+  Trash2,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { useCustomerAuth } from '@/context/customer-auth-context';
+import PageLoading from '@/components/ui/page-loading';
+
+type RegisterTokensResponse = {
+  success?: boolean;
+  tokens?: string[];
+  count?: number;
+  updatedAt?: string | null;
+  message?: string;
+};
+
+type CleanupResponse = {
+  success?: boolean;
+  message?: string;
+};
+
+type NotificationPreferences = {
+  orderUpdates: boolean;
+  promotions: boolean;
+  productAlerts: boolean;
+};
+
+const DEFAULT_PREFERENCES: NotificationPreferences = {
+  orderUpdates: true,
+  promotions: true,
+  productAlerts: true,
+};
+
+const PREFERENCES_STORAGE_KEY = 'jm_notification_preferences';
+const PENDING_TOKEN_STORAGE_KEY = 'jm_pending_fcm_token';
+const LAST_TOKEN_STORAGE_KEY = 'jm_last_fcm_token';
+
+function maskToken(token: string) {
+  if (token.length <= 20) return token;
+  return `${token.slice(0, 10)}...${token.slice(-8)}`;
+}
+
+export default function AccountNotificationsPage() {
+  const router = useRouter();
+  const { customer, customerId, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
+
+  const [pageLoading, setPageLoading] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+  const [registeringDevice, setRegisteringDevice] = useState(false);
+  const [removingDevice, setRemovingDevice] = useState(false);
+  const [isNativePlatform, setIsNativePlatform] = useState(false);
+  const [registeredTokens, setRegisteredTokens] = useState<string[]>([]);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [currentDeviceToken, setCurrentDeviceToken] = useState<string | null>(null);
+  const [preferences, setPreferences] =
+    useState<NotificationPreferences>(DEFAULT_PREFERENCES);
+
+  const detectNativePlatform = useCallback(async () => {
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      setIsNativePlatform(Capacitor.isNativePlatform());
+    } catch {
+      setIsNativePlatform(false);
+    }
+  }, []);
+
+  const syncLocalDeviceToken = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const lastKnownToken = localStorage.getItem(LAST_TOKEN_STORAGE_KEY);
+    const pendingToken = localStorage.getItem(PENDING_TOKEN_STORAGE_KEY);
+    setCurrentDeviceToken(lastKnownToken || pendingToken || null);
+  }, []);
+
+  const loadRegistrationStatus = useCallback(async () => {
+    if (!customerId) return;
+
+    setLoadingStatus(true);
+    try {
+      const response = await fetch(
+        `/api/notifications/register-device?customerId=${customerId}`
+      );
+      const payload = (await response.json().catch(() => null)) as
+        | RegisterTokensResponse
+        | null;
+
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.message || `Failed to load notification status`);
+      }
+
+      const tokens = Array.isArray(payload.tokens)
+        ? payload.tokens.filter((token): token is string => Boolean(token))
+        : [];
+
+      setRegisteredTokens(tokens);
+      setUpdatedAt(payload.updatedAt || null);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to load notification status';
+      toast.error(message);
+      setRegisteredTokens([]);
+      setUpdatedAt(null);
+    } finally {
+      syncLocalDeviceToken();
+      await detectNativePlatform();
+      setLoadingStatus(false);
+      setPageLoading(false);
+    }
+  }, [customerId, detectNativePlatform, syncLocalDeviceToken]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(PREFERENCES_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<NotificationPreferences>;
+      setPreferences({
+        orderUpdates:
+          typeof parsed.orderUpdates === 'boolean'
+            ? parsed.orderUpdates
+            : DEFAULT_PREFERENCES.orderUpdates,
+        promotions:
+          typeof parsed.promotions === 'boolean'
+            ? parsed.promotions
+            : DEFAULT_PREFERENCES.promotions,
+        productAlerts:
+          typeof parsed.productAlerts === 'boolean'
+            ? parsed.productAlerts
+            : DEFAULT_PREFERENCES.productAlerts,
+      });
+    } catch {
+      setPreferences(DEFAULT_PREFERENCES);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
+  }, [preferences]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isAuthenticated || !customerId) {
+        setPageLoading(false);
+        router.push('/login?redirect=/account/notifications');
+      } else {
+        loadRegistrationStatus();
+      }
+    }
+  }, [authLoading, isAuthenticated, customerId, loadRegistrationStatus, router]);
+
+  const thisDeviceRegistered = useMemo(() => {
+    if (!currentDeviceToken) return false;
+    return registeredTokens.includes(currentDeviceToken);
+  }, [currentDeviceToken, registeredTokens]);
+
+  const handleRegisterThisDevice = async () => {
+    if (!customerId) return;
+
+    setRegisteringDevice(true);
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (!Capacitor.isNativePlatform()) {
+        toast.error('Push registration is available only in the Android app.');
+        return;
+      }
+
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      const permissions = await PushNotifications.requestPermissions();
+      if (permissions.receive !== 'granted') {
+        toast.error('Notification permission is denied on this device.');
+        return;
+      }
+
+      type ListenerHandle = { remove: () => Promise<void> } | null;
+      let registrationHandle: ListenerHandle = null;
+      let errorHandle: ListenerHandle = null;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+      const tokenValue = await new Promise<string>(async (resolve, reject) => {
+        const cleanup = async () => {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          if (registrationHandle) {
+            await registrationHandle.remove();
+            registrationHandle = null;
+          }
+          if (errorHandle) {
+            await errorHandle.remove();
+            errorHandle = null;
+          }
+        };
+
+        registrationHandle = await PushNotifications.addListener(
+          'registration',
+          async (token) => {
+            await cleanup();
+            resolve(token.value);
+          }
+        );
+
+        errorHandle = await PushNotifications.addListener(
+          'registrationError',
+          async (error) => {
+            await cleanup();
+            const reason =
+              error && typeof error === 'object'
+                ? JSON.stringify(error)
+                : String(error);
+            reject(new Error(reason));
+          }
+        );
+
+        timeoutId = setTimeout(async () => {
+          await cleanup();
+          reject(new Error('Timed out while waiting for push token'));
+        }, 20_000);
+
+        try {
+          await PushNotifications.register();
+        } catch (error) {
+          await cleanup();
+          reject(error);
+        }
+      });
+
+      const response = await fetch('/api/notifications/register-device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId,
+          fcmToken: tokenValue,
+          platform: 'android',
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | RegisterTokensResponse
+        | null;
+
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.message || 'Failed to register this device');
+      }
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(LAST_TOKEN_STORAGE_KEY, tokenValue);
+        localStorage.removeItem(PENDING_TOKEN_STORAGE_KEY);
+      }
+
+      setCurrentDeviceToken(tokenValue);
+      toast.success('This device is now registered for notifications.');
+      await loadRegistrationStatus();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to register this device';
+      toast.error(message);
+    } finally {
+      setRegisteringDevice(false);
+    }
+  };
+
+  const handleDisableThisDevice = async () => {
+    if (!customerId || !currentDeviceToken) {
+      toast.error('No local device token found.');
+      return;
+    }
+
+    setRemovingDevice(true);
+    try {
+      const response = await fetch(
+        `/api/notifications/cleanup-tokens?customerId=${customerId}&fcmToken=${encodeURIComponent(
+          currentDeviceToken
+        )}`,
+        { method: 'DELETE' }
+      );
+      const payload = (await response.json().catch(() => null)) as
+        | CleanupResponse
+        | null;
+
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.message || 'Failed to disable this device');
+      }
+
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(LAST_TOKEN_STORAGE_KEY);
+        localStorage.removeItem(PENDING_TOKEN_STORAGE_KEY);
+      }
+
+      setCurrentDeviceToken(null);
+      toast.success('Notifications disabled on this device.');
+      await loadRegistrationStatus();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to disable this device';
+      toast.error(message);
+    } finally {
+      setRemovingDevice(false);
+    }
+  };
+
+  const togglePreference = (key: keyof NotificationPreferences) => {
+    setPreferences((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  if (authLoading || pageLoading) {
+    return <PageLoading text="Loading notification settings..." />;
+  }
+
+  if (!isAuthenticated || !customer) {
+    return (
+      <main className="min-h-screen bg-gray-50 pb-24 md:pb-8 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-sm p-6 text-center max-w-md">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Sign in required</h1>
+          <p className="text-gray-600 mb-4">
+            Please log in to manage notification preferences.
+          </p>
+          <Link href="/login?redirect=/account/notifications">
+            <Button variant="primary">Go to Login</Button>
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
+        <div className="flex items-center justify-between mb-6">
+          <Link
+            href="/account"
+            className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span>Back to Account</span>
+          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadRegistrationStatus}
+            isLoading={loadingStatus}
+          >
+            <RefreshCcw className="w-4 h-4 mr-2" />
+            Refresh Status
+          </Button>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+          <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 md:px-8 py-8 text-white">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <Bell className="w-8 h-8 md:w-10 md:h-10" />
+              </div>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold">Notifications</h1>
+                <p className="text-white/90 mt-1 text-sm md:text-base">
+                  Manage device registration and notification preferences.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 md:p-8 space-y-6">
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="border border-gray-200 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-1">Registered Devices</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {registeredTokens.length}
+                </p>
+              </div>
+
+              <div className="border border-gray-200 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-1">This Device</p>
+                <div className="flex items-center gap-2">
+                  {thisDeviceRegistered ? (
+                    <>
+                      <ShieldCheck className="w-5 h-5 text-green-600" />
+                      <span className="font-semibold text-green-700">Registered</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldAlert className="w-5 h-5 text-amber-600" />
+                      <span className="font-semibold text-amber-700">Not Registered</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="border border-gray-200 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-1">Last Backend Update</p>
+                <p className="font-semibold text-gray-900">
+                  {updatedAt
+                    ? new Date(updatedAt).toLocaleString('en-US')
+                    : 'No registration yet'}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-800 mb-2">Current Device Token</p>
+              <p className="text-sm text-gray-700">
+                {currentDeviceToken ? maskToken(currentDeviceToken) : 'Not detected on this device'}
+              </p>
+              <p className="text-xs text-gray-500 mt-2">
+                Push notifications currently work on the native Android app. Web browser support
+                is not enabled in this build.
+              </p>
+            </div>
+
+            {!isNativePlatform && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <p className="text-sm text-amber-900">
+                  You are viewing this page on web. To register push notifications, open the
+                  JulineMart Android app and sign in there.
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="primary"
+                onClick={handleRegisterThisDevice}
+                isLoading={registeringDevice}
+              >
+                <Smartphone className="w-4 h-4 mr-2" />
+                Register This Device
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDisableThisDevice}
+                disabled={!currentDeviceToken}
+                isLoading={removingDevice}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Disable on This Device
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-6 md:p-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Preference Controls
+          </h2>
+          <p className="text-sm text-gray-600 mb-6">
+            These controls are saved locally on this device for UI preference. Server-side
+            targeting rules can be added later if you want these to be enforced during sends.
+          </p>
+
+          <div className="space-y-4">
+            <label className="flex items-start justify-between gap-4 border border-gray-200 rounded-lg p-4">
+              <div>
+                <p className="font-medium text-gray-900">Order Updates</p>
+                <p className="text-sm text-gray-600">
+                  Delivery progress, payment confirmations, and order state changes.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                className="w-5 h-5 mt-1"
+                checked={preferences.orderUpdates}
+                onChange={() => togglePreference('orderUpdates')}
+              />
+            </label>
+
+            <label className="flex items-start justify-between gap-4 border border-gray-200 rounded-lg p-4">
+              <div>
+                <p className="font-medium text-gray-900">Promotions</p>
+                <p className="text-sm text-gray-600">
+                  Campaign announcements and special discount alerts.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                className="w-5 h-5 mt-1"
+                checked={preferences.promotions}
+                onChange={() => togglePreference('promotions')}
+              />
+            </label>
+
+            <label className="flex items-start justify-between gap-4 border border-gray-200 rounded-lg p-4">
+              <div>
+                <p className="font-medium text-gray-900">Product Alerts</p>
+                <p className="text-sm text-gray-600">
+                  Product recommendations and restock notifications.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                className="w-5 h-5 mt-1"
+                checked={preferences.productAlerts}
+                onChange={() => togglePreference('productAlerts')}
+              />
+            </label>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
