@@ -4,11 +4,15 @@ import { createSign } from 'node:crypto';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 type SendPayload = {
+  audience?: 'single' | 'all_customers' | 'all_vendors' | 'all_staff' | 'segment';
   customerId?: string | number;
   title?: string;
   message?: string;
   data?: Record<string, unknown>;
   type?: string;
+  segment?: {
+    platform?: 'android' | 'web';
+  };
 };
 
 type ServiceAccountConfig = {
@@ -62,6 +66,11 @@ type TokenSendFailure = {
 };
 
 type TokenSendResult = TokenSendSuccess | TokenSendFailure;
+type Audience = NonNullable<SendPayload['audience']>;
+
+type DeviceTokenRow = {
+  fcm_token?: string | null;
+};
 
 const GOOGLE_TOKEN_AUDIENCE = 'https://oauth2.googleapis.com/token';
 const GOOGLE_OAUTH_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
@@ -75,6 +84,14 @@ const LEGACY_INVALID_TOKEN_ERROR_CODES = new Set([
   'NotRegistered',
   'MissingRegistration',
 ]);
+const SUPPORTED_AUDIENCES: Audience[] = [
+  'single',
+  'all_customers',
+  'all_vendors',
+  'all_staff',
+  'segment',
+];
+const SUPPORTED_SEGMENT_PLATFORMS = new Set(['android', 'web']);
 
 let cachedAccessToken: { token: string; expiresAtMs: number } | null = null;
 
@@ -124,6 +141,43 @@ function getSupabaseClient() {
 function getTokenPreview(token: string) {
   if (token.length <= 24) return token;
   return `${token.slice(0, 12)}...${token.slice(-8)}`;
+}
+
+function parseAudience(value: unknown) {
+  if (typeof value !== 'string') return null;
+  return SUPPORTED_AUDIENCES.includes(value as Audience) ? (value as Audience) : null;
+}
+
+function resolveAudience(payload: SendPayload) {
+  if (payload.audience) {
+    return parseAudience(payload.audience);
+  }
+  return payload.customerId ? 'single' : null;
+}
+
+function parseSegmentPlatform(value: unknown) {
+  if (typeof value !== 'string') return null;
+  return SUPPORTED_SEGMENT_PLATFORMS.has(value) ? value : null;
+}
+
+function dedupeTokens(tokens: string[]) {
+  return [...new Set(tokens.map((token) => token.trim()).filter(Boolean))];
+}
+
+function isAdminRequest(request: NextRequest) {
+  const configuredSecret = process.env.NOTIFICATIONS_ADMIN_SECRET;
+  if (!configuredSecret) return false;
+  return request.headers.get('x-notifications-admin-secret') === configuredSecret;
+}
+
+function isMissingColumnError(error: unknown, columnName: string) {
+  if (!error || typeof error !== 'object') return false;
+  const maybeMessage =
+    'message' in error && typeof error.message === 'string' ? error.message : '';
+  const maybeDetails =
+    'details' in error && typeof error.details === 'string' ? error.details : '';
+  const combined = `${maybeMessage} ${maybeDetails}`.toLowerCase();
+  return combined.includes('column') && combined.includes(columnName.toLowerCase());
 }
 
 function parseFcmFailure(rawText: string, httpStatus: number) {
@@ -191,7 +245,11 @@ function parseLegacyFcmFailure(rawText: string, httpStatus: number) {
   };
 }
 
-async function cleanupInvalidTokens(customerId: string | number, tokens: string[]) {
+async function cleanupInvalidTokens(
+  audience: Audience,
+  customerId: string | number | undefined,
+  tokens: string[]
+) {
   if (!tokens.length) {
     return { attempted: false, deleted: 0 as number, error: null as string | null };
   }
@@ -205,12 +263,12 @@ async function cleanupInvalidTokens(customerId: string | number, tokens: string[
     };
   }
 
-  const { data, error } = await supabase
-    .from('device_tokens')
-    .delete()
-    .eq('customer_id', customerId)
-    .in('fcm_token', tokens)
-    .select('fcm_token');
+  let deleteQuery = supabase.from('device_tokens').delete().in('fcm_token', tokens);
+  if (audience === 'single' && customerId !== undefined) {
+    deleteQuery = deleteQuery.eq('customer_id', customerId);
+  }
+
+  const { data, error } = await deleteQuery.select('fcm_token');
 
   if (error) {
     return {
@@ -306,45 +364,231 @@ function normalizeDataPayload(data?: Record<string, unknown>) {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as SendPayload;
-    const { customerId, title, message, data, type } = body;
+    const { customerId, title, message, data, type, segment } = body;
+    const audience = resolveAudience(body);
 
-    if (!customerId || !title || !message) {
-      return NextResponse.json(
-        { success: false, message: 'Missing required fields (customerId, title, message)' },
-        { status: 400 }
-      );
-    }
-
-    console.log(`Sending notification to customer ${customerId}`);
-    console.log(`Title: ${title}`);
-    console.log(`Type: ${type || 'general'}`);
-
-    const tokensResponse = await fetch(
-      `${request.nextUrl.origin}/api/notifications/register-device?customerId=${customerId}`,
-      { method: 'GET' }
-    );
-    const tokensData = (await tokensResponse.json()) as {
-      success?: boolean;
-      message?: string;
-      tokens?: string[];
-    };
-
-    if (!tokensResponse.ok || !tokensData.success) {
+    if (!audience) {
       return NextResponse.json(
         {
           success: false,
           message:
-            tokensData.message ||
-            `Failed to load device tokens (HTTP ${tokensResponse.status})`,
+            'Missing or invalid audience. Provide audience or keep backward-compatible customerId payload for single sends.',
         },
-        { status: 502 }
+        { status: 400 }
       );
     }
 
-    if (!tokensData.success || !tokensData.tokens || tokensData.tokens.length === 0) {
+    if (!title || !message) {
+      return NextResponse.json(
+        { success: false, message: 'Missing required fields (title, message)' },
+        { status: 400 }
+      );
+    }
+
+    if (audience === 'single' && !customerId) {
+      return NextResponse.json(
+        {
+          success: false,
+          audience,
+          message: 'Missing customerId for audience=single',
+        },
+        { status: 400 }
+      );
+    }
+
+    if (audience === 'segment' && segment?.platform) {
+      const parsedPlatform = parseSegmentPlatform(segment.platform);
+      if (!parsedPlatform) {
+        return NextResponse.json(
+          {
+            success: false,
+            audience,
+            message: 'Invalid segment.platform. Supported values: android, web',
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (audience !== 'single') {
+      const adminSecret = process.env.NOTIFICATIONS_ADMIN_SECRET;
+      if (!adminSecret) {
+        return NextResponse.json(
+          {
+            success: false,
+            audience,
+            message:
+              'Bulk notifications are disabled because NOTIFICATIONS_ADMIN_SECRET is not configured.',
+          },
+          { status: 500 }
+        );
+      }
+
+      if (!isAdminRequest(request)) {
+        return NextResponse.json(
+          {
+            success: false,
+            audience,
+            message: 'Unauthorized bulk notification request',
+          },
+          { status: 401 }
+        );
+      }
+    }
+
+    console.log(`Sending notification for audience ${audience}`);
+    if (audience === 'single') {
+      console.log(`Target customer ${customerId}`);
+    }
+    console.log(`Title: ${title}`);
+    console.log(`Type: ${type || 'general'}`);
+
+    let targetTokens: string[] = [];
+
+    if (audience === 'single') {
+      const tokensResponse = await fetch(
+        `${request.nextUrl.origin}/api/notifications/register-device?customerId=${customerId}`,
+        { method: 'GET' }
+      );
+      const tokensData = (await tokensResponse.json()) as {
+        success?: boolean;
+        message?: string;
+        tokens?: string[];
+      };
+
+      if (!tokensResponse.ok || !tokensData.success) {
+        return NextResponse.json(
+          {
+            success: false,
+            audience,
+            message:
+              tokensData.message ||
+              `Failed to load device tokens (HTTP ${tokensResponse.status})`,
+          },
+          { status: 502 }
+        );
+      }
+
+      targetTokens = tokensData.tokens || [];
+    } else {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        return NextResponse.json(
+          {
+            success: false,
+            audience,
+            message: 'Supabase environment variables are not configured',
+          },
+          { status: 500 }
+        );
+      }
+
+      if (audience === 'all_customers') {
+        const { data: tokenRows, error } = await supabase
+          .from('device_tokens')
+          .select('fcm_token');
+
+        if (error) {
+          throw new Error(`Database error: ${error.message}`);
+        }
+
+        targetTokens = (tokenRows || [])
+          .map((row: DeviceTokenRow) => row.fcm_token || '')
+          .filter(Boolean);
+      } else if (audience === 'segment') {
+        if (!segment?.platform) {
+          return NextResponse.json(
+            {
+              success: false,
+              audience,
+              message:
+                'segment.platform is required for audience=segment in this MVP',
+            },
+            { status: 400 }
+          );
+        }
+
+        const segmentPlatform = parseSegmentPlatform(segment.platform);
+        if (!segmentPlatform) {
+          return NextResponse.json(
+            {
+              success: false,
+              audience,
+              message: 'Invalid segment.platform. Supported values: android, web',
+            },
+            { status: 400 }
+          );
+        }
+
+        const { data: tokenRows, error } = await supabase
+          .from('device_tokens')
+          .select('fcm_token')
+          .eq('platform', segmentPlatform);
+
+        if (error) {
+          if (isMissingColumnError(error, 'platform')) {
+            return NextResponse.json(
+              {
+                success: false,
+                audience,
+                message:
+                  "device_tokens.platform column is required for audience=segment. Add a 'platform' column to use platform-based segments.",
+              },
+              { status: 400 }
+            );
+          }
+          throw new Error(`Database error: ${error.message}`);
+        }
+
+        targetTokens = (tokenRows || [])
+          .map((row: DeviceTokenRow) => row.fcm_token || '')
+          .filter(Boolean);
+      } else if (audience === 'all_vendors' || audience === 'all_staff') {
+        const targetUserType = audience === 'all_vendors' ? 'vendor' : 'staff';
+        const { data: tokenRows, error } = await supabase
+          .from('device_tokens')
+          .select('fcm_token')
+          .eq('user_type', targetUserType);
+
+        if (error) {
+          if (isMissingColumnError(error, 'user_type')) {
+            return NextResponse.json(
+              {
+                success: false,
+                audience,
+                message:
+                  "device_tokens.user_type column is required for vendor/staff audiences. Add a 'user_type' column to use all_vendors/all_staff.",
+              },
+              { status: 400 }
+            );
+          }
+          throw new Error(`Database error: ${error.message}`);
+        }
+
+        targetTokens = (tokenRows || [])
+          .map((row: DeviceTokenRow) => row.fcm_token || '')
+          .filter(Boolean);
+      }
+    }
+
+    const dedupedTokens = dedupeTokens(targetTokens);
+    const matchedTokensCount = dedupedTokens.length;
+
+    if (matchedTokensCount === 0) {
       return NextResponse.json({
         success: false,
-        message: 'No devices registered for this customer',
+        audience,
+        message:
+          audience === 'single'
+            ? 'No devices registered for this customer'
+            : 'No devices matched the selected audience',
+        matchedTokensCount: 0,
+        sent: 0,
+        failed: 0,
+        totalDevices: 0,
+        invalidTokenCount: 0,
+        cleanedUpInvalidTokens: 0,
+        errors: [],
       });
     }
 
@@ -368,7 +612,7 @@ export async function POST(request: NextRequest) {
     });
 
     const results: TokenSendResult[] = await Promise.all(
-      tokensData.tokens.map(async (token) => {
+      dedupedTokens.map(async (token) => {
         try {
           if (useFcmV1 && serviceAccount && accessToken) {
             const fcmPayload = {
@@ -530,6 +774,7 @@ export async function POST(request: NextRequest) {
     const invalidFailures = failedSends.filter((result) => result.invalidToken);
 
     const cleanupResult = await cleanupInvalidTokens(
+      audience,
       customerId,
       invalidFailures.map((result) => result.token)
     );
@@ -550,12 +795,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
+          audience,
           message: allFailuresAreInvalidTokens
             ? 'All registered device tokens are invalid or expired. Ask the user to open the app and sign in again to refresh push token registration.'
             : 'FCM rejected all target tokens',
+          matchedTokensCount,
           sent: 0,
           failed: failureCount,
-          totalDevices: tokensData.tokens.length,
+          totalDevices: matchedTokensCount,
           invalidTokenCount: invalidFailures.length,
           cleanedUpInvalidTokens: cleanupResult.deleted,
           cleanupWarning: cleanupResult.error,
@@ -567,10 +814,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: failureCount === 0,
+      audience,
       message: failureCount === 0 ? 'Notifications sent' : 'Notifications partially sent',
+      matchedTokensCount,
       sent: successCount,
       failed: failureCount,
-      totalDevices: tokensData.tokens.length,
+      totalDevices: matchedTokensCount,
       invalidTokenCount: invalidFailures.length,
       cleanedUpInvalidTokens: cleanupResult.deleted,
       cleanupWarning: cleanupResult.error,
@@ -582,3 +831,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
+
+/*
+Env note:
+- NOTIFICATIONS_ADMIN_SECRET is required for non-single audiences
+  (all_customers, all_vendors, all_staff, segment).
+
+Quick test plan:
+1) Single send: POST with { customerId, title, message } and no admin header -> should work.
+2) Bulk no secret header: POST with { audience: "all_customers", title, message } -> should return 401 (or 500 if NOTIFICATIONS_ADMIN_SECRET is not configured).
+3) Bulk with secret: same request + x-notifications-admin-secret header -> should send.
+4) Segment filter: POST with { audience: "segment", segment: { platform: "android" }, title, message } + admin header -> should send/filter.
+*/
