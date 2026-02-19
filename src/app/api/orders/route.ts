@@ -4,6 +4,7 @@ import { wcApi, handleApiError } from '@/lib/woocommerce/client';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    console.log('Creating order with meta_data:', body?.meta_data);
     const response = await wcApi.post('orders', body);
     return NextResponse.json(response.data);
   } catch (error) {

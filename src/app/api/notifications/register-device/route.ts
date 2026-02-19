@@ -1,21 +1,10 @@
 // src/app/api/notifications/register-device/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Supabase environment variables are not configured');
-  }
-
-  return createClient(supabaseUrl, supabaseKey);
-}
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseServerClient();
     const body = await request.json();
     const { customerId, fcmToken, platform } = body;
 
@@ -29,6 +18,18 @@ export async function POST(request: NextRequest) {
     console.log(`Registering device token for customer ${customerId}`);
     console.log(`Token prefix: ${String(fcmToken).substring(0, 20)}...`);
     console.log(`Platform: ${platform || 'android'}`);
+
+    // If the same physical device token was previously tied to another customer,
+    // remove that stale association so re-login can rebind cleanly.
+    const { error: reassignmentCleanupError } = await supabase
+      .from('device_tokens')
+      .delete()
+      .eq('fcm_token', fcmToken)
+      .neq('customer_id', customerId);
+
+    if (reassignmentCleanupError) {
+      throw new Error(`Database error: ${reassignmentCleanupError.message}`);
+    }
 
     const { error } = await supabase
       .from('device_tokens')
@@ -47,7 +48,26 @@ export async function POST(request: NextRequest) {
       );
 
     if (error) {
-      throw new Error(`Database error: ${error.message}`);
+      const errorCode = (error as { code?: string }).code;
+
+      // Fallback for schemas with unique(fcm_token): rebind the token to the current customer.
+      if (errorCode === '23505') {
+        const { error: updateError } = await supabase
+          .from('device_tokens')
+          .update({
+            customer_id: customerId,
+            platform: platform || 'android',
+            updated_at: new Date().toISOString(),
+            last_used_at: new Date().toISOString(),
+          })
+          .eq('fcm_token', fcmToken);
+
+        if (updateError) {
+          throw new Error(`Database error: ${updateError.message}`);
+        }
+      } else {
+        throw new Error(`Database error: ${error.message}`);
+      }
     }
 
     const { count, error: countError } = await supabase
@@ -78,7 +98,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseServerClient();
     const customerId = request.nextUrl.searchParams.get('customerId');
 
     if (!customerId) {
@@ -113,4 +133,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
-

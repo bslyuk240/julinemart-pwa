@@ -896,6 +896,12 @@ export default function CheckoutPage() {
             key: '_hub_name',
             value: items[0]?.hubName || 'Default Hub',
           },
+          ...(selectedOption?.zoneId
+            ? [{ key: '_jlo_destination_zone_id', value: String(selectedOption.zoneId) }]
+            : []),
+          ...(selectedOption?.title
+            ? [{ key: '_jlo_destination_zone_name', value: selectedOption.title }]
+            : []),
           // NEW: Influencer coupon data
           ...(appliedCoupon ? [
             {

@@ -1,22 +1,11 @@
 // src/app/api/notifications/cleanup-tokens/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Supabase environment variables are not configured');
-  }
-
-  return createClient(supabaseUrl, supabaseKey);
-}
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 // DELETE endpoint to remove specific token or all tokens for a customer
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseServerClient();
     const customerId = request.nextUrl.searchParams.get('customerId');
     const fcmToken = request.nextUrl.searchParams.get('fcmToken');
 
@@ -59,7 +48,7 @@ export async function DELETE(request: NextRequest) {
 // GET endpoint to clean up old unused tokens (older than 90 days)
 export async function GET() {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseServerClient();
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
@@ -89,4 +78,3 @@ export async function GET() {
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
-

@@ -165,7 +165,11 @@
 
                 console.log('Device check:', checkData);
 
-                if (!checkData.success || checkData.count === 0) {
+                if (!checkResponse.ok || !checkData.success) {
+                    throw new Error(checkData.message || `Device token lookup failed (HTTP ${checkResponse.status})`);
+                }
+
+                if (checkData.count === 0) {
                     throw new Error('No device registered for this customer ID. Make sure you signed in on the app!');
                 }
 
@@ -191,19 +195,49 @@
                 console.log('Send result:', data);
 
                 if (data.success) {
+                    const partialNote = data.failed
+                        ? `<br><strong>Note:</strong> ${data.failed} device(s) failed to receive this notification.`
+                        : '';
+                    const cleanupNote = data.cleanedUpInvalidTokens
+                        ? `<br><strong>Cleanup:</strong> Removed ${data.cleanedUpInvalidTokens} stale token(s).`
+                        : '';
+
                     resultDiv.className = 'result success';
                     resultDiv.innerHTML = `
-                        <strong>✅ Success!</strong><br>
+                        <strong>Success!</strong><br>
                         Notification sent to ${data.sent || data.totalDevices} device(s).<br>
                         ${data.simulated ? '<br><strong>Note:</strong> FCM is not fully configured, so this was simulated.' : ''}
-                        <br><br>
-                        <strong>Check your phone now!</strong> 📱
+                        ${partialNote}
+                        ${cleanupNote}
+                        <br><br><strong>Check your phone now.</strong>
                     `;
+                    resultDiv.style.display = 'block';
                 } else {
-                    throw new Error(data.message || 'Failed to send notification');
-                }
+                    const errors = Array.isArray(data.errors) ? data.errors : [];
+                    const errorDetails = errors.length
+                        ? `<br><br><strong>FCM details:</strong><br>${errors
+                            .slice(0, 5)
+                            .map((err) => {
+                                const token = err.token ? `[${err.token}] ` : '';
+                                const code = err.errorCode || err.status || (err.httpStatus ? `HTTP ${err.httpStatus}` : 'UNKNOWN');
+                                const reason = err.message || 'Unknown FCM error';
+                                return `${token}${code}: ${reason}`;
+                            })
+                            .join('<br>')}`
+                        : '';
+                    const cleanupFailureNote = data.cleanedUpInvalidTokens
+                        ? `<br><br><strong>Cleanup:</strong> Removed ${data.cleanedUpInvalidTokens} stale token(s).`
+                        : '';
 
-                resultDiv.style.display = 'block';
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <strong>Error:</strong><br>
+                        ${data.message || 'Failed to send notification'}
+                        ${cleanupFailureNote}
+                        ${errorDetails}
+                    `;
+                    resultDiv.style.display = 'block';
+                }
 
             } catch (error) {
                 console.error('Error:', error);

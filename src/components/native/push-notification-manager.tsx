@@ -5,13 +5,14 @@ import { useEffect } from 'react';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 
 export default function PushNotificationManager() {
-  const { customer } = useCustomerAuth();
+  const { customer, customerId } = useCustomerAuth();
   // Default to enabled on native. Set NEXT_PUBLIC_ENABLE_NATIVE_PUSH=false to turn it off.
   const enableNativePush = process.env.NEXT_PUBLIC_ENABLE_NATIVE_PUSH !== 'false';
 
   useEffect(() => {
     let mounted = true;
     const pendingTokenKey = 'jm_pending_fcm_token';
+    const lastKnownTokenKey = 'jm_last_fcm_token';
 
     const setupPushNotifications = async () => {
       try {
@@ -31,8 +32,9 @@ export default function PushNotificationManager() {
 
         const registerTokenForCustomer = async (tokenValue: string) => {
           if (!mounted) return;
+          const activeCustomerId = customerId ?? customer?.id;
 
-          if (!customer) {
+          if (!activeCustomerId) {
             localStorage.setItem(pendingTokenKey, tokenValue);
             console.log('Push token pending: waiting for signed-in customer');
             return;
@@ -43,7 +45,7 @@ export default function PushNotificationManager() {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                customerId: customer.id,
+                customerId: activeCustomerId,
                 fcmToken: tokenValue,
                 platform: 'android',
               }),
@@ -56,6 +58,7 @@ export default function PushNotificationManager() {
             }
 
             localStorage.removeItem(pendingTokenKey);
+            localStorage.setItem(lastKnownTokenKey, tokenValue);
             console.log('FCM token saved to backend');
           } catch (error) {
             localStorage.setItem(pendingTokenKey, tokenValue);
@@ -67,6 +70,7 @@ export default function PushNotificationManager() {
         // the registration event before listeners are attached.
         await PushNotifications.addListener('registration', async (token) => {
           console.log('Push registration success, token:', token.value);
+          localStorage.setItem(lastKnownTokenKey, token.value);
           await registerTokenForCustomer(token.value);
         });
 
@@ -98,8 +102,14 @@ export default function PushNotificationManager() {
         );
 
         const pendingToken = localStorage.getItem(pendingTokenKey);
-        if (pendingToken && customer) {
+        if (pendingToken && (customerId || customer?.id)) {
           await registerTokenForCustomer(pendingToken);
+        }
+
+        // Rebind the current signed-in customer to the latest known token on re-login.
+        const lastKnownToken = localStorage.getItem(lastKnownTokenKey);
+        if (lastKnownToken && (customerId || customer?.id)) {
+          await registerTokenForCustomer(lastKnownToken);
         }
 
         const permResult = await PushNotifications.requestPermissions();
@@ -126,7 +136,7 @@ export default function PushNotificationManager() {
         }
       });
     };
-  }, [customer, enableNativePush]);
+  }, [customer, customerId, enableNativePush]);
 
   return null;
 }
