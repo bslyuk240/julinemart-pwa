@@ -37,7 +37,7 @@
     "react-paystack": "^6.0.0",
     "sharp": "^0.33.5",
     "sonner": "^1.7.4",
-    "swiper": "^11.1.15",
+    "swiper": "^12.1.2",
     "tailwind-merge": "^2.5.4",
     "zod": "^3.23.8",
     "zustand": "^4.5.5"
