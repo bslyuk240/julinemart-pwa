@@ -1,6 +1,7 @@
 'use client';
 
 import { MessageCircle } from 'lucide-react';
+import { trackWhatsappClick } from '@/lib/gtag';
 
 // ==================== WHATSAPP CONFIGURATION ====================
 const WHATSAPP_NUMBER = '2347075825761'; // Your WhatsApp business number
@@ -11,6 +12,10 @@ export default function WhatsAppFloat() {
   const handleWhatsAppClick = () => {
     const encodedMessage = encodeURIComponent(WHATSAPP_MESSAGE);
     const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
+    trackWhatsappClick({
+      linkUrl: whatsappUrl,
+      placement: 'floating_button',
+    });
     window.open(whatsappUrl, '_blank');
   };
 

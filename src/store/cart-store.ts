@@ -5,6 +5,7 @@ import { Product } from '@/types/product';
 import type { CartItem as TypedCartItem } from '@/types/cart';
 import { calculateTax, areTaxesEnabled } from '@/lib/woocommerce/tax-calculator';
 import { getAllShippingMethods } from '@/lib/woocommerce/shipping';
+import { trackAddToCart } from '@/lib/gtag';
 
 export interface CartItem extends TypedCartItem {
   weight?: number;
@@ -60,6 +61,35 @@ const ERROR_MESSAGES = {
   INVALID_COUPON: 'Invalid or expired coupon code',
 };
 
+const buildAddToCartAnalyticsItem = (
+  product: Product,
+  quantity: number,
+  unitPrice: number,
+  variation?: {
+    id: number;
+    attributes: Record<string, string>;
+    price: number;
+    regularPrice: number;
+    salePrice?: number;
+    image?: string;
+    sku?: string;
+    stockQuantity: number | null;
+    stockStatus: 'instock' | 'outofstock' | 'onbackorder';
+  }
+) => ({
+  item_id: String(variation?.id ?? product.id),
+  item_name: product.name,
+  item_brand: product.brands?.[0]?.name || product.store?.shop_name || product.store?.name,
+  item_category: product.categories?.[0]?.name,
+  item_variant: variation
+    ? Object.entries(variation.attributes)
+        .map(([key, value]) => `${key}:${value}`)
+        .join(', ')
+    : undefined,
+  price: unitPrice,
+  quantity,
+});
+
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
@@ -97,7 +127,35 @@ export const useCartStore = create<CartState>()(
         );
 
         if (existingItem) {
-          get().updateQuantity(existingItem.id, existingItem.quantity + quantity);
+          const nextQuantity = existingItem.quantity + quantity;
+
+          if (nextQuantity > MAX_CART_QUANTITY) {
+            toast.error(`Maximum quantity is ${MAX_CART_QUANTITY}`);
+            return;
+          }
+
+          if (
+            existingItem.stockQuantity !== null &&
+            existingItem.stockQuantity !== undefined &&
+            nextQuantity > existingItem.stockQuantity
+          ) {
+            toast.error(ERROR_MESSAGES.OUT_OF_STOCK);
+            return;
+          }
+
+          get().updateQuantity(existingItem.id, nextQuantity);
+          trackAddToCart({
+            currency: 'NGN',
+            value: existingItem.price * quantity,
+            items: [
+              buildAddToCartAnalyticsItem(
+                product,
+                quantity,
+                existingItem.price,
+                variation ?? existingItem.variation
+              ),
+            ],
+          });
           return;
         }
 
@@ -215,6 +273,11 @@ const numericWeight =
 
         get().calculateTotals();
         toast.success(SUCCESS_MESSAGES.ADDED_TO_CART);
+        trackAddToCart({
+          currency: 'NGN',
+          value: displayPrice * quantity,
+          items: [buildAddToCartAnalyticsItem(product, quantity, displayPrice, variation)],
+        });
       },
 
       removeItem: (itemId: number) => {
