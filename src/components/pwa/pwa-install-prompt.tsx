@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Download, Share } from 'lucide-react';
 import Image from 'next/image';
+import { trackPwaInstallAccepted, trackPwaInstallPromptShown } from '@/lib/gtag';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -14,6 +15,7 @@ export default function PWAInstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const hasTrackedPromptShownRef = useRef(false);
 
   useEffect(() => {
     // Check if already installed (standalone mode)
@@ -55,6 +57,20 @@ export default function PWAInstallPrompt() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!showPrompt) {
+      hasTrackedPromptShownRef.current = false;
+      return;
+    }
+
+    if (isStandalone || hasTrackedPromptShownRef.current) return;
+
+    trackPwaInstallPromptShown({
+      platform: isIOS ? 'ios' : 'android_desktop',
+    });
+    hasTrackedPromptShownRef.current = true;
+  }, [showPrompt, isStandalone, isIOS]);
+
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
 
@@ -65,6 +81,7 @@ export default function PWAInstallPrompt() {
     const { outcome } = await deferredPrompt.userChoice;
     
     if (outcome === 'accepted') {
+      trackPwaInstallAccepted({ platform: 'android_desktop' });
       console.log('✅ User accepted PWA install');
     } else {
       console.log('❌ User dismissed PWA install');

@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -11,7 +12,6 @@ import Link from 'next/link';
 import { 
   getAllShippingMethods, 
   getEnabledPaymentGateways,
-  ShippingMethod,
   PaymentGateway 
 } from '@/lib/woocommerce/shipping';
 // Orders are created via server API to avoid client-side CORS
@@ -20,6 +20,7 @@ import PageLoading from '@/components/ui/page-loading';
 import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
 import { getShippingFee } from '@/lib/shipping/jloShipping';
 import { updateCustomer } from '@/lib/woocommerce/customers';
+import { trackBeginCheckout, trackPurchase } from '@/lib/gtag';
 
 interface ShippingOption {
   id: string;
@@ -62,9 +63,9 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
   const currentOrderRef = useRef<any>(null);
+  const hasTrackedBeginCheckoutRef = useRef(false);
   
   // Saved card state
-  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [defaultSavedCard, setDefaultSavedCard] = useState<SavedCard | null>(null);
   const [useSavedCard, setUseSavedCard] = useState(false);
   const [saveCard, setSaveCard] = useState(true);
@@ -162,6 +163,36 @@ export default function CheckoutPage() {
   const discountedSubtotal = Math.max(0, subtotal - voucherDiscount); // Vouchers discount products
   const total = discountedSubtotal + discountedShipping + taxAmount;
 
+  const toAnalyticsItems = useCallback(
+    () =>
+      items.map((item: any) => ({
+        item_id: String(item.variation?.id ?? item.productId ?? item.id),
+        item_name: item.name,
+        price: Number(item.price) || 0,
+        quantity: Number(item.quantity) || 1,
+        item_brand: item.vendorName || undefined,
+        item_variant: item.variation?.attributes
+          ? Object.entries(item.variation.attributes)
+              .map(([key, value]) => `${key}:${String(value)}`)
+              .join(', ')
+          : undefined,
+      })),
+    [items]
+  );
+
+  const trackPurchaseForOrder = useCallback(
+    (orderId: number | string) => {
+      trackPurchase({
+        transactionId: String(orderId),
+        currency: 'NGN',
+        value: total,
+        shipping: discountedShipping,
+        items: toAnalyticsItems(),
+      });
+    },
+    [discountedShipping, toAnalyticsItems, total]
+  );
+
   // Load Paystack script
   useEffect(() => {
     if (typeof window !== 'undefined' && !window.PaystackPop) {
@@ -171,6 +202,17 @@ export default function CheckoutPage() {
       document.body.appendChild(script);
     }
   }, []);
+
+  useEffect(() => {
+    if (!items.length || hasTrackedBeginCheckoutRef.current) return;
+
+    trackBeginCheckout({
+      currency: 'NGN',
+      value: discountedSubtotal,
+      items: toAnalyticsItems(),
+    });
+    hasTrackedBeginCheckoutRef.current = true;
+  }, [discountedSubtotal, items.length, toAnalyticsItems]);
 
   // Initialize Paystack payment with inline callbacks
   const initializePaystackPayment = (config: any) => {
@@ -260,7 +302,7 @@ export default function CheckoutPage() {
         toast.success('Payment card saved for future use!');
         await refreshCustomer();
       }
-      
+      trackPurchaseForOrder(orderId);
       clearCart();
       currentOrderRef.current = null;
       
@@ -331,6 +373,7 @@ export default function CheckoutPage() {
 
         if (verifyResponse.ok) {
           setIsProcessing(false);
+          trackPurchaseForOrder(orderId);
           clearCart();
           toast.success('Payment successful!');
           router.push(`/order-success?order=${orderId}`);
@@ -401,7 +444,7 @@ export default function CheckoutPage() {
     } else {
       setLoading(false);
     }
-  }, [items]);
+  }, [items, formData.country]);
 
   useEffect(() => {
     if (customer) {
@@ -412,7 +455,6 @@ export default function CheckoutPage() {
             ? JSON.parse(savedCardsMeta.value)
             : savedCardsMeta.value;
           if (Array.isArray(parsed)) {
-            setSavedCards(parsed);
             const def = parsed.find((c) => c.is_default) || parsed[0] || null;
             setDefaultSavedCard(def || null);
           }
@@ -432,7 +474,7 @@ export default function CheckoutPage() {
     } else {
       setUseDifferentAddress(true);
     }
-  }, [customer]);
+  }, [customer, applyBillingAddress, applyShippingAddress]);
 
   useEffect(() => {
     if (!useDifferentAddress && customer?.shipping) {
@@ -1026,6 +1068,7 @@ export default function CheckoutPage() {
             }, 500);
           }
         } else {
+          trackPurchaseForOrder(order.id);
           clearCart();
           toast.success('Order placed successfully!');
           router.push(`/order-success?order=${order.id}`);

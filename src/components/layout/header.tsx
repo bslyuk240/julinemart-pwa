@@ -9,6 +9,7 @@ import { useCart } from '@/hooks/use-cart';
 import { searchProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
 import { useRouter } from 'next/navigation';
+import { trackWhatsappClick } from '@/lib/gtag';
 
 // WhatsApp configuration
 const WHATSAPP_NUMBER = '2347075825761';
@@ -115,6 +116,10 @@ export default function Header() {
   const handleWhatsAppClick = () => {
     const encodedMessage = encodeURIComponent(WHATSAPP_MESSAGE);
     const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
+    trackWhatsappClick({
+      linkUrl: whatsappUrl,
+      placement: 'header_button',
+    });
     window.open(whatsappUrl, '_blank');
   };
 
