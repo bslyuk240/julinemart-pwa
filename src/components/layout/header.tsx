@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 import { trackWhatsappClick } from '@/lib/gtag';
 
 // WhatsApp configuration
-const WHATSAPP_NUMBER = '2347075825761';
+const WHATSAPP_NUMBER = '2347048929309';
 const WHATSAPP_MESSAGE = 'Hello! I need help with shopping on JulineMart.';
 
 // Banner data interface
@@ -244,3 +244,4 @@ export default function Header() {
     </header>
   );
 }
+
