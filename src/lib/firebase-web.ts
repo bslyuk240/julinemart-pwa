@@ -11,43 +11,70 @@ type FirebaseWebConfig = {
   appId: string;
 };
 
+export type FirebaseWebRuntimeConfig = FirebaseWebConfig & {
+  vapidKey: string;
+};
+
 let firebaseApp: FirebaseApp | null = null;
+let configPromise: Promise<FirebaseWebRuntimeConfig | null> | null = null;
 let messagingPromise: Promise<Messaging | null> | null = null;
 let warnedMissingConfig = false;
 
-function getFirebaseWebConfig(): FirebaseWebConfig | null {
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const messagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID;
-  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
+export async function getFirebaseWebRuntimeConfig(): Promise<FirebaseWebRuntimeConfig | null> {
+  if (typeof window === 'undefined') return null;
 
-  if (!apiKey || !authDomain || !projectId || !messagingSenderId || !appId) {
-    if (!warnedMissingConfig) {
-      warnedMissingConfig = true;
-      console.warn(
-        'Web push disabled: missing NEXT_PUBLIC_FIREBASE_* web SDK environment variables.'
-      );
-    }
-    return null;
+  if (!configPromise) {
+    configPromise = (async () => {
+      try {
+        const response = await fetch('/api/notifications/firebase-config', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload?.success || !payload?.config || !payload?.vapidKey) {
+          if (!warnedMissingConfig) {
+            warnedMissingConfig = true;
+            console.warn(
+              payload?.message ||
+                'Web push disabled: Firebase runtime config endpoint is unavailable.'
+            );
+          }
+          return null;
+        }
+
+        return {
+          ...(payload.config as FirebaseWebConfig),
+          vapidKey: String(payload.vapidKey),
+        } satisfies FirebaseWebRuntimeConfig;
+      } catch {
+        if (!warnedMissingConfig) {
+          warnedMissingConfig = true;
+          console.warn('Web push disabled: failed to load Firebase runtime config.');
+        }
+        return null;
+      }
+    })();
   }
 
-  return {
-    apiKey,
-    authDomain,
-    projectId,
-    messagingSenderId,
-    appId,
-  };
+  return configPromise;
 }
 
-export function getFirebaseWebApp(): FirebaseApp | null {
+export async function getFirebaseWebApp(): Promise<FirebaseApp | null> {
   if (typeof window === 'undefined') return null;
 
   if (firebaseApp) return firebaseApp;
 
-  const config = getFirebaseWebConfig();
-  if (!config) return null;
+  const runtimeConfig = await getFirebaseWebRuntimeConfig();
+  if (!runtimeConfig) return null;
+
+  const config: FirebaseWebConfig = {
+    apiKey: runtimeConfig.apiKey,
+    authDomain: runtimeConfig.authDomain,
+    projectId: runtimeConfig.projectId,
+    messagingSenderId: runtimeConfig.messagingSenderId,
+    appId: runtimeConfig.appId,
+  };
 
   firebaseApp = getApps().length ? getApp() : initializeApp(config);
   return firebaseApp;
@@ -58,7 +85,7 @@ export async function getFirebaseWebMessaging(): Promise<Messaging | null> {
 
   if (!messagingPromise) {
     messagingPromise = (async () => {
-      const app = getFirebaseWebApp();
+      const app = await getFirebaseWebApp();
       if (!app) return null;
 
       const supported = await isSupported().catch(() => false);

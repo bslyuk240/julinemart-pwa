@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import { getToken, onMessage } from 'firebase/messaging';
 import { toast } from 'sonner';
 import { useCustomerAuth } from '@/context/customer-auth-context';
-import { getFirebaseWebMessaging } from '@/lib/firebase-web';
+import {
+  getFirebaseWebMessaging,
+  getFirebaseWebRuntimeConfig,
+} from '@/lib/firebase-web';
 import {
   WEB_PUSH_ENABLE_EVENT,
   type WebPushEnableResult,
@@ -157,6 +160,14 @@ export default function WebPushManager() {
             } satisfies WebPushEnableResult;
           }
 
+          const runtimeConfig = await getFirebaseWebRuntimeConfig();
+          if (!runtimeConfig) {
+            return {
+              success: false,
+              message: 'Firebase web push config is unavailable.',
+            } satisfies WebPushEnableResult;
+          }
+
           const swRegistration = await navigator.serviceWorker.register(
             '/firebase-messaging-sw.js'
           );
@@ -181,11 +192,11 @@ export default function WebPushManager() {
             } satisfies WebPushEnableResult;
           }
 
-          const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+          const vapidKey = runtimeConfig.vapidKey;
           if (!vapidKey) {
             return {
               success: false,
-              message: 'Missing NEXT_PUBLIC_FIREBASE_VAPID_KEY.',
+              message: 'Missing Firebase web push VAPID key.',
             } satisfies WebPushEnableResult;
           }
 
