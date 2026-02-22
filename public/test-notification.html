@@ -185,8 +185,16 @@
                         message,
                         type,
                         data: {
+                            targetPath:
+                                type === 'order_update'
+                                    ? '/orders/12345'
+                                    : type === 'product'
+                                        ? '/products'
+                                        : type === 'promotion'
+                                            ? '/products'
+                                            : '/',
                             orderId: type === 'order_update' ? '12345' : undefined,
-                            productId: type === 'product' ? '67890' : undefined,
+                            productSlug: type === 'product' ? 'sample-product' : undefined,
                         }
                     })
                 });
