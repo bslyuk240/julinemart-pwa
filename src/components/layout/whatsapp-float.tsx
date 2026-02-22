@@ -4,7 +4,7 @@ import { MessageCircle } from 'lucide-react';
 import { trackWhatsappClick } from '@/lib/gtag';
 
 // ==================== WHATSAPP CONFIGURATION ====================
-const WHATSAPP_NUMBER = '2347075825761'; // Your WhatsApp business number
+const WHATSAPP_NUMBER = '2347048929309'; // Your WhatsApp business number
 const WHATSAPP_MESSAGE = 'Hello! I need help with shopping on JulineMart.';
 // ================================================================
 
@@ -49,3 +49,4 @@ export default function WhatsAppFloat() {
     </>
   );
 }
+
