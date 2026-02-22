@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { wcApi, handleApiError } from '@/lib/woocommerce/client';
 
 // Sync Paystack reference into WooCommerce order meta so Woo admin refunds work.
-// Configure live/test keys in env: WC_BASE_URL, WC_CONSUMER_KEY, WC_CONSUMER_SECRET.
+// Configure live/test keys in env: WC_BASE_URL, WC_KEY, WC_SECRET.
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
@@ -29,8 +29,8 @@ export async function POST(request: Request) {
       reference,
     });
 
-    const consumerKey = process.env.WC_CONSUMER_KEY || process.env.WC_KEY;
-    const consumerSecret = process.env.WC_CONSUMER_SECRET || process.env.WC_SECRET;
+    const consumerKey = process.env.WC_KEY;
+    const consumerSecret = process.env.WC_SECRET;
     const baseUrl = process.env.WC_BASE_URL;
 
     if (!baseUrl || !consumerKey || !consumerSecret) {

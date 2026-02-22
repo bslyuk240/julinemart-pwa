@@ -7,6 +7,12 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseServerClient();
     const body = await request.json();
     const { customerId, fcmToken, platform } = body;
+    const normalizedPlatform =
+      platform === undefined || platform === null || platform === ''
+        ? 'android'
+        : platform === 'android' || platform === 'web'
+          ? platform
+          : null;
 
     if (!customerId || !fcmToken) {
       return NextResponse.json(
@@ -15,9 +21,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!normalizedPlatform) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Invalid platform. Supported values: android, web',
+        },
+        { status: 400 }
+      );
+    }
+
     console.log(`Registering device token for customer ${customerId}`);
     console.log(`Token prefix: ${String(fcmToken).substring(0, 20)}...`);
-    console.log(`Platform: ${platform || 'android'}`);
+    console.log(`Platform: ${normalizedPlatform}`);
 
     // If the same physical device token was previously tied to another customer,
     // remove that stale association so re-login can rebind cleanly.
@@ -37,7 +53,7 @@ export async function POST(request: NextRequest) {
         {
           customer_id: customerId,
           fcm_token: fcmToken,
-          platform: platform || 'android',
+          platform: normalizedPlatform,
           updated_at: new Date().toISOString(),
           last_used_at: new Date().toISOString(),
         },
@@ -56,7 +72,7 @@ export async function POST(request: NextRequest) {
           .from('device_tokens')
           .update({
             customer_id: customerId,
-            platform: platform || 'android',
+            platform: normalizedPlatform,
             updated_at: new Date().toISOString(),
             last_used_at: new Date().toISOString(),
           })

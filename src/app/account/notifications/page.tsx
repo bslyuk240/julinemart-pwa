@@ -16,6 +16,10 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import PageLoading from '@/components/ui/page-loading';
+import {
+  WEB_PUSH_ENABLE_EVENT,
+  type WebPushEnableResult,
+} from '@/lib/web-push-events';
 
 type RegisterTokensResponse = {
   success?: boolean;
@@ -270,6 +274,56 @@ export default function AccountNotificationsPage() {
     }
   };
 
+  const handleEnableBrowserNotifications = async () => {
+    if (!customerId) return;
+
+    setRegisteringDevice(true);
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        toast.error('Browser notification setup is available only on web.');
+        return;
+      }
+
+      const result = await Promise.race([
+        new Promise<WebPushEnableResult>((resolve) => {
+          window.dispatchEvent(
+            new CustomEvent(WEB_PUSH_ENABLE_EVENT, {
+              detail: { resolve },
+            })
+          );
+        }),
+        new Promise<WebPushEnableResult>((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                success: false,
+                message: 'Web push setup timed out. Please try again.',
+              }),
+            20_000
+          )
+        ),
+      ]);
+
+      if (!result.success) {
+        throw new Error(
+          result.message || 'Failed to enable browser notifications on this device'
+        );
+      }
+
+      toast.success('Browser notifications enabled on this device.');
+      await loadRegistrationStatus();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to enable browser notifications';
+      toast.error(message);
+    } finally {
+      setRegisteringDevice(false);
+    }
+  };
+
   const handleDisableThisDevice = async () => {
     if (!customerId || !currentDeviceToken) {
       toast.error('No local device token found.');
@@ -415,29 +469,39 @@ export default function AccountNotificationsPage() {
                 {currentDeviceToken ? maskToken(currentDeviceToken) : 'Not detected on this device'}
               </p>
               <p className="text-xs text-gray-500 mt-2">
-                Push notifications currently work on the native Android app. Web browser support
-                is not enabled in this build.
+                Push notifications are supported on both Android app and compatible browsers.
               </p>
             </div>
 
             {!isNativePlatform && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <p className="text-sm text-amber-900">
-                  You are viewing this page on web. To register push notifications, open the
-                  JulineMart Android app and sign in there.
+                  You are on web. Tap &quot;Enable Browser Notifications&quot; to request
+                  permission and register this browser.
                 </p>
               </div>
             )}
 
             <div className="flex flex-wrap gap-3">
-              <Button
-                variant="primary"
-                onClick={handleRegisterThisDevice}
-                isLoading={registeringDevice}
-              >
-                <Smartphone className="w-4 h-4 mr-2" />
-                Register This Device
-              </Button>
+              {isNativePlatform ? (
+                <Button
+                  variant="primary"
+                  onClick={handleRegisterThisDevice}
+                  isLoading={registeringDevice}
+                >
+                  <Smartphone className="w-4 h-4 mr-2" />
+                  Register This Device
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  onClick={handleEnableBrowserNotifications}
+                  isLoading={registeringDevice}
+                >
+                  <Bell className="w-4 h-4 mr-2" />
+                  Enable Browser Notifications
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={handleDisableThisDevice}
