@@ -28,9 +28,8 @@ const getWpBaseUrl = () => {
 };
 
 const getWcCredentials = () => {
-  const consumer_key = process.env.WC_CONSUMER_KEY || process.env.WC_KEY || "";
-  const consumer_secret =
-    process.env.WC_CONSUMER_SECRET || process.env.WC_SECRET || "";
+  const consumer_key = process.env.WC_KEY || "";
+  const consumer_secret = process.env.WC_SECRET || "";
   return { consumer_key, consumer_secret };
 };
 
@@ -49,7 +48,7 @@ async function callWpJson(
   const { consumer_key, consumer_secret } = getWcCredentials();
   if (!consumer_key || !consumer_secret) {
     throw new Error(
-      "Missing WooCommerce credentials. Set WC_CONSUMER_KEY/WC_CONSUMER_SECRET (or WC_KEY/WC_SECRET)."
+      "Missing WooCommerce credentials. Set WC_KEY and WC_SECRET."
     );
   }
 
