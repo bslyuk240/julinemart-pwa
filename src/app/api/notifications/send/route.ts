@@ -361,6 +361,35 @@ function normalizeDataPayload(data?: Record<string, unknown>) {
   return Object.keys(normalized).length ? normalized : undefined;
 }
 
+function resolveWebLinkPath(data?: Record<string, string>) {
+  if (!data) return '/';
+
+  const targetPath = data.targetPath;
+  if (targetPath) {
+    if (targetPath.startsWith('/')) return targetPath;
+    try {
+      const parsed = new URL(targetPath);
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } catch {
+      return '/';
+    }
+  }
+
+  if (data.type === 'order_update' && data.orderId) {
+    return `/orders/${data.orderId}`;
+  }
+
+  if (data.type === 'product' && data.productSlug) {
+    return `/product/${data.productSlug}`;
+  }
+
+  if (data.type === 'promotion') {
+    return '/products';
+  }
+
+  return '/';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as SendPayload;
@@ -613,6 +642,8 @@ export async function POST(request: NextRequest) {
       type: type || 'general',
       ...(data || {}),
     });
+    const webLinkPath = resolveWebLinkPath(normalizedData);
+    const webLinkUrl = new URL(webLinkPath, request.nextUrl.origin).toString();
 
     const results: TokenSendResult[] = await Promise.all(
       dedupedTokens.map(async (token) => {
@@ -631,6 +662,21 @@ export async function POST(request: NextRequest) {
                   notification: {
                     sound: 'default',
                     color: '#77088a',
+                  },
+                },
+                webpush: {
+                  headers: {
+                    Urgency: 'high',
+                    TTL: '2419200',
+                  },
+                  notification: {
+                    title,
+                    body: message,
+                    icon: '/icon-192.png',
+                    badge: '/favicon-96x96.png',
+                  },
+                  fcm_options: {
+                    link: webLinkUrl,
                   },
                 },
               },
