@@ -108,6 +108,17 @@ async function initFirebaseMessaging() {
 
     const messaging = firebase.messaging();
     messaging.onBackgroundMessage((messagePayload) => {
+      // Avoid duplicate notifications when FCM/browser already displays
+      // a notification payload automatically.
+      const hasManagedNotification = Boolean(
+        messagePayload &&
+          messagePayload.notification &&
+          (messagePayload.notification.title || messagePayload.notification.body)
+      );
+      if (hasManagedNotification) {
+        return;
+      }
+
       const { title, options } = buildNotification(messagePayload);
       self.registration.showNotification(title, options);
     });
