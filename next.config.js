@@ -22,7 +22,7 @@ const nextConfig = {
   },
   
   experimental: {
-    optimizePackageImports: ['lucide-react', 'swiper'],
+    optimizePackageImports: ['lucide-react'],
   },
 };
 
