@@ -5,13 +5,13 @@ const JLO_BASE = getJloBaseUrl();
 
 export async function GET(
   _request: Request,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   if (!JLO_BASE) {
     return NextResponse.json({ success: false, message: 'JLO API base URL not configured' }, { status: 500 });
   }
 
-  const orderId = params.orderId;
+  const { orderId } = await params;
   if (!orderId) {
     return NextResponse.json({ success: false, message: 'orderId is required' }, { status: 400 });
   }
