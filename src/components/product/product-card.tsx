@@ -77,6 +77,12 @@ export default function ProductCard({
   // Check if vendor is official
   // Method 1: Check for official-store tag
   const hasOfficialTag = product.tags?.some(tag => tag.slug === 'official-store');
+  const hasShipsFromAbroadTag = product.tags?.some((tag) => {
+    const normalizedSlug = tag.slug?.trim().toLowerCase();
+    const normalizedName = tag.name?.trim().toLowerCase();
+
+    return normalizedSlug === 'ships-from-abroad' || normalizedName === 'ships from abroad';
+  });
   
   // Method 2: Check vendor type (if you add it to your backend)
   // const hasVendorType = product.store?.vendor_type === 'official';
@@ -177,11 +183,20 @@ export default function ProductCard({
 
       {/* Product Info */}
       <div className="p-2 md:p-4 space-y-1 md:space-y-2">
-        {/* Vendor Name (if available) */}
-        {product.store?.shop_name && (
-          <p className="text-[10px] md:text-xs text-gray-500 truncate">
-            {product.store.shop_name}
-          </p>
+        {(hasShipsFromAbroadTag || product.store?.shop_name) && (
+          <div className="space-y-1">
+            {hasShipsFromAbroadTag && (
+              <span className="inline-flex w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em] text-amber-800">
+                Ships from Abroad
+              </span>
+            )}
+
+            {product.store?.shop_name && (
+              <p className="text-[10px] md:text-xs text-gray-500 truncate">
+                {product.store.shop_name}
+              </p>
+            )}
+          </div>
         )}
 
         {/* Title */}
