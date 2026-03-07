@@ -194,7 +194,7 @@ export default function ProductCard({
             {hasShipsFromAbroadTag && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[9px] font-semibold tracking-[0.04em] text-sky-700">
                 <Plane className="h-2.5 w-2.5" />
-                Ships Abroad
+                Ships from Abroad
               </span>
             )}
           </div>
