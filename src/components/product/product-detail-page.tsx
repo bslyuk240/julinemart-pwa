@@ -397,6 +397,16 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
   const inWishlist = isInWishlist(product.id);
   const reviewsAllowed = product.reviews_allowed;
   const decodedProductName = decodeHtmlEntities(product.name);
+  const hasOfficialTag = product.tags?.some((tag) => tag.slug === 'official-store');
+  const hasShipsFromAbroadTag = product.tags?.some((tag) => {
+    const normalizedSlug = tag.slug?.trim().toLowerCase();
+    const normalizedName = tag.name?.trim().toLowerCase();
+
+    return normalizedSlug === 'ships-from-abroad' || normalizedName === 'ships from abroad';
+  });
+  const productBadges = product.tags?.filter((tag) =>
+    ['flash-sale', 'deal', 'featured', 'new-arrival', 'black-friday'].includes(tag.slug)
+  ) || [];
   const primaryCategoryName = product.categories?.[0]?.name
     ? decodeHtmlEntities(product.categories[0].name)
     : '';
@@ -423,20 +433,24 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
         </nav>
 
         {/* ==================== PRODUCT BADGES (LIKE JUMIA) ==================== */}
-        {product.tags && product.tags.length > 0 && (
+        {(hasOfficialTag || hasShipsFromAbroadTag || productBadges.length > 0) && (
           <div className="mb-4 flex flex-wrap gap-2">
             {/* Official Store Badge */}
-            {product.tags.some(tag => tag.slug === 'official-store') && (
+            {hasOfficialTag && (
               <div className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-xs md:text-sm font-semibold px-3 py-1.5 rounded-md shadow-sm">
                 <BadgeCheck className="w-4 h-4" />
                 Official Store
               </div>
             )}
+
+            {hasShipsFromAbroadTag && (
+              <div className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-800 md:text-xs">
+                Ships from Abroad
+              </div>
+            )}
             
             {/* Product Tag Badges */}
-            {product.tags
-              .filter(tag => ['flash-sale', 'deal', 'featured', 'new-arrival', 'black-friday'].includes(tag.slug))
-              .map((tag) => {
+            {productBadges.map((tag) => {
                 const config = getBadgeConfig(tag.slug);
                 return (
                   <div
