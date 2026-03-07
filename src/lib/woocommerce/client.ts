@@ -1,21 +1,41 @@
 import WooCommerceRestApi from "@woocommerce/woocommerce-rest-api";
 
 const isClient = typeof window !== "undefined";
+let serverApi: WooCommerceRestApi | null = null;
 
 // Utility: scrub credentials from URLs/headers before logging
 const scrubAuth = (value?: string) =>
   value?.replace(/\/\/([^:]+):([^@]+)@/g, "//***:***@");
 
-// SERVER-ONLY WC client (wc/v3)
-const serverApi = !isClient
-  ? new WooCommerceRestApi({
-      url: process.env.WC_BASE_URL?.replace("/wp-json/wc/v3", "") || "",
-      consumerKey: process.env.WC_KEY || "",
-      consumerSecret: process.env.WC_SECRET || "",
-      version: "wc/v3",
-      queryStringAuth: true,
-    })
-  : null;
+function getServerApi() {
+  if (isClient) return null;
+  if (serverApi) return serverApi;
+
+  const wcBaseUrl = process.env.WC_BASE_URL;
+  const consumerKey = process.env.WC_KEY;
+  const consumerSecret = process.env.WC_SECRET;
+  const missing = [
+    !wcBaseUrl ? "WC_BASE_URL" : null,
+    !consumerKey ? "WC_KEY" : null,
+    !consumerSecret ? "WC_SECRET" : null,
+  ].filter(Boolean);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing WooCommerce configuration: ${missing.join(", ")}`
+    );
+  }
+
+  serverApi = new WooCommerceRestApi({
+    url: wcBaseUrl!.replace("/wp-json/wc/v3", ""),
+    consumerKey: consumerKey!,
+    consumerSecret: consumerSecret!,
+    version: "wc/v3",
+    queryStringAuth: true,
+  });
+
+  return serverApi;
+}
 
 async function callProxy(
   method: "get" | "post" | "put" | "delete",
@@ -45,8 +65,9 @@ async function callProxy(
 // Client-safe wrapper for WooCommerce endpoints (wc/v3)
 export const wcApi = {
   get: async (endpoint: string, params?: any) => {
-    if (serverApi) {
-      const res = await serverApi.get(endpoint, params);
+    const api = getServerApi();
+    if (api) {
+      const res = await api.get(endpoint, params);
       // Normalize: server returns axios-style { data, headers }; add total/totalPages for parity
       const total = res.headers?.["x-wp-total"] ?? res.headers?.["X-WP-Total"];
       const totalPages = res.headers?.["x-wp-totalpages"] ?? res.headers?.["X-WP-TotalPages"];
@@ -59,17 +80,20 @@ export const wcApi = {
     return callProxy("get", endpoint, { params });
   },
   post: async (endpoint: string, data?: any) => {
-    if (serverApi) return serverApi.post(endpoint, data);
+    const api = getServerApi();
+    if (api) return api.post(endpoint, data);
     const proxyData = await callProxy("post", endpoint, { data });
     return { data: proxyData };
   },
   put: async (endpoint: string, data?: any) => {
-    if (serverApi) return serverApi.put(endpoint, data);
+    const api = getServerApi();
+    if (api) return api.put(endpoint, data);
     const proxyData = await callProxy("put", endpoint, { data });
     return { data: proxyData };
   },
   delete: async (endpoint: string, params?: any) => {
-    if (serverApi) return serverApi.delete(endpoint, params);
+    const api = getServerApi();
+    if (api) return api.delete(endpoint, params);
     const proxyData = await callProxy("delete", endpoint, { params });
     return { data: proxyData };
   },

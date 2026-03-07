@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, ShoppingCart, Star, BadgeCheck } from 'lucide-react';
+import { Heart, ShoppingCart, Star, BadgeCheck, Plane } from 'lucide-react';
 import { Product } from '@/types/product';
 import { useCart } from '@/hooks/use-cart';
 import { useWishlist } from '@/hooks/use-wishlist';
@@ -54,7 +54,7 @@ export default function ProductCard({
     try {
       addItem(product, 1);
       toast.success('Added to cart!');
-    } catch (error) {
+    } catch {
       toast.error('Failed to add to cart');
     } finally {
       setIsAddingToCart(false);
@@ -184,17 +184,18 @@ export default function ProductCard({
       {/* Product Info */}
       <div className="p-2 md:p-4 space-y-1 md:space-y-2">
         {(hasShipsFromAbroadTag || product.store?.shop_name) && (
-          <div className="space-y-1">
-            {hasShipsFromAbroadTag && (
-              <span className="inline-flex w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.08em] text-amber-800">
-                Ships from Abroad
-              </span>
-            )}
-
+          <div className="flex min-h-[18px] items-center gap-2 overflow-hidden md:min-h-[20px]">
             {product.store?.shop_name && (
-              <p className="text-[10px] md:text-xs text-gray-500 truncate">
+              <p className="min-w-0 flex-1 truncate text-[10px] md:text-xs text-gray-500">
                 {product.store.shop_name}
               </p>
+            )}
+
+            {hasShipsFromAbroadTag && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[9px] font-semibold tracking-[0.04em] text-sky-700">
+                <Plane className="h-2.5 w-2.5" />
+                Ships from Abroad
+              </span>
             )}
           </div>
         )}
