@@ -237,7 +237,7 @@ export default function CheckoutPage() {
         metadata: config.metadata,
         onClose: function() {
           console.log('Payment window closed');
-          toast.warning('Payment cancelled');
+          toast.warning('Payment cancelled. Your order is still pending payment.');
           setIsProcessing(false);
           currentOrderRef.current = null;
         },
