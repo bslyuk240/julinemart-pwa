@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, User, Save, Mail, Phone, MapPin, Package, Calendar } from 'lucide-react';
+import { ArrowLeft, User, Save, Mail, Phone, MapPin, Package, Calendar, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { updateCustomer, getCustomer } from '@/lib/woocommerce/customers';
 import PageLoading from '@/components/ui/page-loading';
+import { ACCOUNT_DELETION_EMAIL } from '@/lib/constants';
 
 export default function AccountSettingsPage() {
   const router = useRouter();
@@ -372,6 +373,37 @@ export default function AccountSettingsPage() {
                       >
                         Go to Login Page →
                       </Link>
+                    </div>
+                  </div>
+
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+                    <Trash2 className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <h3 className="font-medium text-red-900 text-sm">Delete Your Account</h3>
+                      <p className="text-sm text-red-700 mt-1">
+                        To request account deletion, review the deletion policy and email{' '}
+                        <a
+                          href={`mailto:${ACCOUNT_DELETION_EMAIL}`}
+                          className="font-medium underline underline-offset-2"
+                        >
+                          {ACCOUNT_DELETION_EMAIL}
+                        </a>{' '}
+                        from your registered account email address.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-3">
+                        <Link
+                          href="/account-deletion"
+                          className="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
+                        >
+                          View Deletion Policy
+                        </Link>
+                        <a
+                          href={`mailto:${ACCOUNT_DELETION_EMAIL}`}
+                          className="inline-flex items-center rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
+                        >
+                          Email Request
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
