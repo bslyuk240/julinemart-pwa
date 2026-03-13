@@ -33,8 +33,11 @@ export default function GlobalPullToRefresh({ children }: GlobalPullToRefreshPro
     >
       {(pullDistance > 0 || isRefreshing) && (
         <div
-          className="fixed top-2 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-full bg-white shadow px-3 py-1 text-xs text-gray-700"
-          style={{ transform: `translate(-50%, ${Math.min(pullDistance, 40)}px)` }}
+          className="fixed top-0 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 rounded-full bg-white shadow px-3 py-1 text-xs text-gray-700"
+          style={{
+            top: 'calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 0.5rem)',
+            transform: `translate(-50%, ${Math.min(pullDistance, 40)}px)`,
+          }}
         >
           <span
             className={`h-2 w-2 rounded-full ${

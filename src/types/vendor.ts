@@ -14,6 +14,7 @@ export interface Vendor {
   social?: VendorSocial;
   phone?: string;
   banner?: string;
+  store_banner?: string;
   gravatar?: string;
   avatar?: string;
   store_logo?: string;
@@ -26,7 +27,7 @@ export interface Vendor {
   };
   enabled?: boolean;              // ✅ REQUIRED for Solution 2
   registered?: string;
-  payment?: any;
+  payment?: unknown;
   is_store_vacation?: boolean;    // ✅ REQUIRED for Solution 2
   vacation_message?: string;      // ✅ REQUIRED for Solution 2
   show_min_order_type?: string;
