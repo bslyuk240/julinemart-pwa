@@ -98,7 +98,7 @@
 
   /* Bottom navigation safe area (for iOS) */
   .bottom-nav-safe {
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   }
 
   /* Skeleton loader */
@@ -150,19 +150,19 @@
 
   /* Safe area padding */
   .safe-top {
-    padding-top: env(safe-area-inset-top);
+    padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   }
 
   .safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   }
 
   .safe-left {
-    padding-left: env(safe-area-inset-left);
+    padding-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
   }
 
   .safe-right {
-    padding-right: env(safe-area-inset-right);
+    padding-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   }
 
   /* Smooth scrolling for horizontal sections */
@@ -186,13 +186,13 @@
 /* Fix bottom nav sticky on mobile */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .bottom-nav-fixed {
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   }
 }
 
 /* Add padding to main content for bottom nav */
 main {
-  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(64px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
 }
 
 @media (min-width: 768px) {

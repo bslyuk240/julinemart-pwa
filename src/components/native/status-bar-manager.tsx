@@ -4,36 +4,23 @@ import { useEffect } from 'react';
 
 export function StatusBarManager() {
   useEffect(() => {
-    const setupStatusBar = async () => {
-      // Only run on mobile platforms
+    const setupSystemBars = async () => {
       if (typeof window === 'undefined') return;
-      
+
       try {
-        const { StatusBar, Style } = await import('@capacitor/status-bar');
-        const { Capacitor } = await import('@capacitor/core');
-        
-        // Check if running on a native platform
+        const { Capacitor, SystemBars, SystemBarsStyle } = await import('@capacitor/core');
+
         if (Capacitor.isNativePlatform()) {
-          // Disable overlay mode so status bar doesn't overlap content
-          await StatusBar.setOverlaysWebView({ overlay: false });
-          
-          // Set status bar to match your purple theme
-          await StatusBar.setBackgroundColor({ color: '#77088a' }); // Match banner purple
-          await StatusBar.setStyle({ style: Style.Light }); // White text/icons
-          
-          // Show the status bar (in case it was hidden)
-          await StatusBar.show();
-          
-          console.log('✅ Status bar configured (non-overlay mode)');
+          await SystemBars.setStyle({ style: SystemBarsStyle.Light });
+          await SystemBars.show();
         }
-      } catch (error) {
-        // Silently fail if status bar plugin is not available
-        console.log('Status bar plugin not available');
+      } catch {
+        console.log('System bars plugin not available');
       }
     };
 
-    setupStatusBar();
+    setupSystemBars();
   }, []);
 
-  return null; // This component doesn't render anything
+  return null;
 }

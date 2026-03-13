@@ -11,9 +11,10 @@ const config: CapacitorConfig = {
     androidScheme: 'https'
   },
   plugins: {
-    StatusBar: {
-      style: 'LIGHT', // White text/icons
-      backgroundColor: '#6b21a8', // Purple-700 to match your theme
+    SystemBars: {
+      insetsHandling: 'css',
+      style: 'LIGHT',
+      hidden: false,
     },
   },
 };

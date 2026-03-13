@@ -12,6 +12,9 @@ import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { getVendorById, getVendorProducts, getVendorProductCount } from '@/lib/woocommerce/vendors-custom';
 import type { Vendor } from '@/types/vendor';
 
+type VendorSortOption = 'date' | 'popularity' | 'price' | 'price-desc';
+type VendorInfo = NonNullable<Product['store']>;
+
 const humanizeSlug = (value?: string) => {
   if (!value) {
     return undefined;
@@ -21,14 +24,42 @@ const humanizeSlug = (value?: string) => {
     .replace(/\b\w/g, (l: string) => l.toUpperCase());
 };
 
+const getProductPrice = (product: Product) => {
+  const price = Number(product.price || product.sale_price || product.regular_price || 0);
+  return Number.isFinite(price) ? price : 0;
+};
+
+const sortVendorProducts = (items: Product[], sortBy: VendorSortOption) => {
+  const products = [...items];
+
+  products.sort((a, b) => {
+    if (sortBy === 'popularity') {
+      return (b.total_sales || 0) - (a.total_sales || 0);
+    }
+
+    if (sortBy === 'price') {
+      return getProductPrice(a) - getProductPrice(b);
+    }
+
+    if (sortBy === 'price-desc') {
+      return getProductPrice(b) - getProductPrice(a);
+    }
+
+    return new Date(b.date_created).getTime() - new Date(a.date_created).getTime();
+  });
+
+  return products;
+};
+
 export default function VendorStorePage() {
   const params = useParams();
   const vendorId = params.id as string;
   
   const [products, setProducts] = useState<Product[]>([]);
+  const [sortBy, setSortBy] = useState<VendorSortOption>('date');
   const [productCount, setProductCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [vendorInfo, setVendorInfo] = useState<any>(null);
+  const [vendorInfo, setVendorInfo] = useState<VendorInfo | null>(null);
   const [vendorDetails, setVendorDetails] = useState<Vendor | null>(null);
   const [policies, setPolicies] = useState<StorePolicies | null>(null);
   const [policyLoading, setPolicyLoading] = useState(true);
@@ -94,7 +125,7 @@ export default function VendorStorePage() {
           setProductCount(vendorProducts.length);
         }
 
-        setProducts(vendorProducts);
+        setProducts(sortVendorProducts(vendorProducts, sortBy));
 
         if (vendorProducts.length > 0 && vendorProducts[0].store) {
           setVendorInfo(vendorProducts[0].store);
@@ -113,7 +144,7 @@ export default function VendorStorePage() {
         if (!silent) setLoading(false);
       }
     },
-    [vendorId]
+    [sortBy, vendorId]
   );
 
   const fetchVendorDetails = useCallback(async () => {
@@ -165,6 +196,11 @@ export default function VendorStorePage() {
       setRefreshing(false);
     }
   }, [fetchVendorDetails, fetchVendorProducts, fetchPolicies]);
+
+  const handleSortChange = (newSortBy: VendorSortOption) => {
+    setSortBy(newSortBy);
+    setProducts((currentProducts) => sortVendorProducts(currentProducts, newSortBy));
+  };
 
   const { pullDistance, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -279,7 +315,7 @@ export default function VendorStorePage() {
     null;
   
   // ✅ Banner Image (cover/header image)
-  const vendorBanner = vendorDetails?.banner || (vendorDetails as any)?.store_banner || null;
+  const vendorBanner = vendorDetails?.banner || vendorDetails?.store_banner || null;
 
   const freeShippingThreshold = policies?.shippingPolicy?.freeShippingThreshold ?? 0;
   const shippingDescription = policies?.shippingPolicy?.description;
@@ -526,11 +562,15 @@ export default function VendorStorePage() {
               All Products ({productCount != null ? productCount : products.length})
             </h2>
             
-            <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm">
-              <option>Latest</option>
-              <option>Popular</option>
-              <option>Price: Low to High</option>
-              <option>Price: High to Low</option>
+            <select
+              value={sortBy}
+              onChange={(e) => handleSortChange(e.target.value as VendorSortOption)}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              <option value="date">Latest</option>
+              <option value="popularity">Popular</option>
+              <option value="price">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
             </select>
           </div>
 
@@ -543,7 +583,7 @@ export default function VendorStorePage() {
                 No Products Yet
               </h3>
               <p className="text-gray-600 mb-6">
-                This store hasn't added any products yet. Check back soon!
+                This store hasn&apos;t added any products yet. Check back soon!
               </p>
               <Link
                 href="/"

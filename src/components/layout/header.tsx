@@ -124,7 +124,7 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white shadow-sm">
+    <header className="safe-top sticky top-0 z-50 bg-white shadow-sm">
       {/* ==================== TOP BAR - NOW DYNAMIC (UPDATED!) ==================== */}
       {!bannerLoading && banner.enabled && (
         <div 

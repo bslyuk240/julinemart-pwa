@@ -6,10 +6,12 @@ import TrendingSection from '@/components/home/trending-section';
 import TopSellers from '@/components/home/top-sellers';
 import SponsoredProducts from '@/components/home/sponsored-products';
 import LaunchingDeals from '@/components/home/launching-deals';
-import { getProducts } from '@/lib/woocommerce/products';
+import ElectronicsCategories from '@/components/home/electronics-categories';
+import { getCategoryBySlug, getSubcategories } from '@/lib/woocommerce/categories';
+import { getProducts, getProductsByCategory } from '@/lib/woocommerce/products';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
+import type { Product } from '@/types/product';
 
-// Simple fisher-yates shuffle so each render surfaces different items
 function shuffle<T>(items: T[]) {
   const arr = [...items];
   for (let i = arr.length - 1; i > 0; i -= 1) {
@@ -19,20 +21,40 @@ function shuffle<T>(items: T[]) {
   return arr;
 }
 
-export const revalidate = 300; // Revalidate every 5 minutes
+export const revalidate = 300;
+
+async function getDescendantCategoryIds(rootCategoryId: number): Promise<number[]> {
+  const discovered = new Set<number>([rootCategoryId]);
+  const queue = [rootCategoryId];
+
+  while (queue.length > 0) {
+    const parentId = queue.shift();
+    if (!parentId) continue;
+
+    const children = await getSubcategories(parentId, 100);
+
+    for (const child of children) {
+      if (!discovered.has(child.id)) {
+        discovered.add(child.id);
+        queue.push(child.id);
+      }
+    }
+  }
+
+  return Array.from(discovered);
+}
 
 export default async function HomePage() {
-  // Fetch each section individually with error logging
-  let flashSaleProducts: any[] = [];
-  let dealProducts: any[] = [];
-  let trendingProducts: any[] = [];
-  let topSellerProducts: any[] = [];
-  let sponsoredProducts: any[] = [];
-  let launchingProducts: any[] = [];
+  let flashSaleProducts: Product[] = [];
+  let dealProducts: Product[] = [];
+  let trendingProducts: Product[] = [];
+  let topSellerProducts: Product[] = [];
+  let sponsoredProducts: Product[] = [];
+  let launchingProducts: Product[] = [];
+  let electronicsProducts: Product[] = [];
 
   try {
     const rawProducts = await getProducts({ tag: 'flash-sale', per_page: 12 });
-    // ✅ Filter out disabled vendor products
     const filtered = await filterActiveVendorProducts(rawProducts);
     flashSaleProducts = shuffle(filtered);
   } catch (error) {
@@ -41,7 +63,6 @@ export default async function HomePage() {
 
   try {
     const rawProducts = await getProducts({ tag: 'deal', per_page: 12 });
-    // ✅ Filter out disabled vendor products
     const filtered = await filterActiveVendorProducts(rawProducts);
     dealProducts = shuffle(filtered);
   } catch (error) {
@@ -50,7 +71,6 @@ export default async function HomePage() {
 
   try {
     const rawProducts = await getProducts({ tag: 'best-seller', per_page: 12 });
-    // ✅ Filter out disabled vendor products
     const filtered = await filterActiveVendorProducts(rawProducts);
     trendingProducts = shuffle(filtered);
   } catch (error) {
@@ -59,7 +79,6 @@ export default async function HomePage() {
 
   try {
     const rawProducts = await getProducts({ tag: 'top-seller', per_page: 12 });
-    // ✅ Filter out disabled vendor products
     const filtered = await filterActiveVendorProducts(rawProducts);
     topSellerProducts = shuffle(filtered);
   } catch (error) {
@@ -68,7 +87,6 @@ export default async function HomePage() {
 
   try {
     const rawProducts = await getProducts({ tag: 'sponsored', per_page: 12 });
-    // ✅ Filter out disabled vendor products
     const filtered = await filterActiveVendorProducts(rawProducts);
     sponsoredProducts = shuffle(filtered);
   } catch (error) {
@@ -77,81 +95,90 @@ export default async function HomePage() {
 
   try {
     const rawProducts = await getProducts({ tag: 'launching-deal', per_page: 12 });
-    // ✅ Filter out disabled vendor products
     const filtered = await filterActiveVendorProducts(rawProducts);
     launchingProducts = shuffle(filtered);
   } catch (error) {
     console.error('Launching deals fetch failed:', error);
   }
 
+  try {
+    const electronicsCategory = await getCategoryBySlug('electronics');
+    if (electronicsCategory) {
+      const categoryIds = await getDescendantCategoryIds(electronicsCategory.id);
+      const productGroups = await Promise.all(
+        categoryIds.map((categoryId) =>
+          getProductsByCategory(categoryId, {
+            per_page: 24,
+            orderby: 'date',
+            order: 'desc',
+          })
+        )
+      );
+
+      const mergedProducts = productGroups.flat();
+      const dedupedProducts = Array.from(
+        new Map(mergedProducts.map((product) => [product.id, product])).values()
+      );
+      const filteredProducts = await filterActiveVendorProducts(dedupedProducts);
+      electronicsProducts = filteredProducts.slice(0, 18);
+    }
+  } catch (error) {
+    console.error('Electronics products fetch failed:', error);
+  }
+
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Hero Slider */}
       <section className="container mx-auto px-4 py-3 md:py-6">
         <HeroSlider />
       </section>
 
-      {/* Category Strip */}
       <CategoryStrip />
 
-      {/* Flash Sales */}
-      {flashSaleProducts.length > 0 && (
-        <FlashSales products={flashSaleProducts} />
-      )}
+      {flashSaleProducts.length > 0 && <FlashSales products={flashSaleProducts} />}
 
-      {/* Launching Deals */}
-      {launchingProducts.length > 0 && (
-        <LaunchingDeals products={launchingProducts} />
-      )}
+      {launchingProducts.length > 0 && <LaunchingDeals products={launchingProducts} />}
 
-      {/* Sponsored Products */}
       {sponsoredProducts.length > 0 && (
         <SponsoredProducts products={sponsoredProducts} />
       )}
 
-      {/* Top Sellers */}
-      {topSellerProducts.length > 0 && (
-        <TopSellers products={topSellerProducts} />
+      {topSellerProducts.length > 0 && <TopSellers products={topSellerProducts} />}
+
+      {dealProducts.length > 0 && <DealsSection products={dealProducts} />}
+
+      {trendingProducts.length > 0 && <TrendingSection products={trendingProducts} />}
+
+      {electronicsProducts.length > 0 && (
+        <ElectronicsCategories products={electronicsProducts} />
       )}
 
-      {/* Deals Section */}
-      {dealProducts.length > 0 && (
-        <DealsSection products={dealProducts} />
-      )}
-
-      {/* Trending/Best Sellers */}
-      {trendingProducts.length > 0 && (
-        <TrendingSection products={trendingProducts} />
-      )}
-
-      {/* Empty State - Show when no products with tags */}
-      {flashSaleProducts.length === 0 && 
-       dealProducts.length === 0 && 
-       trendingProducts.length === 0 &&
-       topSellerProducts.length === 0 &&
-       sponsoredProducts.length === 0 &&
-       launchingProducts.length === 0 && (
-        <div className="container mx-auto px-4 py-12 text-center">
-          <p className="text-gray-600 mb-4">
-            No featured products yet. Add tags to your products to display them here.
-          </p>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto">
-            <p className="text-sm text-blue-800 font-medium mb-2">
-              How to add products to homepage sections:
+      {flashSaleProducts.length === 0 &&
+        dealProducts.length === 0 &&
+        trendingProducts.length === 0 &&
+        topSellerProducts.length === 0 &&
+        sponsoredProducts.length === 0 &&
+        launchingProducts.length === 0 &&
+        electronicsProducts.length === 0 && (
+          <div className="container mx-auto px-4 py-12 text-center">
+            <p className="mb-4 text-gray-600">
+              No featured products yet. Add tags to your products to display them here.
             </p>
-            <ul className="text-sm text-blue-700 text-left space-y-1">
-              <li>• Tag products with "flash-sale" for Flash Sales section</li>
-              <li>• Tag products with "deal" for Deals section</li>
-              <li>• Tag products with "best-seller" for Trending section</li>
-              <li>• Tag products with "top-seller" for Top Sellers section</li>
-              <li>• Tag products with "sponsored" for Sponsored Products section</li>
-              <li>• Tag products with "launching-deal" for Launching Deals section</li>
-            </ul>
+            <div className="mx-auto max-w-2xl rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <p className="mb-2 text-sm font-medium text-blue-800">
+                How to add products to homepage sections:
+              </p>
+              <ul className="space-y-1 text-left text-sm text-blue-700">
+                <li>&bull; Tag products with &quot;flash-sale&quot; for Flash Sales section</li>
+                <li>&bull; Tag products with &quot;deal&quot; for Deals section</li>
+                <li>&bull; Tag products with &quot;best-seller&quot; for Trending section</li>
+                <li>&bull; Tag products with &quot;top-seller&quot; for Top Sellers section</li>
+                <li>&bull; Tag products with &quot;sponsored&quot; for Sponsored Products section</li>
+                <li>&bull; Tag products with &quot;launching-deal&quot; for Launching Deals section</li>
+              </ul>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Bottom spacing for mobile navigation */}
       <div className="h-20 md:h-8" />
     </main>
   );
