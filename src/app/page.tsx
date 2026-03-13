@@ -6,7 +6,7 @@ import TrendingSection from '@/components/home/trending-section';
 import TopSellers from '@/components/home/top-sellers';
 import SponsoredProducts from '@/components/home/sponsored-products';
 import LaunchingDeals from '@/components/home/launching-deals';
-import ElectronicsCategories from '@/components/home/electronics-categories';
+import CategoryProductsSection from '@/components/home/category-products-section';
 import { getCategoryBySlug, getSubcategories } from '@/lib/woocommerce/categories';
 import { getProducts, getProductsByCategory } from '@/lib/woocommerce/products';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
@@ -44,6 +44,32 @@ async function getDescendantCategoryIds(rootCategoryId: number): Promise<number[
   return Array.from(discovered);
 }
 
+async function getCategoryTreeProducts(categorySlug: string, limit: number = 18): Promise<Product[]> {
+  const rootCategory = await getCategoryBySlug(categorySlug);
+  if (!rootCategory) {
+    return [];
+  }
+
+  const categoryIds = await getDescendantCategoryIds(rootCategory.id);
+  const productGroups = await Promise.all(
+    categoryIds.map((categoryId) =>
+      getProductsByCategory(categoryId, {
+        per_page: 24,
+        orderby: 'date',
+        order: 'desc',
+      })
+    )
+  );
+
+  const mergedProducts = productGroups.flat();
+  const dedupedProducts = Array.from(
+    new Map(mergedProducts.map((product) => [product.id, product])).values()
+  );
+  const filteredProducts = await filterActiveVendorProducts(dedupedProducts);
+
+  return filteredProducts.slice(0, limit);
+}
+
 export default async function HomePage() {
   let flashSaleProducts: Product[] = [];
   let dealProducts: Product[] = [];
@@ -52,6 +78,7 @@ export default async function HomePage() {
   let sponsoredProducts: Product[] = [];
   let launchingProducts: Product[] = [];
   let electronicsProducts: Product[] = [];
+  let fashionProducts: Product[] = [];
 
   try {
     const rawProducts = await getProducts({ tag: 'flash-sale', per_page: 12 });
@@ -102,28 +129,15 @@ export default async function HomePage() {
   }
 
   try {
-    const electronicsCategory = await getCategoryBySlug('electronics');
-    if (electronicsCategory) {
-      const categoryIds = await getDescendantCategoryIds(electronicsCategory.id);
-      const productGroups = await Promise.all(
-        categoryIds.map((categoryId) =>
-          getProductsByCategory(categoryId, {
-            per_page: 24,
-            orderby: 'date',
-            order: 'desc',
-          })
-        )
-      );
-
-      const mergedProducts = productGroups.flat();
-      const dedupedProducts = Array.from(
-        new Map(mergedProducts.map((product) => [product.id, product])).values()
-      );
-      const filteredProducts = await filterActiveVendorProducts(dedupedProducts);
-      electronicsProducts = filteredProducts.slice(0, 18);
-    }
+    electronicsProducts = await getCategoryTreeProducts('electronics');
   } catch (error) {
     console.error('Electronics products fetch failed:', error);
+  }
+
+  try {
+    fashionProducts = await getCategoryTreeProducts('fashion-accessories');
+  } catch (error) {
+    console.error('Fashion products fetch failed:', error);
   }
 
   return (
@@ -149,7 +163,27 @@ export default async function HomePage() {
       {trendingProducts.length > 0 && <TrendingSection products={trendingProducts} />}
 
       {electronicsProducts.length > 0 && (
-        <ElectronicsCategories products={electronicsProducts} />
+        <CategoryProductsSection
+          products={electronicsProducts}
+          title="Electronics"
+          subtitle="Shop electronics"
+          href="/category/electronics"
+          sectionClassName="bg-gradient-to-br from-blue-50 via-cyan-50 to-white"
+          accentClassName="bg-gradient-to-br from-blue-600 to-cyan-500"
+          linkClassName="text-blue-600 hover:text-blue-700"
+        />
+      )}
+
+      {fashionProducts.length > 0 && (
+        <CategoryProductsSection
+          products={fashionProducts}
+          title="Fashion & Accessories"
+          subtitle="Shop fashion"
+          href="/category/fashion-accessories"
+          sectionClassName="bg-gradient-to-br from-rose-50 via-pink-50 to-white"
+          accentClassName="bg-gradient-to-br from-rose-600 to-pink-500"
+          linkClassName="text-rose-600 hover:text-rose-700"
+        />
       )}
 
       {flashSaleProducts.length === 0 &&
@@ -158,7 +192,8 @@ export default async function HomePage() {
         topSellerProducts.length === 0 &&
         sponsoredProducts.length === 0 &&
         launchingProducts.length === 0 &&
-        electronicsProducts.length === 0 && (
+        electronicsProducts.length === 0 &&
+        fashionProducts.length === 0 && (
           <div className="container mx-auto px-4 py-12 text-center">
             <p className="mb-4 text-gray-600">
               No featured products yet. Add tags to your products to display them here.
