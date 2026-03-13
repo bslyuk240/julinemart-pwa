@@ -134,7 +134,8 @@ export default function VendorStorePage() {
             id: vendorData.id,
             name: vendorData.store_name,
             shop_name: vendorData.store_name,
-            url: vendorData.store_slug ? `/store/${vendorData.store_slug}` : '',
+            url: vendorData.store_slug ? `/store/${vendorData.store_slug}` : vendorData.store_url || '',
+            address: vendorData.vendor_address ?? vendorData.address ?? vendorData.store_address ?? '',
           });
         }
       } catch (error) {
