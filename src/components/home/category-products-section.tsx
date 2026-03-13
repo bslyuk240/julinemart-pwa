@@ -3,28 +3,42 @@ import { ChevronRight, Zap } from 'lucide-react';
 import ProductCard from '../product/product-card';
 import type { Product } from '@/types/product';
 
-interface ElectronicsCategoriesProps {
+interface CategoryProductsSectionProps {
   products: Product[];
+  title: string;
+  subtitle: string;
+  href: string;
+  sectionClassName: string;
+  accentClassName: string;
+  linkClassName: string;
 }
 
-export default function ElectronicsCategories({ products }: ElectronicsCategoriesProps) {
+export default function CategoryProductsSection({
+  products,
+  title,
+  subtitle,
+  href,
+  sectionClassName,
+  accentClassName,
+  linkClassName,
+}: CategoryProductsSectionProps) {
   return (
-    <section className="bg-gradient-to-br from-blue-50 via-cyan-50 to-white py-3 md:py-6">
+    <section className={`${sectionClassName} py-3 md:py-6`}>
       <div className="container mx-auto px-4">
         <div className="mb-3 flex items-center justify-between md:mb-4">
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 p-1.5 shadow-md md:p-2">
+            <div className={`rounded-lg p-1.5 shadow-md md:p-2 ${accentClassName}`}>
               <Zap className="h-4 w-4 text-white md:h-5 md:w-5" />
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-blue-700 md:text-xs">Shop electronics</p>
-              <h2 className="text-base font-bold text-primary-900 md:text-xl">Electronics</h2>
+              <p className="text-[10px] uppercase tracking-wide md:text-xs">{subtitle}</p>
+              <h2 className="text-base font-bold text-primary-900 md:text-xl">{title}</h2>
             </div>
           </div>
 
           <Link
-            href="/category/electronics"
-            className="flex items-center gap-1 text-xs font-medium text-blue-600 transition hover:text-blue-700 md:text-sm"
+            href={href}
+            className={`flex items-center gap-1 text-xs font-medium transition md:text-sm ${linkClassName}`}
           >
             View All
             <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
