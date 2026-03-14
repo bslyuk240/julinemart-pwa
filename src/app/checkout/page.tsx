@@ -64,7 +64,13 @@ export default function CheckoutPage() {
   const { customer, customerId, isAuthenticated, refreshCustomer } = useCustomerAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isCartHydrated, setIsCartHydrated] = useState(() => useCartStore.persist.hasHydrated());
+  const [isCartHydrated, setIsCartHydrated] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return useCartStore.persist?.hasHydrated?.() ?? true;
+  });
   const currentOrderRef = useRef<any>(null);
   const hasTrackedBeginCheckoutRef = useRef(false);
   
@@ -207,12 +213,19 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
-    if (useCartStore.persist.hasHydrated()) {
+    const persistApi = useCartStore.persist;
+
+    if (!persistApi?.hasHydrated || !persistApi?.onFinishHydration) {
       setIsCartHydrated(true);
       return;
     }
 
-    const unsubscribe = useCartStore.persist.onFinishHydration(() => {
+    if (persistApi.hasHydrated()) {
+      setIsCartHydrated(true);
+      return;
+    }
+
+    const unsubscribe = persistApi.onFinishHydration(() => {
       setIsCartHydrated(true);
     });
 
