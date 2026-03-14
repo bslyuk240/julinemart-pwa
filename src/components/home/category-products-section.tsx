@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { ChevronRight, Zap } from 'lucide-react';
 import ProductCard from '../product/product-card';
