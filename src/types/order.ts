@@ -131,6 +131,7 @@ export interface MetaData {
 }
 
 export interface CreateOrderData {
+  status?: OrderStatus;
   payment_method: string;
   payment_method_title: string;
   set_paid: boolean;
