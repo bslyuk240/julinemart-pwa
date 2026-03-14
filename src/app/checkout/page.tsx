@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { 
   getAllShippingMethods, 
   getEnabledPaymentGateways,
+  getMatchingShippingZoneData,
   PaymentGateway 
 } from '@/lib/woocommerce/shipping';
 // Orders are created via server API to avoid client-side CORS
@@ -21,6 +22,7 @@ import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculato
 import { getShippingFee } from '@/lib/shipping/jloShipping';
 import { updateCustomer } from '@/lib/woocommerce/customers';
 import { trackBeginCheckout, trackPurchase } from '@/lib/gtag';
+import { useCartStore } from '@/store/cart-store';
 
 interface ShippingOption {
   id: string;
@@ -62,6 +64,7 @@ export default function CheckoutPage() {
   const { customer, customerId, isAuthenticated, refreshCustomer } = useCustomerAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isCartHydrated, setIsCartHydrated] = useState(() => useCartStore.persist.hasHydrated());
   const currentOrderRef = useRef<any>(null);
   const hasTrackedBeginCheckoutRef = useRef(false);
   
@@ -204,6 +207,19 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
+    if (useCartStore.persist.hasHydrated()) {
+      setIsCartHydrated(true);
+      return;
+    }
+
+    const unsubscribe = useCartStore.persist.onFinishHydration(() => {
+      setIsCartHydrated(true);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
     if (!items.length || hasTrackedBeginCheckoutRef.current) return;
 
     trackBeginCheckout({
@@ -298,9 +314,10 @@ export default function CheckoutPage() {
       toast.success('Payment verified successfully!', { id: 'payment-verify' });
       console.log('✅ Payment verified, clearing cart...');
       
+      await persistCheckoutProfileIfNeeded();
+
       if (verifyData.cardSaved) {
         toast.success('Payment card saved for future use!');
-        await refreshCustomer();
       }
       trackPurchaseForOrder(orderId);
       clearCart();
@@ -372,6 +389,7 @@ export default function CheckoutPage() {
         });
 
         if (verifyResponse.ok) {
+          await persistCheckoutProfileIfNeeded();
           setIsProcessing(false);
           trackPurchaseForOrder(orderId);
           clearCart();
@@ -396,7 +414,16 @@ export default function CheckoutPage() {
       try {
         setLoading(true);
 
-        const zonesWithMethods = await getAllShippingMethods();
+        const [allZonesWithMethods, gateways, rate] = await Promise.all([
+          getAllShippingMethods(),
+          getEnabledPaymentGateways(),
+          getDefaultTaxRate(formData.country),
+        ]);
+        const zonesWithMethods = getMatchingShippingZoneData(
+          allZonesWithMethods,
+          formData.country,
+          formData.state
+        );
         const options: ShippingOption[] = [];
 
         zonesWithMethods.forEach(({ zone, methods }) => {
@@ -416,20 +443,21 @@ export default function CheckoutPage() {
         });
 
         setShippingOptions(options);
-        
+
         if (options.length > 0) {
           setSelectedShipping(options[0].id);
           setShippingCost(options[0].cost ?? null);
+        } else {
+          setSelectedShipping('');
+          setShippingCost(null);
         }
 
-        const gateways = await getEnabledPaymentGateways();
         setPaymentGateways(gateways);
         
         if (gateways.length > 0) {
           setSelectedPayment(gateways[0].id);
         }
 
-        const rate = await getDefaultTaxRate(formData.country);
         setTaxRate(rate * 100);
       } catch (error) {
         console.error('Error fetching checkout data:', error);
@@ -444,7 +472,7 @@ export default function CheckoutPage() {
     } else {
       setLoading(false);
     }
-  }, [items, formData.country]);
+  }, [items, formData.country, formData.state]);
 
   useEffect(() => {
     if (customer) {
@@ -571,42 +599,69 @@ export default function CheckoutPage() {
     }
   };
 
-  const persistAddressIfNeeded = async () => {
-    if (!isAuthenticated || !customerId || !saveNewAddress || !useDifferentAddress) return;
+  const persistCheckoutProfileIfNeeded = async () => {
+    if (!isAuthenticated || !customerId) return false;
+
+    const shouldSaveAddress = saveNewAddress && useDifferentAddress;
+    const existingShipping = customer?.shipping;
+    const existingBilling = customer?.billing;
+
+    const shippingPayload = {
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      address_1: shouldSaveAddress ? formData.address1 : existingShipping?.address_1 || '',
+      address_2: shouldSaveAddress ? formData.address2 : existingShipping?.address_2 || '',
+      city: shouldSaveAddress ? formData.city : existingShipping?.city || '',
+      state: shouldSaveAddress ? formData.state : existingShipping?.state || '',
+      postcode: shouldSaveAddress ? formData.postcode : existingShipping?.postcode || '',
+      country: shouldSaveAddress ? formData.country : existingShipping?.country || formData.country,
+      phone: formData.phone,
+      company: existingShipping?.company || '',
+    };
+
+    const billingPayload = {
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      address_1: shouldSaveAddress ? formData.address1 : existingBilling?.address_1 || '',
+      address_2: shouldSaveAddress ? formData.address2 : existingBilling?.address_2 || '',
+      city: shouldSaveAddress ? formData.city : existingBilling?.city || '',
+      state: shouldSaveAddress ? formData.state : existingBilling?.state || '',
+      postcode: shouldSaveAddress ? formData.postcode : existingBilling?.postcode || '',
+      country: shouldSaveAddress ? formData.country : existingBilling?.country || formData.country,
+      email: formData.email,
+      phone: formData.phone,
+      company: existingBilling?.company || '',
+    };
 
     try {
-      const shippingPayload = {
+      const updated = await updateCustomer(customerId, {
+        email: formData.email,
         first_name: formData.firstName,
         last_name: formData.lastName,
-        address_1: formData.address1,
-        address_2: formData.address2,
-        city: formData.city,
-        state: formData.state,
-        postcode: formData.postcode,
-        country: formData.country,
-        phone: formData.phone,
-        company: '',
-      };
-
-      const billingPayload = {
-        ...shippingPayload,
-        email: formData.email,
-      };
-
-      const updated = await updateCustomer(customerId, {
         shipping: shippingPayload,
         billing: billingPayload,
       });
 
-      if (updated) {
-        await refreshCustomer();
-        toast.success('Address saved for future checkouts');
-      } else {
-        toast.error('Could not save address to your account');
+      if (!updated) {
+        if (shouldSaveAddress) {
+          toast.error('Could not save address to your account');
+        }
+        return false;
       }
+
+      await refreshCustomer();
+
+      if (shouldSaveAddress) {
+        toast.success('Address saved for future checkouts');
+      }
+
+      return true;
     } catch (error) {
-      console.error('Address save error:', error);
-      toast.error('We could not save this address to your account');
+      console.error('Checkout profile save error:', error);
+      if (shouldSaveAddress) {
+        toast.error('We could not save this address to your account');
+      }
+      return false;
     }
   };
 
@@ -805,6 +860,11 @@ export default function CheckoutPage() {
   };
 
   const handlePlaceOrder = async () => {
+    if (loading) {
+      toast.error('Checkout options are still loading. Please wait a moment.');
+      return;
+    }
+
     if (!validateForm()) {
       toast.error('Please fill in all required fields correctly');
       return;
@@ -1018,7 +1078,6 @@ export default function CheckoutPage() {
 
       if (order && order.id) {
         console.log('✅ Order created:', order.id);
-        await persistAddressIfNeeded();
         
         const selectedGateway = paymentGateways.find(g => g.id === selectedPayment);
         const requiresPayment = selectedGateway?.id !== 'cod' && 
@@ -1068,6 +1127,7 @@ export default function CheckoutPage() {
             }, 500);
           }
         } else {
+          await persistCheckoutProfileIfNeeded();
           trackPurchaseForOrder(order.id);
           clearCart();
           toast.success('Order placed successfully!');
@@ -1084,7 +1144,7 @@ export default function CheckoutPage() {
     }
   };
 
-  if (loading) {
+  if (!isCartHydrated) {
     return <PageLoading text="Loading checkout..." />;
   }
 
@@ -1119,6 +1179,12 @@ export default function CheckoutPage() {
           </Link>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Checkout</h1>
         </div>
+
+        {loading && (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Loading shipping and payment options...
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Checkout Form */}
@@ -1342,51 +1408,55 @@ export default function CheckoutPage() {
             </div>
 
             {/* Shipping Method */}
-            {shippingOptions.length > 0 && (
+            {(loading || shippingOptions.length > 0) && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Truck className="w-6 h-6 text-primary-600" />
                   <h2 className="text-xl font-semibold text-gray-900">Shipping Method</h2>
                 </div>
 
-                <div className="space-y-3">
-                  {shippingOptions.map((option) => {
-                    const isJlo = option.methodId === 'jlo_shipping';
-                    const displayCost = isJlo ? shippingCost : option.cost;
+                {shippingOptions.length > 0 ? (
+                  <div className="space-y-3">
+                    {shippingOptions.map((option) => {
+                      const isJlo = option.methodId === 'jlo_shipping';
+                      const displayCost = isJlo ? shippingCost : option.cost;
 
-                    return (
-                      <label
-                        key={option.id}
-                        className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                          selectedShipping === option.id
-                            ? 'border-primary-600 bg-primary-50'
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="shipping"
-                          value={option.id}
-                          checked={selectedShipping === option.id}
-                          onChange={(e) => handleShippingChange(e.target.value)}
-                          className="mt-1 w-4 h-4 text-primary-600"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium text-gray-900">{option.title}</p>
-                            <p className="font-semibold text-primary-600">
-                              {displayCost !== null
-                                ? (displayCost === 0
-                                  ? 'FREE'
-                                  : formatPrice(displayCost))
-                                : 'Calculated at checkout'}
-                            </p>
+                      return (
+                        <label
+                          key={option.id}
+                          className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                            selectedShipping === option.id
+                              ? 'border-primary-600 bg-primary-50'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="shipping"
+                            value={option.id}
+                            checked={selectedShipping === option.id}
+                            onChange={(e) => handleShippingChange(e.target.value)}
+                            className="mt-1 w-4 h-4 text-primary-600"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium text-gray-900">{option.title}</p>
+                              <p className="font-semibold text-primary-600">
+                                {displayCost !== null
+                                  ? (displayCost === 0
+                                    ? 'FREE'
+                                    : formatPrice(displayCost))
+                                  : 'Calculated at checkout'}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Loading shipping methods...</p>
+                )}
 
                 {isCalculatingShipping && (
                   <p className="text-sm text-gray-500 mt-2">
@@ -1534,13 +1604,17 @@ export default function CheckoutPage() {
             )}
 
             {/* Payment Method */}
-            {paymentGateways.length > 0 && (
+            {(loading || paymentGateways.length > 0) && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <CreditCard className="w-6 h-6 text-primary-600" />
                   <h2 className="text-xl font-semibold text-gray-900">Payment Method</h2>
                 </div>
 
+                {paymentGateways.length === 0 ? (
+                  <p className="text-sm text-gray-500">Loading payment methods...</p>
+                ) : (
+                  <>
                 {isAuthenticated && defaultSavedCard && isPaystackGateway && (
                   <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
                     <label className="flex items-start gap-3 cursor-pointer">
@@ -1615,6 +1689,8 @@ export default function CheckoutPage() {
                       </div>
                     </label>
                   </div>
+                )}
+                  </>
                 )}
               </div>
             )}
@@ -1693,9 +1769,18 @@ export default function CheckoutPage() {
                 fullWidth
                 isLoading={isProcessing}
                 onClick={handlePlaceOrder}
-                disabled={isProcessing}
+                disabled={
+                  isProcessing ||
+                  loading ||
+                  !selectedPayment ||
+                  (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null)
+                }
               >
-                {isProcessing ? 'Processing...' : 'Place Order'}
+                {isProcessing
+                  ? 'Processing...'
+                  : loading
+                    ? 'Loading checkout options...'
+                    : 'Place Order'}
               </Button>
 
               <p className="text-xs text-gray-500 text-center mt-4">

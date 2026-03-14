@@ -113,11 +113,8 @@ export default function VendorStorePage() {
           }
         }
 
-        // Use backend vendor product count for accurate count, then fetch by product IDs
-        const [countData, vendorProducts] = await Promise.all([
-          getVendorProductCount(numericVendorId),
-          getVendorProducts(numericVendorId),
-        ]);
+        const countData = await getVendorProductCount(numericVendorId);
+        const vendorProducts = await getVendorProducts(numericVendorId, countData?.product_ids);
 
         if (countData?.product_count != null) {
           setProductCount(countData.product_count);
@@ -147,6 +144,8 @@ export default function VendorStorePage() {
     [sortBy, vendorId]
   );
 
+  // Retained temporarily to avoid a larger file rewrite; the page no longer calls this on load.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const fetchVendorDetails = useCallback(async () => {
     const numericVendorId = Number(vendorId);
     if (!numericVendorId || Number.isNaN(numericVendorId)) {
@@ -177,8 +176,7 @@ export default function VendorStorePage() {
 
   useEffect(() => {
     fetchVendorProducts();
-    fetchVendorDetails();
-  }, [fetchVendorProducts, fetchVendorDetails]);
+  }, [fetchVendorProducts]);
 
   useEffect(() => {
     fetchPolicies();
@@ -190,12 +188,11 @@ export default function VendorStorePage() {
       await Promise.all([
         fetchVendorProducts({ silent: true }),
         fetchPolicies(true, { silent: true }),
-        fetchVendorDetails(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [fetchVendorDetails, fetchVendorProducts, fetchPolicies]);
+  }, [fetchVendorProducts, fetchPolicies]);
 
   const handleSortChange = (newSortBy: VendorSortOption) => {
     setSortBy(newSortBy);
