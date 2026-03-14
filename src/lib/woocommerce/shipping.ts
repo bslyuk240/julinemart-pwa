@@ -4,7 +4,12 @@ export interface ShippingZone {
   id: number;
   name: string;
   order: number;
-  _links?: any;
+  _links?: unknown;
+}
+
+export interface ZoneLocation {
+  code: string;
+  type: string;
 }
 
 export interface ShippingMethod {
@@ -27,7 +32,7 @@ export interface ShippingMethod {
       placeholder: string;
     };
   };
-  _links?: any;
+  _links?: unknown;
 }
 
 export interface PaymentGateway {
@@ -40,10 +45,18 @@ export interface PaymentGateway {
   method_description: string;
   method_supports: string[];
   settings: {
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  _links?: any;
+  _links?: unknown;
 }
+
+let shippingMethodsCache: Promise<{
+  zone: ShippingZone;
+  methods: ShippingMethod[];
+  locations: ZoneLocation[];
+}[]> | null = null;
+
+let enabledPaymentGatewaysCache: Promise<PaymentGateway[]> | null = null;
 
 /**
  * Get all shipping zones
@@ -85,30 +98,127 @@ export async function getShippingMethods(zoneId: number): Promise<ShippingMethod
 }
 
 /**
- * Get all available shipping methods across all zones
+ * Get locations for a specific shipping zone.
  */
-export async function getAllShippingMethods(): Promise<{
-  zone: ShippingZone;
-  methods: ShippingMethod[];
-}[]> {
+export async function getShippingZoneLocations(zoneId: number): Promise<ZoneLocation[]> {
   try {
-    const zones = await getShippingZones();
-    
-    const zonesWithMethods = await Promise.all(
-      zones.map(async (zone) => {
-        const methods = await getShippingMethods(zone.id);
-        return {
-          zone,
-          methods: methods.filter(m => m.enabled),
-        };
-      })
-    );
-    
-    return zonesWithMethods.filter(z => z.methods.length > 0);
+    const response = await wcApi.get(`shipping/zones/${zoneId}/locations`);
+    return response.data;
   } catch (error) {
-    console.error('Error fetching shipping methods:', error);
+    handleApiError(error);
     return [];
   }
+}
+
+export interface ShippingZoneWithMethods {
+  zone: ShippingZone;
+  methods: ShippingMethod[];
+  locations: ZoneLocation[];
+}
+
+const normalizeLocationValue = (value: string | undefined | null) =>
+  String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+
+const scoreZoneMatch = (
+  locations: ZoneLocation[],
+  country: string,
+  state?: string
+) => {
+  const normalizedCountry = normalizeLocationValue(country);
+  const normalizedState = normalizeLocationValue(state);
+  let bestScore = -1;
+
+  for (const location of locations) {
+    const locationCode = String(location.code || '').toUpperCase();
+    const normalizedCode = normalizeLocationValue(locationCode);
+
+    if (location.type === 'country' && normalizedCode === normalizedCountry) {
+      bestScore = Math.max(bestScore, 200);
+    }
+
+    if (location.type === 'state' && normalizedState) {
+      if (
+        normalizedCode === normalizeLocationValue(`${country}:${state}`) ||
+        normalizedCode.endsWith(normalizedState)
+      ) {
+        bestScore = Math.max(bestScore, 300);
+      }
+    }
+  }
+
+  return bestScore;
+};
+
+const isRestOfWorldZone = (zone: ShippingZone) =>
+  zone.name.trim().toLowerCase() === 'rest of the world';
+
+export function getMatchingShippingZoneData(
+  zonesWithMethods: ShippingZoneWithMethods[],
+  country: string,
+  state?: string
+): ShippingZoneWithMethods[] {
+  let bestMatch: ShippingZoneWithMethods | null = null;
+  let bestScore = -1;
+
+  for (const zoneData of zonesWithMethods) {
+    const score = scoreZoneMatch(zoneData.locations, country, state);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = zoneData;
+    }
+  }
+
+  if (bestMatch && bestScore >= 0) {
+    return [bestMatch];
+  }
+
+  const restOfWorldZone = zonesWithMethods.find((zoneData) =>
+    isRestOfWorldZone(zoneData.zone)
+  );
+
+  if (restOfWorldZone) {
+    return [restOfWorldZone];
+  }
+
+  return zonesWithMethods;
+}
+
+/**
+ * Get all available shipping methods across all zones
+ */
+export async function getAllShippingMethods(): Promise<ShippingZoneWithMethods[]> {
+  if (!shippingMethodsCache) {
+    shippingMethodsCache = (async () => {
+      try {
+        const zones = await getShippingZones();
+
+        const zonesWithMethods = await Promise.all(
+          zones.map(async (zone) => {
+            const [methods, locations] = await Promise.all([
+              getShippingMethods(zone.id),
+              getShippingZoneLocations(zone.id),
+            ]);
+            return {
+              zone,
+              methods: methods.filter((method) => method.enabled),
+              locations,
+            };
+          })
+        );
+
+        return zonesWithMethods.filter((zoneData) => zoneData.methods.length > 0);
+      } catch (error) {
+        shippingMethodsCache = null;
+        console.error('Error fetching shipping methods:', error);
+        return [];
+      }
+    })();
+  }
+
+  return shippingMethodsCache;
 }
 
 /**
@@ -117,19 +227,7 @@ export async function getAllShippingMethods(): Promise<{
  */
 export async function calculateShipping(
   zoneId: number,
-  methodId: string,
-  packageData?: {
-    destination?: {
-      country?: string;
-      state?: string;
-      postcode?: string;
-      city?: string;
-    };
-    items?: Array<{
-      product_id: number;
-      quantity: number;
-    }>;
-  }
+  methodId: string
 ): Promise<{
   cost: number;
   label: string;
@@ -170,13 +268,20 @@ export async function getPaymentGateways(): Promise<PaymentGateway[]> {
  * Get enabled payment gateways only
  */
 export async function getEnabledPaymentGateways(): Promise<PaymentGateway[]> {
-  try {
-    const gateways = await getPaymentGateways();
-    return gateways.filter(gateway => gateway.enabled);
-  } catch (error) {
-    handleApiError(error);
-    return [];
+  if (!enabledPaymentGatewaysCache) {
+    enabledPaymentGatewaysCache = (async () => {
+      try {
+        const gateways = await getPaymentGateways();
+        return gateways.filter((gateway) => gateway.enabled);
+      } catch (error) {
+        enabledPaymentGatewaysCache = null;
+        handleApiError(error);
+        return [];
+      }
+    })();
   }
+
+  return enabledPaymentGatewaysCache;
 }
 
 /**

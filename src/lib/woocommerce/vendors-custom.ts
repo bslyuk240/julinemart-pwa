@@ -112,7 +112,7 @@ export async function getVendorById(id: number): Promise<Vendor | null> {
             logo: wcfmData.logo,
             gravatar: wcfmData.gravatar,
             banner: wcfmData.banner,
-            avatar: (wcfmData as any).avatar,
+            avatar: wcfmData.avatar,
           });
           // Merge WCFM data for missing fields
           return {
@@ -120,7 +120,7 @@ export async function getVendorById(id: number): Promise<Vendor | null> {
             logo: data.logo || wcfmData.logo || '',
             gravatar: data.gravatar || wcfmData.gravatar || '',
             banner: data.banner || wcfmData.banner || '',
-            avatar: data.avatar || (wcfmData as any).avatar,
+            avatar: data.avatar || wcfmData.avatar,
             store_logo: data.store_logo || wcfmData.store_logo || '',
           } as Vendor;
         }
@@ -144,11 +144,10 @@ const VENDOR_PRODUCTS_CHUNK = 100;
  * so vendor pages show the correct products even when WooCommerce list doesn't include store data.
  * Falls back to fetching pages and filtering by product.store.id if backend has no product_ids.
  */
-export async function getVendorProducts(vendorId: number): Promise<Product[]> {
+export async function getVendorProducts(vendorId: number, productIds?: number[]): Promise<Product[]> {
   try {
-    const countData = await getVendorProductCount(vendorId);
-    if (countData?.product_ids?.length) {
-      const ids = countData.product_ids;
+    const ids = productIds ?? (await getVendorProductCount(vendorId))?.product_ids;
+    if (ids?.length) {
       const chunks: number[][] = [];
       for (let i = 0; i < ids.length; i += VENDOR_PRODUCTS_CHUNK) {
         chunks.push(ids.slice(i, i + VENDOR_PRODUCTS_CHUNK));
