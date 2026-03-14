@@ -12,6 +12,8 @@ import { getProducts, getProductsByCategory } from '@/lib/woocommerce/products';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 import type { Product } from '@/types/product';
 
+const HOMEPAGE_FETCH_TIMEOUT_MS = 12000;
+
 function shuffle<T>(items: T[]) {
   const arr = [...items];
   for (let i = arr.length - 1; i > 0; i -= 1) {
@@ -44,6 +46,45 @@ async function getDescendantCategoryIds(rootCategoryId: number): Promise<number[
   return Array.from(discovered);
 }
 
+async function withTimeout<T>(
+  task: Promise<T>,
+  label: string,
+  fallback: T,
+  timeoutMs: number = HOMEPAGE_FETCH_TIMEOUT_MS
+): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timeoutHandle = setTimeout(() => {
+      console.error(`${label} timed out after ${timeoutMs}ms`);
+      resolve(fallback);
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([task, timeoutPromise]);
+  } catch (error) {
+    console.error(`${label} failed:`, error);
+    return fallback;
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
+async function getHomepageTagProducts(tag: string, label: string): Promise<Product[]> {
+  return withTimeout(
+    (async () => {
+      const rawProducts = await getProducts({ tag, per_page: 12 });
+      const filteredProducts = await filterActiveVendorProducts(rawProducts);
+      return shuffle(filteredProducts);
+    })(),
+    label,
+    []
+  );
+}
+
 async function getCategoryTreeProducts(categorySlug: string, limit: number = 18): Promise<Product[]> {
   const rootCategory = await getCategoryBySlug(categorySlug);
   if (!rootCategory) {
@@ -71,74 +112,25 @@ async function getCategoryTreeProducts(categorySlug: string, limit: number = 18)
 }
 
 export default async function HomePage() {
-  let flashSaleProducts: Product[] = [];
-  let dealProducts: Product[] = [];
-  let trendingProducts: Product[] = [];
-  let topSellerProducts: Product[] = [];
-  let sponsoredProducts: Product[] = [];
-  let launchingProducts: Product[] = [];
-  let electronicsProducts: Product[] = [];
-  let fashionProducts: Product[] = [];
-
-  try {
-    const rawProducts = await getProducts({ tag: 'flash-sale', per_page: 12 });
-    const filtered = await filterActiveVendorProducts(rawProducts);
-    flashSaleProducts = shuffle(filtered);
-  } catch (error) {
-    console.error('Flash sale fetch failed:', error);
-  }
-
-  try {
-    const rawProducts = await getProducts({ tag: 'deal', per_page: 12 });
-    const filtered = await filterActiveVendorProducts(rawProducts);
-    dealProducts = shuffle(filtered);
-  } catch (error) {
-    console.error('Deals fetch failed:', error);
-  }
-
-  try {
-    const rawProducts = await getProducts({ tag: 'best-seller', per_page: 12 });
-    const filtered = await filterActiveVendorProducts(rawProducts);
-    trendingProducts = shuffle(filtered);
-  } catch (error) {
-    console.error('Best sellers fetch failed:', error);
-  }
-
-  try {
-    const rawProducts = await getProducts({ tag: 'top-seller', per_page: 12 });
-    const filtered = await filterActiveVendorProducts(rawProducts);
-    topSellerProducts = shuffle(filtered);
-  } catch (error) {
-    console.error('Top sellers fetch failed:', error);
-  }
-
-  try {
-    const rawProducts = await getProducts({ tag: 'sponsored', per_page: 12 });
-    const filtered = await filterActiveVendorProducts(rawProducts);
-    sponsoredProducts = shuffle(filtered);
-  } catch (error) {
-    console.error('Sponsored fetch failed:', error);
-  }
-
-  try {
-    const rawProducts = await getProducts({ tag: 'launching-deal', per_page: 12 });
-    const filtered = await filterActiveVendorProducts(rawProducts);
-    launchingProducts = shuffle(filtered);
-  } catch (error) {
-    console.error('Launching deals fetch failed:', error);
-  }
-
-  try {
-    electronicsProducts = await getCategoryTreeProducts('electronics');
-  } catch (error) {
-    console.error('Electronics products fetch failed:', error);
-  }
-
-  try {
-    fashionProducts = await getCategoryTreeProducts('fashion-accessories');
-  } catch (error) {
-    console.error('Fashion products fetch failed:', error);
-  }
+  const [
+    flashSaleProducts,
+    dealProducts,
+    trendingProducts,
+    topSellerProducts,
+    sponsoredProducts,
+    launchingProducts,
+    electronicsProducts,
+    fashionProducts,
+  ] = await Promise.all([
+    getHomepageTagProducts('flash-sale', 'Flash sale fetch'),
+    getHomepageTagProducts('deal', 'Deals fetch'),
+    getHomepageTagProducts('best-seller', 'Best sellers fetch'),
+    getHomepageTagProducts('top-seller', 'Top sellers fetch'),
+    getHomepageTagProducts('sponsored', 'Sponsored fetch'),
+    getHomepageTagProducts('launching-deal', 'Launching deals fetch'),
+    withTimeout(getCategoryTreeProducts('electronics'), 'Electronics products fetch', []),
+    withTimeout(getCategoryTreeProducts('fashion-accessories'), 'Fashion products fetch', []),
+  ]);
 
   return (
     <main className="min-h-screen bg-gray-50">

@@ -2,6 +2,25 @@ import WooCommerceRestApi from "@woocommerce/woocommerce-rest-api";
 
 const isClient = typeof window !== "undefined";
 let serverApi: WooCommerceRestApi | null = null;
+const WC_REQUEST_TIMEOUT_MS = 8000;
+
+type RequestPayload = {
+  params?: unknown;
+  data?: unknown;
+};
+
+type ApiErrorLike = {
+  message?: string;
+  response?: {
+    status?: number;
+  };
+  config?: {
+    url?: string;
+  };
+  request?: {
+    path?: string;
+  };
+};
 
 // Utility: scrub credentials from URLs/headers before logging
 const scrubAuth = (value?: string) =>
@@ -32,6 +51,7 @@ function getServerApi() {
     consumerSecret: consumerSecret!,
     version: "wc/v3",
     queryStringAuth: true,
+    timeout: WC_REQUEST_TIMEOUT_MS,
   });
 
   return serverApi;
@@ -40,7 +60,7 @@ function getServerApi() {
 async function callProxy(
   method: "get" | "post" | "put" | "delete",
   endpoint: string,
-  payload?: any
+  payload?: RequestPayload
 ) {
   const res = await fetch("/api/woocommerce/proxy", {
     method: "POST",
@@ -64,7 +84,7 @@ async function callProxy(
 
 // Client-safe wrapper for WooCommerce endpoints (wc/v3)
 export const wcApi = {
-  get: async (endpoint: string, params?: any) => {
+  get: async (endpoint: string, params?: unknown) => {
     const api = getServerApi();
     if (api) {
       const res = await api.get(endpoint, params);
@@ -79,19 +99,19 @@ export const wcApi = {
     }
     return callProxy("get", endpoint, { params });
   },
-  post: async (endpoint: string, data?: any) => {
+  post: async (endpoint: string, data?: unknown) => {
     const api = getServerApi();
     if (api) return api.post(endpoint, data);
     const proxyData = await callProxy("post", endpoint, { data });
     return { data: proxyData };
   },
-  put: async (endpoint: string, data?: any) => {
+  put: async (endpoint: string, data?: unknown) => {
     const api = getServerApi();
     if (api) return api.put(endpoint, data);
     const proxyData = await callProxy("put", endpoint, { data });
     return { data: proxyData };
   },
-  delete: async (endpoint: string, params?: any) => {
+  delete: async (endpoint: string, params?: unknown) => {
     const api = getServerApi();
     if (api) return api.delete(endpoint, params);
     const proxyData = await callProxy("delete", endpoint, { params });
@@ -109,23 +129,25 @@ export const wcApi = {
  * This will send "wp:wcfmmp/v1/vendors/35" to the proxy route.
  */
 export const wpApi = {
-  get: async (endpoint: string, params?: any) => {
+  get: async (endpoint: string, params?: unknown) => {
     const data = await callProxy("get", `wp:${endpoint}`, { params });
     return { data };
   },
 };
 
 // Helper function for error handling
-export const handleApiError = (error: any, context?: string) => {
+export const handleApiError = (error: unknown, context?: string) => {
+  const typedError =
+    typeof error === "object" && error !== null ? (error as ApiErrorLike) : undefined;
   const baseInfo = {
-    message: error?.message,
-    status: error?.response?.status,
-    url: scrubAuth(error?.config?.url || error?.request?.path),
+    message: typedError?.message ?? String(error),
+    status: typedError?.response?.status,
+    url: scrubAuth(typedError?.config?.url || typedError?.request?.path),
   };
 
-  if (error?.response) console.error(context || "API Error:", baseInfo);
-  else if (error?.request) console.error(context || "Network Error:", baseInfo);
-  else console.error(context || "Error:", error?.message || error);
+  if (typedError?.response) console.error(context || "API Error:", baseInfo);
+  else if (typedError?.request) console.error(context || "Network Error:", baseInfo);
+  else console.error(context || "Error:", baseInfo.message);
 
   return error;
 };
