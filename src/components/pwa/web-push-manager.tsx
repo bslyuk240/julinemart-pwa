@@ -16,6 +16,7 @@ import {
 
 const PENDING_TOKEN_STORAGE_KEY = 'jm_pending_fcm_token';
 const LAST_TOKEN_STORAGE_KEY = 'jm_last_fcm_token';
+const DEV_CACHE_RESET_KEY = 'jm_dev_cache_reset_done';
 
 function toStringMap(input?: Record<string, unknown>) {
   const result: Record<string, string> = {};
@@ -69,6 +70,36 @@ export default function WebPushManager() {
   const registrationCacheRef = useRef<string | null>(null);
   const onMessageCleanupRef = useRef<(() => void) | null>(null);
   const inFlightSetupRef = useRef<Promise<WebPushEnableResult> | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (process.env.NODE_ENV !== 'development') return;
+
+    const hostname = window.location.hostname;
+    const isLocalhost =
+      hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+
+    if (!isLocalhost) return;
+    if (sessionStorage.getItem(DEV_CACHE_RESET_KEY) === 'true') return;
+
+    sessionStorage.setItem(DEV_CACHE_RESET_KEY, 'true');
+
+    void (async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((registration) => registration.unregister()));
+        }
+
+        if ('caches' in window) {
+          const cacheKeys = await caches.keys();
+          await Promise.all(cacheKeys.map((cacheKey) => caches.delete(cacheKey)));
+        }
+      } catch (error) {
+        console.error('Dev cache reset failed:', error);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

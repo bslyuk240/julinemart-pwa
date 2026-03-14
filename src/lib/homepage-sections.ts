@@ -1,7 +1,8 @@
-import { getCategoryBySlug, getSubcategories } from '@/lib/woocommerce/categories';
-import { getProducts, getProductsByCategory } from '@/lib/woocommerce/products';
+import { getCategories } from '@/lib/woocommerce/categories';
+import { getProducts } from '@/lib/woocommerce/products';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 import type { Product } from '@/types/product';
+import type { Category } from '@/types/category';
 
 const HOMEPAGE_FETCH_TIMEOUT_MS = 12000;
 
@@ -52,7 +53,20 @@ async function withTimeout<T>(
   }
 }
 
-async function getDescendantCategoryIds(rootCategoryId: number): Promise<number[]> {
+let categoriesCache: Promise<Category[]> | null = null;
+
+async function getAllHomepageCategories(): Promise<Category[]> {
+  if (!categoriesCache) {
+    categoriesCache = getCategories({
+      per_page: 100,
+      hide_empty: false,
+    });
+  }
+
+  return categoriesCache;
+}
+
+function getDescendantCategoryIds(categories: Category[], rootCategoryId: number): number[] {
   const discovered = new Set<number>([rootCategoryId]);
   const queue = [rootCategoryId];
 
@@ -60,7 +74,7 @@ async function getDescendantCategoryIds(rootCategoryId: number): Promise<number[
     const parentId = queue.shift();
     if (!parentId) continue;
 
-    const children = await getSubcategories(parentId, 100);
+    const children = categories.filter((category) => category.parent === parentId);
 
     for (const child of children) {
       if (!discovered.has(child.id)) {
@@ -86,27 +100,20 @@ async function getHomepageTagProducts(tag: string, label: string): Promise<Produ
 }
 
 async function getCategoryTreeProducts(categorySlug: string, limit: number = 18): Promise<Product[]> {
-  const rootCategory = await getCategoryBySlug(categorySlug);
+  const categories = await getAllHomepageCategories();
+  const rootCategory = categories.find((category) => category.slug === categorySlug) || null;
   if (!rootCategory) {
     return [];
   }
 
-  const categoryIds = await getDescendantCategoryIds(rootCategory.id);
-  const productGroups = await Promise.all(
-    categoryIds.map((categoryId) =>
-      getProductsByCategory(categoryId, {
-        per_page: 24,
-        orderby: 'date',
-        order: 'desc',
-      })
-    )
-  );
-
-  const mergedProducts = productGroups.flat();
-  const dedupedProducts = Array.from(
-    new Map(mergedProducts.map((product) => [product.id, product])).values()
-  );
-  const filteredProducts = await filterActiveVendorProducts(dedupedProducts);
+  const categoryIds = getDescendantCategoryIds(categories, rootCategory.id);
+  const rawProducts = await getProducts({
+    category: categoryIds.join(','),
+    per_page: 50,
+    orderby: 'date',
+    order: 'desc',
+  });
+  const filteredProducts = await filterActiveVendorProducts(rawProducts);
 
   return filteredProducts.slice(0, limit);
 }
