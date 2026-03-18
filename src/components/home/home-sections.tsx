@@ -33,7 +33,6 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
   const [sections, setSections] = useState<HomepageSectionsData>(
     initialSections || EMPTY_SECTIONS
   );
-
   useEffect(() => {
     if (!hasAnyMissingSections(initialSections)) {
       return;
@@ -54,7 +53,16 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
         const data = (await response.json()) as HomepageSectionsData;
 
         if (!cancelled) {
-          setSections(data);
+          // Merge: keep existing data for any section the API returned empty
+          setSections((prev) => {
+            const merged: HomepageSectionsData = { ...prev };
+            (Object.keys(data) as (keyof HomepageSectionsData)[]).forEach((key) => {
+              if (data[key].length > 0) {
+                merged[key] = data[key];
+              }
+            });
+            return merged;
+          });
         }
       } catch (error) {
         console.error('Failed to refresh homepage sections:', error);
@@ -66,7 +74,7 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
     return () => {
       cancelled = true;
     };
-  }, [initialSections]);
+  }, []);
 
   const {
     flashSaleProducts,

@@ -88,7 +88,6 @@ export default function HeroSlider() {
   const [slides, setSlides] = useState<Slide[]>(DEFAULT_SLIDES);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
-  const [loading, setLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const slide = slides[currentSlide] || slides[0];
@@ -137,8 +136,6 @@ export default function HeroSlider() {
         }
       } catch (error) {
         console.error('❌ Error fetching slides:', error);
-      } finally {
-        setLoading(false);
       }
     }
 
@@ -187,14 +184,6 @@ export default function HeroSlider() {
       setIsMuted(!isMuted);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="relative overflow-hidden rounded-xl md:rounded-2xl shadow-lg">
-        <div className="w-full h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px] bg-gray-200 animate-pulse" />
-      </div>
-    );
-  }
 
   return (
     <div className="relative overflow-hidden rounded-xl md:rounded-2xl shadow-lg group">
