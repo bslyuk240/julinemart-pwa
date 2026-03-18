@@ -60,6 +60,10 @@ async function getAllHomepageCategories(): Promise<Category[]> {
     categoriesCache = getCategories({
       per_page: 100,
       hide_empty: false,
+    }).catch((err) => {
+      // Clear so the next request retries instead of reusing a failed promise
+      categoriesCache = null;
+      throw err;
     });
   }
 
