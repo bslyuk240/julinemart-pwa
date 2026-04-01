@@ -10,15 +10,16 @@ const LOGO_URL = process.env.NEXT_PUBLIC_LOGO_URL || `${SITE_URL}/favicon.ico`;
 const DEFAULT_DESCRIPTION = `Shop the latest products and best deals at ${SITE_NAME}.`;
 
 type ProductPageProps = {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 };
 
 const stripHtml = (value?: string | null) => (value ? value.replace(/<[^>]*>/g, '').trim() : '');
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const product = await getProductBySlug(params.slug);
+  const { slug } = await params;
+  const product = await getProductBySlug(slug);
   if (!product) {
     return {
       title: `${SITE_NAME} | Product`,
@@ -31,7 +32,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     stripHtml(product.description) ||
     `${decodeHtmlEntities(product.name)} on ${SITE_NAME}`;
   const imageUrl = product.images?.[0]?.src || LOGO_URL;
-  const canonicalUrl = `${SITE_URL}/product/${params.slug}`;
+  const canonicalUrl = `${SITE_URL}/product/${slug}`;
 
   return {
     title: decodeHtmlEntities(product.name),
@@ -61,7 +62,8 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
-  const product = await getProductBySlug(params.slug);
+  const { slug } = await params;
+  const product = await getProductBySlug(slug);
   if (!product) {
     notFound();
   }

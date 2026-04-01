@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 export default async function DynamicPage({ params }: PageProps) {
+  const { slug } = await params;
   const blockedJobSlugs = [
     'job-openings',
     'sales-representative',
@@ -17,11 +18,11 @@ export default async function DynamicPage({ params }: PageProps) {
     'virtual-assistant-customer-care-representative',
   ];
 
-  if (blockedJobSlugs.includes(params.slug)) {
+  if (blockedJobSlugs.includes(slug)) {
     notFound();
   }
 
-  const page = await getPageBySlug(params.slug);
+  const page = await getPageBySlug(slug);
 
   if (!page) {
     notFound();

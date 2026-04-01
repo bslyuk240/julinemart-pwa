@@ -7,15 +7,16 @@ import { ArrowLeft, Store } from 'lucide-react';
 export const revalidate = 300; // Revalidate every 5 minutes
 
 interface BrandPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 export default async function BrandPage({ params }: BrandPageProps) {
-  const brand = await getBrandBySlug(params.slug).catch(() => null);
-  const products = brand 
-    ? await getProductsByBrand(params.slug, { per_page: 24 }).catch(() => [])
+  const { slug } = await params;
+  const brand = await getBrandBySlug(slug).catch(() => null);
+  const products = brand
+    ? await getProductsByBrand(slug, { per_page: 24 }).catch(() => [])
     : [];
 
   if (!brand) {
@@ -23,7 +24,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
       <main className="min-h-screen bg-gray-50 flex items-center justify-center pb-24 md:pb-8">
         <div className="text-center px-4">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Brand Not Found</h1>
-          <p className="text-gray-600 mb-6">The brand you're looking for doesn't exist.</p>
+          <p className="text-gray-600 mb-6">The brand you&apos;re looking for doesn&apos;t exist.</p>
           <Link
             href="/brands"
             className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
@@ -68,19 +69,19 @@ export default async function BrandPage({ params }: BrandPageProps) {
                 </span>
               </div>
             )}
-            
+
             {/* Brand Info */}
             <div className="flex-1">
               <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2">
                 {brand.name}
               </h1>
-              
+
               {brand.description && (
                 <p className="text-gray-600 mb-3 text-sm md:text-base">
                   {brand.description}
                 </p>
               )}
-              
+
               <div className="flex items-center gap-4 text-sm text-gray-500">
                 <div className="flex items-center gap-2">
                   <Store className="w-4 h-4" />
