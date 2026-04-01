@@ -3,10 +3,10 @@ import { getJloBaseUrl } from '@/lib/jlo/returns';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { returnId: string } }
+  { params }: { params: Promise<{ returnId: string }> }
 ) {
   const base = getJloBaseUrl();
-  const returnId = params.returnId;
+  const { returnId } = await params;
 
   try {
     const res = await fetch(
@@ -41,10 +41,10 @@ export async function GET(
 }
 export async function POST(
   req: NextRequest,
-  { params }: { params: { returnId: string } }
+  { params }: { params: Promise<{ returnId: string }> }
 ) {
   const base = getJloBaseUrl();
-  const shipmentId = params.returnId;
+  const { returnId: shipmentId } = await params;
 
   try {
     const body = await req.json();

@@ -6,9 +6,10 @@ const JLO_BASE = getJloBaseUrl();
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (Number.isNaN(orderId)) {
     return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
   }
@@ -43,9 +44,10 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (Number.isNaN(orderId)) {
     return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
   }

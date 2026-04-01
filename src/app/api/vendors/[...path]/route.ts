@@ -17,10 +17,10 @@ export const revalidate = 0;
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    const path = params.path || [];
+    const { path = [] } = await params;
     
     // Build WordPress endpoint URL
     const baseUrl = process.env.WC_BASE_URL?.replace('/wc/v3', '') || '';

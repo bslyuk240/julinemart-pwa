@@ -4,9 +4,10 @@ import { addOrderNote } from '@/lib/woocommerce/refunds';
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const orderId = Number(params.id);
+  const { id } = await params;
+  const orderId = Number(id);
   if (Number.isNaN(orderId)) {
     return NextResponse.json({ success: false, message: 'Invalid order id' }, { status: 400 });
   }
