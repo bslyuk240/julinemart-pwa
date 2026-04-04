@@ -162,17 +162,14 @@ export function toWcProduct(row: any): Product {
     meta_data: Array.isArray(row.meta_data) ? row.meta_data : [],
     store: (() => {
       if (row.store) return row.store;
-      const vendorId = Number(row.woocommerce_vendor_id ?? row.wc_vendor_id ?? 0);
+      // Supabase data has a nested vendor object: { id, store_name, store_slug, woocommerce_vendor_id }
+      const vendor = row.vendor;
+      const vendorId = Number(vendor?.woocommerce_vendor_id ?? row.woocommerce_vendor_id ?? row.wc_vendor_id ?? 0);
       if (!vendorId) return undefined;
-      // Find vendor entry in categories (has store_name, not name)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const vendorCat = Array.isArray(row.categories)
-        ? row.categories.find((c: any) => c.store_name)
-        : null;
       return {
         id: vendorId,
-        name: vendorCat?.store_name ?? `Vendor ${vendorId}`,
-        shop_name: vendorCat?.store_name ?? `Vendor ${vendorId}`,
+        name: vendor?.store_name ?? `Vendor ${vendorId}`,
+        shop_name: vendor?.store_name ?? `Vendor ${vendorId}`,
         url: `/vendor/${vendorId}`,
         address: {},
       };
