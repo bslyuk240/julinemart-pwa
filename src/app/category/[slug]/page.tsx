@@ -4,135 +4,79 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown } from 'lucide-react';
-import { getProducts } from '@/lib/woocommerce/products';
-import { getCategoryBySlug } from '@/lib/woocommerce/categories';
 import { Product } from '@/types/product';
-import { decodeHtmlEntities } from '@/lib/utils/helpers';
-import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 
 export default function CategoryPage() {
   const params = useParams();
   const slug = params.slug as string;
-  
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [categoryName, setCategoryName] = useState('');
-  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'date' | 'popularity' | 'rating' | 'price'>('date');
   const perPage = 24;
 
-  useEffect(() => {
-    fetchCategoryAndProducts();
-  }, [slug]);
+  const categoryName = slug
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 
-  const fetchCategoryAndProducts = async () => {
-    try {
-      setLoading(true);
-      setHasMore(true);
-      setPage(1);
-      
-      const category = await getCategoryBySlug(slug);
-      
-      if (category) {
-        setCategoryName(decodeHtmlEntities(category.name));
-        setCategoryId(category.id.toString());
-        
-        const fetchedProducts = await getProducts({
-          category: category.id.toString(),
-          per_page: perPage,
-          orderby: sortBy,
-          order: 'desc',
-          page: 1,
-        });
-        
-        // ✅ SOLUTION 2: Filter out disabled vendors
-        const filtered = await filterActiveVendorProducts(fetchedProducts);
-        setProducts(filtered);
-        setHasMore(filtered.length === perPage);
-      } else {
-        setCategoryId(null);
-        const fetchedProducts = await getProducts({ 
-          category: slug,
-          per_page: perPage,
-          orderby: sortBy,
-          order: 'desc',
-          page: 1,
-        });
-        
-        // ✅ SOLUTION 2: Filter out disabled vendors
-        const filtered = await filterActiveVendorProducts(fetchedProducts);
-        setProducts(filtered);
-        setHasMore(filtered.length === perPage);
-        setCategoryName(slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
-      }
-    } catch (error) {
-      console.error('Error fetching category products:', error);
-    } finally {
-      setLoading(false);
-    }
+  const buildUrl = (pageNumber: number, sort: typeof sortBy) => {
+    const qs = new URLSearchParams({
+      category: slug,
+      per_page: String(perPage),
+      page: String(pageNumber),
+      orderby: sort,
+      order: 'desc',
+    });
+    return `/api/products?${qs.toString()}`;
   };
+
+  const fetchFromApi = async (url: string): Promise<{ products: Product[]; total: number; totalPages: number }> => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Products API error: ${res.status}`);
+    return res.json();
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        setHasMore(true);
+        setPage(1);
+        const { products: fetched } = await fetchFromApi(buildUrl(1, sortBy));
+        setProducts(fetched);
+        setHasMore(fetched.length === perPage);
+      } catch (error) {
+        console.error('Error fetching category products:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, sortBy]);
 
   const loadMore = async () => {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const categoryParam = categoryId ?? slug;
-      const fetchedProducts = await getProducts({
-        category: categoryParam,
-        per_page: perPage,
-        orderby: sortBy,
-        order: 'desc',
-        page: nextPage,
-      });
-
-      // ✅ SOLUTION 2: Filter out disabled vendors
-      const filtered = await filterActiveVendorProducts(fetchedProducts);
-
-      if (filtered.length > 0) {
-        setProducts((prev) => [...prev, ...filtered]);
+      const { products: more } = await fetchFromApi(buildUrl(nextPage, sortBy));
+      if (more.length > 0) {
+        setProducts((prev) => [...prev, ...more]);
         setPage(nextPage);
-        setHasMore(filtered.length === perPage);
+        setHasMore(more.length === perPage);
       } else {
         setHasMore(false);
       }
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error loading more products:', error);
     } finally {
       setLoadingMore(false);
     }
   };
-
-  const refetchCurrentPage = async () => {
-    try {
-      const categoryParam = categoryId ?? slug;
-      const fetchedProducts = await getProducts({
-        category: categoryParam,
-        per_page: perPage,
-        orderby: sortBy,
-        order: 'desc',
-        page: 1,
-      });
-      
-      // ✅ SOLUTION 2: Filter out disabled vendors
-      const filtered = await filterActiveVendorProducts(fetchedProducts);
-      setProducts(filtered);
-      setPage(1);
-      setHasMore(filtered.length === perPage);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    }
-  };
-
-  // Refetch when sort changes after initial load
-  useEffect(() => {
-    if (!loading && categoryName) {
-      refetchCurrentPage();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortBy]);
 
   if (loading) {
     return (
@@ -147,10 +91,6 @@ export default function CategoryPage() {
     );
   }
 
-  const productCount = products.length;
-  const hasProducts = productCount > 0;
-  const displayText = hasProducts ? `${productCount} products found` : 'Browse products in this category';
-
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
       <div className="container mx-auto px-4 py-6">
@@ -164,7 +104,9 @@ export default function CategoryPage() {
 
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">{categoryName}</h1>
-          <p className="text-sm md:text-base text-gray-600">{displayText}</p>
+          <p className="text-sm md:text-base text-gray-600">
+            {products.length > 0 ? `${products.length} products found` : 'Browse products in this category'}
+          </p>
         </div>
 
         <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-lg shadow-sm">
@@ -173,16 +115,15 @@ export default function CategoryPage() {
               <Filter className="w-4 h-4" />
               <span className="font-medium hidden md:inline">Filters</span>
             </button>
-            
             <div className="hidden md:flex items-center gap-2">
-              <span className="text-sm text-gray-600">{productCount} products</span>
+              <span className="text-sm text-gray-600">{products.length} products</span>
             </div>
           </div>
 
           <div className="relative">
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'date' | 'popularity' | 'rating' | 'price')}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors appearance-none pr-8 cursor-pointer text-sm"
             >
               <option value="date">Latest</option>
@@ -194,10 +135,9 @@ export default function CategoryPage() {
           </div>
         </div>
 
-        {hasProducts ? (
+        {products.length > 0 ? (
           <>
             <ProductGrid products={products} columns={4} />
-
             {hasMore && (
               <div className="text-center mt-8">
                 <button

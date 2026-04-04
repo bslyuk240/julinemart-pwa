@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProductGrid from '@/components/product/product-grid';
-import { searchProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
 
 function SearchContent() {
@@ -27,27 +26,21 @@ function SearchContent() {
       setHasSearched(true);
 
       try {
-        const data = await searchProducts(query, { per_page: 24 });
-        if (!isCancelled) {
-          setProducts(data);
-        }
+        const qs = new URLSearchParams({ search: query, per_page: '24' });
+        const res = await fetch(`/api/products?${qs.toString()}`);
+        if (!res.ok) throw new Error(`Search API error: ${res.status}`);
+        const { products: data } = await res.json();
+        if (!isCancelled) setProducts(data ?? []);
       } catch (error) {
         console.error('Error searching products:', error);
-        if (!isCancelled) {
-          setProducts([]);
-        }
+        if (!isCancelled) setProducts([]);
       } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
+        if (!isCancelled) setLoading(false);
       }
     };
 
     fetchResults();
-
-    return () => {
-      isCancelled = true;
-    };
+    return () => { isCancelled = true; };
   }, [query]);
 
   return (
@@ -80,7 +73,7 @@ function SearchContent() {
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <h2 className="text-xl font-semibold text-gray-900 mb-2">No products found</h2>
             <p className="text-gray-600">
-              We could not find any results for "{query}". Try another search term.
+              We could not find any results for &quot;{query}&quot;. Try another search term.
             </p>
           </div>
         )}
