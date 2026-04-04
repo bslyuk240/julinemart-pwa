@@ -1,41 +1,66 @@
 import { NextResponse } from 'next/server';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 const WP_URL = process.env.NEXT_PUBLIC_WP_URL;
 
-export async function GET() {
+async function fetchFromSupabase() {
   try {
-    console.log('📡 API Route: Fetching PWA settings from WordPress...');
-    
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('homepage_content')
+      .select('key, content')
+      .eq('is_active', true)
+      .in('key', ['hero_slider', 'announcement_bar']);
+
+    if (error || !data || data.length === 0) return null;
+
+    const sliderRow = data.find((r: any) => r.key === 'hero_slider');
+    const bannerRow = data.find((r: any) => r.key === 'announcement_bar');
+
+    const sliders = sliderRow?.content?.slides ?? [];
+    const banner = bannerRow?.content ?? { enabled: false, text: '' };
+
+    // Only return Supabase data if slider content exists
+    if (sliders.length === 0) return null;
+
+    return { sliders, banner };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchFromWordPress() {
+  if (!WP_URL) return null;
+  try {
     const response = await fetch(
       `${WP_URL}/wp-json/julinemart-pwa/v1/settings`,
       {
-        next: { revalidate: 300 }, // Cache for 5 minutes
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        next: { revalidate: 300 },
+        headers: { 'Content-Type': 'application/json' },
       }
     );
-
-    if (!response.ok) {
-      console.error('❌ WordPress API error:', response.status);
-      return NextResponse.json(
-        { error: 'Failed to fetch settings' },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    console.log('✅ Settings fetched successfully:', {
-      sliders: data.sliders?.length || 0,
-      banner: data.banner?.enabled ? 'enabled' : 'disabled',
-    });
-
-    return NextResponse.json(data);
-  } catch (error: any) {
-    console.error('❌ Error fetching PWA settings:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
   }
+}
+
+export async function GET() {
+  // Try Supabase homepage_content first
+  const supabaseData = await fetchFromSupabase();
+  if (supabaseData) {
+    return NextResponse.json(supabaseData);
+  }
+
+  // Fall back to WordPress plugin
+  const wpData = await fetchFromWordPress();
+  if (wpData) {
+    return NextResponse.json(wpData);
+  }
+
+  return NextResponse.json(
+    { error: 'Failed to fetch settings' },
+    { status: 503 }
+  );
 }

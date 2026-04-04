@@ -1,17 +1,54 @@
 import { wcApi, handleApiError, WooCommerceResponse } from './client';
 import { Product, ProductsQueryParams, ProductVariation, ProductReview } from '@/types/product';
+import {
+  catalogGetProducts,
+  catalogGetProduct,
+  catalogGetVariations,
+  type CatalogProductsParams,
+} from '@/lib/catalog/client';
+
+// ─── catalog-first helpers ────────────────────────────────────────────────────
 
 /**
- * Get all products with optional filters
- * FIXED: Handles tag slug to ID conversion for WooCommerce compatibility
+ * Map WooCommerce ProductsQueryParams to catalog params.
+ * Catalog uses slugs for category/tag; WC uses numeric IDs.
+ * Only slug-based filters map cleanly — numeric IDs fall back to WC.
+ */
+function toCatalogParams(params: ProductsQueryParams): CatalogProductsParams | null {
+  // If WC-specific numeric IDs are used we can't map them — use WC directly
+  if (params.category && !isNaN(Number(params.category))) return null;
+  if (params.tag && !isNaN(Number(params.tag))) return null;
+  // Unsupported WC filters
+  if (params.featured || params.on_sale || params.include || params.orderby === 'popularity') return null;
+
+  return {
+    page: params.page as number | undefined,
+    per_page: params.per_page as number | undefined,
+    category: params.category as string | undefined,
+    tag: params.tag as string | undefined,
+    search: params.search as string | undefined,
+    type: params.type as 'simple' | 'variable' | undefined,
+  };
+}
+
+// ─── exported functions ───────────────────────────────────────────────────────
+
+/**
+ * Get all products — tries Supabase catalog first, falls back to WooCommerce.
  */
 export async function getProducts(
   params: ProductsQueryParams = {}
 ): Promise<Product[]> {
+  // Try catalog (slug-based filters only)
+  const catalogParams = toCatalogParams(params);
+  if (catalogParams) {
+    const result = await catalogGetProducts(catalogParams);
+    if (result && result.products.length > 0) return result.products;
+  }
+
+  // WooCommerce fallback
   try {
-    // If filtering by tag slug, convert to tag ID first
     if (params.tag && isNaN(Number(params.tag))) {
-      // It's a slug, not an ID
       const tagId = await getTagIdBySlug(params.tag);
       if (tagId) {
         params.tag = tagId.toString();
@@ -20,7 +57,6 @@ export async function getProducts(
         return [];
       }
     }
-
     const response = await wcApi.get('products', params);
     return response.data;
   } catch (error) {
@@ -30,13 +66,24 @@ export async function getProducts(
 }
 
 /**
- * Get products with pagination metadata (total, totalPages).
- * Use this on list pages so "Load more" can show until all pages are loaded (e.g. 300+ products).
+ * Get products with pagination — tries Supabase catalog first, falls back to WooCommerce.
  */
 export async function getProductsWithPagination(
   params: ProductsQueryParams = {}
 ): Promise<{ products: Product[]; total: number; totalPages: number }> {
   const { filterActiveVendorProducts } = await import('@/lib/utils/vendor-filters');
+
+  // Try catalog first
+  const catalogParams = toCatalogParams(params);
+  if (catalogParams) {
+    const result = await catalogGetProducts(catalogParams);
+    if (result && result.products.length > 0) {
+      const products = await filterActiveVendorProducts(result.products);
+      return { products, total: result.total, totalPages: result.totalPages };
+    }
+  }
+
+  // WooCommerce fallback
   try {
     if (params.tag && isNaN(Number(params.tag))) {
       const tagId = await getTagIdBySlug(params.tag);
@@ -72,9 +119,12 @@ async function getTagIdBySlug(slug: string): Promise<number | null> {
 }
 
 /**
- * Get a single product by ID
+ * Get a single product by ID — tries Supabase catalog first, falls back to WooCommerce.
  */
 export async function getProduct(id: number): Promise<Product | null> {
+  const catalogProduct = await catalogGetProduct(id);
+  if (catalogProduct) return catalogProduct;
+
   try {
     const response = await wcApi.get(`products/${id}`);
     return response.data;
@@ -126,11 +176,14 @@ export async function createProductReview(payload: {
 }
 
 /**
- * Get variations for a variable product
+ * Get variations — tries Supabase catalog first, falls back to WooCommerce.
  */
 export async function getProductVariations(
   productId: number
 ): Promise<ProductVariation[]> {
+  const catalogVars = await catalogGetVariations(productId);
+  if (catalogVars) return catalogVars;
+
   try {
     const response = await wcApi.get(`products/${productId}/variations`, {
       per_page: 100,
