@@ -300,7 +300,11 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
       try {
         setLoadingVariations(true);
-        const data = await getProductVariations(product.id);
+        // Use inline variations from catalog-product response if available
+        // (avoids a separate fetch and fixes the Supabase UUID → 0 mapping issue)
+        const data = product._variations?.length
+          ? product._variations
+          : await getProductVariations(product.supabaseId ?? product.id as any);
         setVariations(data);
 
         // Prefill defaults if available

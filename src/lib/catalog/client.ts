@@ -99,8 +99,16 @@ export function toWcProduct(row: any): Product {
       }))
     : [];
 
+  // catalog-product returns variations as full objects; extract before the
+  // WC numeric-id mapping destroys them
+  const inlineVariations =
+    Array.isArray(row.variations) && row.variations.length > 0 && typeof row.variations[0] === 'object'
+      ? (row.variations as unknown[]).map(toWcVariation)
+      : undefined;
+
   return {
     supabaseId: row.id ?? undefined,
+    _variations: inlineVariations,
     // Use woo_product_id as the numeric WC id; fall back to wc_id or 0
     id: Number(row.woo_product_id ?? row.wc_id ?? row.id ?? 0),
     name: row.name ?? '',
@@ -193,7 +201,14 @@ function toWcVariation(row: any): ProductVariation {
     stock_status: row.stock_status ?? 'instock',
     stock_quantity: row.stock_quantity != null ? Number(row.stock_quantity) : null,
     manage_stock: Boolean(row.manage_stock),
-    attributes: Array.isArray(row.attributes) ? row.attributes : [],
+    // Supabase stores [{name, value}]; WC/UI expects [{id, name, option}]
+    attributes: Array.isArray(row.attributes)
+      ? row.attributes.map((a: any) => ({
+          id: a.id ?? 0,
+          name: a.name ?? '',
+          option: a.option ?? a.value ?? '',
+        }))
+      : [],
     image: row.image ?? (Array.isArray(row.images) ? row.images[0] : undefined),
   };
 }

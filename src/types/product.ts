@@ -1,6 +1,7 @@
 export interface Product {
   id: number;
   supabaseId?: string;
+  _variations?: ProductVariation[];
   name: string;
   slug: string;
   permalink: string;
