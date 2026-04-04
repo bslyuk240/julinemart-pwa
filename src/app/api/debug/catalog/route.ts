@@ -12,11 +12,12 @@ export async function GET() {
   // 1. Check if the env var is configured
   const envConfigured = Boolean(jloCatalogUrl);
 
-  // 2. Probe the JLO function directly
+  // 2. Probe the JLO function directly and capture raw response
   let jloReachable = false;
   let jloStatus: number | null = null;
   let jloError: string | null = null;
-  let sampleProductName: string | null = null;
+  let rawResponse: unknown = null;
+  let responseShape: string | null = null;
 
   if (jloCatalogUrl) {
     try {
@@ -25,14 +26,22 @@ export async function GET() {
       jloStatus = res.status;
       jloReachable = res.ok;
 
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          sampleProductName = data[0]?.name ?? null;
+      const text = await res.text();
+      try {
+        rawResponse = JSON.parse(text);
+        if (Array.isArray(rawResponse)) {
+          responseShape = `array[${rawResponse.length}]`;
+        } else if (rawResponse && typeof rawResponse === 'object') {
+          responseShape = `object with keys: ${Object.keys(rawResponse as object).join(', ')}`;
+        } else {
+          responseShape = typeof rawResponse;
         }
-      } else {
-        jloError = await res.text().catch(() => `HTTP ${res.status}`);
+      } catch {
+        rawResponse = text.slice(0, 500); // show first 500 chars if not JSON
+        responseShape = 'non-json';
       }
+
+      if (!res.ok) jloError = text.slice(0, 300);
     } catch (err: any) {
       jloError = err?.message ?? 'fetch failed';
     }
@@ -49,7 +58,9 @@ export async function GET() {
     jlo_reachable: jloReachable,
     jlo_http_status: jloStatus,
     jlo_error: jloError,
+    response_shape: responseShape,
+    raw_response: rawResponse,
     catalog_client_working: catalogWorking,
-    sample_product: sampleProductName ?? (catalogProducts?.[0]?.name ?? null),
+    sample_product: catalogProducts?.[0]?.name ?? null,
   });
 }
