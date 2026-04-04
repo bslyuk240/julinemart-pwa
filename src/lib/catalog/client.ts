@@ -203,9 +203,7 @@ function toWcVariation(row: any): ProductVariation {
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function catalogGetProducts(
-  params: ProductsQueryParams = {}
-): Promise<Product[] | null> {
+function buildProductsQS(params: ProductsQueryParams): string {
   const qs = new URLSearchParams();
   if (params.page) qs.set('page', String(params.page));
   if (params.per_page) qs.set('per_page', String(params.per_page));
@@ -221,13 +219,32 @@ export async function catalogGetProducts(
   if (params.stock_status) qs.set('stock_status', params.stock_status);
   if (params.orderby) qs.set('orderby', params.orderby);
   if (params.order) qs.set('order', params.order);
+  return qs.toString();
+}
 
-  const query = qs.toString();
-  const path = `/.netlify/functions/catalog-products${query ? `?${query}` : ''}`;
-
+export async function catalogGetProductsWithMeta(
+  params: ProductsQueryParams = {}
+): Promise<{ products: Product[]; total: number; totalPages: number } | null> {
+  const qs = buildProductsQS(params);
+  const path = `/.netlify/functions/catalog-products${qs ? `?${qs}` : ''}`;
   const resp = await jloFetch<JloListResponse>(path);
   if (!resp?.success || !Array.isArray(resp.data) || resp.data.length === 0) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const meta = resp.meta as any;
+  return {
+    products: resp.data.map(toWcProduct),
+    total: Number(meta?.total ?? resp.data.length),
+    totalPages: Number(meta?.total_pages ?? 1),
+  };
+}
 
+export async function catalogGetProducts(
+  params: ProductsQueryParams = {}
+): Promise<Product[] | null> {
+  const qs = buildProductsQS(params);
+  const path = `/.netlify/functions/catalog-products${qs ? `?${qs}` : ''}`;
+  const resp = await jloFetch<JloListResponse>(path);
+  if (!resp?.success || !Array.isArray(resp.data) || resp.data.length === 0) return null;
   return resp.data.map(toWcProduct);
 }
 

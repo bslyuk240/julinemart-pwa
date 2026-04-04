@@ -51,6 +51,8 @@ export async function GET() {
   const catalogProducts = await catalogGetProducts({ per_page: 1 });
   const catalogWorking = catalogProducts !== null && catalogProducts.length > 0;
 
+  const sampleProduct = catalogProducts?.[0] ?? null;
+
   return NextResponse.json({
     source: catalogWorking ? 'supabase_via_jlo' : 'woocommerce_fallback',
     jlo_catalog_url: jloCatalogUrl ?? '(not set)',
@@ -61,6 +63,9 @@ export async function GET() {
     response_shape: responseShape,
     raw_response: rawResponse,
     catalog_client_working: catalogWorking,
-    sample_product: catalogProducts?.[0]?.name ?? null,
+    sample_product: sampleProduct?.name ?? null,
+    sample_store: sampleProduct?.store ?? null,
+    sample_price: sampleProduct?.price ?? null,
+    sample_categories: sampleProduct?.categories ?? null,
   });
 }
