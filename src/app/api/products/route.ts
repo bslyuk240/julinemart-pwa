@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
   if (searchParams.get('min_price')) params.min_price = searchParams.get('min_price');
   if (searchParams.get('max_price')) params.max_price = searchParams.get('max_price');
   if (searchParams.get('stock_status')) params.stock_status = searchParams.get('stock_status');
+  if (searchParams.get('woo_vendor_id')) params.woo_vendor_id = searchParams.get('woo_vendor_id');
 
   const result = await getProductsWithPagination(params);
   return NextResponse.json(result);

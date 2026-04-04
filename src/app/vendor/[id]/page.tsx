@@ -9,7 +9,7 @@ import { Product } from '@/types/product';
 import { getStorePolicies, StorePolicies } from '@/lib/woocommerce/policies';
 import { formatPrice } from '@/lib/utils/format-price';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
-import { getVendorById, getVendorProducts, getVendorProductCount } from '@/lib/woocommerce/vendors-custom';
+import { getVendorById } from '@/lib/woocommerce/vendors-custom';
 import type { Vendor } from '@/types/vendor';
 
 type VendorSortOption = 'date' | 'popularity' | 'price' | 'price-desc';
@@ -113,14 +113,12 @@ export default function VendorStorePage() {
           }
         }
 
-        const countData = await getVendorProductCount(numericVendorId);
-        const vendorProducts = await getVendorProducts(numericVendorId, countData?.product_ids);
+        const qs = new URLSearchParams({ woo_vendor_id: String(numericVendorId), per_page: '100' });
+        const res = await fetch(`/api/products?${qs.toString()}`);
+        if (!res.ok) throw new Error(`Vendor products API error: ${res.status}`);
+        const { products: vendorProducts, total } = await res.json();
 
-        if (countData?.product_count != null) {
-          setProductCount(countData.product_count);
-        } else {
-          setProductCount(vendorProducts.length);
-        }
+        setProductCount(total || vendorProducts.length);
 
         setProducts(sortVendorProducts(vendorProducts, sortBy));
 

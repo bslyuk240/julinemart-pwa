@@ -216,6 +216,7 @@ function buildProductsQS(params: ProductsQueryParams): string {
   if (params.stock_status) qs.set('stock_status', params.stock_status);
   if (params.orderby) qs.set('orderby', params.orderby);
   if (params.order) qs.set('order', params.order);
+  if (params.woo_vendor_id) qs.set('woo_vendor_id', String(params.woo_vendor_id));
   return qs.toString();
 }
 

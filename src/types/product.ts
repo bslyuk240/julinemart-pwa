@@ -180,4 +180,5 @@ export interface ProductsQueryParams {
   min_price?: string;
   max_price?: string;
   stock_status?: 'instock' | 'outofstock' | 'onbackorder';
+  woo_vendor_id?: number | string;
 }
