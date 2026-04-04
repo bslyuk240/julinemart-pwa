@@ -1,17 +1,26 @@
 import { wcApi, handleApiError, WooCommerceResponse } from './client';
 import { Product, ProductsQueryParams, ProductVariation, ProductReview } from '@/types/product';
+import {
+  catalogGetProducts,
+  catalogGetProduct,
+  catalogGetVariations,
+} from '@/lib/catalog/client';
 
 /**
  * Get all products with optional filters
- * FIXED: Handles tag slug to ID conversion for WooCommerce compatibility
+ * Tries Supabase catalog first via JLO Netlify functions, falls back to WooCommerce.
  */
 export async function getProducts(
   params: ProductsQueryParams = {}
 ): Promise<Product[]> {
+  // Supabase-first
+  const catalogProducts = await catalogGetProducts(params);
+  if (catalogProducts && catalogProducts.length > 0) return catalogProducts;
+
+  // WooCommerce fallback
   try {
     // If filtering by tag slug, convert to tag ID first
     if (params.tag && isNaN(Number(params.tag))) {
-      // It's a slug, not an ID
       const tagId = await getTagIdBySlug(params.tag);
       if (tagId) {
         params.tag = tagId.toString();
@@ -73,8 +82,14 @@ async function getTagIdBySlug(slug: string): Promise<number | null> {
 
 /**
  * Get a single product by ID
+ * Tries Supabase catalog first, falls back to WooCommerce.
  */
 export async function getProduct(id: number): Promise<Product | null> {
+  // Supabase-first (catalog-product endpoint accepts id too)
+  const catalogProduct = await catalogGetProduct(String(id));
+  if (catalogProduct) return catalogProduct;
+
+  // WooCommerce fallback
   try {
     const response = await wcApi.get(`products/${id}`);
     return response.data;
@@ -127,10 +142,16 @@ export async function createProductReview(payload: {
 
 /**
  * Get variations for a variable product
+ * Tries Supabase catalog first, falls back to WooCommerce.
  */
 export async function getProductVariations(
   productId: number
 ): Promise<ProductVariation[]> {
+  // Supabase-first
+  const catalogVariations = await catalogGetVariations(productId);
+  if (catalogVariations && catalogVariations.length > 0) return catalogVariations;
+
+  // WooCommerce fallback
   try {
     const response = await wcApi.get(`products/${productId}/variations`, {
       per_page: 100,
@@ -145,8 +166,14 @@ export async function getProductVariations(
 
 /**
  * Get a product by slug
+ * Tries Supabase catalog first, falls back to WooCommerce.
  */
 export async function getProductBySlug(slug: string): Promise<Product | null> {
+  // Supabase-first
+  const catalogProduct = await catalogGetProduct(slug);
+  if (catalogProduct) return catalogProduct;
+
+  // WooCommerce fallback
   try {
     const response = await wcApi.get('products', { slug });
     return response.data[0] || null;
