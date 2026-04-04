@@ -163,7 +163,13 @@ export function toWcProduct(row: any): Product {
     tags,
     brands: Array.isArray(row.brands) ? row.brands : undefined,
     images,
-    attributes: Array.isArray(row.attributes) ? row.attributes : [],
+    // Supabase uses is_variation; WC/UI checks attr.variation
+    attributes: Array.isArray(row.attributes)
+      ? row.attributes.map((a: any) => ({
+          ...a,
+          variation: a.variation ?? a.is_variation ?? false,
+        }))
+      : [],
     default_attributes: Array.isArray(row.default_attributes) ? row.default_attributes : [],
     variations: Array.isArray(row.variations) ? row.variations.map(Number) : [],
     grouped_products: Array.isArray(row.grouped_products) ? row.grouped_products : [],
