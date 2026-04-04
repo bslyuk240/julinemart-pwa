@@ -335,9 +335,12 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     }
 
     const match = variations.find((variation) => {
+      if (!variation.attributes.length) return false;
       return variation.attributes.every((attr) => {
         const key = attr.name.toLowerCase();
-        return selectedAttributes[key] && selectedAttributes[key] === attr.option;
+        const selected = selectedAttributes[key];
+        if (!selected) return false;
+        return selected.toLowerCase() === (attr.option ?? '').toLowerCase();
       });
     });
 
