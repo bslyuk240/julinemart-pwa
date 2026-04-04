@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import ProductGallery from '@/components/product/product-gallery';
 import ProductCarousel from '@/components/product/product-carousel';
 import { Badge } from '@/components/ui/badge';
-import { getRelatedProducts, getProductVariations, getProductReviews, createProductReview } from '@/lib/woocommerce/products';
+import { getProductVariations, getProductReviews, createProductReview } from '@/lib/woocommerce/products';
 import ProductFeatures from '@/components/product/product-features';
 import { useCartStore } from '@/store/cart-store';
 import { useWishlist } from '@/hooks/use-wishlist';
@@ -75,9 +75,16 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
   useEffect(() => {
     const fetchRelated = async () => {
       if (!product) return;
+      const categorySlug = product.categories?.[0]?.slug;
+      if (!categorySlug) return;
       try {
-        const related = await getRelatedProducts(product.id, 6);
-        setRelatedProducts(related);
+        const qs = new URLSearchParams({ category: categorySlug, per_page: '7' });
+        const res = await fetch(`/api/products?${qs.toString()}`);
+        if (!res.ok) return;
+        const { products: data } = await res.json();
+        setRelatedProducts(
+          (data as Product[]).filter((p) => p.id !== product.id).slice(0, 6)
+        );
       } catch (error) {
         console.error('Error fetching related products:', error);
       }
