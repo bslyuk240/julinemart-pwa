@@ -3,11 +3,12 @@
  *
  * Calls JLO Netlify functions which serve product data from Supabase.
  * Must never run in the browser (CORS is locked to production domain).
+ * A runtime guard in jloFetch() returns null immediately in the browser
+ * so client components fall through to the WooCommerce fallback.
  * The JLO backend site URL must be set via NEXT_PUBLIC_JLO_CATALOG_URL.
  *
  * All functions return null/[] on any error so callers can fall back to WooCommerce.
  */
-import 'server-only';
 
 import type { Product, ProductVariation, ProductsQueryParams } from '@/types/product';
 
@@ -20,6 +21,10 @@ function getJloCatalogBase(): string | null {
 }
 
 async function jloFetch<T>(path: string): Promise<T | null> {
+  // Never run in the browser — JLO CORS is locked to production domain.
+  // Client components will get null and fall back to WooCommerce.
+  if (typeof window !== 'undefined') return null;
+
   const base = getJloCatalogBase();
   if (!base) return null;
 
