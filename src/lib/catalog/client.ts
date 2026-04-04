@@ -1,11 +1,13 @@
 /**
- * Supabase Catalog Client
+ * Supabase Catalog Client — SERVER-SIDE ONLY
  *
  * Calls JLO Netlify functions which serve product data from Supabase.
+ * Must never run in the browser (CORS is locked to production domain).
  * The JLO backend site URL must be set via NEXT_PUBLIC_JLO_CATALOG_URL.
  *
  * All functions return null/[] on any error so callers can fall back to WooCommerce.
  */
+import 'server-only';
 
 import type { Product, ProductVariation, ProductsQueryParams } from '@/types/product';
 
@@ -43,8 +45,13 @@ interface JloSingleResponse { success: boolean; data: unknown }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toWcProduct(row: any): Product {
-  // Derive price: prefer sale_price when set, else regular_price
-  const regularPrice = String(row.regular_price ?? '');
+  // Derive price: prefer sale_price, else regular_price, else sourcing_meta NGN snapshot
+  const snapshotNgn = row.sourcing_meta?.final_price_snapshot_ngn
+    ?? row.sourcing_meta?.landed_cost_snapshot_ngn
+    ?? null;
+  const regularPrice = row.regular_price
+    ? String(row.regular_price)
+    : snapshotNgn ? String(snapshotNgn) : '';
   const salePrice = row.sale_price ? String(row.sale_price) : '';
   const price = salePrice || regularPrice;
   const onSale = Boolean(salePrice && salePrice !== regularPrice);
@@ -53,14 +60,16 @@ export function toWcProduct(row: any): Product {
   const rawStatus = row.status ?? 'publish';
   const status = rawStatus === 'published' ? 'publish' : rawStatus;
 
-  // Normalise categories: Supabase ids are UUIDs, WC type expects number — use 0
+  // Normalise categories: filter out vendor/hub entries (those have store_name not name)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const categories = Array.isArray(row.categories)
-    ? row.categories.map((c: any) => ({
-        id: typeof c.id === 'number' ? c.id : 0,
-        name: c.name ?? c.store_name ?? '',
-        slug: c.slug ?? c.store_slug ?? '',
-      }))
+    ? row.categories
+        .filter((c: any) => c.name && c.slug)
+        .map((c: any) => ({
+          id: typeof c.id === 'number' ? c.id : 0,
+          name: c.name,
+          slug: c.slug,
+        }))
     : [];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -146,7 +155,23 @@ export function toWcProduct(row: any): Product {
     grouped_products: Array.isArray(row.grouped_products) ? row.grouped_products : [],
     menu_order: Number(row.menu_order ?? 0),
     meta_data: Array.isArray(row.meta_data) ? row.meta_data : [],
-    store: row.store,
+    store: (() => {
+      if (row.store) return row.store;
+      const vendorId = Number(row.woocommerce_vendor_id ?? row.wc_vendor_id ?? 0);
+      if (!vendorId) return undefined;
+      // Find vendor entry in categories (has store_name, not name)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const vendorCat = Array.isArray(row.categories)
+        ? row.categories.find((c: any) => c.store_name)
+        : null;
+      return {
+        id: vendorId,
+        name: vendorCat?.store_name ?? `Vendor ${vendorId}`,
+        shop_name: vendorCat?.store_name ?? `Vendor ${vendorId}`,
+        url: `/vendor/${vendorId}`,
+        address: {},
+      };
+    })(),
   };
 }
 
