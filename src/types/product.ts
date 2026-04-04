@@ -1,5 +1,6 @@
 export interface Product {
   id: number;
+  supabaseId?: string;
   name: string;
   slug: string;
   permalink: string;
@@ -98,6 +99,7 @@ export interface VariationAttribute {
 
 export interface ProductVariation {
   id: number;
+  supabaseId?: string;
   sku: string;
   price: string;
   regular_price: string;

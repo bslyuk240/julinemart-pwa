@@ -3,6 +3,7 @@ import { Product } from './product';
 export interface CartItem {
   id: number;
   productId: number;
+  supabaseProductId?: string;
   name: string;
   slug: string;
   price: number;
@@ -15,6 +16,7 @@ export interface CartItem {
   sku: string;
   variation?: {
     id: number;
+    supabaseId?: string;
     attributes: Record<string, string>;
     price: number;
     regularPrice: number;

@@ -100,6 +100,7 @@ export function toWcProduct(row: any): Product {
     : [];
 
   return {
+    supabaseId: row.id ?? undefined,
     // Use woo_product_id as the numeric WC id; fall back to wc_id or 0
     id: Number(row.woo_product_id ?? row.wc_id ?? row.id ?? 0),
     name: row.name ?? '',
@@ -182,6 +183,7 @@ function toWcVariation(row: any): ProductVariation {
   const regularPrice = String(row.regular_price ?? '');
   const salePrice = row.sale_price ? String(row.sale_price) : '';
   return {
+    supabaseId: row.id ?? undefined,
     id: Number(row.woo_product_id ?? row.wc_id ?? row.id ?? 0),
     sku: row.sku ?? '',
     price: salePrice || regularPrice,

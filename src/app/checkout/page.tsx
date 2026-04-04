@@ -332,11 +332,12 @@ export default function CheckoutPage() {
       if (verifyData.cardSaved) {
         toast.success('Payment card saved for future use!');
       }
-      trackPurchaseForOrder(orderId);
+      const redirectOrderId = verifyData.order?.id ?? orderId;
+      trackPurchaseForOrder(redirectOrderId);
       clearCart();
       currentOrderRef.current = null;
-      
-      router.push(`/order-success?order=${orderId}`);
+
+      router.push(`/order-success?order=${redirectOrderId}`);
       
     } catch (error: any) {
       console.error('❌ Payment verification error:', error);
@@ -402,12 +403,14 @@ export default function CheckoutPage() {
         });
 
         if (verifyResponse.ok) {
+          const savedCardVerify = await verifyResponse.json().catch(() => ({}));
+          const savedCardOrderId = savedCardVerify?.order?.id ?? orderId;
           await persistCheckoutProfileIfNeeded();
           setIsProcessing(false);
-          trackPurchaseForOrder(orderId);
+          trackPurchaseForOrder(savedCardOrderId);
           clearCart();
           toast.success('Payment successful!');
-          router.push(`/order-success?order=${orderId}`);
+          router.push(`/order-success?order=${savedCardOrderId}`);
         } else {
           throw new Error('Failed to update order status');
         }
@@ -994,6 +997,12 @@ export default function CheckoutPage() {
                   ]
                 : []),
               ...attributeMeta,
+              ...(item.supabaseProductId
+                ? [{ key: '_supabase_product_id', value: item.supabaseProductId }]
+                : []),
+              ...(item.variation?.supabaseId
+                ? [{ key: '_supabase_variation_id', value: item.variation.supabaseId }]
+                : []),
             ],
           };
         }),
@@ -1106,12 +1115,12 @@ export default function CheckoutPage() {
           }
 
           if (useSavedCard && defaultSavedCard && isAuthenticated) {
-            await handleSavedCardPayment(order.id);
+            await handleSavedCardPayment(order.payment_reference ?? order.id);
           } else {
-            currentOrderRef.current = order.id;
-            
+            currentOrderRef.current = order.payment_reference ?? order.id;
+
             const paystackConfig = {
-              reference: `JLM_${order.id}_${Date.now()}`,
+              reference: order.payment_reference ?? `JLM_${order.id}_${Date.now()}`,
               email: formData.email,
               amount: amountKobo,
               publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
