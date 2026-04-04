@@ -3,7 +3,6 @@
 import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getProductsWithPagination } from '@/lib/woocommerce/products';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown } from 'lucide-react';
 import { Product } from '@/types/product';
@@ -88,21 +87,23 @@ function ProductsContent() {
 
   const PER_PAGE = 48;
 
-  const buildFetchParams = (pageNumber: number, overrideSort?: typeof sortBy) => {
+  const buildFetchUrl = (pageNumber: number, overrideSort?: typeof sortBy) => {
     const activeSort = overrideSort || sortBy;
     const sortParams = computeSortParams(activeSort);
-    const params: Record<string, any> = {
-      per_page: PER_PAGE,
-      page: pageNumber,
+    const qs = new URLSearchParams({
+      per_page: String(PER_PAGE),
+      page: String(pageNumber),
       orderby: sortParams.orderby,
       order: sortParams.order,
-    };
+    });
+    if (tagFilter) qs.set('tag', tagFilter);
+    return `/api/products?${qs.toString()}`;
+  };
 
-    if (tagFilter) {
-      params.tag = tagFilter;
-    }
-
-    return params;
+  const fetchFromApi = async (url: string) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Products API error: ${res.status}`);
+    return res.json() as Promise<{ products: Product[]; total: number; totalPages: number }>;
   };
 
   // Sync sort with URL param on navigation changes
@@ -118,7 +119,7 @@ function ProductsContent() {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const { products: fetchedProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(1));
+        const { products: fetchedProducts, totalPages: pages } = await fetchFromApi(buildFetchUrl(1));
         setProducts(fetchedProducts);
         setPage(1);
         setTotalPages(pages || 999);
@@ -139,7 +140,7 @@ function ProductsContent() {
     try {
       setLoadingMore(true);
       const nextPage = page + 1;
-      const { products: moreProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(nextPage));
+      const { products: moreProducts, totalPages: pages } = await fetchFromApi(buildFetchUrl(nextPage));
       
       setProducts((prev) => [...prev, ...moreProducts]);
       setPage(nextPage);
@@ -162,7 +163,7 @@ function ProductsContent() {
       setSortOrder(order);
       
       console.log('📊 Sort params:', { orderby, order });
-      const { products: sortedProducts, totalPages: pages } = await getProductsWithPagination(buildFetchParams(1, newSortBy));
+      const { products: sortedProducts, totalPages: pages } = await fetchFromApi(buildFetchUrl(1, newSortBy));
       console.log('✅ Sorted products loaded:', sortedProducts.length);
       
       setProducts(sortedProducts);
