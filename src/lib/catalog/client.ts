@@ -33,36 +33,83 @@ async function jloFetch<T>(path: string): Promise<T | null> {
   }
 }
 
+// JLO functions return { success, data, meta } for lists and { success, data } for single
+interface JloListResponse { success: boolean; data: unknown[]; meta?: unknown }
+interface JloSingleResponse { success: boolean; data: unknown }
+
 // ---------------------------------------------------------------------------
 // Row → WC Product mapper
 // ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toWcProduct(row: any): Product {
+  // Derive price: prefer sale_price when set, else regular_price
+  const regularPrice = String(row.regular_price ?? '');
+  const salePrice = row.sale_price ? String(row.sale_price) : '';
+  const price = salePrice || regularPrice;
+  const onSale = Boolean(salePrice && salePrice !== regularPrice);
+
+  // Map "published" → "publish" to match WC status enum
+  const rawStatus = row.status ?? 'publish';
+  const status = rawStatus === 'published' ? 'publish' : rawStatus;
+
+  // Normalise categories: Supabase ids are UUIDs, WC type expects number — use 0
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const categories = Array.isArray(row.categories)
+    ? row.categories.map((c: any) => ({
+        id: typeof c.id === 'number' ? c.id : 0,
+        name: c.name ?? c.store_name ?? '',
+        slug: c.slug ?? c.store_slug ?? '',
+      }))
+    : [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tags = Array.isArray(row.tags)
+    ? row.tags.map((t: any) => ({
+        id: typeof t.id === 'number' ? t.id : 0,
+        name: t.name ?? '',
+        slug: t.slug ?? '',
+      }))
+    : [];
+
+  // Normalise images: Supabase has { id(uuid), src, alt, position, is_thumbnail }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const images = Array.isArray(row.images)
+    ? row.images.map((img: any) => ({
+        id: typeof img.id === 'number' ? img.id : 0,
+        date_created: img.date_created ?? '',
+        date_modified: img.date_modified ?? '',
+        src: img.src ?? '',
+        name: img.name ?? '',
+        alt: img.alt ?? '',
+      }))
+    : [];
+
   return {
-    id: Number(row.wc_id ?? row.id ?? 0),
+    // Use woo_product_id as the numeric WC id; fall back to wc_id or 0
+    id: Number(row.woo_product_id ?? row.wc_id ?? row.id ?? 0),
     name: row.name ?? '',
     slug: row.slug ?? '',
     permalink: row.permalink ?? '',
-    date_created: row.date_created ?? '',
-    date_modified: row.date_modified ?? '',
+    date_created: row.date_created ?? row.created_at ?? '',
+    date_modified: row.date_modified ?? row.updated_at ?? '',
     type: row.type ?? 'simple',
-    status: row.status ?? 'publish',
+    status: status as Product['status'],
     featured: Boolean(row.featured),
     catalog_visibility: row.catalog_visibility ?? 'visible',
     description: row.description ?? '',
     short_description: row.short_description ?? '',
     sku: row.sku ?? '',
-    price: String(row.price ?? ''),
-    regular_price: String(row.regular_price ?? ''),
-    sale_price: String(row.sale_price ?? ''),
+    price,
+    regular_price: regularPrice,
+    sale_price: salePrice,
     date_on_sale_from: row.date_on_sale_from ?? null,
     date_on_sale_to: row.date_on_sale_to ?? null,
     price_html: row.price_html ?? '',
-    on_sale: Boolean(row.on_sale),
+    on_sale: onSale,
     purchasable: row.purchasable !== false,
     total_sales: Number(row.total_sales ?? 0),
-    virtual: Boolean(row.virtual),
+    virtual: Boolean(row.is_virtual ?? row.virtual),
     downloadable: Boolean(row.downloadable),
     external_url: row.external_url ?? '',
     button_text: row.button_text ?? '',
@@ -89,13 +136,13 @@ export function toWcProduct(row: any): Product {
     cross_sell_ids: Array.isArray(row.cross_sell_ids) ? row.cross_sell_ids : [],
     parent_id: Number(row.parent_id ?? 0),
     purchase_note: row.purchase_note ?? '',
-    categories: Array.isArray(row.categories) ? row.categories : [],
-    tags: Array.isArray(row.tags) ? row.tags : [],
+    categories,
+    tags,
     brands: Array.isArray(row.brands) ? row.brands : undefined,
-    images: Array.isArray(row.images) ? row.images : [],
+    images,
     attributes: Array.isArray(row.attributes) ? row.attributes : [],
     default_attributes: Array.isArray(row.default_attributes) ? row.default_attributes : [],
-    variations: Array.isArray(row.variations) ? row.variations : [],
+    variations: Array.isArray(row.variations) ? row.variations.map(Number) : [],
     grouped_products: Array.isArray(row.grouped_products) ? row.grouped_products : [],
     menu_order: Number(row.menu_order ?? 0),
     meta_data: Array.isArray(row.meta_data) ? row.meta_data : [],
@@ -105,18 +152,20 @@ export function toWcProduct(row: any): Product {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toWcVariation(row: any): ProductVariation {
+  const regularPrice = String(row.regular_price ?? '');
+  const salePrice = row.sale_price ? String(row.sale_price) : '';
   return {
-    id: Number(row.wc_id ?? row.id ?? 0),
+    id: Number(row.woo_product_id ?? row.wc_id ?? row.id ?? 0),
     sku: row.sku ?? '',
-    price: String(row.price ?? ''),
-    regular_price: String(row.regular_price ?? ''),
-    sale_price: String(row.sale_price ?? ''),
-    on_sale: Boolean(row.on_sale),
+    price: salePrice || regularPrice,
+    regular_price: regularPrice,
+    sale_price: salePrice,
+    on_sale: Boolean(salePrice && salePrice !== regularPrice),
     stock_status: row.stock_status ?? 'instock',
     stock_quantity: row.stock_quantity != null ? Number(row.stock_quantity) : null,
     manage_stock: Boolean(row.manage_stock),
     attributes: Array.isArray(row.attributes) ? row.attributes : [],
-    image: row.image,
+    image: row.image ?? (Array.isArray(row.images) ? row.images[0] : undefined),
   };
 }
 
@@ -146,26 +195,26 @@ export async function catalogGetProducts(
   const query = qs.toString();
   const path = `/.netlify/functions/catalog-products${query ? `?${query}` : ''}`;
 
-  const data = await jloFetch<unknown[]>(path);
-  if (!data || !Array.isArray(data) || data.length === 0) return null;
+  const resp = await jloFetch<JloListResponse>(path);
+  if (!resp?.success || !Array.isArray(resp.data) || resp.data.length === 0) return null;
 
-  return data.map(toWcProduct);
+  return resp.data.map(toWcProduct);
 }
 
 export async function catalogGetProduct(slug: string): Promise<Product | null> {
-  const data = await jloFetch<unknown>(
+  const resp = await jloFetch<JloSingleResponse>(
     `/.netlify/functions/catalog-product?slug=${encodeURIComponent(slug)}`
   );
-  if (!data) return null;
-  return toWcProduct(data);
+  if (!resp?.success || !resp.data) return null;
+  return toWcProduct(resp.data);
 }
 
 export async function catalogGetVariations(
   productId: number
 ): Promise<ProductVariation[] | null> {
-  const data = await jloFetch<unknown[]>(
+  const resp = await jloFetch<JloListResponse>(
     `/.netlify/functions/catalog-variations?product_id=${productId}`
   );
-  if (!data || !Array.isArray(data) || data.length === 0) return null;
-  return data.map(toWcVariation);
+  if (!resp?.success || !Array.isArray(resp.data) || resp.data.length === 0) return null;
+  return resp.data.map(toWcVariation);
 }
