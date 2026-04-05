@@ -86,6 +86,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         id: d.order_id,
+        order_number: d.order_number,
         payment_reference: d.payment_reference,
         total_amount: d.total_amount,
         subtotal: d.subtotal,

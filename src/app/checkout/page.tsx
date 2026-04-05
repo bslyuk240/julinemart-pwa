@@ -338,7 +338,8 @@ export default function CheckoutPage() {
       clearCart();
       currentOrderRef.current = null;
 
-      router.push(`/order-success?order=${redirectOrderId}`);
+      const orderNum = verifyData.order?.order_number;
+      router.push(`/order-success?ref=${orderNum || redirectOrderId}`);
       
     } catch (error: any) {
       console.error('❌ Payment verification error:', error);
@@ -411,7 +412,8 @@ export default function CheckoutPage() {
           trackPurchaseForOrder(savedCardOrderId);
           clearCart();
           toast.success('Payment successful!');
-          router.push(`/order-success?order=${savedCardOrderId}`);
+          const savedCardOrderNum = savedCardVerify?.order?.order_number;
+          router.push(`/order-success?ref=${savedCardOrderNum || savedCardOrderId}`);
         } else {
           throw new Error('Failed to update order status');
         }
@@ -1130,15 +1132,15 @@ export default function CheckoutPage() {
                 order_id: order.id,
                 customer_id: customerId || 'guest',
                 custom_fields: [
-                  { 
-                    display_name: 'Order ID', 
-                    variable_name: 'order_id', 
-                    value: order.id.toString() 
+                  {
+                    display_name: 'Order Number',
+                    variable_name: 'order_number',
+                    value: order.order_number ? `#${order.order_number}` : order.id.toString(),
                   },
-                  { 
-                    display_name: 'Customer Name', 
-                    variable_name: 'customer_name', 
-                    value: `${formData.firstName} ${formData.lastName}` 
+                  {
+                    display_name: 'Customer Name',
+                    variable_name: 'customer_name',
+                    value: `${formData.firstName} ${formData.lastName}`
                   },
                 ],
               },
@@ -1155,7 +1157,7 @@ export default function CheckoutPage() {
           trackPurchaseForOrder(order.id);
           clearCart();
           toast.success('Order placed successfully!');
-          router.push(`/order-success?order=${order.id}`);
+          router.push(`/order-success?ref=${order.order_number || order.id}`);
           setIsProcessing(false);
         }
       } else {
