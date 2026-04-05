@@ -165,10 +165,16 @@ export function toWcProduct(row: any): Product {
     images,
     // Supabase uses is_variation; WC/UI checks attr.variation
     attributes: Array.isArray(row.attributes)
-      ? row.attributes.map((a: any) => ({
-          ...a,
-          variation: a.variation ?? a.is_variation ?? false,
-        }))
+      ? row.attributes
+          .filter((a: any) => a.name != null && String(a.name).trim() !== '')
+          .map((a: any) => ({
+            ...a,
+            name: String(a.name).trim(),
+            options: Array.isArray(a.options)
+              ? a.options.map((o: any) => String(o ?? '').trim()).filter(Boolean)
+              : [],
+            variation: a.variation ?? a.is_variation ?? false,
+          }))
       : [],
     default_attributes: Array.isArray(row.default_attributes) ? row.default_attributes : [],
     variations: Array.isArray(row.variations) ? row.variations.map(Number) : [],
@@ -209,11 +215,13 @@ function toWcVariation(row: any): ProductVariation {
     manage_stock: Boolean(row.manage_stock),
     // Supabase stores [{name, value}]; WC/UI expects [{id, name, option}]
     attributes: Array.isArray(row.attributes)
-      ? row.attributes.map((a: any) => ({
-          id: a.id ?? 0,
-          name: a.name ?? '',
-          option: a.option ?? a.value ?? '',
-        }))
+      ? row.attributes
+          .filter((a: any) => a.name != null && String(a.name).trim() !== '')
+          .map((a: any) => ({
+            id: a.id ?? 0,
+            name: String(a.name).trim(),
+            option: String(a.option ?? a.value ?? '').trim(),
+          }))
       : [],
     image: row.image ?? (Array.isArray(row.images) ? row.images[0] : undefined),
   };

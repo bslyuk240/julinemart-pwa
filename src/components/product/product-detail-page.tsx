@@ -300,20 +300,20 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
       try {
         setLoadingVariations(true);
-        // Use inline variations from catalog-product response if available
-        // (avoids a separate fetch and fixes the Supabase UUID → 0 mapping issue)
-        const data = product._variations?.length
-          ? product._variations
-          : await getProductVariations(product.supabaseId ?? product.id as any);
+        // Supabase products include inline variations from catalog-product response.
+        // For WooCommerce-only products, fall back to fetching by WC id.
+        const data = product.supabaseId
+          ? (product._variations ?? [])
+          : await getProductVariations(product.id);
         setVariations(data);
 
         // Prefill defaults if available
         if (product.default_attributes?.length) {
           const defaults: Record<string, string> = {};
           product.default_attributes.forEach((attr: any) => {
-            if (attr.name && attr.option) {
-              defaults[attr.name.toLowerCase()] = attr.option;
-            }
+            const k = (attr.name ?? '').toLowerCase().trim();
+            const v = (attr.option ?? '').trim();
+            if (k && v) defaults[k] = v;
           });
           setSelectedAttributes(defaults);
         }
@@ -337,10 +337,11 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     const match = variations.find((variation) => {
       if (!variation.attributes.length) return false;
       return variation.attributes.every((attr) => {
-        const key = attr.name.toLowerCase();
+        const key = (attr.name ?? '').toLowerCase().trim();
+        if (!key) return true; // skip attrs with no name
         const selected = selectedAttributes[key];
         if (!selected) return false;
-        return selected.toLowerCase() === (attr.option ?? '').toLowerCase();
+        return selected.toLowerCase().trim() === (attr.option ?? '').toLowerCase().trim();
       });
     });
 
@@ -564,19 +565,23 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
             {product.type === 'variable' && variationAttributes.length > 0 && (
               <div className="border-t pt-4 md:pt-5 space-y-4">
                 {variationAttributes.map((attr) => {
-                  const key = attr.name.toLowerCase();
-                  const selected = selectedAttributes[key];
+                  const key = (attr.name ?? '').toLowerCase().trim();
+                  const selected = key ? selectedAttributes[key] : undefined;
+
+                  const norm = (v: string) => (v ?? '').toLowerCase().trim();
 
                   const isOptionAvailable = (option: string) => {
                     if (!variations.length) return true;
                     return variations.some((variation) =>
                       variation.attributes.every((va) => {
-                        const nameKey = va.name.toLowerCase();
+                        const nameKey = norm(va.name ?? '');
+                        if (!nameKey) return true;
                         if (nameKey === key) {
-                          return va.option === option;
+                          return norm(va.option) === norm(option);
                         }
-                        if (selectedAttributes[nameKey]) {
-                          return va.option === selectedAttributes[nameKey];
+                        const sel = selectedAttributes[nameKey];
+                        if (sel) {
+                          return norm(va.option) === norm(sel);
                         }
                         return true;
                       })
@@ -584,7 +589,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                   };
 
                   return (
-                    <div key={attr.id || attr.name} className="space-y-2">
+                    <div key={attr.id || attr.name || key} className="space-y-2">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <p className="text-sm font-medium text-gray-900">
                           {attr.name}
@@ -597,17 +602,18 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {attr.options.map((option) => {
-                          const isSelected = selected === option;
-                          const disabled = !isOptionAvailable(option);
+                          const optionTrimmed = (option ?? '').trim();
+                          const isSelected = selected === optionTrimmed;
+                          const disabled = !isOptionAvailable(optionTrimmed);
                           return (
                             <button
-                              key={option}
+                              key={optionTrimmed || option}
                               type="button"
                               disabled={disabled}
                               onClick={() =>
-                                setSelectedAttributes((prev) => ({
+                                key && setSelectedAttributes((prev) => ({
                                   ...prev,
-                                  [key]: option,
+                                  [key]: optionTrimmed,
                                 }))
                               }
                               className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
@@ -616,7 +622,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                                   : 'border-gray-300 text-gray-700 hover:border-primary-500'
                               } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                              {option}
+                              {optionTrimmed}
                             </button>
                           );
                         })}
@@ -631,7 +637,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
                 {variationAttributes.length > 0 &&
                   variationAttributes.every(
-                    (attr) => selectedAttributes[attr.name.toLowerCase()]
+                    (attr) => selectedAttributes[(attr.name ?? '').toLowerCase().trim()]
                   ) &&
                   !selectedVariation && !loadingVariations && (
                     <p className="text-sm text-red-600">
