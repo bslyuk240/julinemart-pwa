@@ -204,7 +204,8 @@ function toWcVariation(row: any): ProductVariation {
   const salePrice = row.sale_price ? String(row.sale_price) : '';
   return {
     supabaseId: row.id ?? undefined,
-    id: Number(row.woo_product_id ?? row.wc_id ?? row.id ?? 0),
+    // Use woo_variation_id as the numeric WC variation id; fall back to 0
+    id: Number(row.woo_variation_id ?? row.wc_id ?? 0),
     sku: row.sku ?? '',
     price: salePrice || regularPrice,
     regular_price: regularPrice,
