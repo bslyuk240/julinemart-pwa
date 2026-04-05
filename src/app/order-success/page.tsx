@@ -55,9 +55,9 @@ function OrderSuccessContent() {
             </h2>
             <ol className="space-y-4">
               {[
-                { step: '1', text: 'You'll receive an order confirmation email shortly' },
-                { step: '2', text: 'We'll process your order and prepare it for dispatch' },
-                { step: '3', text: 'You'll get a tracking number once your order ships' },
+                { step: '1', text: "You'll receive an order confirmation email shortly" },
+                { step: '2', text: "We'll process your order and prepare it for dispatch" },
+                { step: '3', text: "You'll get a tracking number once your order ships" },
                 { step: '4', text: 'Your order will be delivered to your specified address' },
               ].map(({ step, text }) => (
                 <li key={step} className="flex items-start gap-3">
