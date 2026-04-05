@@ -6,6 +6,58 @@ const JLO_BASE = (
   ''
 ).replace(/\/$/, '');
 
+function adaptOrder(o: any) {
+  const nameParts = (o.customer_name || '').split(' ');
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+  return {
+    id: o.order_number ?? o.id,       // numeric order_number used as URL key
+    number: o.order_number ?? o.id,
+    _supabase_id: o.id,               // keep UUID for detail fetch
+    status: o.overall_status || 'processing',
+    date_created: o.created_at,
+    date_paid: o.paid_at ?? null,
+    date_completed: null,
+    total: String(o.total_amount ?? 0),
+    subtotal: String(o.subtotal ?? 0),
+    shipping_total: String(o.shipping_fee_paid ?? 0),
+    discount_total: String(o.discount_amount ?? 0),
+    currency: 'NGN',
+    payment_method: o.payment_method || '',
+    payment_method_title: o.payment_method || 'Paystack',
+    transaction_id: o.payment_reference || '',
+    billing: {
+      first_name: firstName, last_name: lastName,
+      email: o.customer_email, phone: o.customer_phone,
+      address_1: o.delivery_address, city: o.delivery_city,
+      state: o.delivery_state, country: 'NG',
+    },
+    shipping: {
+      first_name: firstName, last_name: lastName,
+      address_1: o.delivery_address, city: o.delivery_city,
+      state: o.delivery_state, country: 'NG',
+    },
+    line_items: [],    // populated only in single order fetch
+    meta_data: [],
+  };
+}
+
+export async function GET(request: Request) {
+  const email = new URL(request.url).searchParams.get('email');
+  if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
+
+  if (!JLO_BASE) return NextResponse.json({ orders: [] });
+
+  const res = await fetch(`${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(email)}`);
+  const json = await res.json().catch(() => ({ success: false, data: [] }));
+
+  if (!res.ok || !json.success) return NextResponse.json({ orders: [] });
+
+  // Adapt Supabase shape → WC-compatible list shape
+  const orders = (json.data || []).map(adaptOrder);
+  return NextResponse.json({ orders });
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();

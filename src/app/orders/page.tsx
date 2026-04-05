@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { Package, Calendar, ArrowRight, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
-import { getCustomerOrders } from '@/lib/woocommerce/orders';
 import PageLoading from '@/components/ui/page-loading';
 import { toast } from 'sonner';
 import type { Order } from '@/types/order';
@@ -59,7 +58,7 @@ const statusLabels: Record<string, string> = {
 
 export default function OrdersPage() {
   const router = useRouter();
-  const { customerId, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
+  const { customer, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -71,17 +70,18 @@ export default function OrdersPage() {
         loadOrders();
       }
     }
-  }, [authLoading, isAuthenticated, customerId]);
+  }, [authLoading, isAuthenticated, customer?.email]);
 
   const loadOrders = async () => {
-    if (!customerId) {
+    if (!customer?.email) {
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      const orderList = await getCustomerOrders(customerId);
+      const res = await fetch('/api/orders?email=' + encodeURIComponent(customer.email));
+      const { orders: orderList } = await res.json();
       setOrders(orderList ?? []);
     } catch (error) {
       console.error('Error loading orders:', error);
