@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 
-const JLO_BASE = (process.env.JLO_API_BASE_URL || '').replace(/\/$/, '');
+const JLO_BASE = (
+  process.env.JLO_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_JLO_CATALOG_URL ||
+  ''
+).replace(/\/$/, '');
 
 export async function POST(request: Request) {
   try {
@@ -70,10 +74,10 @@ export async function POST(request: Request) {
     const jloData = await jloRes.json();
 
     if (!jloRes.ok || !jloData.success) {
-      console.error('JLO create-order failed:', jloData);
+      console.error('JLO create-order failed:', jloRes.status, jloData);
       return NextResponse.json(
-        { error: jloData.error || 'Failed to create order' },
-        { status: 500 }
+        { error: jloData.error || jloData.message || 'Failed to create order', detail: jloData.detail },
+        { status: jloRes.status === 400 ? 400 : 500 }
       );
     }
 

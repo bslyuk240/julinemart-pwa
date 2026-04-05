@@ -1093,7 +1093,8 @@ export default function CheckoutPage() {
       });
 
       if (!createOrderResponse.ok) {
-        throw new Error('Failed to create order');
+        const errData = await createOrderResponse.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Failed to create order');
       }
 
       const order = await createOrderResponse.json();

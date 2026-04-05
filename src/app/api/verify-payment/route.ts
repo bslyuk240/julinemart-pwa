@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const JLO_BASE = (process.env.JLO_API_BASE_URL || '').replace(/\/$/, '');
+const JLO_BASE = (
+  process.env.JLO_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_JLO_CATALOG_URL ||
+  ''
+).replace(/\/$/, '');
 
 export async function POST(request: NextRequest) {
   try {
