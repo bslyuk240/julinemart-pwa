@@ -30,6 +30,15 @@ const getBadgeConfig = (tagSlug: string) => {
 
 const stripHtml = (value: string) => value.replace(/<[^>]*>/g, '').trim();
 
+// Clean up raw CJ option codes for display: "1544707-White-Size" → "White"
+function cleanOptionLabel(option: string): string {
+  // Strip leading numeric CJ product code prefix: e.g. "1544707-" or "4001234-"
+  const withoutPrefix = option.replace(/^\d{4,}[\d-]*-/, '');
+  // Strip trailing "-Size" or "-size" artifact from CJ attribute naming
+  const withoutSuffix = withoutPrefix.replace(/-size$/i, '').trim();
+  return withoutSuffix || option;
+}
+
 interface ProductDetailPageProps {
   initialProduct: Product;
 }
@@ -596,7 +605,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                         </p>
                         {selected && (
                           <span className="text-xs text-gray-500">
-                            Selected: {selected}
+                            Selected: {cleanOptionLabel(selected)}
                           </span>
                         )}
                       </div>
@@ -622,7 +631,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                                   : 'border-gray-300 text-gray-700 hover:border-primary-500'
                               } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                              {optionTrimmed}
+                              {cleanOptionLabel(optionTrimmed)}
                             </button>
                           );
                         })}
