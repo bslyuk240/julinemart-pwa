@@ -318,7 +318,8 @@ export default function CheckoutPage() {
       console.log('🔍 Verification response:', verifyData);
 
       if (!verifyResponse.ok || !verifyData.success) {
-        toast.error('Payment verification failed', { id: 'payment-verify' });
+        const errMsg = verifyData.error || 'Payment verification failed';
+        toast.error(errMsg, { id: 'payment-verify' });
         console.error('Verification failed:', verifyData);
         setIsProcessing(false);
         return;
