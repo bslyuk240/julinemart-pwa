@@ -213,14 +213,24 @@ function toWcVariation(row: any): ProductVariation {
     stock_status: row.stock_status ?? 'instock',
     stock_quantity: row.stock_quantity != null ? Number(row.stock_quantity) : null,
     manage_stock: Boolean(row.manage_stock),
-    // Supabase stores [{name, value}]; WC/UI expects [{id, name, option}]
+    // Supabase stores attrs in two formats depending on import path:
+    //  - CJ import:  [{name, value}]  (array)
+    //  - WC migrate: {colour: "...", size: "..."}  (flat object with slugified keys)
     attributes: Array.isArray(row.attributes)
       ? row.attributes
           .filter((a: any) => a.name != null && String(a.name).trim() !== '')
           .map((a: any) => ({
-            id: a.id ?? 0,
+            id: 0,
             name: String(a.name).trim(),
             option: String(a.option ?? a.value ?? '').trim(),
+          }))
+      : row.attributes && typeof row.attributes === 'object'
+      ? Object.entries(row.attributes as Record<string, unknown>)
+          .filter(([k, v]) => k && v != null && String(v).trim() !== '')
+          .map(([k, v]) => ({
+            id: 0,
+            name: k.trim(),
+            option: String(v).trim(),
           }))
       : [],
     image: row.image ?? (Array.isArray(row.images) ? row.images[0] : undefined),
