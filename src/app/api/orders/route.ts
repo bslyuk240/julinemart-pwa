@@ -6,18 +6,58 @@ const JLO_BASE = (
   ''
 ).replace(/\/$/, '');
 
+const SUB_STATUS_RANK: Record<string, number> = {
+  pending: 1,
+  assigned: 2,
+  pickup_scheduled: 2,
+  in_transit: 3,
+  out_for_delivery: 4,
+  delivered: 5,
+};
+
+function deriveOrderStatus(o: any): string {
+  const subOrders: any[] = o.sub_orders || [];
+  const dbStatus: string = o.overall_status || 'processing';
+  if (!subOrders.length) return dbStatus;
+
+  const ranks = subOrders
+    .map((so: any) => SUB_STATUS_RANK[so.status] ?? 1)
+    .filter((r: number) => r > 0);
+  if (!ranks.length) return dbStatus;
+
+  const minRank = Math.min(...ranks);
+  if (ranks.every((r: number) => r === 5)) return 'delivered';
+
+  const rankToWc: Record<number, string> = {
+    1: 'processing',
+    2: 'ready-to-ship',
+    3: 'shipped',
+    4: 'out-for-delivery',
+    5: 'delivered',
+  };
+  return rankToWc[minRank] ?? dbStatus;
+}
+
 function adaptOrder(o: any) {
   const nameParts = (o.customer_name || '').split(' ');
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ') || '';
+  const derivedStatus = deriveOrderStatus(o);
+
+  const subOrders: any[] = o.sub_orders || [];
+  const allDelivered = subOrders.length > 0 && subOrders.every((so: any) => so.status === 'delivered');
+  const lastDeliveredAt = allDelivered
+    ? subOrders.map((so: any) => so.delivered_at).filter(Boolean).sort().at(-1) ?? null
+    : null;
+
   return {
-    id: o.order_number ?? o.id,       // numeric order_number used as URL key
+    id: o.order_number ?? o.id,
     number: o.order_number ?? o.id,
-    _supabase_id: o.id,               // keep UUID for detail fetch
-    status: o.overall_status || 'processing',
+    _supabase_id: o.id,
+    status: derivedStatus,
     date_created: o.created_at,
     date_paid: o.paid_at ?? null,
-    date_completed: null,
+    date_completed: lastDeliveredAt,
     total: String(o.total_amount ?? 0),
     subtotal: String(o.subtotal ?? 0),
     shipping_total: String(o.shipping_fee_paid ?? 0),
@@ -37,7 +77,7 @@ function adaptOrder(o: any) {
       address_1: o.delivery_address, city: o.delivery_city,
       state: o.delivery_state, country: 'NG',
     },
-    line_items: [],    // populated only in single order fetch
+    line_items: [],
     meta_data: [],
   };
 }

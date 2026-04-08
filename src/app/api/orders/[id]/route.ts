@@ -4,18 +4,100 @@ import { getJloBaseUrl } from '@/lib/jlo/returns';
 
 const JLO_BASE = getJloBaseUrl();
 
+// Map sub-order status → numeric rank for comparison
+const SUB_STATUS_RANK: Record<string, number> = {
+  pending: 1,
+  assigned: 2,
+  pickup_scheduled: 2,
+  in_transit: 3,
+  out_for_delivery: 4,
+  delivered: 5,
+};
+
+// Derive WC-compatible status from sub_orders progression
+function deriveOrderStatus(o: any): string {
+  const subOrders: any[] = o.sub_orders || [];
+  const dbStatus: string = o.overall_status || 'processing';
+
+  if (!subOrders.length) return dbStatus;
+
+  const ranks = subOrders
+    .map((so: any) => SUB_STATUS_RANK[so.status] ?? 1)
+    .filter((r: number) => r > 0);
+
+  if (!ranks.length) return dbStatus;
+
+  const minRank = Math.min(...ranks);
+  const allDelivered = ranks.every((r: number) => r === 5);
+
+  if (allDelivered) return 'delivered';
+
+  const rankToWc: Record<number, string> = {
+    1: 'processing',
+    2: 'ready-to-ship',
+    3: 'shipped',
+    4: 'out-for-delivery',
+    5: 'delivered',
+  };
+  return rankToWc[minRank] ?? dbStatus;
+}
+
+// Build tracking meta_data from sub_orders so OrderStatusTracker can display it
+function buildMetaData(o: any): any[] {
+  const subOrders: any[] = o.sub_orders || [];
+  const trackingItems = subOrders
+    .filter((so: any) => so.tracking_number || so.courier_waybill)
+    .map((so: any) => {
+      const tracking = so.tracking_number || so.courier_waybill;
+      const courierName = so.couriers?.name || 'Fez Delivery';
+      return {
+        tracking_provider: courierName,
+        tracking_number: tracking,
+        tracking_link: `https://fezdelivery.co/track/${tracking}`,
+        date_shipped: so.updated_at ?? null,
+      };
+    });
+
+  const meta: any[] = [];
+
+  if (trackingItems.length) {
+    meta.push({ key: 'wc_shipment_tracking_items', value: trackingItems });
+  }
+
+  // Show assigned carrier / hub even before tracking is added
+  const first = subOrders[0];
+  if (first?.couriers?.name) {
+    meta.push({ key: 'jlo_recommended_carrier', value: first.couriers.name });
+  }
+  if (first?.hubs?.name) {
+    meta.push({ key: 'jlo_hub_name', value: first.hubs.name });
+  }
+
+  return meta;
+}
+
 function adaptOrder(o: any) {
   const nameParts = (o.customer_name || '').split(' ');
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ') || '';
+
+  const derivedStatus = deriveOrderStatus(o);
+
+  // date_completed: use delivered_at from the last sub-order if all delivered
+  const subOrders: any[] = o.sub_orders || [];
+  const allDelivered = subOrders.length > 0 && subOrders.every((so: any) => so.status === 'delivered');
+  const lastDeliveredAt = allDelivered
+    ? subOrders.map((so: any) => so.delivered_at).filter(Boolean).sort().at(-1) ?? null
+    : null;
+
   return {
     id: o.order_number ?? o.id,
     number: o.order_number ?? o.id,
     _supabase_id: o.id,
-    status: o.overall_status || 'processing',
+    status: derivedStatus,
     date_created: o.created_at,
     date_paid: o.paid_at ?? null,
-    date_completed: null,
+    date_completed: lastDeliveredAt,
     total: String(o.total_amount ?? 0),
     subtotal: String(o.subtotal ?? 0),
     shipping_total: String(o.shipping_fee_paid ?? 0),
@@ -44,7 +126,7 @@ function adaptOrder(o: any) {
       total: String(item.subtotal ?? 0),
       meta_data: [],
     })),
-    meta_data: [],
+    meta_data: buildMetaData(o),
   };
 }
 
