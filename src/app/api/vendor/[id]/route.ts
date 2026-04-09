@@ -46,7 +46,7 @@ export async function GET(
         .from('products')
         .select('id, name, sku, price, regular_price, sale_price, status, woocommerce_id, slug', { count: 'exact' })
         .eq('vendor_id', vendor.id)
-        .eq('status', 'publish')
+        .in('status', ['publish', 'published'])
         .order('created_at', { ascending: false });
 
       total = count ?? 0;
