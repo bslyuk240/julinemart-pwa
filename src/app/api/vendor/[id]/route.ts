@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -7,9 +6,19 @@ export const revalidate = 0;
 /**
  * GET /api/vendor/[id]
  *
- * Returns vendor info + their products entirely from Supabase.
- * [id] = WooCommerce vendor ID (numeric string)
+ * Returns vendor info + their products by proxying to the JLO catalog-products
+ * Netlify function (which has its own Supabase service-role access).
+ *
+ * Runs server-side so JLO CORS restrictions don't apply.
+ * [id] = WooCommerce numeric vendor ID.
  */
+
+const JLO_BASE = (
+  process.env.NEXT_PUBLIC_JLO_CATALOG_URL ||
+  process.env.JLO_API_BASE_URL ||
+  ''
+).replace(/\/$/, '');
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -21,98 +30,113 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid vendor ID' }, { status: 400 });
   }
 
+  if (!JLO_BASE) {
+    return NextResponse.json(
+      { vendor: null, products: [], total: 0, source: 'error', error: 'JLO catalog URL not configured' },
+      { status: 503 }
+    );
+  }
+
   try {
-    const supabase = getSupabaseServerClient();
+    // status=all avoids WC "publish" vs Supabase "published" mismatches
+    const url =
+      `${JLO_BASE}/.netlify/functions/catalog-products` +
+      `?woo_vendor_id=${wcVendorId}&per_page=100&status=all`;
 
-    // ── 1. Look up vendor by WC vendor ID ────────────────────────────────────
-    const { data: vendor, error: vendorErr } = await supabase
-      .from('vendors')
-      .select('id, store_name, email, phone, description, logo_url, banner_url, is_active')
-      .eq('woocommerce_vendor_id', wcVendorId)
-      .maybeSingle();
+    const res = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+      // short cache — vendor pages are browsed frequently
+      next: { revalidate: 60 },
+    });
 
-    if (vendorErr) {
-      console.error('Supabase vendor lookup error:', vendorErr);
+    if (!res.ok) {
+      return NextResponse.json(
+        { vendor: null, products: [], total: 0, source: 'error' },
+        { status: res.status }
+      );
     }
 
-    if (!vendor) {
+    const body = await res.json();
+
+    if (!body.success || !Array.isArray(body.data) || body.data.length === 0) {
       return NextResponse.json({ vendor: null, products: [], total: 0, source: 'supabase' });
     }
 
-    // ── 2. Get products with images from Supabase ─────────────────────────────
-    const { data: rows, count } = await supabase
-      .from('products')
-      .select(
-        'id, name, sku, slug, regular_price, sale_price, stock_status, woo_product_id, type, short_description, ' +
-        'product_images(src, alt, position, is_thumbnail)',
-        { count: 'exact' }
-      )
-      .eq('vendor_id', vendor.id)
-      .in('status', ['publish', 'published'])
-      .order('created_at', { ascending: false });
-
-    // ── 3. Shape products ─────────────────────────────────────────────────────
+    // Extract vendor info from the first row's nested vendor object
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const products = (rows || []).map((sp: any) => {
-      const sortedImgs = (sp.product_images || []).sort(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (a: any, b: any) => a.position - b.position
-      );
-      const images = sortedImgs.map(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (img: any) => ({ id: 0, src: img.src, alt: img.alt || '', name: '' })
-      );
+    const firstRow = body.data[0] as any;
+    const vendorRow = firstRow?.vendor ?? null;
+    const vendor = vendorRow
+      ? {
+          id:               wcVendorId,
+          store_name:       vendorRow.store_name ?? `Vendor ${wcVendorId}`,
+          store_logo:       vendorRow.logo_url   ?? null,
+          banner:           vendorRow.banner_url  ?? null,
+          shop_description: vendorRow.description ?? null,
+          email:            vendorRow.email        ?? null,
+          phone:            vendorRow.phone        ?? null,
+          is_active:        true,
+          store_slug:       vendorRow.store_slug  ?? '',
+          store_url:        `/vendor/${wcVendorId}`,
+        }
+      : null;
 
-      const price = sp.sale_price ?? sp.regular_price ?? '0';
+    // Map catalog rows → Product shape expected by the vendor page
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const allProducts = body.data.map((p: any) => {
+      const regularPrice = String(p.regular_price ?? p.min_price ?? '');
+      const salePrice    = p.sale_price ? String(p.sale_price) : '';
+      const price        = salePrice || regularPrice || String(p.price ?? '');
+
+      const images = Array.isArray(p.images)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ? p.images.map((img: any) => ({ id: 0, src: img.src ?? '', alt: img.alt ?? '', name: '' }))
+        : [];
 
       return {
-        id:            sp.woo_product_id || sp.id,
-        supabase_id:   sp.id,
-        name:          sp.name,
-        sku:           sp.sku,
-        slug:          sp.slug,
-        type:          sp.type,
-        short_description: sp.short_description,
-        price:         String(price),
-        regular_price: String(sp.regular_price ?? ''),
-        sale_price:    sp.sale_price ? String(sp.sale_price) : '',
-        on_sale:       Boolean(sp.sale_price && sp.sale_price !== sp.regular_price),
-        stock_status:  sp.stock_status || 'instock',
+        id:            Number(p.woo_product_id ?? p.id ?? 0),
+        supabase_id:   p.id,
+        name:          p.name ?? '',
+        sku:           p.sku  ?? '',
+        slug:          p.slug ?? '',
+        type:          p.type ?? 'simple',
+        short_description: p.short_description ?? '',
+        price,
+        regular_price: regularPrice,
+        sale_price:    salePrice,
+        on_sale:       Boolean(salePrice && salePrice !== regularPrice),
+        stock_status:  p.stock_status ?? 'instock',
+        status:        p.status ?? 'publish',
         images,
-        categories:    [],
+        categories:    Array.isArray(p.categories) ? p.categories : [],
+        tags:          Array.isArray(p.tags)        ? p.tags        : [],
         average_rating: '0',
         rating_count:  0,
-        date_created:  sp.created_at || '',
-        store: {
-          id:        wcVendorId,
-          name:      vendor.store_name,
-          shop_name: vendor.store_name,
-          url:       `/vendor/${wcVendorId}`,
-          address:   {},
-        },
+        date_created:  p.created_at ?? '',
+        store: vendor
+          ? { id: wcVendorId, name: vendor.store_name, shop_name: vendor.store_name, url: `/vendor/${wcVendorId}`, address: {} }
+          : undefined,
       };
     });
 
+    // Only show published products
+    const products = allProducts.filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (p: any) => p.status === 'publish' || p.status === 'published'
+    );
+
     return NextResponse.json({
-      vendor: {
-        id:               wcVendorId,
-        store_name:       vendor.store_name,
-        store_logo:       vendor.logo_url,
-        banner:           vendor.banner_url,
-        shop_description: vendor.description,
-        email:            vendor.email,
-        phone:            vendor.phone,
-        is_active:        vendor.is_active,
-        store_slug:       '',
-        store_url:        `/vendor/${wcVendorId}`,
-      },
+      vendor,
       products,
-      total: count ?? products.length,
+      total: products.length,
       source: 'supabase',
     });
 
   } catch (err) {
-    console.error('vendor API error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[/api/vendor] error:', err);
+    return NextResponse.json(
+      { vendor: null, products: [], total: 0, source: 'error' },
+      { status: 500 }
+    );
   }
 }
