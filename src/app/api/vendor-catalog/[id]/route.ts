@@ -144,10 +144,11 @@ export async function GET(
     );
   }
 
-  // status=all avoids format mismatches between WC "publish" and Supabase "published"
+  // Request published only server-side so pagination doesn't bury them behind drafts.
+  // Use per_page=500 to fetch the full vendor catalog in one shot.
   const catalogUrl =
     `${JLO_BASE}/.netlify/functions/catalog-products` +
-    `?woo_vendor_id=${encodeURIComponent(id)}&per_page=100&status=all`;
+    `?woo_vendor_id=${encodeURIComponent(id)}&per_page=500&status=published`;
 
   try {
     const res = await fetch(catalogUrl, {
@@ -167,11 +168,9 @@ export async function GET(
       return NextResponse.json({ success: false, products: [], total: 0 });
     }
 
-    // Map and filter to published products only
+    // Function already filtered to published; map straight through.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const products: Product[] = body.data
-      .filter((row: any) => row.status === 'published' || row.status === 'publish')
-      .map(normalizedRowToProduct);
+    const products: Product[] = body.data.map((row: any) => normalizedRowToProduct(row));
 
     // Extract vendor info from first row for the store header
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
