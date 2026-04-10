@@ -186,6 +186,9 @@ export async function GET(
           vendor_display_name: vendorRow.store_name ?? '',
           vendor_shop_name: vendorRow.store_name ?? '',
           enabled: true,
+          logo: vendorRow.logo_url ?? null,
+          store_logo: vendorRow.logo_url ?? null,
+          banner: vendorRow.banner_url ?? null,
         }
       : null;
 
