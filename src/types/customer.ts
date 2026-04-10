@@ -56,12 +56,55 @@ export interface NotificationPrefs {
   updated_at?: string;
 }
 
-// ── Legacy WooCommerce types (kept for order display compatibility) ────────────
+// ── Legacy WooCommerce types (kept for WC lib / order display compatibility) ──
 
 export interface MetaData {
   id: number;
   key: string;
   value: any;
+}
+
+export interface BillingAddress {
+  first_name: string;
+  last_name: string;
+  company: string;
+  address_1: string;
+  address_2: string;
+  city: string;
+  state: string;
+  postcode: string;
+  country: string;
+  email: string;
+  phone: string;
+}
+
+export interface ShippingAddress {
+  first_name: string;
+  last_name: string;
+  company: string;
+  address_1: string;
+  address_2: string;
+  city: string;
+  state: string;
+  postcode: string;
+  country: string;
+}
+
+/** WooCommerce REST API customer object */
+export interface Customer {
+  id: number;
+  date_created: string;
+  date_modified: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  username: string;
+  billing: BillingAddress;
+  shipping: ShippingAddress;
+  is_paying_customer: boolean;
+  avatar_url: string;
+  meta_data: MetaData[];
 }
 
 export interface AuthUser {
