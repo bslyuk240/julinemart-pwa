@@ -38,10 +38,10 @@ export async function GET(
   }
 
   try {
-    // status=all avoids WC "publish" vs Supabase "published" mismatches
+    // Filter server-side to published only so pagination never buries them
     const url =
       `${JLO_BASE}/.netlify/functions/catalog-products` +
-      `?woo_vendor_id=${wcVendorId}&per_page=100&status=all`;
+      `?woo_vendor_id=${wcVendorId}&per_page=500&status=published`;
 
     const res = await fetch(url, {
       headers: { 'Content-Type': 'application/json' },
