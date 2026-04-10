@@ -21,7 +21,7 @@ import PageLoading from '@/components/ui/page-loading';
 import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
 import { getShippingFee } from '@/lib/shipping/jloShipping';
 import { getSavedCards, upsertAddress, updateCustomerProfile, getAddresses } from '@/lib/supabase/customers';
-import type { CustomerAddress } from '@/types/customer';
+import type { CustomerAddress, SavedCard } from '@/types/customer';
 import { trackBeginCheckout, trackPurchase } from '@/lib/gtag';
 import { useCartStore } from '@/store/cart-store';
 
@@ -34,17 +34,6 @@ interface ShippingOption {
   methodId: string;
 }
 
-interface SavedCard {
-  id: string;
-  authorization_code: string;
-  card_type: string;
-  last4: string;
-  exp_month: string;
-  exp_year: string;
-  bank: string;
-  country_code: string;
-  is_default: boolean;
-}
 
 const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
 const DEFAULT_WEIGHT = 0.5;
@@ -1631,7 +1620,7 @@ export default function CheckoutPage() {
                           </span>
                         </div>
                         <p className="text-sm text-gray-600 mt-1">
-                          {defaultSavedCard.card_type.toUpperCase()} ending in {defaultSavedCard.last4}
+                          {(defaultSavedCard.card_type ?? 'Card').toUpperCase()} ending in {defaultSavedCard.last4}
                           {' • '}Expires {defaultSavedCard.exp_month}/{defaultSavedCard.exp_year}
                         </p>
                       </div>
