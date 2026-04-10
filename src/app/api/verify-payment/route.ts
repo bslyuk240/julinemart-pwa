@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 // Simple WooCommerce client without type dependency
 const WC_BASE_URL = process.env.NEXT_PUBLIC_WP_URL!;
@@ -9,9 +10,9 @@ const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY!;
 // Helper function to make WooCommerce API calls
 async function wooCommerceAPI(endpoint: string, method: string = 'GET', data?: any) {
   const auth = Buffer.from(`${WC_KEY}:${WC_SECRET}`).toString('base64');
-  
+
   const url = `${WC_BASE_URL}/wp-json/wc/v3/${endpoint}`;
-  
+
   const options: RequestInit = {
     method,
     headers: {
@@ -25,7 +26,7 @@ async function wooCommerceAPI(endpoint: string, method: string = 'GET', data?: a
   }
 
   const response = await fetch(url, options);
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`WooCommerce API error: ${response.status} - ${errorText}`);
@@ -37,7 +38,7 @@ async function wooCommerceAPI(endpoint: string, method: string = 'GET', data?: a
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { reference, orderId, saveCard, customerId } = body;
+    const { reference, orderId, saveCard, customerId, customerEmail } = body;
 
     if (!reference || !orderId) {
       return NextResponse.json(
@@ -116,13 +117,15 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Order updated to processing:', wcResponse.id);
 
-    // Step 3: If customer wants to save card, save it
+    // Step 3: If customer wants to save card, save it to Supabase
     let cardSaved = false;
     if (saveCard && customerId && paystackData.data.authorization?.reusable) {
       try {
-        cardSaved = await saveCustomerCard(
+        const email = customerEmail || paystackData.data.customer?.email || '';
+        cardSaved = await saveCustomerCardToSupabase(
           customerId,
-          paystackData.data.authorization
+          paystackData.data.authorization,
+          email
         );
       } catch (error) {
         console.error('❌ Failed to save card:', error);
@@ -160,64 +163,54 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function saveCustomerCard(
-  customerId: number, 
-  authorization: any
+async function saveCustomerCardToSupabase(
+  customerId: string,
+  authorization: any,
+  email: string
 ): Promise<boolean> {
   try {
-    // Get existing customer data
-    const customer = await wooCommerceAPI(`customers/${customerId}`, 'GET');
-    
-    // Get existing saved cards
-    const existingCardsMeta = customer.meta_data?.find(
-      (m: any) => m.key === 'saved_payment_cards'
-    );
-    
-    let savedCards: any[] = [];
-    if (existingCardsMeta?.value) {
-      savedCards = typeof existingCardsMeta.value === 'string'
-        ? JSON.parse(existingCardsMeta.value)
-        : existingCardsMeta.value;
-    }
+    const supabase = getSupabaseServerClient();
 
     // Check if card already exists
-    const cardExists = savedCards.some(
-      (card: any) => card.authorization_code === authorization.authorization_code
-    );
+    const { data: existing } = await supabase
+      .from('customer_saved_cards')
+      .select('id')
+      .eq('customer_id', customerId)
+      .eq('authorization_code', authorization.authorization_code)
+      .maybeSingle();
 
-    if (!cardExists) {
-      // Add new card
-      const newCard = {
-        id: `card_${Date.now()}`,
-        authorization_code: authorization.authorization_code,
-        card_type: authorization.card_type,
-        last4: authorization.last4,
-        exp_month: authorization.exp_month,
-        exp_year: authorization.exp_year,
-        bank: authorization.bank,
-        country_code: authorization.country_code,
-        is_default: savedCards.length === 0, // First card is default
-      };
-
-      savedCards.push(newCard);
-
-      // Update customer meta data
-      await wooCommerceAPI(`customers/${customerId}`, 'PUT', {
-        meta_data: [
-          {
-            key: 'saved_payment_cards',
-            value: JSON.stringify(savedCards),
-          },
-        ],
-      });
-
-      console.log('💳 Card saved for customer:', customerId);
-      return true;
+    if (existing) {
+      console.log('💳 Card already saved for customer:', customerId);
+      return false;
     }
-    
-    return false;
+
+    // Count existing cards to determine if this is the default
+    const { count } = await supabase
+      .from('customer_saved_cards')
+      .select('*', { count: 'exact', head: true })
+      .eq('customer_id', customerId);
+
+    const isDefault = (count ?? 0) === 0;
+
+    const { error } = await supabase.from('customer_saved_cards').insert({
+      customer_id: customerId,
+      authorization_code: authorization.authorization_code,
+      card_type: authorization.card_type || authorization.brand || 'card',
+      last4: authorization.last4,
+      exp_month: authorization.exp_month,
+      exp_year: authorization.exp_year,
+      bank: authorization.bank || null,
+      country_code: authorization.country_code || null,
+      email,
+      is_default: isDefault,
+    });
+
+    if (error) throw new Error(error.message);
+
+    console.log('💳 Card saved to Supabase for customer:', customerId);
+    return true;
   } catch (error) {
-    console.error('Error saving customer card:', error);
+    console.error('Error saving customer card to Supabase:', error);
     throw error;
   }
 }

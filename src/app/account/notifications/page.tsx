@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useCustomerAuth } from '@/context/customer-auth-context';
+
 import PageLoading from '@/components/ui/page-loading';
 import {
   WEB_PUSH_ENABLE_EVENT,
@@ -57,7 +58,8 @@ function maskToken(token: string) {
 
 export default function AccountNotificationsPage() {
   const router = useRouter();
-  const { customer, customerId, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
+  const { user, customer, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
+  const customerId = user?.id ?? null;
 
   const [pageLoading, setPageLoading] = useState(true);
   const [loadingStatus, setLoadingStatus] = useState(false);

@@ -6,10 +6,17 @@ import { useRouter } from 'next/navigation';
 import { Package, Calendar, ArrowRight, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
-import { getCustomerOrders } from '@/lib/woocommerce/orders';
+import { getCustomerOrders } from '@/lib/supabase/customers';
 import PageLoading from '@/components/ui/page-loading';
 import { toast } from 'sonner';
-import type { Order } from '@/types/order';
+
+interface OrderSummary {
+  id: string;
+  order_number: string | number;
+  overall_status: string;
+  total_amount: number | string;
+  created_at: string;
+}
 
 const statusColors: Record<string, { bg: string; text: string; border: string }> = {
   // Payment statuses
@@ -59,8 +66,8 @@ const statusLabels: Record<string, string> = {
 
 export default function OrdersPage() {
   const router = useRouter();
-  const { customerId, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { user, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -71,17 +78,17 @@ export default function OrdersPage() {
         loadOrders();
       }
     }
-  }, [authLoading, isAuthenticated, customerId]);
+  }, [authLoading, isAuthenticated, user]);
 
   const loadOrders = async () => {
-    if (!customerId) {
+    if (!user?.email) {
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      const orderList = await getCustomerOrders(customerId);
+      const orderList = await getCustomerOrders(user.email);
       setOrders(orderList ?? []);
     } catch (error) {
       console.error('Error loading orders:', error);
@@ -91,9 +98,9 @@ export default function OrdersPage() {
     }
   };
 
-  const formatPrice = (price: string, currency: string = 'NGN') => {
-    const amount = parseFloat(price);
-    return `${currency} ${amount.toLocaleString()}`;
+  const formatPrice = (amount: number | string, currency: string = 'NGN') => {
+    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return `${currency} ${(isNaN(num) ? 0 : num).toLocaleString()}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -135,7 +142,7 @@ export default function OrdersPage() {
         ) : (
           <div className="space-y-4">
             {orders.map((order) => {
-              const statusStyle = statusColors[order.status] || statusColors.pending;
+              const statusStyle = statusColors[order.overall_status] || statusColors.pending;
 
               return (
                 <div
@@ -147,13 +154,13 @@ export default function OrdersPage() {
                       <Package className="w-6 h-6 text-primary-600" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Order #{order.number}</p>
+                      <p className="text-sm text-gray-600">Order #{order.order_number}</p>
                       <p className="text-xl font-semibold text-gray-900">
-                        {formatPrice(order.total, order.currency)}
+                        {formatPrice(order.total_amount)}
                       </p>
                       <p className="text-sm text-gray-600 flex items-center gap-2 mt-1">
                         <Calendar className="w-4 h-4" />
-                        {formatDate(order.date_created)}
+                        {formatDate(order.created_at)}
                       </p>
                     </div>
                   </div>
@@ -162,7 +169,7 @@ export default function OrdersPage() {
                     <span
                       className={`px-3 py-1 rounded-full text-sm font-medium border ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}
                     >
-                      {statusLabels[order.status] || order.status}
+                      {statusLabels[order.overall_status] || order.overall_status}
                     </span>
                     <Link href={`/orders/${order.id}`}>
                       <Button variant="outline" size="sm" className="flex items-center gap-2">

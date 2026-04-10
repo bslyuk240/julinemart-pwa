@@ -1,120 +1,93 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { Customer } from '@/types/customer';
-import { getCurrentCustomer } from '@/lib/woocommerce/customers';
+import type { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase/client';
+import type { CustomerProfile } from '@/types/customer';
 
 interface AuthContextType {
-  customer: Customer | null;
-  customerId: number | null;
+  user: User | null;
+  customer: CustomerProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (customerId: number) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshCustomer: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
+  user: null,
   customer: null,
-  customerId: null,
   isAuthenticated: false,
   isLoading: true,
-  login: async () => {},
-  logout: () => {},
+  logout: async () => {},
   refreshCustomer: async () => {},
 });
 
-const CUSTOMER_ID_KEY = 'julinemart_customer_id';
-
 export function CustomerAuthProvider({ children }: { children: React.ReactNode }) {
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [customerId, setCustomerId] = useState<number | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load customer on mount
+  const loadProfile = async (u: User) => {
+    const { data } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', u.id)
+      .single();
+    setCustomer(data ?? null);
+  };
+
   useEffect(() => {
-    loadCustomer();
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        loadProfile(session.user).finally(() => setIsLoading(false));
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    // Listen to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        setIsLoading(true);
+        loadProfile(session.user).finally(() => setIsLoading(false));
+      } else {
+        setUser(null);
+        setCustomer(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const loadCustomer = async () => {
-    try {
-      setIsLoading(true);
-      const storedId = localStorage.getItem(CUSTOMER_ID_KEY);
-      
-      if (storedId) {
-        const id = parseInt(storedId);
-        setCustomerId(id);
-        
-        const customerData = await getCurrentCustomer(id);
-        if (customerData) {
-          setCustomer(customerData);
-        } else {
-          // Invalid customer ID, clear it
-          localStorage.removeItem(CUSTOMER_ID_KEY);
-          setCustomerId(null);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading customer:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const login = async (id: number) => {
-    try {
-      setIsLoading(true);
-      localStorage.setItem(CUSTOMER_ID_KEY, id.toString());
-      setCustomerId(id);
-      
-      const customerData = await getCurrentCustomer(id);
-      if (customerData) {
-        setCustomer(customerData);
-      }
-    } catch (error) {
-      console.error('Error during login:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem(CUSTOMER_ID_KEY);
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
     setCustomer(null);
-    setCustomerId(null);
   };
 
   const refreshCustomer = async () => {
-    if (customerId) {
-      try {
-        const customerData = await getCurrentCustomer(customerId);
-        if (customerData) {
-          setCustomer(customerData);
-        }
-      } catch (error) {
-        console.error('Error refreshing customer:', error);
-      }
-    }
+    if (user) await loadProfile(user);
   };
 
-  const value = {
-    customer,
-    customerId,
-    isAuthenticated: customer !== null,
-    isLoading,
-    login,
-    logout,
-    refreshCustomer,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{
+      user,
+      customer,
+      isAuthenticated: !!user,
+      isLoading,
+      logout,
+      refreshCustomer,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useCustomerAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useCustomerAuth must be used within CustomerAuthProvider');
-  }
-  return context;
+  return useContext(AuthContext);
 }

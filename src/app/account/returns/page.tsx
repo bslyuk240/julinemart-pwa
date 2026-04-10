@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 
 export default function ReturnsPage() {
   const router = useRouter();
-  const { customerId, isAuthenticated, isLoading } = useCustomerAuth();
+  const { user, isAuthenticated, isLoading } = useCustomerAuth();
   const [returns, setReturns] = useState<JloReturn[]>([]);
   const [loading, setLoading] = useState(true);
   const [enriching, setEnriching] = useState(false);
@@ -19,18 +19,18 @@ export default function ReturnsPage() {
 
   useEffect(() => {
     if (!isLoading) {
-      if (!isAuthenticated || !customerId) {
+      if (!isAuthenticated || !user?.email) {
         router.push('/login?redirect=/account/returns');
       } else {
-        loadReturns(customerId);
+        loadReturns(user.email);
       }
     }
-  }, [customerId, isAuthenticated, isLoading]);
+  }, [user, isAuthenticated, isLoading]);
 
-  const loadReturns = async (id: number) => {
+  const loadReturns = async (email: string) => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/returns?wc_customer_id=${id}`);
+      const res = await fetch(`/api/returns?customer_email=${encodeURIComponent(email)}`);
       if (!res.ok) throw new Error('Failed to fetch returns');
       const json = await res.json();
       const payload = json?.data ?? json;

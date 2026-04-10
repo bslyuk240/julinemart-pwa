@@ -1,168 +1,100 @@
-// src/app/api/auth/google/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { searchCustomerByEmail, createCustomer } from '@/lib/woocommerce/customers';
-import { AuthResult } from '@/lib/woocommerce/auth';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: NextRequest) {
   try {
     const { credential } = await request.json();
-
     if (!credential) {
-      return NextResponse.json(
-        { success: false, message: 'No credential provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: 'No credential provided' }, { status: 400 });
     }
 
-    // Decode the JWT token from Google
+    // Decode Google JWT (signature already verified by Google's GSI library client-side)
     const base64Url = credential.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
+      atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
     );
-
     const googleUser = JSON.parse(jsonPayload);
 
-    // Extract user information from Google token
-    const {
-      email,
-      given_name: firstName,
-      family_name: lastName,
-      name: fullName,
-      picture: profilePicture,
-      sub: googleId,
-    } = googleUser;
+    const { email, given_name: firstName, family_name: lastName, name: fullName, picture: avatarUrl, sub: googleId } = googleUser;
 
     if (!email) {
-      return NextResponse.json(
-        { success: false, message: 'No email in Google account' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: 'No email in Google account' }, { status: 400 });
     }
 
-    // Check if customer already exists in WooCommerce
-    console.log('🔍 Searching for customer with email:', email);
-    let customer = await searchCustomerByEmail(email);
-    console.log('🔍 Search result:', customer ? `Found customer ID ${customer.id}` : 'No customer found');
+    const userFirstName = firstName || (fullName ? fullName.split(' ')[0] : '');
+    const userLastName = lastName || (fullName ? fullName.split(' ').slice(1).join(' ') : '');
 
-    if (customer) {
-      // Customer exists - log them in (account linking)
-      console.log('✅ Logging in existing customer:', customer.id);
-      console.log('🔗 Account linking: Google account linked to existing email/password account');
-      const result: AuthResult = {
+    // Try to find existing user by email
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email === email);
+
+    if (existingUser) {
+      // Update avatar if Google provides one
+      if (avatarUrl && !existingUser.user_metadata?.avatar_url) {
+        await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+          user_metadata: { ...existingUser.user_metadata, avatar_url: avatarUrl },
+        });
+        await supabaseAdmin.from('customers').update({ avatar_url: avatarUrl }).eq('id', existingUser.id);
+      }
+
+      // Sign in via magic link token exchange — return a session
+      const { data: sessionData, error: sessionErr } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+      });
+      if (sessionErr || !sessionData) {
+        return NextResponse.json({ success: false, message: 'Failed to generate session' }, { status: 500 });
+      }
+
+      return NextResponse.json({
         success: true,
-        customerId: customer.id,
-        customer: customer,
-        message: 'Login successful',
-      };
-
-      return NextResponse.json(result);
+        action: 'login',
+        // Front-end will exchange this token via supabase.auth.verifyOtp
+        token_hash: sessionData.properties?.hashed_token,
+        email,
+      });
     }
 
-    // Customer doesn't exist - create new account
-    console.log('👤 Creating new customer for:', email);
-    // Split full name if first/last name not provided
-    let userFirstName = firstName || '';
-    let userLastName = lastName || '';
-
-    if (!userFirstName && !userLastName && fullName) {
-      const nameParts = fullName.split(' ');
-      userFirstName = nameParts[0] || '';
-      userLastName = nameParts.slice(1).join(' ') || '';
-    }
-
-    // Generate username from email
-    const username = email.split('@')[0] + Math.random().toString(36).substring(2, 6);
-
-    // Generate a secure random password (user won't need it for Google sign-in)
-    const randomPassword =
-      Math.random().toString(36).substring(2, 15) +
-      Math.random().toString(36).substring(2, 15) +
-      'A1!';
-
-    // Create new WooCommerce customer
-    console.log('📝 Calling createCustomer with username:', username);
-    const newCustomer = await createCustomer({
-      email: email,
-      first_name: userFirstName,
-      last_name: userLastName,
-      username: username,
-      password: randomPassword,
-      billing: {
+    // New user — create in Supabase Auth
+    const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      user_metadata: {
         first_name: userFirstName,
         last_name: userLastName,
-        email: email,
-        phone: '',
-        address_1: '',
-        address_2: '',
-        city: '',
-        state: '',
-        postcode: '',
-        country: 'NG',
-        company: '',
-      },
-      shipping: {
-        first_name: userFirstName,
-        last_name: userLastName,
-        address_1: '',
-        address_2: '',
-        city: '',
-        state: '',
-        postcode: '',
-        country: 'NG',
-        company: '',
+        avatar_url: avatarUrl || '',
+        google_id: googleId,
       },
     });
 
-    if (!newCustomer) {
-      console.error('❌ Failed to create customer for:', email);
-      console.error('❌ This usually means the email already exists in WooCommerce');
-      console.log('🔄 Attempting to search for existing customer again...');
-      
-      // Try searching again - maybe the customer exists but wasn't found initially
-      const existingCustomer = await searchCustomerByEmail(email);
-      if (existingCustomer) {
-        console.log('✅ Found existing customer on retry:', existingCustomer.id);
-        console.log('🔗 Linking Google account to existing account');
-        const result: AuthResult = {
-          success: true,
-          customerId: existingCustomer.id,
-          customer: existingCustomer,
-          message: 'Login successful',
-        };
-        return NextResponse.json(result);
-      }
-      
-      console.error('❌ Customer still not found after retry');
-      return NextResponse.json(
-        { success: false, message: 'Failed to create account. Please try again or contact support.' },
-        { status: 500 }
-      );
+    if (createErr || !newUser.user) {
+      return NextResponse.json({ success: false, message: createErr?.message || 'Failed to create account' }, { status: 500 });
     }
 
-    // Store Google ID in customer meta data for future reference
-    // This can be used to link the Google account to the WooCommerce customer
-    // You can enhance this later to update customer meta with Google ID
+    // customer row created by DB trigger — generate session token
+    const { data: sessionData, error: sessionErr } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email,
+    });
+    if (sessionErr || !sessionData) {
+      return NextResponse.json({ success: false, message: 'Account created but session failed' }, { status: 500 });
+    }
 
-    const result: AuthResult = {
+    return NextResponse.json({
       success: true,
-      customerId: newCustomer.id,
-      customer: newCustomer,
-      message: 'Account created successfully',
-    };
-
-    return NextResponse.json(result);
+      action: 'signup',
+      token_hash: sessionData.properties?.hashed_token,
+      email,
+      first_name: userFirstName,
+    });
   } catch (error: any) {
     console.error('Google auth error:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: error.message || 'Authentication failed',
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: error.message || 'Authentication failed' }, { status: 500 });
   }
 }
