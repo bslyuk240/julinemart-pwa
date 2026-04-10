@@ -9,7 +9,7 @@ import { Product } from '@/types/product';
 import { getStorePolicies, StorePolicies } from '@/lib/woocommerce/policies';
 import { formatPrice } from '@/lib/utils/format-price';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
-import { getVendorById, getVendorProducts, getVendorProductCount } from '@/lib/woocommerce/vendors-custom';
+import { getVendorById, getVendorProducts, getVendorProductCount, getCatalogVendorData } from '@/lib/woocommerce/vendors-custom';
 import type { Vendor } from '@/types/vendor';
 
 type VendorSortOption = 'date' | 'popularity' | 'price' | 'price-desc';
@@ -89,50 +89,67 @@ export default function VendorStorePage() {
         if (!silent) setLoading(true);
 
         const numericVendorId = parseInt(vendorId, 10);
-        
-        // ✅ Check vendor status first
-        const vendorData = await getVendorById(numericVendorId);
-        setVendorDetails(vendorData);
-        
-        // ✅ If vendor is disabled or on vacation, don't fetch products
+
+        // Fetch Supabase catalog products and WC vendor details in parallel.
+        // Supabase is the primary products source; WC supplies logo/banner/enabled/vacation.
+        const [catalogData, vendorData] = await Promise.all([
+          getCatalogVendorData(numericVendorId),
+          getVendorById(numericVendorId),
+        ]);
+
+        // WC vendor details take priority; fall back to Supabase-derived vendor info
+        const resolvedVendor = vendorData ?? catalogData.vendor ?? null;
+        setVendorDetails(resolvedVendor);
+
+        // Respect WC enabled/vacation flags when WC data is available
         if (vendorData) {
           if (vendorData.enabled === false) {
-            console.log('⚠️ Vendor is disabled');
             setProducts([]);
             setProductCount(0);
-            if (!silent) setLoading(false);
             return;
           }
-
           if (vendorData.is_store_vacation === true) {
-            console.log('🏖️ Vendor is on vacation');
             setProducts([]);
             setProductCount(0);
-            if (!silent) setLoading(false);
             return;
           }
         }
 
+        // ✅ Use Supabase catalog products (primary source)
+        if (catalogData.products.length > 0) {
+          setProductCount(catalogData.total);
+          setProducts(sortVendorProducts(catalogData.products, sortBy));
+          const firstProduct = catalogData.products[0];
+          if (firstProduct?.store) {
+            setVendorInfo(firstProduct.store);
+          } else if (resolvedVendor) {
+            setVendorInfo({
+              id: resolvedVendor.id,
+              name: resolvedVendor.store_name,
+              shop_name: resolvedVendor.store_name,
+              url: resolvedVendor.store_slug ? `/vendor/${resolvedVendor.id}` : resolvedVendor.store_url || '',
+              address: resolvedVendor.vendor_address ?? resolvedVendor.address ?? resolvedVendor.store_address ?? '',
+            });
+          }
+          return;
+        }
+
+        // Fallback: try WooCommerce products if Supabase returned nothing
         const countData = await getVendorProductCount(numericVendorId);
         const vendorProducts = await getVendorProducts(numericVendorId, countData?.product_ids);
 
-        if (countData?.product_count != null) {
-          setProductCount(countData.product_count);
-        } else {
-          setProductCount(vendorProducts.length);
-        }
-
+        setProductCount(countData?.product_count ?? vendorProducts.length);
         setProducts(sortVendorProducts(vendorProducts, sortBy));
 
         if (vendorProducts.length > 0 && vendorProducts[0].store) {
           setVendorInfo(vendorProducts[0].store);
-        } else if (vendorData) {
+        } else if (resolvedVendor) {
           setVendorInfo({
-            id: vendorData.id,
-            name: vendorData.store_name,
-            shop_name: vendorData.store_name,
-            url: vendorData.store_slug ? `/store/${vendorData.store_slug}` : vendorData.store_url || '',
-            address: vendorData.vendor_address ?? vendorData.address ?? vendorData.store_address ?? '',
+            id: resolvedVendor.id,
+            name: resolvedVendor.store_name,
+            shop_name: resolvedVendor.store_name,
+            url: resolvedVendor.store_slug ? `/vendor/${resolvedVendor.id}` : resolvedVendor.store_url || '',
+            address: resolvedVendor.vendor_address ?? resolvedVendor.address ?? resolvedVendor.store_address ?? '',
           });
         }
       } catch (error) {
