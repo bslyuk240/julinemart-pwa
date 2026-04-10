@@ -126,7 +126,7 @@ function normalizedRowToProduct(p: any): Product {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!JLO_BASE) {
     return NextResponse.json(
@@ -135,7 +135,7 @@ export async function GET(
     );
   }
 
-  const { id } = params;
+  const { id } = await params;
   const numericId = parseInt(id, 10);
   if (!numericId || isNaN(numericId)) {
     return NextResponse.json(
