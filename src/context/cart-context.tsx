@@ -12,5 +12,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
 export function useCartContext() {
   const context = useContext(CartContext);
-  return context ?? useCart();
+  const fallback = useCart();
+  return context ?? fallback;
 }
