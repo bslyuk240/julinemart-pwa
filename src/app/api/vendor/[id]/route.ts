@@ -44,7 +44,7 @@ export async function GET(
     if (vendor) {
       const { data: supabaseProducts, count } = await supabase
         .from('products')
-        .select('id, name, sku, regular_price, sale_price, status, woo_product_id, slug', { count: 'exact' })
+        .select('id, name, sku, regular_price, sale_price, status, woo_product_id, slug, product_images(src, alt, position, is_thumbnail)', { count: 'exact' })
         .eq('vendor_id', vendor.id)
         .in('status', ['publish', 'published'])
         .order('created_at', { ascending: false });
@@ -67,7 +67,7 @@ export async function GET(
 
             for (let i = 0; i < wcIds.length; i += batchSize) {
               const batch = wcIds.slice(i, i + batchSize);
-              const wcUrl = `${wcBase}/wp-json/wc/v3/products?include=${batch.join(',')}&per_page=${batchSize}&consumer_key=${wcKey}&consumer_secret=${wcSec}`;
+              const wcUrl = `${wcBase}/products?include=${batch.join(',')}&per_page=${batchSize}&consumer_key=${wcKey}&consumer_secret=${wcSec}`;
               const wcRes = await fetch(wcUrl, { next: { revalidate: 300 } });
               if (wcRes.ok) {
                 const wcData = await wcRes.json() as Array<Record<string, unknown>>;
@@ -80,6 +80,14 @@ export async function GET(
             products = supabaseProducts.map(sp => {
               const wc = wcProductMap[sp.woo_product_id as number] || {};
               const price = wc.price ?? sp.sale_price ?? sp.regular_price;
+              // Supabase images as primary fallback when WC has none
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const sbImages = ((sp as any).product_images || [])
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .sort((a: any, b: any) => a.position - b.position)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .map((img: any) => ({ id: 0, src: img.src, alt: img.alt || '', name: '' }));
+              const wcImages = Array.isArray(wc.images) && (wc.images as unknown[]).length > 0 ? wc.images : null;
               return {
                 id:            sp.woo_product_id || sp.id,
                 supabase_id:   sp.id,
@@ -89,7 +97,7 @@ export async function GET(
                 price:         price,
                 regular_price: wc.regular_price  ?? sp.regular_price,
                 sale_price:    wc.sale_price     ?? sp.sale_price,
-                images:        wc.images         ?? [],
+                images:        wcImages ?? sbImages,
                 categories:    wc.categories     ?? [],
                 average_rating: wc.average_rating ?? '0',
                 rating_count:  wc.rating_count   ?? 0,
@@ -102,7 +110,7 @@ export async function GET(
             });
           } catch (wcErr) {
             console.error('WooCommerce enrichment error:', wcErr);
-            // Fall back to Supabase-only data
+            // Fall back to Supabase-only data (use product_images from Supabase)
             products = supabaseProducts.map(sp => ({
               id:   sp.woo_product_id || sp.id,
               name: sp.name,
@@ -111,7 +119,12 @@ export async function GET(
               price: sp.sale_price ?? sp.regular_price,
               regular_price: sp.regular_price,
               sale_price:    sp.sale_price,
-              images: [],
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              images: ((sp as any).product_images || [])
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .sort((a: any, b: any) => a.position - b.position)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .map((img: any) => ({ id: 0, src: img.src, alt: img.alt || '', name: '' })),
               store: {
                 id:        wcVendorId,
                 name:      vendor.store_name,
