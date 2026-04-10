@@ -69,6 +69,9 @@ export default function Footer() {
           <Link href="/page/refund_returns" className="block text-gray-200 hover:text-primary-200">
             Refund & Returns
           </Link>
+          <Link href="/account-deletion" className="block text-gray-200 hover:text-primary-200">
+            Account Deletion
+          </Link>
           <Link href="/page/terms-of-service" className="block text-gray-200 hover:text-primary-200">
             Terms of Service
           </Link>

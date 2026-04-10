@@ -1,5 +1,5 @@
-import { Buffer } from 'buffer';
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,59 +28,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const wpUrl = process.env.NEXT_PUBLIC_WP_URL;
-    const wcKey = process.env.WC_KEY;
-    const wcSecret = process.env.WC_SECRET;
     const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
-    if (!paystackSecretKey || !wpUrl || !wcKey || !wcSecret) {
+    if (!paystackSecretKey) {
       return NextResponse.json(
         { success: false, error: 'Payment configuration error' },
         { status: 500 }
       );
     }
 
-    // Validate customer and ensure the authorization belongs to them
-    const customerResponse = await fetch(`${wpUrl}/wp-json/wc/v3/customers/${customerId}`, {
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${wcKey}:${wcSecret}`).toString('base64')}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    });
+    // Validate customer and card using Supabase
+    const supabase = getSupabaseServerClient();
 
-    if (!customerResponse.ok) {
-      return NextResponse.json(
-        { success: false, error: 'Unable to load customer record' },
-        { status: 403 }
-      );
-    }
+    const { data: card, error: cardError } = await supabase
+      .from('customer_saved_cards')
+      .select('id, authorization_code, email')
+      .eq('customer_id', customerId)
+      .eq('authorization_code', authorization_code)
+      .single();
 
-    const customerData = await customerResponse.json();
-    const savedCardsMeta = customerData?.meta_data?.find((m: any) => m.key === 'saved_payment_cards');
-    let savedCards: any[] = [];
-
-    if (savedCardsMeta?.value) {
-      try {
-        savedCards = Array.isArray(savedCardsMeta.value)
-          ? savedCardsMeta.value
-          : JSON.parse(savedCardsMeta.value);
-      } catch {
-        savedCards = [];
-      }
-    }
-
-    const matchedCard = Array.isArray(savedCards)
-      ? savedCards.find((card: any) => card?.authorization_code === authorization_code)
-      : null;
-
-    if (!matchedCard) {
+    if (cardError || !card) {
       return NextResponse.json(
         { success: false, error: 'Saved card not found for this customer' },
         { status: 403 }
       );
     }
 
-    const chargeEmail = email || customerData?.email;
+    const chargeEmail = email || card.email;
     if (!chargeEmail) {
       return NextResponse.json(
         { success: false, error: 'Customer email is required for payment' },

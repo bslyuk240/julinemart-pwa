@@ -96,6 +96,8 @@ export const CONTACT_INFO = {
   address: 'Lagos, Nigeria',
 };
 
+export const ACCOUNT_DELETION_EMAIL = 'info@julinemart.com';
+
 // SEO Defaults
 export const SEO_DEFAULTS = {
   title: 'JulineMart - Your Online Marketplace',

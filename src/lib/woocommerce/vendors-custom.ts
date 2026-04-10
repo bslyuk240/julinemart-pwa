@@ -136,6 +136,30 @@ export async function getVendorById(id: number): Promise<Vendor | null> {
   }
 }
 
+/**
+ * Fetch vendor products and basic vendor info from the Supabase catalog
+ * via the server-side /api/vendor-catalog/[id] route.
+ * Returns empty gracefully if the catalog is unavailable.
+ */
+export async function getCatalogVendorData(vendorId: number): Promise<{
+  vendor: Vendor | null;
+  products: Product[];
+  total: number;
+}> {
+  try {
+    const res = await fetch(`/api/vendor-catalog/${vendorId}`);
+    if (!res.ok) return { vendor: null, products: [], total: 0 };
+    const data = await res.json();
+    return {
+      vendor: (data.vendor as Vendor) ?? null,
+      products: Array.isArray(data.products) ? (data.products as Product[]) : [],
+      total: Number(data.total ?? 0),
+    };
+  } catch {
+    return { vendor: null, products: [], total: 0 };
+  }
+}
+
 const VENDOR_PRODUCTS_CHUNK = 100;
 
 /**

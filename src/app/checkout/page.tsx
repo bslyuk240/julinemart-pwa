@@ -20,7 +20,8 @@ import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
 import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
 import { getShippingFee } from '@/lib/shipping/jloShipping';
-import { updateCustomer } from '@/lib/woocommerce/customers';
+import { getSavedCards, upsertAddress, updateCustomerProfile, getAddresses } from '@/lib/supabase/customers';
+import type { CustomerAddress } from '@/types/customer';
 import { trackBeginCheckout, trackPurchase } from '@/lib/gtag';
 import { useCartStore } from '@/store/cart-store';
 
@@ -61,7 +62,8 @@ declare global {
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, clearCart } = useCart();
-  const { customer, customerId, isAuthenticated, refreshCustomer } = useCustomerAuth();
+  const { user, customer, isAuthenticated, refreshCustomer } = useCustomerAuth();
+  const customerId = user?.id ?? null;
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isCartHydrated, setIsCartHydrated] = useState(() => {
@@ -78,6 +80,8 @@ export default function CheckoutPage() {
   const [defaultSavedCard, setDefaultSavedCard] = useState<SavedCard | null>(null);
   const [useSavedCard, setUseSavedCard] = useState(false);
   const [saveCard, setSaveCard] = useState(true);
+  // Saved address state (from Supabase customer_addresses)
+  const [defaultShippingAddress, setDefaultShippingAddress] = useState<CustomerAddress | null>(null);
   
   // Shipping & Payment
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
@@ -124,45 +128,25 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const applyShippingAddress = useCallback((): void => {
-    if (!customer?.shipping) return;
-
-    const shipping = customer.shipping;
-    const billing = customer.billing;
+    if (!defaultShippingAddress) return;
 
     setFormData((prev) => ({
       ...prev,
-      firstName: shipping.first_name || customer.first_name || prev.firstName,
-      lastName: shipping.last_name || customer.last_name || prev.lastName,
-      email: prev.email || customer.email || billing?.email || '',
-      phone: shipping.phone || billing?.phone || prev.phone,
-      address1: shipping.address_1 || prev.address1,
-      address2: shipping.address_2 || prev.address2,
-      city: shipping.city || prev.city,
-      state: shipping.state || prev.state,
-      postcode: shipping.postcode || prev.postcode,
-      country: shipping.country || prev.country || 'NG',
+      firstName: defaultShippingAddress.first_name || customer?.first_name || prev.firstName,
+      lastName: defaultShippingAddress.last_name || customer?.last_name || prev.lastName,
+      email: prev.email || customer?.email || '',
+      phone: defaultShippingAddress.phone || customer?.phone || prev.phone,
+      address1: defaultShippingAddress.address_1 || prev.address1,
+      address2: defaultShippingAddress.address_2 || prev.address2,
+      city: defaultShippingAddress.city || prev.city,
+      state: defaultShippingAddress.state || prev.state,
+      postcode: defaultShippingAddress.postcode || prev.postcode,
+      country: defaultShippingAddress.country || prev.country || 'NG',
     }));
-  }, [customer]);
+  }, [customer, defaultShippingAddress]);
 
-  const applyBillingAddress = useCallback((): void => {
-    if (!customer?.billing) return;
-
-    const billing = customer.billing;
-
-    setFormData((prev) => ({
-      ...prev,
-      firstName: billing.first_name || customer?.first_name || prev.firstName,
-      lastName: billing.last_name || customer?.last_name || prev.lastName,
-      email: billing.email || customer?.email || prev.email,
-      phone: billing.phone || prev.phone,
-      address1: billing.address_1 || prev.address1,
-      address2: billing.address_2 || prev.address2,
-      city: billing.city || prev.city,
-      state: billing.state || prev.state,
-      postcode: billing.postcode || prev.postcode,
-      country: billing.country || prev.country || 'NG',
-    }));
-  }, [customer]);
+  // No-op kept for compatibility; billing addresses not auto-applied
+  const applyBillingAddress = useCallback((): void => {}, []);
 
   const formatPrice = (price: number) => `NGN ${price.toLocaleString()}`;
   
@@ -310,6 +294,7 @@ export default function CheckoutPage() {
           orderId: orderId,
           saveCard: saveCard && isAuthenticated,
           customerId: customerId,
+          customerEmail: formData.email || customer?.email,
         }),
       });
 
@@ -494,41 +479,51 @@ export default function CheckoutPage() {
   }, [items, formData.country, formData.state]);
 
   useEffect(() => {
-    if (customer) {
-      const savedCardsMeta = (customer as any)?.meta_data?.find((m: any) => m.key === 'saved_payment_cards');
-      if (savedCardsMeta?.value) {
-        try {
-          const parsed = typeof savedCardsMeta.value === 'string'
-            ? JSON.parse(savedCardsMeta.value)
-            : savedCardsMeta.value;
-          if (Array.isArray(parsed)) {
-            const def = parsed.find((c) => c.is_default) || parsed[0] || null;
-            setDefaultSavedCard(def || null);
-          }
-        } catch (err) {
-          console.error('Error parsing saved cards:', err);
-        }
-      }
+    if (customer && user) {
+      // Pre-fill basic contact info from Supabase profile
+      setFormData((prev) => ({
+        ...prev,
+        email: prev.email || customer.email || '',
+        firstName: prev.firstName || customer.first_name || '',
+        lastName: prev.lastName || customer.last_name || '',
+        phone: prev.phone || customer.phone || '',
+      }));
 
-      if (customer.shipping) {
-        applyShippingAddress();
-        setUseDifferentAddress(false);
-        setSaveNewAddress(false);
-      } else if (customer.billing) {
-        applyBillingAddress();
-        setUseDifferentAddress(true);
-      }
-    } else {
+      // Load saved cards from Supabase
+      getSavedCards(user.id)
+        .then((cards) => {
+          const def = cards.find((c) => c.is_default) || cards[0] || null;
+          setDefaultSavedCard(def || null);
+        })
+        .catch((err) => console.error('Error loading saved cards:', err));
+
+      // Load addresses from Supabase
+      getAddresses(user.id)
+        .then((addresses) => {
+          const shipping =
+            addresses.find((a) => a.type === 'shipping' && a.is_default) ||
+            addresses.find((a) => a.type === 'shipping') ||
+            null;
+          setDefaultShippingAddress(shipping);
+          if (shipping) {
+            setUseDifferentAddress(false);
+            setSaveNewAddress(false);
+          } else {
+            setUseDifferentAddress(true);
+          }
+        })
+        .catch((err) => console.error('Error loading addresses:', err));
+    } else if (!customer) {
       setUseDifferentAddress(true);
     }
-  }, [customer, applyBillingAddress, applyShippingAddress]);
+  }, [customer, user]);
 
   useEffect(() => {
-    if (!useDifferentAddress && customer?.shipping) {
+    if (!useDifferentAddress && defaultShippingAddress) {
       applyShippingAddress();
       setSaveNewAddress(false);
     }
-  }, [useDifferentAddress, customer, applyShippingAddress]);
+  }, [useDifferentAddress, defaultShippingAddress, applyShippingAddress]);
 
   useEffect(() => {
     if (!defaultSavedCard || selectedPayment !== 'paystack') {
@@ -619,61 +614,40 @@ export default function CheckoutPage() {
   };
 
   const persistCheckoutProfileIfNeeded = async () => {
-    if (!isAuthenticated || !customerId) return false;
+    if (!isAuthenticated || !customerId || !user) return false;
 
     const shouldSaveAddress = saveNewAddress && useDifferentAddress;
-    const existingShipping = customer?.shipping;
-    const existingBilling = customer?.billing;
-
-    const shippingPayload = {
-      first_name: formData.firstName,
-      last_name: formData.lastName,
-      address_1: shouldSaveAddress ? formData.address1 : existingShipping?.address_1 || '',
-      address_2: shouldSaveAddress ? formData.address2 : existingShipping?.address_2 || '',
-      city: shouldSaveAddress ? formData.city : existingShipping?.city || '',
-      state: shouldSaveAddress ? formData.state : existingShipping?.state || '',
-      postcode: shouldSaveAddress ? formData.postcode : existingShipping?.postcode || '',
-      country: shouldSaveAddress ? formData.country : existingShipping?.country || formData.country,
-      phone: formData.phone,
-      company: existingShipping?.company || '',
-    };
-
-    const billingPayload = {
-      first_name: formData.firstName,
-      last_name: formData.lastName,
-      address_1: shouldSaveAddress ? formData.address1 : existingBilling?.address_1 || '',
-      address_2: shouldSaveAddress ? formData.address2 : existingBilling?.address_2 || '',
-      city: shouldSaveAddress ? formData.city : existingBilling?.city || '',
-      state: shouldSaveAddress ? formData.state : existingBilling?.state || '',
-      postcode: shouldSaveAddress ? formData.postcode : existingBilling?.postcode || '',
-      country: shouldSaveAddress ? formData.country : existingBilling?.country || formData.country,
-      email: formData.email,
-      phone: formData.phone,
-      company: existingBilling?.company || '',
-    };
 
     try {
-      const updated = await updateCustomer(customerId, {
-        email: formData.email,
+      // Update basic profile (name, phone)
+      await updateCustomerProfile(user.id, {
         first_name: formData.firstName,
         last_name: formData.lastName,
-        shipping: shippingPayload,
-        billing: billingPayload,
+        phone: formData.phone || null,
       });
 
-      if (!updated) {
-        if (shouldSaveAddress) {
-          toast.error('Could not save address to your account');
-        }
-        return false;
-      }
-
-      await refreshCustomer();
-
+      // Save address to Supabase if requested
       if (shouldSaveAddress) {
+        await upsertAddress(user.id, {
+          type: 'shipping',
+          label: 'Home',
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          company: null,
+          address_1: formData.address1,
+          address_2: formData.address2 || null,
+          city: formData.city,
+          state: formData.state,
+          postcode: formData.postcode || null,
+          country: formData.country,
+          phone: formData.phone || null,
+          email: formData.email || null,
+          is_default: !defaultShippingAddress,
+        });
         toast.success('Address saved for future checkouts');
       }
 
+      await refreshCustomer();
       return true;
     } catch (error) {
       console.error('Checkout profile save error:', error);
@@ -933,7 +907,6 @@ export default function CheckoutPage() {
       const shippingLineTotal = Math.max(0, (shippingCost ?? 0) - orderShippingDiscount);
 
       const orderData = {
-        customer_id: isAuthenticated && customerId ? customerId : undefined,
         payment_method: selectedPayment,
         payment_method_title: paymentGateways.find(g => g.id === selectedPayment)?.title || 'Payment',
         set_paid: false,
@@ -1191,8 +1164,8 @@ export default function CheckoutPage() {
   const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
   const isPaystackGateway = selectedPayment === 'paystack';
   const hasSavedShipping = Boolean(
-    customer?.shipping &&
-    (customer.shipping.address_1 || customer.shipping.city || customer.shipping.state)
+    defaultShippingAddress &&
+    (defaultShippingAddress.address_1 || defaultShippingAddress.city || defaultShippingAddress.state)
   );
 
   return (
@@ -1278,11 +1251,11 @@ export default function CheckoutPage() {
                     <div>
                       <p className="font-medium text-green-900 mb-1">Saved Address</p>
                       <p className="text-sm text-green-800">
-                        {customer?.shipping?.first_name} {customer?.shipping?.last_name}{customer?.shipping?.first_name || customer?.shipping?.last_name ? ' • ' : ''}
-                        {customer?.shipping?.address_1}{customer?.shipping?.city ? `, ${customer.shipping.city}` : ''}{customer?.shipping?.state ? `, ${customer.shipping.state}` : ''}
+                        {defaultShippingAddress?.first_name} {defaultShippingAddress?.last_name}{defaultShippingAddress?.first_name || defaultShippingAddress?.last_name ? ' • ' : ''}
+                        {defaultShippingAddress?.address_1}{defaultShippingAddress?.city ? `, ${defaultShippingAddress.city}` : ''}{defaultShippingAddress?.state ? `, ${defaultShippingAddress.state}` : ''}
                       </p>
-                      {customer?.shipping?.phone && (
-                        <p className="text-xs text-green-700 mt-1">Phone: {customer.shipping.phone}</p>
+                      {defaultShippingAddress?.phone && (
+                        <p className="text-xs text-green-700 mt-1">Phone: {defaultShippingAddress.phone}</p>
                       )}
                     </div>
                     <button

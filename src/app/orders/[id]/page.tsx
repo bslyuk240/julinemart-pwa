@@ -27,7 +27,8 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
   const orderId = params.id as string;
-  const { customerId, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
+  const customerEmail = user?.email ?? null;
   
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,9 +97,9 @@ export default function OrderDetailPage() {
         }
 
         // Backup: use customer returns and filter by order_id
-        if (!initialReturns.length && customerId) {
+        if (!initialReturns.length && customerEmail) {
           try {
-            const custRes = await fetch(`/api/returns?wc_customer_id=${customerId}`);
+            const custRes = await fetch(`/api/returns?customer_email=${encodeURIComponent(customerEmail)}`);
             if (custRes.ok) {
               const custJson = await custRes.json();
               const cpayload = custJson?.data ?? custJson;
