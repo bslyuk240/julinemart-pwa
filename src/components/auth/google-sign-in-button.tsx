@@ -106,9 +106,8 @@ export default function GoogleSignInButton({
 
       // Exchange the server-generated token for a real Supabase session
       const { error: verifyErr } = await supabase.auth.verifyOtp({
-        email: data.email,
-        token: data.token_hash,
-        type: 'magiclink',
+        token_hash: data.token_hash,
+        type: 'email',
       });
 
       if (verifyErr) throw new Error(verifyErr.message);
