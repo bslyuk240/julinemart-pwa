@@ -343,16 +343,33 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       return;
     }
 
+    // Normalize for comparison: lowercase + collapse all whitespace
+    const norm = (s: string) => (s ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+
     const match = variations.find((variation) => {
       if (!variation.attributes.length) return false;
       return variation.attributes.every((attr) => {
-        const key = (attr.name ?? '').toLowerCase().trim();
+        const key = norm(attr.name ?? '');
         if (!key) return true; // skip attrs with no name
         const selected = selectedAttributes[key];
         if (!selected) return false;
-        return selected.toLowerCase().trim() === (attr.option ?? '').toLowerCase().trim();
+        return norm(selected) === norm(attr.option ?? '');
       });
     });
+
+    // Fallback: if no exact-norm match and there's only 1 attribute dimension,
+    // try matching on option value alone (ignoring attribute name key differences)
+    if (!match) {
+      const selectedValues = Object.values(selectedAttributes).map(norm);
+      const loose = variations.find((variation) => {
+        if (!variation.attributes.length) return false;
+        return variation.attributes.every((attr) =>
+          selectedValues.some((sv) => sv === norm(attr.option ?? ''))
+        );
+      });
+      setSelectedVariation(loose || null);
+      return;
+    }
 
     setSelectedVariation(match || null);
   }, [selectedAttributes, variations]);
