@@ -1,5 +1,3 @@
-import { APP_URL } from '@/lib/constants';
-
 export interface ShippingZone {
   id: number;
   name: string;
@@ -130,8 +128,7 @@ const scoreZoneMatch = (locations: ZoneLocation[], country: string, state?: stri
 const isRestOfWorldZone = (zone: ShippingZone) => zone.name.trim().toLowerCase() === 'rest of the world';
 
 async function fetchShippingSettings(): Promise<ShippingZoneWithMethods[]> {
-  const baseUrl = APP_URL.replace(/\/$/, '');
-  const response = await fetch(`${baseUrl}/api/jlo/shipping-settings`, {
+  const response = await fetch('/api/jlo/shipping-settings', {
     cache: 'no-store',
   });
 
