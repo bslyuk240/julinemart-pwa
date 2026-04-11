@@ -13,6 +13,7 @@ interface ProductGalleryProps {
 export default function ProductGallery({ images, productName }: ProductGalleryProps) {
   const [selectedImage, setSelectedImage] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const isRemoteImage = (src: string) => /^https?:\/\//i.test(src);
 
   // Reset to first image whenever the images array changes (e.g. variation selected)
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
           className="object-cover cursor-zoom-in"
           onClick={() => setIsModalOpen(true)}
           priority
+          unoptimized={isRemoteImage(images[selectedImage].src)}
         />
 
         {/* Navigation Arrows */}
@@ -82,7 +84,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {images.map((image, index) => (
             <button
-              key={image.id}
+              key={`${image.src || 'image'}-${index}`}
               onClick={() => setSelectedImage(index)}
               className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
                 selectedImage === index
@@ -96,6 +98,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
                 fill
                 className="object-cover"
                 sizes="80px"
+                unoptimized={isRemoteImage(image.src)}
               />
             </button>
           ))}
@@ -136,6 +139,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
               fill
               className="object-contain pointer-events-none"
               sizes="100vw"
+              unoptimized={isRemoteImage(images[selectedImage].src)}
             />
           </div>
 

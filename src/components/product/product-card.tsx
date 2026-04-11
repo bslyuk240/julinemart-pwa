@@ -24,6 +24,7 @@ export default function ProductCard({
   fullWidth = false,
   floatingBadge 
 }: ProductCardProps) {
+  const isRemoteImage = (src: string) => /^https?:\/\//i.test(src);
   const decodedName = decodeHtmlEntities(product.name);
   const { addItem } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
@@ -134,11 +135,11 @@ export default function ProductCard({
           {/* Product Tag Badges */}
           {productBadges.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {productBadges.map((tag) => {
+              {productBadges.map((tag, index) => {
                 const config = getBadgeConfig(tag.slug);
                 return (
                   <span
-                    key={tag.id}
+                    key={`${tag.slug || 'tag'}-${tag.id || index}`}
                     className={`${config.color} text-white text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-md shadow-lg`}
                   >
                     {config.label}
@@ -181,11 +182,12 @@ export default function ProductCard({
         {/* Product Image */}
         <div className="relative aspect-square overflow-hidden rounded-t-lg bg-gray-50">
           <Image
-            src={product.images[0]?.src || '/images/placeholder.jpg'}
+            src={product.images[0]?.src || '/images/placeholder.svg'}
             alt={decodedName}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 220px"
             className="object-cover transition-transform duration-200 group-hover:scale-105"
+            unoptimized={isRemoteImage(product.images[0]?.src || '')}
           />
         </div>
       </div>

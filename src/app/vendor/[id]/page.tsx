@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { Fragment, useCallback, useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Store, Star } from 'lucide-react';
@@ -243,13 +243,13 @@ export default function VendorStorePage() {
                 { val: '95%',  label: 'Positive',  color: 'text-green-600' },
                 { val: '24h',  label: 'Response',  color: 'text-blue-600' },
               ].map((s, i, arr) => (
-                <>
-                  <div key={s.label} className="flex-1">
+                <Fragment key={`${s.label}-${i}`}>
+                  <div className="flex-1">
                     <div className={`font-bold ${s.color}`} style={{ fontSize: 18 }}>{s.val}</div>
                     <div className="text-gray-600" style={{ fontSize: 11 }}>{s.label}</div>
                   </div>
                   {i < arr.length - 1 && <div className="h-8 w-px bg-gray-200" />}
-                </>
+                </Fragment>
               ))}
             </div>
           </div>
@@ -280,8 +280,8 @@ export default function VendorStorePage() {
                   { val: ratingAvg ?? 'N/A',        label: 'Rating' },
                   { val: '95%',                     label: 'Positive' },
                   { val: '24h',                     label: 'Response' },
-                ].map(s => (
-                  <div key={s.label} className="text-center">
+                ].map((s, i) => (
+                  <div key={`${s.label}-${i}`} className="text-center">
                     <p className="text-2xl font-bold text-primary-600">{s.val}</p>
                     <p className="text-xs text-gray-600">{s.label}</p>
                   </div>

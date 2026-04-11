@@ -159,10 +159,10 @@ export default function SettingsTestPage() {
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            WooCommerce Settings Test
+            Store Settings Test
           </h1>
           <p className="text-gray-600">
-            Testing dynamic settings integration with WooCommerce
+            Testing Supabase-backed store settings integration
           </p>
         </div>
 
@@ -190,7 +190,7 @@ export default function SettingsTestPage() {
                 allSuccess ? 'text-green-700' : 'text-yellow-700'
               }`}>
                 {allSuccess 
-                  ? 'Your WooCommerce settings are being fetched correctly' 
+                  ? 'Your store settings are being fetched correctly' 
                   : 'Please check the details below'}
               </p>
             </div>
@@ -238,10 +238,10 @@ export default function SettingsTestPage() {
           <h3 className="font-semibold text-blue-900 mb-3">Expected Values</h3>
           <ul className="space-y-2 text-sm text-blue-800">
             <li>✓ <strong>Return Days:</strong> Should be 3 (your setting)</li>
-            <li>✓ <strong>Free Shipping:</strong> Should match your WooCommerce shipping zone settings</li>
-            <li>✓ <strong>Tax Rate:</strong> Should match your WooCommerce tax settings</li>
+            <li>✓ <strong>Free Shipping:</strong> Should match the configured shipping policy</li>
+            <li>✓ <strong>Tax Rate:</strong> Should match the configured tax policy</li>
             <li>✓ <strong>Currency:</strong> Should be NGN (Nigerian Naira)</li>
-            <li>✓ <strong>Coupons:</strong> Should reflect your WooCommerce coupon settings</li>
+            <li>✓ <strong>Coupons:</strong> Should reflect the configured coupon policy</li>
           </ul>
         </div>
 
@@ -276,11 +276,11 @@ export default function SettingsTestPage() {
           <h3 className="font-semibold text-gray-900 mb-3">Troubleshooting</h3>
           <ul className="space-y-2 text-sm text-gray-700">
             <li>
-              <strong>If return days is not 3:</strong> Check WordPress custom fields 
-              or verify the policies endpoint
+              <strong>If return days is not 3:</strong> Check the policy defaults
+              or verify the settings route
             </li>
             <li>
-              <strong>If taxes are 0:</strong> Enable taxes in WooCommerce → Settings → Tax
+              <strong>If taxes are 0:</strong> Taxes are currently disabled by default in this workspace
             </li>
             <li>
               <strong>If tests fail:</strong> Check browser console for errors and 

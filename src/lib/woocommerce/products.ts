@@ -1,4 +1,3 @@
-import { wcApi, handleApiError, WooCommerceResponse } from './client';
 import { Product, ProductsQueryParams, ProductVariation, ProductReview } from '@/types/product';
 import {
   catalogGetProducts,
@@ -34,13 +33,8 @@ export async function getProductsWithPagination(
  * ID-based lookup always uses WooCommerce — catalog-product expects a slug.
  */
 export async function getProduct(id: number): Promise<Product | null> {
-  try {
-    const response = await wcApi.get(`products/${id}`);
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    return null;
-  }
+  const products = await catalogGetProducts({ include: [id], per_page: 1 });
+  return products?.[0] ?? null;
 }
 
 /**
@@ -50,19 +44,9 @@ export async function getProductReviews(
   productId: number,
   params: { page?: number; per_page?: number } = {}
 ): Promise<ProductReview[]> {
-  try {
-    const response = await wcApi.get('products/reviews', {
-      product: productId,
-      per_page: params.per_page ?? 20,
-      page: params.page ?? 1,
-      order: 'desc',
-      orderby: 'date',
-    });
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    return [];
-  }
+  void productId;
+  void params;
+  return [];
 }
 
 /**
@@ -75,13 +59,8 @@ export async function createProductReview(payload: {
   reviewer_email: string;
   rating: number;
 }): Promise<ProductReview | null> {
-  try {
-    const response = await wcApi.post('products/reviews', payload);
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    return null;
-  }
+  void payload;
+  return null;
 }
 
 /**
@@ -157,7 +136,7 @@ export async function getRelatedProducts(
       per_page: limit,
     });
   } catch (error) {
-    handleApiError(error);
+    console.error('Error fetching related products:', error);
     return [];
   }
 }

@@ -10,7 +10,7 @@
  * All functions return null/[] on any error so callers can fall back to WooCommerce.
  */
 
-import type { Product, ProductVariation, ProductsQueryParams } from '@/types/product';
+import type { Product, ProductAttribute, ProductVariation, ProductsQueryParams } from '@/types/product';
 
 function getJloCatalogBase(): string | null {
   const url =
@@ -43,6 +43,90 @@ async function jloFetch<T>(path: string): Promise<T | null> {
 // JLO functions return { success, data, meta } for lists and { success, data } for single
 interface JloListResponse { success: boolean; data: unknown[]; meta?: unknown }
 interface JloSingleResponse { success: boolean; data: unknown }
+
+const normalizeVariationKey = (value: string) =>
+  (value ?? '')
+    .toLowerCase()
+    .trim()
+    .replace(/^attribute[_-]/, '')
+    .replace(/^pa[_-]/, '')
+    .replace(/^product[_-]/, '')
+    .replace(/[^a-z0-9]+/g, '');
+
+const dedupeOptions = (options: string[]) =>
+  Array.from(new Set(options.map((option) => option.trim()).filter(Boolean)));
+
+const stableNumericId = (value: string): number => {
+  if (!value) return 0;
+
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0) || 0;
+};
+
+const inferAttributesFromVariations = (variations: ProductVariation[]): ProductAttribute[] => {
+  const map = new Map<string, { name: string; options: string[] }>();
+
+  variations.forEach((variation) => {
+    variation.attributes.forEach((attr) => {
+      const rawName = (attr.name ?? '').trim();
+      const rawOption = (attr.option ?? '').trim();
+      if (!rawName || !rawOption) return;
+
+      const key = normalizeVariationKey(rawName);
+      if (!key) return;
+
+      const existing = map.get(key);
+      if (existing) {
+        existing.options.push(rawOption);
+        return;
+      }
+
+      map.set(key, { name: rawName, options: [rawOption] });
+    });
+  });
+
+  return Array.from(map.values()).map((attr, index) => ({
+    id: index + 1,
+    name: attr.name,
+    position: index,
+    visible: true,
+    variation: true,
+    options: dedupeOptions(attr.options),
+  }));
+};
+
+const inferVariationAttributesFromProduct = (
+  productAttributes: ProductAttribute[],
+  variations: ProductVariation[]
+): ProductVariation[] => {
+  const variationAttrs = productAttributes.filter((attr) => attr.variation);
+  if (variationAttrs.length !== 1) return variations;
+
+  const sourceAttr = variationAttrs[0];
+  if (!sourceAttr.options?.length) return variations;
+
+  return variations.map((variation, index) => {
+    if (variation.attributes.length > 0) return variation;
+    const option = sourceAttr.options[index];
+    if (!option) return variation;
+
+    return {
+      ...variation,
+      attributes: [
+        {
+          id: 0,
+          name: sourceAttr.name,
+          option,
+        },
+      ],
+    };
+  });
+};
 
 // ---------------------------------------------------------------------------
 // Row → WC Product mapper
@@ -99,12 +183,35 @@ export function toWcProduct(row: any): Product {
       }))
     : [];
 
+  const productAttributes: ProductAttribute[] = Array.isArray(row.attributes)
+    ? row.attributes
+        .filter((a: any) => a.name != null && String(a.name).trim() !== '')
+        .map((a: any) => ({
+          ...a,
+          name: String(a.name).trim(),
+          options: Array.isArray(a.options)
+            ? a.options.map((o: any) => String(o ?? '').trim()).filter(Boolean)
+            : [],
+          variation: a.variation ?? a.is_variation ?? false,
+        }))
+    : [];
+
   // catalog-product returns variations as full objects; extract before the
   // WC numeric-id mapping destroys them
-  const inlineVariations =
+  const rawInlineVariations =
     Array.isArray(row.variations) && row.variations.length > 0 && typeof row.variations[0] === 'object'
       ? (row.variations as unknown[]).map(toWcVariation)
       : undefined;
+  const inlineVariations = rawInlineVariations
+    ? inferVariationAttributesFromProduct(productAttributes, rawInlineVariations)
+    : undefined;
+  const variationIds = rawInlineVariations
+    ? rawInlineVariations.map((variation) => variation.id).filter((id) => Number.isFinite(id))
+    : Array.isArray(row.variations)
+    ? row.variations
+        .map((variation: any) => Number(variation))
+        .filter((id: number) => Number.isFinite(id))
+    : [];
 
   return {
     supabaseId: row.id ?? undefined,
@@ -164,20 +271,13 @@ export function toWcProduct(row: any): Product {
     brands: Array.isArray(row.brands) ? row.brands : undefined,
     images,
     // Supabase uses is_variation; WC/UI checks attr.variation
-    attributes: Array.isArray(row.attributes)
-      ? row.attributes
-          .filter((a: any) => a.name != null && String(a.name).trim() !== '')
-          .map((a: any) => ({
-            ...a,
-            name: String(a.name).trim(),
-            options: Array.isArray(a.options)
-              ? a.options.map((o: any) => String(o ?? '').trim()).filter(Boolean)
-              : [],
-            variation: a.variation ?? a.is_variation ?? false,
-          }))
+    attributes: productAttributes.length
+      ? productAttributes
+      : inlineVariations?.length
+      ? inferAttributesFromVariations(inlineVariations)
       : [],
     default_attributes: Array.isArray(row.default_attributes) ? row.default_attributes : [],
-    variations: Array.isArray(row.variations) ? row.variations.map(Number) : [],
+    variations: variationIds,
     grouped_products: Array.isArray(row.grouped_products) ? row.grouped_products : [],
     menu_order: Number(row.menu_order ?? 0),
     meta_data: Array.isArray(row.meta_data) ? row.meta_data : [],
@@ -202,10 +302,13 @@ export function toWcProduct(row: any): Product {
 function toWcVariation(row: any): ProductVariation {
   const regularPrice = String(row.regular_price ?? '');
   const salePrice = row.sale_price ? String(row.sale_price) : '';
+  const numericId = Number(row.woo_variation_id ?? row.wc_id ?? 0);
+  const fallbackId = stableNumericId(String(row.id ?? row.supabase_id ?? row.supabaseId ?? row.variation_id ?? ''));
   return {
     supabaseId: row.id ?? undefined,
-    // Use woo_variation_id as the numeric WC variation id; fall back to 0
-    id: Number(row.woo_variation_id ?? row.wc_id ?? 0),
+    // Prefer WC variation IDs, but synthesize a stable numeric fallback for
+    // Supabase-only rows so UI keys and cart entries stay stable.
+    id: numericId || fallbackId,
     sku: row.sku ?? '',
     price: salePrice || regularPrice,
     regular_price: regularPrice,
@@ -246,6 +349,7 @@ function buildProductsQS(params: ProductsQueryParams): string {
   const qs = new URLSearchParams();
   if (params.page) qs.set('page', String(params.page));
   if (params.per_page) qs.set('per_page', String(params.per_page));
+  if (params.include?.length) qs.set('include', params.include.join(','));
   if (params.search) qs.set('search', params.search);
   if (params.category) qs.set('category', String(params.category));
   if (params.tag) qs.set('tag', String(params.tag));

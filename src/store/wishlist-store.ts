@@ -42,7 +42,7 @@ export const useWishlistStore = create<WishlistState>()(
           name: product.name,
           slug: product.slug,
           price: product.price,
-          image: product.images[0]?.src || '/placeholder.png',
+          image: product.images[0]?.src || '/images/placeholder.svg',
           addedAt: new Date().toISOString(),
         };
         

@@ -12,7 +12,7 @@ import { getProductVariations, getProductReviews, createProductReview } from '@/
 import ProductFeatures from '@/components/product/product-features';
 import { useCartStore } from '@/store/cart-store';
 import { useWishlist } from '@/hooks/use-wishlist';
-import { Product, ProductVariation, ProductReview } from '@/types/product';
+import { Product, ProductAttribute, ProductVariation, ProductReview } from '@/types/product';
 import { toast } from 'sonner';
 import { decodeHtmlEntities } from '@/lib/utils/helpers';
 
@@ -29,6 +29,63 @@ const getBadgeConfig = (tagSlug: string) => {
 };
 
 const stripHtml = (value: string) => value.replace(/<[^>]*>/g, '').trim();
+
+const normalizeVariationKey = (value: string) =>
+  (value ?? '')
+    .toLowerCase()
+    .trim()
+    .replace(/^attribute[_-]/, '')
+    .replace(/^pa[_-]/, '')
+    .replace(/^product[_-]/, '')
+    .replace(/[^a-z0-9]+/g, '');
+
+const normalizeVariationValue = (value: string) =>
+  (value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+const dedupeOptions = (options: string[]) =>
+  Array.from(new Set(options.map((option) => option.trim()).filter(Boolean)));
+
+const inferVariationAttributes = (variations: ProductVariation[]): ProductAttribute[] => {
+  const map = new Map<
+    string,
+    {
+      name: string;
+      options: string[];
+    }
+  >();
+
+  variations.forEach((variation) => {
+    variation.attributes.forEach((attr) => {
+      const rawName = (attr.name ?? '').trim();
+      const rawOption = (attr.option ?? '').trim();
+      if (!rawName || !rawOption) return;
+
+      const key = normalizeVariationKey(rawName);
+      if (!key) return;
+
+      const existing = map.get(key);
+      if (existing) {
+        existing.options.push(rawOption);
+        if (!existing.name && rawName) existing.name = rawName;
+        return;
+      }
+
+      map.set(key, {
+        name: rawName,
+        options: [rawOption],
+      });
+    });
+  });
+
+  return Array.from(map.values()).map((attr, index) => ({
+    id: index + 1,
+    name: attr.name,
+    position: index,
+    visible: true,
+    variation: true,
+    options: dedupeOptions(attr.options),
+  }));
+};
 
 // Clean up raw CJ option codes for display: "1544707-White-Size" → "White"
 function cleanOptionLabel(option: string): string {
@@ -193,7 +250,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       name: product.name,
       slug: product.slug,
       price: product.price,
-      image: product.images[0]?.src || '/images/placeholder.jpg',
+      image: product.images[0]?.src || '/images/placeholder.svg',
     });
   };
 
@@ -283,6 +340,47 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     alert('Link copied to clipboard!');
   };
 
+  const selectedVariationKeyedAttrs = useMemo(() => {
+    return Object.entries(selectedAttributes).reduce<Record<string, string>>((acc, [key, value]) => {
+      const normalizedKey = normalizeVariationKey(key);
+      if (normalizedKey && value) acc[normalizedKey] = value;
+      return acc;
+    }, {});
+  }, [selectedAttributes]);
+
+  const matchesVariationSelection = useMemo(
+    () =>
+      (
+        variation: ProductVariation,
+        overrides: Record<string, string> = {},
+        strict = false
+      ) => {
+        if (!variation.attributes.length) return false;
+
+        let matchedDimensions = 0;
+
+        return variation.attributes.every((attr) => {
+          const key = normalizeVariationKey(attr.name ?? '');
+          if (!key) return true;
+
+          const expected = Object.prototype.hasOwnProperty.call(overrides, key)
+            ? overrides[key]
+            : selectedVariationKeyedAttrs[key];
+
+          if (!expected) {
+            return strict ? false : true;
+          }
+
+          matchedDimensions += 1;
+          return (
+            normalizeVariationValue(expected) ===
+            normalizeVariationValue(attr.option ?? '')
+          );
+        }) && (!strict || matchedDimensions > 0);
+      },
+    [selectedVariationKeyedAttrs]
+  );
+
   const increaseQuantity = () => {
     if (product && effectiveStockQty && quantity < effectiveStockQty) {
       setQuantity(quantity + 1);
@@ -309,22 +407,24 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
       try {
         setLoadingVariations(true);
-        // Supabase products include inline variations from catalog-product response.
-        // For WooCommerce-only products, fall back to fetching by WC id.
-        const data = product.supabaseId
-          ? (product._variations ?? [])
-          : await getProductVariations(product.id);
+        // Supabase products may expose either full inline variation objects or
+        // just variation IDs. Only trust the inline payload when it actually
+        // contains variation objects; otherwise fall back to fetching by WC id.
+        const inlineVariations = product._variations?.length ? product._variations : null;
+        const data = inlineVariations ?? await getProductVariations(product.id);
         setVariations(data);
 
         // Prefill defaults if available
         if (product.default_attributes?.length) {
           const defaults: Record<string, string> = {};
           product.default_attributes.forEach((attr: any) => {
-            const k = (attr.name ?? '').toLowerCase().trim();
+            const k = normalizeVariationKey(String(attr.name ?? ''));
             const v = (attr.option ?? '').trim();
             if (k && v) defaults[k] = v;
           });
           setSelectedAttributes(defaults);
+        } else {
+          setSelectedAttributes({});
         }
       } catch (err) {
         console.error('Error loading variations', err);
@@ -343,40 +443,19 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       return;
     }
 
-    // Normalize for comparison: lowercase + collapse all whitespace
-    const norm = (s: string) => (s ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
-
-    const match = variations.find((variation) => {
-      if (!variation.attributes.length) return false;
-      return variation.attributes.every((attr) => {
-        const key = norm(attr.name ?? '');
-        if (!key) return true; // skip attrs with no name
-        const selected = selectedAttributes[key];
-        if (!selected) return false;
-        return norm(selected) === norm(attr.option ?? '');
-      });
-    });
-
-    // Fallback: if no exact-norm match and there's only 1 attribute dimension,
-    // try matching on option value alone (ignoring attribute name key differences)
-    if (!match) {
-      const selectedValues = Object.values(selectedAttributes).map(norm);
-      const loose = variations.find((variation) => {
-        if (!variation.attributes.length) return false;
-        return variation.attributes.every((attr) =>
-          selectedValues.some((sv) => sv === norm(attr.option ?? ''))
-        );
-      });
-      setSelectedVariation(loose || null);
-      return;
-    }
-
+    const match = variations.find((variation) => matchesVariationSelection(variation, {}, true));
     setSelectedVariation(match || null);
-  }, [selectedAttributes, variations]);
+  }, [matchesVariationSelection, variations]);
 
   const variationAttributes = useMemo(
-    () => product?.attributes?.filter((attr) => attr.variation) || [],
-    [product]
+    () => {
+      const inferredAttrs = inferVariationAttributes(variations);
+      if (inferredAttrs.length > 0) return inferredAttrs;
+
+      const attrs = product?.attributes?.filter((attr) => attr.variation) || [];
+      return attrs;
+    },
+    [product, variations]
   );
 
   const selectedPrice = useMemo(() => {
@@ -591,26 +670,13 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
             {product.type === 'variable' && variationAttributes.length > 0 && (
               <div className="border-t pt-4 md:pt-5 space-y-4">
                 {variationAttributes.map((attr) => {
-                  const key = (attr.name ?? '').toLowerCase().trim();
+                  const key = normalizeVariationKey(attr.name ?? '');
                   const selected = key ? selectedAttributes[key] : undefined;
-
-                  const norm = (v: string) => (v ?? '').toLowerCase().trim();
 
                   const isOptionAvailable = (option: string) => {
                     if (!variations.length) return true;
                     return variations.some((variation) =>
-                      variation.attributes.every((va) => {
-                        const nameKey = norm(va.name ?? '');
-                        if (!nameKey) return true;
-                        if (nameKey === key) {
-                          return norm(va.option) === norm(option);
-                        }
-                        const sel = selectedAttributes[nameKey];
-                        if (sel) {
-                          return norm(va.option) === norm(sel);
-                        }
-                        return true;
-                      })
+                      matchesVariationSelection(variation, key ? { [key]: option } : {}, false)
                     );
                   };
 
@@ -627,17 +693,18 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                         )}
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {attr.options.map((option) => {
+                        {attr.options.map((option, index) => {
                           const optionTrimmed = (option ?? '').trim();
                           const isSelected = selected === optionTrimmed;
                           const disabled = !isOptionAvailable(optionTrimmed);
                           return (
                             <button
-                              key={optionTrimmed || option}
+                              key={`${key || 'variation'}-${optionTrimmed || index}`}
                               type="button"
                               disabled={disabled}
                               onClick={() =>
-                                key && setSelectedAttributes((prev) => ({
+                                key &&
+                                setSelectedAttributes((prev) => ({
                                   ...prev,
                                   [key]: optionTrimmed,
                                 }))
@@ -662,9 +729,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                 )}
 
                 {variationAttributes.length > 0 &&
-                  variationAttributes.every(
-                    (attr) => selectedAttributes[(attr.name ?? '').toLowerCase().trim()]
-                  ) &&
+                  variationAttributes.every((attr) => selectedAttributes[normalizeVariationKey(attr.name ?? '')]) &&
                   !selectedVariation && !loadingVariations && (
                     <p className="text-sm text-red-600">
                       This combination is not available. Please choose a different option.

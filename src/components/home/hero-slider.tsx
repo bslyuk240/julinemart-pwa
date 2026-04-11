@@ -38,7 +38,7 @@ const DEFAULT_SLIDES: Slide[] = [
     id: 1,
     type: 'video',
     videoSrc: "https://res.cloudinary.com/dupgdbwrt/video/upload/v1763955248/copy_E58DF95E-E76A-4B31-B3D0-9D89B0E8F2C0_otgkkq.mov",
-    videoPoster: '/images/placeholder.jpg',
+    videoPoster: '/images/placeholder.svg',
     primaryButton: {
       text: 'Shop Now',
       link: '/products',
@@ -111,7 +111,7 @@ export default function HeroSlider() {
               type: wpSlide.type || 'image',
               backgroundImage: wpSlide.type === 'image' ? wpSlide.media_url : undefined,
               videoSrc: wpSlide.type === 'video' ? wpSlide.media_url : undefined,
-              videoPoster: wpSlide.type === 'video' ? '/images/placeholder.jpg' : undefined,
+              videoPoster: wpSlide.type === 'video' ? '/images/placeholder.svg' : undefined,
               title: wpSlide.title,
               description: wpSlide.description,
               primaryButton: {

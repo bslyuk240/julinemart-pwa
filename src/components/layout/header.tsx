@@ -39,7 +39,7 @@ export default function Header() {
   // ==================== BANNER STATE (NEW!) ====================
   const [banner, setBanner] = useState<BannerData>({
     enabled: true,
-    text: 'Free Shipping on Orders Over ₦10,000 🎉',
+    text: 'Free Shipping on Orders Over ₦100,000 🎉',
     background_color: '#77088a',
     text_color: '#ffffff',
   });
@@ -54,28 +54,28 @@ export default function Header() {
   useEffect(() => {
     async function fetchBanner() {
       try {
-        console.log('📢 Fetching banner from WordPress...');
+        console.log('Fetching banner from Supabase settings...');
         const response = await fetch('/api/pwa-settings');
         
         if (response.ok) {
           const data = await response.json();
           
           if (data.banner && Object.keys(data.banner).length > 0) {
-            console.log('✅ WordPress banner loaded:', data.banner);
+            console.log('Banner loaded:', data.banner);
             setBanner({
               enabled: data.banner.enabled ?? true,
-              text: data.banner.text || 'Free Shipping on Orders Over ₦10,000 🎉',
+              text: data.banner.text || 'Free Shipping on Orders Over ₦100,000 🎉',
               background_color: data.banner.background_color || '#77088a',
               text_color: data.banner.text_color || '#ffffff',
             });
           } else {
-            console.log('⚠️ No WordPress banner found, using default');
+            console.log('No banner found, using default');
           }
         } else {
-          console.log('⚠️ WordPress API failed, using default banner');
+          console.log('Banner API failed, using default banner');
         }
       } catch (error) {
-        console.error('❌ Error fetching banner:', error);
+        console.error('Error fetching banner:', error);
       } finally {
         setBannerLoading(false);
       }

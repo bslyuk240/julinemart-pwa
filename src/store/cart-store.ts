@@ -247,7 +247,7 @@ const numericWeight =
     variation?.salePrice ??
     (product.sale_price ? parseFloat(product.sale_price) : undefined),
   quantity,
-  image: variation?.image || product.images[0]?.src || '/placeholder.png',
+  image: variation?.image || product.images[0]?.src || '/images/placeholder.svg',
   stockStatus: effectiveStockStatus,
   stockQuantity: effectiveStockQty,
   sku: variation?.sku || product.sku,
