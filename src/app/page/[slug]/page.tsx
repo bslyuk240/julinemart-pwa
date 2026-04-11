@@ -11,6 +11,9 @@ interface PageProps {
 
 export default async function DynamicPage({ params }: PageProps) {
   const { slug } = await params;
+  const vendorPortalUrl = (
+    process.env.NEXT_PUBLIC_VENDOR_URL?.replace(/\/+$/, '') || 'https://vendors.julinemart.com'
+  );
   const blockedJobSlugs = [
     'job-openings',
     'sales-representative',
@@ -41,6 +44,21 @@ export default async function DynamicPage({ params }: PageProps) {
       );
     } catch (error) {
       console.error('Error normalizing page links', error);
+    }
+  }
+
+  if (slug === 'become-a-vendor') {
+    try {
+      const vendorApplyNowPattern = new RegExp(
+        `href=(['"])https://admin\\.julinemart\\.com/vendor-register/?\\1`,
+        'gi'
+      );
+      normalizedContent = normalizedContent.replace(
+        vendorApplyNowPattern,
+        `href=$1${vendorPortalUrl}$1`
+      );
+    } catch (error) {
+      console.error('Error normalizing vendor application link', error);
     }
   }
 
