@@ -42,6 +42,13 @@ function deriveOrderStatus(o: any): string {
   return rankToWc[minRank] ?? dbStatus;
 }
 
+function getTrackingLink(courierName: string, trackingNumber: string): string | null {
+  const name = courierName.toLowerCase();
+  if (name.includes('fez')) return `https://fezdelivery.co/track/${trackingNumber}`;
+  // For Local Riders and other local couriers, no public tracking URL — use JLO portal
+  return null;
+}
+
 // Build tracking meta_data from sub_orders so OrderStatusTracker can display it
 function buildMetaData(o: any): any[] {
   const subOrders: any[] = o.sub_orders || [];
@@ -53,7 +60,7 @@ function buildMetaData(o: any): any[] {
       return {
         tracking_provider: courierName,
         tracking_number: tracking,
-        tracking_link: `https://fezdelivery.co/track/${tracking}`,
+        tracking_link: getTrackingLink(courierName, tracking),
         date_shipped: so.updated_at ?? null,
       };
     });
