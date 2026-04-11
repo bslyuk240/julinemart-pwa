@@ -1,5 +1,6 @@
 import { getProducts } from '@/lib/woocommerce/products';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
+import { filterProductsByCategory } from '@/lib/utils/category-filters';
 import type { Product } from '@/types/product';
 
 const HOMEPAGE_FETCH_TIMEOUT_MS = 12000;
@@ -66,13 +67,13 @@ async function getHomepageTagProducts(tag: string, label: string): Promise<Produ
 // Pass the category slug directly to the catalog — no WC category ID lookup.
 async function getCategoryProducts(categorySlug: string, limit: number = 18): Promise<Product[]> {
   const rawProducts = await getProducts({
-    category: categorySlug,
-    per_page: limit,
+    per_page: Math.max(limit * 3, 48),
     orderby: 'date',
     order: 'desc',
   });
-  const filteredProducts = await filterActiveVendorProducts(rawProducts);
-  return filteredProducts.slice(0, limit);
+  const vendorFiltered = await filterActiveVendorProducts(rawProducts);
+  const categoryFiltered = filterProductsByCategory(vendorFiltered, categorySlug);
+  return categoryFiltered.slice(0, limit);
 }
 
 export async function getHomepageSectionsData(): Promise<HomepageSectionsData> {

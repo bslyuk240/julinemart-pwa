@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown, X } from 'lucide-react';
 import { Product } from '@/types/product';
+import { filterProductsByCategory } from '@/lib/utils/category-filters';
 
 type CategorySortOption = 'date' | 'popularity' | 'rating' | 'price' | 'price-desc';
 
@@ -19,7 +20,7 @@ export default function CategoryPage() {
   const [hasMore, setHasMore] = useState(true);
   const [sortBy, setSortBy] = useState<CategorySortOption>('date');
   const [showFilters, setShowFilters] = useState(false);
-  const perPage = 24;
+  const perPage = 100;
 
   const categoryName = slug
     .split('-')
@@ -41,7 +42,6 @@ export default function CategoryPage() {
   const buildUrl = (pageNumber: number, sort: CategorySortOption) => {
     const sortParams = computeSortParams(sort);
     const qs = new URLSearchParams({
-      category: slug,
       per_page: String(perPage),
       page: String(pageNumber),
       orderby: sortParams.orderby,
@@ -63,7 +63,7 @@ export default function CategoryPage() {
         setHasMore(true);
         setPage(1);
         const { products: fetched } = await fetchFromApi(buildUrl(1, sortBy));
-        setProducts(fetched);
+        setProducts(filterProductsByCategory(fetched, slug));
         setHasMore(fetched.length === perPage);
       } catch (error) {
         console.error('Error fetching category products:', error);
@@ -80,8 +80,9 @@ export default function CategoryPage() {
       setLoadingMore(true);
       const nextPage = page + 1;
       const { products: more } = await fetchFromApi(buildUrl(nextPage, sortBy));
-      if (more.length > 0) {
-        setProducts((prev) => [...prev, ...more]);
+      const filtered = filterProductsByCategory(more, slug);
+      if (filtered.length > 0) {
+        setProducts((prev) => [...prev, ...filtered]);
         setPage(nextPage);
         setHasMore(more.length === perPage);
       } else {

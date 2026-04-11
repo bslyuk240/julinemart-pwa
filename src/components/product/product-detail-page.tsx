@@ -15,6 +15,7 @@ import { useWishlist } from '@/hooks/use-wishlist';
 import { Product, ProductAttribute, ProductVariation, ProductReview } from '@/types/product';
 import { toast } from 'sonner';
 import { decodeHtmlEntities } from '@/lib/utils/helpers';
+import { filterProductsByCategory } from '@/lib/utils/category-filters';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -144,12 +145,12 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       const categorySlug = product.categories?.[0]?.slug;
       if (!categorySlug) return;
       try {
-        const qs = new URLSearchParams({ category: categorySlug, per_page: '7' });
+        const qs = new URLSearchParams({ per_page: '24' });
         const res = await fetch(`/api/products?${qs.toString()}`);
         if (!res.ok) return;
         const { products: data } = await res.json();
         setRelatedProducts(
-          (data as Product[]).filter((p) => p.id !== product.id).slice(0, 6)
+          filterProductsByCategory((data as Product[]).filter((p) => p.id !== product.id), categorySlug).slice(0, 6)
         );
       } catch (error) {
         console.error('Error fetching related products:', error);
