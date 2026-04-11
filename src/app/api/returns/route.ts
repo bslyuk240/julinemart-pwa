@@ -9,14 +9,23 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const customerId = searchParams.get('wc_customer_id');
   const orderId = searchParams.get('order_id');
+  const customerEmail = searchParams.get('customer_email');
+  const customerId = searchParams.get('wc_customer_id');
 
-  const path = orderId
-    ? `/api/returns-by-order/${encodeURIComponent(orderId)}`
-    : customerId
-    ? `/api/returns-list?wc_customer_id=${encodeURIComponent(customerId)}`
-    : '/api/returns-list';
+  // Map to the correct JLO Netlify function paths
+  let path: string;
+  if (orderId) {
+    // get-order-returns accepts ?order_id=<supabase-uuid>
+    path = `/.netlify/functions/get-order-returns?order_id=${encodeURIComponent(orderId)}`;
+  } else if (customerEmail) {
+    // returns-list by email — not yet implemented in JLO, return empty gracefully
+    return NextResponse.json([], { status: 200 });
+  } else if (customerId) {
+    path = `/api/returns-list?wc_customer_id=${encodeURIComponent(customerId)}`;
+  } else {
+    return NextResponse.json([], { status: 200 });
+  }
 
   try {
     const res = await fetch(`${JLO_BASE}${path}`);
@@ -25,18 +34,15 @@ export async function GET(request: Request) {
       return { message: text || null };
     });
 
-    if (!res.ok || data?.success === false) {
-      return NextResponse.json(
-        { success: false, message: data?.message || data?.error || 'Failed to fetch returns', details: data },
-        { status: res.status || 500 }
-      );
+    if (!res.ok) {
+      // Return empty array rather than propagating 400/500 — returns are optional
+      return NextResponse.json([], { status: 200 });
     }
 
-    return NextResponse.json(data?.data ?? data, { status: res.status });
-  } catch (error: any) {
-    return NextResponse.json(
-      { success: false, message: error?.message || 'Failed to fetch returns' },
-      { status: 500 }
-    );
+    // get-order-returns returns { success, data: [] }
+    const payload = data?.data ?? data;
+    return NextResponse.json(Array.isArray(payload) ? payload : [], { status: 200 });
+  } catch {
+    return NextResponse.json([], { status: 200 });
   }
 }
