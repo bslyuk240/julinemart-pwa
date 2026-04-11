@@ -88,6 +88,17 @@ function ProductsContent() {
 
   const PER_PAGE = 24;
 
+  const buildProductsHref = (tag?: string) => {
+    const qs = new URLSearchParams();
+    if (sortBy !== 'date') {
+      qs.set('sort', sortBy);
+    }
+    if (tag) {
+      qs.set('tag', tag);
+    }
+    return qs.toString() ? `/products?${qs.toString()}` : '/products';
+  };
+
   const buildFetchUrl = (pageNumber: number, overrideSort?: typeof sortBy) => {
     const activeSort = overrideSort || sortBy;
     const sortParams = computeSortParams(activeSort);
@@ -285,7 +296,7 @@ function ProductsContent() {
             <h3 className="font-semibold text-gray-900 mb-3">Filter by Category</h3>
             <div className="flex flex-wrap gap-2">
               <Link
-                href="/products"
+                href={buildProductsHref()}
                 className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                   !tagFilter 
                     ? 'bg-primary-600 text-white' 
@@ -295,7 +306,7 @@ function ProductsContent() {
                 All Products
               </Link>
               <Link
-                href="/products?tag=flash-sale"
+                href={buildProductsHref('flash-sale')}
                 className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                   tagFilter === 'flash-sale' 
                     ? 'bg-primary-600 text-white' 
@@ -305,7 +316,7 @@ function ProductsContent() {
                 Flash Sale
               </Link>
               <Link
-                href="/products?tag=deal"
+                href={buildProductsHref('deal')}
                 className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                   tagFilter === 'deal' 
                     ? 'bg-primary-600 text-white' 
@@ -315,7 +326,7 @@ function ProductsContent() {
                 Deals
               </Link>
               <Link
-                href="/products?tag=best-seller"
+                href={buildProductsHref('best-seller')}
                 className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                   tagFilter === 'best-seller' 
                     ? 'bg-primary-600 text-white' 
@@ -325,7 +336,7 @@ function ProductsContent() {
                 Best Sellers
               </Link>
               <Link
-                href="/products?tag=top-seller"
+                href={buildProductsHref('top-seller')}
                 className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                   tagFilter === 'top-seller' 
                     ? 'bg-primary-600 text-white' 
@@ -335,7 +346,7 @@ function ProductsContent() {
                 Top Sellers
               </Link>
               <Link
-                href="/products?tag=sponsored"
+                href={buildProductsHref('sponsored')}
                 className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                   tagFilter === 'sponsored' 
                     ? 'bg-primary-600 text-white' 
@@ -345,7 +356,7 @@ function ProductsContent() {
                 Sponsored
               </Link>
               <Link
-                href="/products?tag=launching-deal"
+                href={buildProductsHref('launching-deal')}
                 className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                   tagFilter === 'launching-deal' 
                     ? 'bg-primary-600 text-white' 

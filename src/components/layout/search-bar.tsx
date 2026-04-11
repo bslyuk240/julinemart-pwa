@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react';
 import { clsx } from 'clsx';
 import { Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { searchProducts } from '@/lib/woocommerce/products';
-import { Product } from '@/types/product';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
+import type { Product } from '@/types/product';
 
 export default function SearchBar() {
   const [query, setQuery] = useState('');
@@ -21,33 +20,49 @@ export default function SearchBar() {
       return;
     }
 
-    const handle = setTimeout(async () => {
+    let cancelled = false;
+    const handle = window.setTimeout(async () => {
       try {
         setIsSearching(true);
-        const data = await searchProducts(query.trim(), { per_page: 6 });
-        
-        // ✅ SOLUTION 2: Filter out disabled vendors
-        const filtered = await filterActiveVendorProducts(data);
-        setResults(filtered);
+        const qs = new URLSearchParams({
+          search: query.trim(),
+          per_page: '6',
+        });
+        const response = await fetch(`/api/products?${qs.toString()}`);
+        if (!response.ok) throw new Error(`Search API error: ${response.status}`);
+        const { products } = await response.json();
+        const filtered = await filterActiveVendorProducts(products ?? []);
+        if (!cancelled) {
+          setResults(filtered);
+        }
       } catch {
-        setResults([]);
+        if (!cancelled) {
+          setResults([]);
+        }
       } finally {
-        setIsSearching(false);
+        if (!cancelled) {
+          setIsSearching(false);
+        }
       }
     }, 250);
 
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [query]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      router.push(`/search?q=${encodeURIComponent(query)}`);
+      router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+      setIsFocused(false);
     }
   };
 
   const handleClear = () => {
     setQuery('');
+    setResults([]);
   };
 
   return (
@@ -59,61 +74,61 @@ export default function SearchBar() {
         )}
       >
         <Search className="absolute left-3 w-5 h-5 text-gray-400" />
-        
+
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onBlur={() => setTimeout(() => setIsFocused(false), 150)}
           placeholder="Search for products, brands and categories..."
           className="w-full pl-10 pr-20 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-transparent transition-colors"
         />
 
-        {query && (
+        {query ? (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="absolute right-20 p-1 hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="Clear search"
+          >
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        ) : null}
+
         <button
-          type="button"
-          onClick={handleClear}
-          className="absolute right-20 p-1 hover:bg-gray-100 rounded-full transition-colors"
+          type="submit"
+          className="absolute right-2 bg-secondary-500 hover:bg-secondary-600 text-white px-4 py-2 rounded-md transition-colors font-medium"
         >
-          <X className="w-4 h-4 text-gray-500" />
+          Search
         </button>
-      )}
-
-      <button
-        type="submit"
-        className="absolute right-2 bg-secondary-500 hover:bg-secondary-600 text-white px-4 py-2 rounded-md transition-colors font-medium"
-      >
-        Search
-      </button>
-    </div>
-
-    {/* Search Suggestions Dropdown (Optional) */}
-    {isFocused && query && (
-      <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 max-h-96 overflow-y-auto z-50">
-        <div className="p-3 space-y-2">
-          {isSearching && <p className="text-sm text-gray-500">Searching...</p>}
-
-          {!isSearching && results.length === 0 && (
-            <p className="text-sm text-gray-500">No products found</p>
-          )}
-
-          {results.map((product) => (
-            <button
-              key={product.id}
-              type="button"
-              onClick={() => router.push(`/product/${product.slug}`)}
-              className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 flex items-center justify-between gap-2"
-            >
-              <span className="text-sm text-gray-900 line-clamp-1">{product.name}</span>
-              <span className="text-xs text-primary-600 font-semibold">
-                {product.price ? `₦${Number(product.price).toLocaleString()}` : ''}
-              </span>
-            </button>
-          ))}
-        </div>
       </div>
-    )}
-  </form>
-);
+
+      {isFocused && query && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 max-h-96 overflow-y-auto z-50">
+          <div className="p-3 space-y-2">
+            {isSearching && <p className="text-sm text-gray-500">Searching...</p>}
+
+            {!isSearching && results.length === 0 && (
+              <p className="text-sm text-gray-500">No products found</p>
+            )}
+
+            {results.map((product) => (
+              <button
+                key={product.id}
+                type="button"
+                onMouseDown={() => router.push(`/product/${product.slug}`)}
+                className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 flex items-center justify-between gap-2"
+              >
+                <span className="text-sm text-gray-900 line-clamp-1">{product.name}</span>
+                <span className="text-xs text-primary-600 font-semibold">
+                  {product.price ? `NGN ${Number(product.price).toLocaleString()}` : ''}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </form>
+  );
 }

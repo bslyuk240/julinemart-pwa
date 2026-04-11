@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import ProductGrid from '@/components/product/product-grid';
-import { Filter, ChevronDown } from 'lucide-react';
+import { Filter, ChevronDown, X } from 'lucide-react';
 import { Product } from '@/types/product';
+
+type CategorySortOption = 'date' | 'popularity' | 'rating' | 'price' | 'price-desc';
 
 export default function CategoryPage() {
   const params = useParams();
@@ -15,7 +17,8 @@ export default function CategoryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [sortBy, setSortBy] = useState<'date' | 'popularity' | 'rating' | 'price'>('date');
+  const [sortBy, setSortBy] = useState<CategorySortOption>('date');
+  const [showFilters, setShowFilters] = useState(false);
   const perPage = 24;
 
   const categoryName = slug
@@ -23,13 +26,26 @@ export default function CategoryPage() {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
 
-  const buildUrl = (pageNumber: number, sort: typeof sortBy) => {
+  const computeSortParams = (sort: CategorySortOption) => {
+    if (sort === 'price-desc') {
+      return { orderby: 'price' as const, order: 'desc' as const };
+    }
+
+    if (sort === 'price') {
+      return { orderby: 'price' as const, order: 'asc' as const };
+    }
+
+    return { orderby: sort as 'date' | 'popularity' | 'rating', order: 'desc' as const };
+  };
+
+  const buildUrl = (pageNumber: number, sort: CategorySortOption) => {
+    const sortParams = computeSortParams(sort);
     const qs = new URLSearchParams({
       category: slug,
       per_page: String(perPage),
       page: String(pageNumber),
-      orderby: sort,
-      order: 'desc',
+      orderby: sortParams.orderby,
+      order: sortParams.order,
     });
     return `/api/products?${qs.toString()}`;
   };
@@ -111,7 +127,15 @@ export default function CategoryPage() {
 
         <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-lg shadow-sm">
           <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+            <button
+              type="button"
+              onClick={() => setShowFilters((prev) => !prev)}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+                showFilters
+                  ? 'border-primary-600 bg-primary-50 text-primary-700'
+                  : 'border-gray-300 hover:bg-gray-50'
+              }`}
+            >
               <Filter className="w-4 h-4" />
               <span className="font-medium hidden md:inline">Filters</span>
             </button>
@@ -123,17 +147,56 @@ export default function CategoryPage() {
           <div className="relative">
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              onChange={(e) => setSortBy(e.target.value as CategorySortOption)}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors appearance-none pr-8 cursor-pointer text-sm"
             >
               <option value="date">Latest</option>
               <option value="popularity">Popular</option>
               <option value="rating">Top Rated</option>
               <option value="price">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
             </select>
             <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
+
+        {showFilters && (
+          <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">Quick filters</h3>
+              <button
+                type="button"
+                onClick={() => setShowFilters(false)}
+                className="rounded-full p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                aria-label="Close filters"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: 'Latest', value: 'date' },
+                { label: 'Popular', value: 'popularity' },
+                { label: 'Top Rated', value: 'rating' },
+                { label: 'Price: Low to High', value: 'price' },
+                { label: 'Price: High to Low', value: 'price-desc' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSortBy(option.value as CategorySortOption)}
+                  className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
+                    sortBy === option.value
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {products.length > 0 ? (
           <>

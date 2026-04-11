@@ -6,10 +6,10 @@ import Image from 'next/image';
 import { Search, Menu, ShoppingCart, MessageCircle } from 'lucide-react';
 import MobileMenu from '@/components/layout/mobile-menu';
 import { useCart } from '@/hooks/use-cart';
-import { searchProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
 import { useRouter } from 'next/navigation';
 import { trackWhatsappClick } from '@/lib/gtag';
+import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 
 // WhatsApp configuration
 const WHATSAPP_NUMBER = '2347048929309';
@@ -90,18 +90,35 @@ export default function Header() {
       setResults([]);
       return;
     }
-    const handle = setTimeout(async () => {
+    let cancelled = false;
+    const handle = window.setTimeout(async () => {
       try {
         setIsSearching(true);
-        const data = await searchProducts(query.trim(), { per_page: 6 });
-        setResults(data);
+        const qs = new URLSearchParams({
+          search: query.trim(),
+          per_page: '6',
+        });
+        const response = await fetch(`/api/products?${qs.toString()}`);
+        if (!response.ok) throw new Error(`Search API error: ${response.status}`);
+        const { products } = await response.json();
+        const filtered = await filterActiveVendorProducts(products ?? []);
+        if (!cancelled) {
+          setResults(filtered);
+        }
       } catch {
-        setResults([]);
+        if (!cancelled) {
+          setResults([]);
+        }
       } finally {
-        setIsSearching(false);
+        if (!cancelled) {
+          setIsSearching(false);
+        }
       }
     }, 250);
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [query]);
 
   const handleSubmit = (e: React.FormEvent) => {

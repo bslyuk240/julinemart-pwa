@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProductGrid from '@/components/product/product-grid';
 import { Product } from '@/types/product';
+import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -30,7 +31,8 @@ function SearchContent() {
         const res = await fetch(`/api/products?${qs.toString()}`);
         if (!res.ok) throw new Error(`Search API error: ${res.status}`);
         const { products: data } = await res.json();
-        if (!isCancelled) setProducts(data ?? []);
+        const filtered = await filterActiveVendorProducts(data ?? []);
+        if (!isCancelled) setProducts(filtered);
       } catch (error) {
         console.error('Error searching products:', error);
         if (!isCancelled) setProducts([]);
