@@ -23,6 +23,9 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const url = new URL(_req.url);
+  const page = Math.max(Number(url.searchParams.get('page') || 1), 1);
+  const perPage = Math.min(Math.max(Number(url.searchParams.get('per_page') || 24), 1), 100);
   const { id } = await params;
   const wcVendorId = parseInt(id, 10);
 
@@ -41,12 +44,12 @@ export async function GET(
     // Filter server-side to published only so pagination never buries them
     const url =
       `${JLO_BASE}/.netlify/functions/catalog-products` +
-      `?woo_vendor_id=${wcVendorId}&per_page=500&status=published`;
+      `?woo_vendor_id=${wcVendorId}&page=${page}&per_page=${perPage}&status=published`;
 
     const res = await fetch(url, {
       headers: { 'Content-Type': 'application/json' },
-      // short cache — vendor pages are browsed frequently
-      next: { revalidate: 60 },
+      // cache the first page a bit longer; vendor pages are browsed frequently
+      next: { revalidate: 300 },
     });
 
     if (!res.ok) {
@@ -59,7 +62,16 @@ export async function GET(
     const body = await res.json();
 
     if (!body.success || !Array.isArray(body.data) || body.data.length === 0) {
-      return NextResponse.json({ vendor: null, products: [], total: 0, source: 'supabase' });
+      const meta = body?.meta ?? null;
+      return NextResponse.json({
+        vendor: null,
+        products: [],
+        total: Number(meta?.total ?? 0),
+        totalPages: Number(meta?.total_pages ?? 0),
+        page,
+        perPage,
+        source: 'supabase',
+      });
     }
 
     // Extract vendor info from the first row's nested vendor object
@@ -128,7 +140,10 @@ export async function GET(
     return NextResponse.json({
       vendor,
       products,
-      total: products.length,
+      total: Number(body?.meta?.total ?? products.length),
+      totalPages: Number(body?.meta?.total_pages ?? 1),
+      page,
+      perPage,
       source: 'supabase',
     });
 

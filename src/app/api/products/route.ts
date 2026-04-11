@@ -22,5 +22,9 @@ export async function GET(request: NextRequest) {
   if (searchParams.get('woo_vendor_id')) params.woo_vendor_id = searchParams.get('woo_vendor_id');
 
   const result = await getProductsWithPagination(params);
-  return NextResponse.json(result);
+  return NextResponse.json(result, {
+    headers: {
+      'Cache-Control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=600',
+    },
+  });
 }

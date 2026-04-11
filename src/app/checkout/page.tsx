@@ -37,9 +37,14 @@ interface ShippingOption {
 
 const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
 const DEFAULT_WEIGHT = 0.5;
+const JLO_BASE =
+  process.env.NEXT_PUBLIC_JLO_CATALOG_URL ||
+  'https://jlo.julinemart.com';
 const VOUCHER_VALIDATION_URL =
   process.env.NEXT_PUBLIC_VOUCHER_VALIDATION_URL ||
-  'https://jlo.julinemart.com/.netlify/functions/voucherHelpers';
+  `${JLO_BASE.replace(/\/$/, '')}/.netlify/functions/voucherHelpers`;
+const INFLUENCER_VALIDATION_URL =
+  `${JLO_BASE.replace(/\/$/, '')}/api/influencers/validate-coupon`;
 
 // Declare Paystack type
 declare global {
@@ -55,13 +60,7 @@ export default function CheckoutPage() {
   const customerId = user?.id ?? null;
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isCartHydrated, setIsCartHydrated] = useState(() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-
-    return useCartStore.persist?.hasHydrated?.() ?? true;
-  });
+  const [isCartHydrated, setIsCartHydrated] = useState(false);
   const currentOrderRef = useRef<any>(null);
   const hasTrackedBeginCheckoutRef = useRef(false);
   
@@ -698,22 +697,17 @@ export default function CheckoutPage() {
     setCouponError('');
 
     try {
-      const response = await fetch(
-        'https://gfikkrwhsedhwmkxybzm.supabase.co/functions/v1/influencers/validate-coupon',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            coupon_code: couponCode.toUpperCase(),
-            cart_total: subtotal,
-            shipping_cost: shippingCost,
-          }),
-        }
-      );
+      const response = await fetch(INFLUENCER_VALIDATION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          coupon_code: couponCode.toUpperCase(),
+          cart_total: subtotal,
+          shipping_cost: shippingCost,
+        }),
+      });
 
       const result = await response.json();
 
@@ -1156,6 +1150,27 @@ export default function CheckoutPage() {
     defaultShippingAddress &&
     (defaultShippingAddress.address_1 || defaultShippingAddress.city || defaultShippingAddress.state)
   );
+  const hasRequiredAddress = Boolean(
+    formData.firstName.trim() &&
+    formData.lastName.trim() &&
+    formData.email.trim() &&
+    formData.phone.trim() &&
+    formData.address1.trim() &&
+    formData.city.trim() &&
+    formData.state.trim() &&
+    formData.country.trim()
+  );
+  const shippingReady =
+    Boolean(selectedOption) &&
+    (selectedOption?.methodId !== 'jlo_shipping' || shippingCost !== null);
+  const isCheckoutReady =
+    !loading &&
+    hasRequiredAddress &&
+    Boolean(selectedPayment) &&
+    Boolean(selectedShipping) &&
+    shippingReady &&
+    !shippingError &&
+    !isProcessing;
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
@@ -1464,7 +1479,7 @@ export default function CheckoutPage() {
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Tag className="w-6 h-6 text-primary-600" />
-                  <h2 className="text-xl font-semibold text-gray-900">Discount Code</h2>
+                  <h2 className="text-xl font-semibold text-gray-900">Discounts</h2>
                 </div>
 
                 <div className="space-y-5">
@@ -1526,9 +1541,9 @@ export default function CheckoutPage() {
                         {voucherError && (
                           <p className="text-sm text-red-600">{voucherError}</p>
                         )}
-                        <p className="text-xs text-gray-500">
-                          Vouchers are validated once shipping has been calculated.
-                        </p>
+                          <p className="text-xs text-gray-500">
+                            Campaign vouchers discount products and are validated after shipping is calculated.
+                          </p>
                       </div>
                     )}
                   </div>
@@ -1584,7 +1599,7 @@ export default function CheckoutPage() {
                     <p className="text-xs text-gray-500">
                       {appliedVoucher
                         ? 'Remove the campaign voucher to use an influencer code.'
-                        : '💡 Have an influencer code? Save on shipping!'}
+                        : 'Influencer codes discount shipping.'}
                     </p>
                   </div>
                 </div>
@@ -1758,9 +1773,7 @@ export default function CheckoutPage() {
                 isLoading={isProcessing}
                 onClick={handlePlaceOrder}
                 disabled={
-                  isProcessing ||
-                  loading ||
-                  !selectedPayment ||
+                  !isCheckoutReady ||
                   (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null)
                 }
               >

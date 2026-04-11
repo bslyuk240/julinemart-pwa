@@ -143,3 +143,34 @@ export async function getCustomerOrders(email: string, limit = 10) {
     .limit(limit);
   return data || [];
 }
+
+async function countCustomerOrders(email: string, modifier?: (query: any) => any) {
+  let query: any = supabase
+    .from('orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('customer_email', email);
+
+  if (modifier) {
+    query = modifier(query);
+  }
+
+  const { count, error } = await query;
+  if (error) throw new Error(error.message);
+  return count || 0;
+}
+
+export async function getCustomerOrderSummary(email: string): Promise<{
+  total: number;
+  pending: number;
+  processing: number;
+  completed: number;
+}> {
+  const [total, pending, processing, completed] = await Promise.all([
+    countCustomerOrders(email, (query) => query),
+    countCustomerOrders(email, (query) => query.eq('overall_status', 'pending')),
+    countCustomerOrders(email, (query) => query.in('overall_status', ['processing', 'confirmed', 'packed'])),
+    countCustomerOrders(email, (query) => query.eq('overall_status', 'delivered')),
+  ]);
+
+  return { total, pending, processing, completed };
+}

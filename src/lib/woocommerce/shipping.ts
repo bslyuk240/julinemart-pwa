@@ -1,3 +1,5 @@
+import { APP_URL } from '@/lib/constants';
+
 export interface ShippingZone {
   id: number;
   name: string;
@@ -52,81 +54,11 @@ export interface ShippingZoneWithMethods {
   locations: ZoneLocation[];
 }
 
-const DEFAULT_FREE_SHIPPING_THRESHOLD = 100000;
-const DEFAULT_STANDARD_SHIPPING_COST = 1500;
-
-const DEFAULT_SHIPPING_ZONE: ShippingZone = {
-  id: 1,
-  name: 'Nigeria',
-  order: 0,
+type JloShippingSettingsResponse = {
+  success: boolean;
+  data?: ShippingZoneWithMethods[];
+  message?: string;
 };
-
-const DEFAULT_SHIPPING_LOCATIONS: ZoneLocation[] = [{ code: 'NG', type: 'country' }];
-
-const DEFAULT_SHIPPING_METHODS: ShippingMethod[] = [
-  {
-    instance_id: 1,
-    title: 'Standard Delivery',
-    order: 0,
-    enabled: true,
-    method_id: 'flat_rate',
-    method_title: 'Flat rate',
-    method_description: 'Standard delivery for orders below the free shipping threshold.',
-    settings: {
-      cost: {
-        id: 'cost',
-        label: 'Cost',
-        description: '',
-        type: 'price',
-        value: String(DEFAULT_STANDARD_SHIPPING_COST),
-        default: String(DEFAULT_STANDARD_SHIPPING_COST),
-        tip: '',
-        placeholder: '',
-      },
-      min_amount: {
-        id: 'min_amount',
-        label: 'Minimum order amount',
-        description: '',
-        type: 'price',
-        value: String(DEFAULT_FREE_SHIPPING_THRESHOLD),
-        default: String(DEFAULT_FREE_SHIPPING_THRESHOLD),
-        tip: '',
-        placeholder: '',
-      },
-    },
-  },
-  {
-    instance_id: 2,
-    title: 'Free Shipping',
-    order: 1,
-    enabled: true,
-    method_id: 'free_shipping',
-    method_title: 'Free shipping',
-    method_description: 'Free delivery on qualifying orders.',
-    settings: {
-      cost: {
-        id: 'cost',
-        label: 'Cost',
-        description: '',
-        type: 'price',
-        value: '0',
-        default: '0',
-        tip: '',
-        placeholder: '',
-      },
-      min_amount: {
-        id: 'min_amount',
-        label: 'Minimum order amount',
-        description: '',
-        type: 'price',
-        value: String(DEFAULT_FREE_SHIPPING_THRESHOLD),
-        default: String(DEFAULT_FREE_SHIPPING_THRESHOLD),
-        tip: '',
-        placeholder: '',
-      },
-    },
-  },
-];
 
 const DEFAULT_PAYMENT_GATEWAYS: PaymentGateway[] = [
   {
@@ -140,17 +72,6 @@ const DEFAULT_PAYMENT_GATEWAYS: PaymentGateway[] = [
     method_supports: ['products'],
     settings: {},
   },
-  {
-    id: 'bank_transfer',
-    title: 'Bank Transfer',
-    description: 'Transfer funds directly to our bank account',
-    order: 1,
-    enabled: true,
-    method_title: 'Bank Transfer',
-    method_description: 'Transfer funds directly to our bank account',
-    method_supports: ['products'],
-    settings: {},
-  },
 ];
 
 let shippingMethodsCache: Promise<ShippingZoneWithMethods[]> | null = null;
@@ -161,6 +82,24 @@ const normalizeLocationValue = (value: string | undefined | null) =>
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '');
+
+const pickDefaultZone = (zonesWithMethods: ShippingZoneWithMethods[]) => {
+  if (zonesWithMethods.length === 0) return null;
+
+  const ordered = [...zonesWithMethods].sort((a, b) => {
+    const aCost = Number(a.methods[0]?.settings?.cost?.value ?? Number.POSITIVE_INFINITY);
+    const bCost = Number(b.methods[0]?.settings?.cost?.value ?? Number.POSITIVE_INFINITY);
+    if (aCost !== bCost) return aCost - bCost;
+
+    const aOrder = Number(a.zone.order ?? 0);
+    const bOrder = Number(b.zone.order ?? 0);
+    if (aOrder !== bOrder) return aOrder - bOrder;
+
+    return a.zone.name.localeCompare(b.zone.name);
+  });
+
+  return ordered[0] || null;
+};
 
 const scoreZoneMatch = (locations: ZoneLocation[], country: string, state?: string) => {
   const normalizedCountry = normalizeLocationValue(country);
@@ -190,6 +129,24 @@ const scoreZoneMatch = (locations: ZoneLocation[], country: string, state?: stri
 
 const isRestOfWorldZone = (zone: ShippingZone) => zone.name.trim().toLowerCase() === 'rest of the world';
 
+async function fetchShippingSettings(): Promise<ShippingZoneWithMethods[]> {
+  const baseUrl = APP_URL.replace(/\/$/, '');
+  const response = await fetch(`${baseUrl}/api/jlo/shipping-settings`, {
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch shipping settings');
+  }
+
+  const payload = (await response.json()) as JloShippingSettingsResponse;
+  if (!payload.success || !Array.isArray(payload.data)) {
+    return [];
+  }
+
+  return payload.data;
+}
+
 export function getMatchingShippingZoneData(
   zonesWithMethods: ShippingZoneWithMethods[],
   country: string,
@@ -215,34 +172,36 @@ export function getMatchingShippingZoneData(
     return [restOfWorldZone];
   }
 
-  return zonesWithMethods;
+  const defaultZone = pickDefaultZone(zonesWithMethods);
+  return defaultZone ? [defaultZone] : zonesWithMethods;
 }
 
 export async function getShippingZones(): Promise<ShippingZone[]> {
-  return [DEFAULT_SHIPPING_ZONE];
+  const zones = await getAllShippingMethods();
+  return zones.map(({ zone }) => zone);
 }
 
 export async function getShippingZone(zoneId: number): Promise<ShippingZone | null> {
-  return zoneId === DEFAULT_SHIPPING_ZONE.id ? DEFAULT_SHIPPING_ZONE : null;
+  const zones = await getAllShippingMethods();
+  return zones.find((entry) => entry.zone.id === zoneId)?.zone ?? null;
 }
 
 export async function getShippingMethods(zoneId: number): Promise<ShippingMethod[]> {
-  return zoneId === DEFAULT_SHIPPING_ZONE.id ? DEFAULT_SHIPPING_METHODS : [];
+  const zones = await getAllShippingMethods();
+  return zones.find((entry) => entry.zone.id === zoneId)?.methods ?? [];
 }
 
 export async function getShippingZoneLocations(zoneId: number): Promise<ZoneLocation[]> {
-  return zoneId === DEFAULT_SHIPPING_ZONE.id ? DEFAULT_SHIPPING_LOCATIONS : [];
+  const zones = await getAllShippingMethods();
+  return zones.find((entry) => entry.zone.id === zoneId)?.locations ?? [];
 }
 
 export async function getAllShippingMethods(): Promise<ShippingZoneWithMethods[]> {
   if (!shippingMethodsCache) {
-    shippingMethodsCache = Promise.resolve([
-      {
-        zone: DEFAULT_SHIPPING_ZONE,
-        methods: DEFAULT_SHIPPING_METHODS.filter((method) => method.enabled),
-        locations: DEFAULT_SHIPPING_LOCATIONS,
-      },
-    ]);
+    shippingMethodsCache = fetchShippingSettings().catch((error) => {
+      console.error('Failed to load JLO shipping settings:', error);
+      return [];
+    });
   }
 
   return shippingMethodsCache;

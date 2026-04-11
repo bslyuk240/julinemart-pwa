@@ -11,6 +11,7 @@ import { formatPrice } from '@/lib/utils/format-price';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 
 type VendorSortOption = 'date' | 'popularity' | 'price' | 'price-desc';
+const INITIAL_PAGE_SIZE = 12;
 
 interface VendorData {
   id: number;
@@ -56,26 +57,37 @@ export default function VendorStorePage() {
   const [sortBy,       setSortBy]       = useState<VendorSortOption>('date');
   const [loading,      setLoading]      = useState(true);
   const [refreshing,   setRefreshing]   = useState(false);
+  const [loadingMore,  setLoadingMore]  = useState(false);
+  const [currentPage,  setCurrentPage]  = useState(0);
+  const [totalPages,   setTotalPages]   = useState(0);
   const [policies,     setPolicies]     = useState<StorePolicies | null>(null);
   const [policyLoading, setPolicyLoading] = useState(true);
 
   // ── Fetch vendor + products from Supabase-backed API ────────────────────────
-  const fetchVendor = useCallback(async (opts: { silent?: boolean } = {}) => {
-    const { silent = false } = opts;
+  const fetchVendor = useCallback(async (opts: { silent?: boolean; page?: number; perPage?: number; append?: boolean } = {}) => {
+    const { silent = false, page = 1, perPage = INITIAL_PAGE_SIZE, append = false } = opts;
     if (!silent) setLoading(true);
     try {
-      const res  = await fetch(`/api/vendor/${vendorId}`, { cache: 'no-store' });
+      const res  = await fetch(`/api/vendor/${vendorId}?page=${page}&per_page=${perPage}`, { cache: 'no-store' });
       const data = await res.json() as {
         vendor: VendorData;
         products: Product[];
         total: number;
+        totalPages?: number;
+        page?: number;
+        perPage?: number;
         source: string;
       };
 
       if (data.vendor) setVendor(data.vendor);
       if (data.products) {
-        setProducts(sortProducts(data.products, sortBy));
+        setProducts(prev => {
+          const next = append ? [...prev, ...data.products] : data.products;
+          return sortProducts(next, sortBy);
+        });
         setTotal(data.total ?? data.products.length);
+        setCurrentPage(data.page ?? page);
+        setTotalPages(data.totalPages ?? 0);
       }
     } catch (err) {
       console.error('Error fetching vendor:', err);
@@ -97,14 +109,35 @@ export default function VendorStorePage() {
     }
   }, []);
 
-  useEffect(() => { fetchVendor(); },   [fetchVendor]);
+  useEffect(() => { fetchVendor({ page: 1, perPage: INITIAL_PAGE_SIZE }); },   [fetchVendor]);
   useEffect(() => { fetchPolicies(); }, [fetchPolicies]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([fetchVendor({ silent: true }), fetchPolicies(true, { silent: true })]);
+    await Promise.all([
+      fetchVendor({ silent: true, page: 1, perPage: INITIAL_PAGE_SIZE }),
+      fetchPolicies(true, { silent: true }),
+    ]);
     setRefreshing(false);
   }, [fetchVendor, fetchPolicies]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMore) return;
+    const nextPage = currentPage + 1;
+    if (totalPages > 0 && nextPage > totalPages) return;
+
+    setLoadingMore(true);
+    try {
+      await fetchVendor({
+        silent: true,
+        page: nextPage,
+        perPage: INITIAL_PAGE_SIZE,
+        append: true,
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [currentPage, fetchVendor, loadingMore, totalPages]);
 
   const handleSortChange = (newSort: VendorSortOption) => {
     setSortBy(newSort);
@@ -307,7 +340,21 @@ export default function VendorStorePage() {
           </div>
 
           {products.length > 0 ? (
-            <ProductGrid products={products} columns={4} />
+            <>
+              <ProductGrid products={products} columns={6} />
+              {(total ?? 0) > products.length && (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="inline-flex items-center rounded-lg border border-primary-600 px-5 py-3 text-sm font-semibold text-primary-600 transition-colors hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loadingMore ? 'Loading more...' : 'Load more products'}
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-16 bg-white rounded-lg">
               <Store className="w-16 h-16 text-gray-300 mx-auto mb-4" />

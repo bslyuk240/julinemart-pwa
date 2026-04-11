@@ -24,6 +24,7 @@ function ProductsContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showShell, setShowShell] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -85,7 +86,7 @@ function ProductsContent() {
     return { orderby: sort as 'date' | 'popularity' | 'rating', order: 'desc' as const };
   };
 
-  const PER_PAGE = 48;
+  const PER_PAGE = 24;
 
   const buildFetchUrl = (pageNumber: number, overrideSort?: typeof sortBy) => {
     const activeSort = overrideSort || sortBy;
@@ -136,6 +137,11 @@ function ProductsContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchKey, sortBy]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowShell(true), 120);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const loadMore = async () => {
     try {
       setLoadingMore(true);
@@ -181,10 +187,33 @@ function ProductsContent() {
     return (
       <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
         <div className="container mx-auto px-4 py-6">
-          <div className="text-center py-20">
-            <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading products...</p>
+          <div className="mb-6">
+            <div className="h-8 w-48 rounded bg-gray-100 animate-pulse mb-2" />
+            <div className="h-4 w-72 rounded bg-gray-100 animate-pulse" />
           </div>
+          <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+            <div className="h-10 w-full rounded bg-gray-100 animate-pulse" />
+          </div>
+          {showShell ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
+              {Array.from({ length: 24 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-lg shadow-sm overflow-hidden">
+                  <div className="aspect-square bg-gray-100 animate-pulse" />
+                  <div className="p-2 md:p-4 space-y-2">
+                    <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+                    <div className="h-4 w-full bg-gray-100 rounded animate-pulse" />
+                    <div className="h-4 w-20 bg-gray-100 rounded animate-pulse" />
+                    <div className="h-8 w-full bg-gray-100 rounded animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-20">
+              <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading products...</p>
+            </div>
+          )}
         </div>
       </main>
     );
