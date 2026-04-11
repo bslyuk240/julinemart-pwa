@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Package, Calendar, ArrowRight, ShoppingBag } from 'lucide-react';
+import { Package, Calendar, ArrowRight, ShoppingBag, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { getCustomerOrders } from '@/lib/supabase/customers';
@@ -69,6 +69,7 @@ export default function OrdersPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const totalOrders = orders.length;
 
   useEffect(() => {
     if (!authLoading) {
@@ -121,9 +122,25 @@ export default function OrdersPage() {
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
       <div className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">My Orders</h1>
-          <p className="text-gray-600 mt-1">Track your recent purchases and order history.</p>
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/account"
+              className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to account
+            </Link>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">My Orders</h1>
+              <p className="text-gray-600 mt-1">Track your recent purchases and order history.</p>
+            </div>
+          </div>
+
+          <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm">
+            <Package className="w-4 h-4 text-primary-600" />
+            <span>{totalOrders} {totalOrders === 1 ? 'order' : 'orders'}</span>
+          </div>
         </div>
 
         {orders.length === 0 ? (
@@ -135,9 +152,17 @@ export default function OrdersPage() {
             <p className="text-gray-600 mb-6">
               You haven&apos;t placed any orders. Start shopping to see them here.
             </p>
-            <Link href="/">
-              <Button variant="primary">Start Shopping</Button>
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link href="/">
+                <Button variant="primary">Start Shopping</Button>
+              </Link>
+              <Link
+                href="/account"
+                className="inline-flex items-center justify-center rounded-lg border-2 border-primary-600 px-4 py-2 font-medium text-primary-600 hover:bg-primary-50 transition-colors"
+              >
+                Back to account
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
