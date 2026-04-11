@@ -1,4 +1,4 @@
-import { getPageBySlug } from '@/lib/woocommerce/pages';
+import { getPageBySlug } from '@/lib/supabase/static-pages';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
