@@ -32,7 +32,7 @@ type Slide = {
   overlayOpacity: number;
 };
 
-// Default slides (fallback if WordPress fails)
+// Default slides if no homepage settings are available
 const DEFAULT_SLIDES: Slide[] = [
   {
     id: 1,
@@ -92,20 +92,20 @@ export default function HeroSlider() {
 
   const slide = slides[currentSlide] || slides[0];
 
-  // Fetch slides from WordPress
+  // Fetch slides from the homepage settings API
   useEffect(() => {
     async function fetchSlides() {
       try {
-        console.log('🎬 Fetching slides from WordPress...');
+        console.log('🎬 Fetching hero slides from settings...');
         const response = await fetch('/api/pwa-settings');
         
         if (response.ok) {
           const data = await response.json();
           
           if (data.sliders && data.sliders.length > 0) {
-            console.log('✅ WordPress slides loaded:', data.sliders.length);
+            console.log('✅ Hero slides loaded:', data.sliders.length);
             
-            // Transform WordPress slides to our format
+            // Transform settings slides to the component format
             const transformedSlides: Slide[] = data.sliders.map((wpSlide: any, index: number) => ({
               id: index + 1,
               type: wpSlide.type || 'image',
@@ -129,10 +129,10 @@ export default function HeroSlider() {
             
             setSlides(transformedSlides);
           } else {
-            console.log('⚠️ No WordPress slides found, using defaults');
+            console.log('⚠️ No slides found, using defaults');
           }
         } else {
-          console.log('⚠️ WordPress API failed, using defaults');
+          console.log('⚠️ Settings API failed, using defaults');
         }
       } catch (error) {
         console.error('❌ Error fetching slides:', error);
@@ -142,7 +142,7 @@ export default function HeroSlider() {
     fetchSlides();
   }, []);
 
-  // Keep the index within bounds when slides update from WordPress
+  // Keep the index within bounds when slides update
   useEffect(() => {
     if (currentSlide >= slides.length) {
       setCurrentSlide(0);
