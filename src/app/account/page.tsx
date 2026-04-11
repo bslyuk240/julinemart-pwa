@@ -76,6 +76,8 @@ export default function AccountPage() {
     { icon: Bell, title: 'Notifications', description: 'Manage preferences', href: '/account/notifications', color: 'text-orange-600', bgColor: 'bg-orange-50' },
     { icon: Settings, title: 'Settings', description: 'Account preferences', href: '/account/settings', color: 'text-gray-600', bgColor: 'bg-gray-50' },
   ];
+  const primaryActionItems = accountMenuItems.slice(0, 4);
+  const secondaryActionItems = accountMenuItems.slice(4);
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
@@ -117,7 +119,7 @@ export default function AccountPage() {
             </Link>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {accountMenuItems.slice(0, 4).map((item) => (
+            {primaryActionItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -211,7 +213,42 @@ export default function AccountPage() {
             </div>
 
             {/* Sidebar */}
-            <div className="lg:col-span-1">
+            <div className="lg:hidden">
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">More</h2>
+                  <span className="text-sm text-gray-500">Account tools</span>
+                </div>
+                <div className="space-y-2">
+                  {secondaryActionItems.map(item => (
+                    <Link key={item.href} href={item.href}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
+                      <div className={`w-10 h-10 rounded-lg ${item.bgColor} flex items-center justify-center flex-shrink-0`}>
+                        <item.icon className={`w-5 h-5 ${item.color}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 group-hover:text-primary-600">{item.title}</p>
+                        <p className="text-sm text-gray-600 truncate">{item.description}</p>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-primary-600 flex-shrink-0" />
+                    </Link>
+                  ))}
+                  <button onClick={handleLogout}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-red-50 transition-colors group mt-4 border-t pt-4">
+                    <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
+                      <LogOut className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-gray-900 group-hover:text-red-600">Logout</p>
+                      <p className="text-sm text-gray-600">Sign out of your account</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-red-600 flex-shrink-0" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="hidden lg:block lg:col-span-1">
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Account</h2>
                 <div className="space-y-2">
@@ -275,7 +312,7 @@ export default function AccountPage() {
                 </div>
               </div>
             </div>
-            <div className="lg:col-span-1">
+            <div className="hidden lg:block lg:col-span-1">
               <div className="bg-white rounded-lg shadow-sm p-6 min-h-[320px]">
                 <div className="h-6 w-24 bg-gray-100 rounded animate-pulse mb-4" />
                 <div className="space-y-2">
