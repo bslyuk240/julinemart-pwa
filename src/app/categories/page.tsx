@@ -1,194 +1,117 @@
 import Link from 'next/link';
-import { 
-  Shirt, 
-  Car, 
-  Tv, 
-  Home as HomeIcon, 
-  ShoppingCart,
-  Sparkles,
-  Wrench,
-  BookOpen,
-  Dumbbell,
-  Baby,
-  Laptop
-} from 'lucide-react';
 import { decodeHtmlEntities } from '@/lib/utils/helpers';
+import { getTopLevelCategories } from '@/lib/woocommerce/categories';
+import {
+  FALLBACK_CATEGORY_SLUGS,
+  getCategoryVisual,
+  isVisibleCategorySlug,
+} from '@/lib/utils/category-display';
 
-const categories = [
-  { 
-    id: 1, 
-    name: 'Fashion & Accessories', 
-    slug: 'fashion-accessories', 
-    icon: Shirt,
-    count: 0, // Will be updated when fetched from API
-    color: 'bg-pink-500',
-    image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=400'
-  },
-  { 
-    id: 2, 
-    name: 'Automotive', 
-    slug: 'automotive', 
-    icon: Car,
-    count: 0,
-    color: 'bg-red-500',
-    image: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=400'
-  },
-  { 
-    id: 3, 
-    name: 'Electronics', 
-    slug: 'electronics', 
-    icon: Tv,
-    count: 0,
-    color: 'bg-blue-500',
-    image: 'https://images.unsplash.com/photo-1593784991095-a205069470b6?w=400'
-  },
-  { 
-    id: 4, 
-    name: 'Home & Living', 
-    slug: 'home-living', 
-    icon: HomeIcon,
-    count: 0,
-    color: 'bg-green-500',
-    image: 'https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400'
-  },
-  { 
-    id: 5, 
-    name: 'Grocery & Foodstuff', 
-    slug: 'grocery-foodstuff', 
-    icon: ShoppingCart,
-    count: 0,
-    color: 'bg-orange-500',
-    image: 'https://images.unsplash.com/photo-1543257580-7269da773bf5?w=400'
-  },
-  { 
-    id: 6, 
-    name: 'Beauty & Personal Care', 
-    slug: 'beauty-personal-care', 
-    icon: Sparkles,
-    count: 0,
-    color: 'bg-purple-500',
-    image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400'
-  },
-  { 
-    id: 7, 
-    name: 'Tools & Industrial', 
-    slug: 'tools-industrial', 
-    icon: Wrench,
-    count: 0,
-    color: 'bg-gray-700',
-    image: 'https://images.unsplash.com/photo-1530124566582-a618bc2615dc?w=400'
-  },
-  { 
-    id: 8, 
-    name: 'Books & Education', 
-    slug: 'books-education', 
-    icon: BookOpen,
-    count: 0,
-    color: 'bg-amber-500',
-    image: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=400'
-  },
-  { 
-    id: 9, 
-    name: 'Sports & Fitness', 
-    slug: 'sports-fitness', 
-    icon: Dumbbell,
-    count: 0,
-    color: 'bg-teal-500',
-    image: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=400'
-  },
-  { 
-    id: 10, 
-    name: 'Baby, Kids & Toys', 
-    slug: 'baby-kids-toys', 
-    icon: Baby,
-    count: 0,
-    color: 'bg-yellow-500',
-    image: 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=400'
-  },
-  { 
-    id: 11, 
-    name: 'Digital Products', 
-    slug: 'digital-products', 
-    icon: Laptop,
-    count: 0,
-    color: 'bg-indigo-500',
-    image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400'
-  },
-];
+type CategoryCard = {
+  id: number;
+  name: string;
+  slug: string;
+  count: number;
+};
 
-export default function CategoriesPage() {
+const FALLBACK_CATEGORIES: CategoryCard[] = FALLBACK_CATEGORY_SLUGS.map((slug, index) => ({
+  id: index + 1,
+  name: slug
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' '),
+  slug,
+  count: 0,
+}));
+
+export default async function CategoriesPage() {
+  const liveCategories = await getTopLevelCategories(48);
+  const categories = (liveCategories.length > 0
+    ? liveCategories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        count: category.count ?? 0,
+      }))
+    : FALLBACK_CATEGORIES
+  )
+    .filter((category) => isVisibleCategorySlug(category.slug))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
       <div className="container mx-auto px-4 py-6">
-        {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">Shop by Category</h1>
-          <p className="text-sm md:text-base text-gray-600">Browse all {categories.length} product categories</p>
+          <h1 className="mb-1 text-2xl font-bold text-gray-900 md:text-3xl">Shop by Category</h1>
+          <p className="text-sm text-gray-600 md:text-base">
+            Browse all {categories.length} product categories
+          </p>
         </div>
 
-        {/* Categories Grid - mobile & desktop */}
         <div className="grid grid-cols-2 gap-2 md:hidden lg:grid lg:grid-cols-4 lg:gap-3">
           {categories.map((category) => {
-            const Icon = category.icon;
+            const visual = getCategoryVisual(category.slug, category.name);
+            const Icon = visual.icon;
+
             return (
               <Link
                 key={category.id}
                 href={`/category/${category.slug}`}
-                className="group bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200"
+                className="group overflow-hidden rounded-lg bg-white shadow-sm transition-all duration-200 hover:shadow-lg"
               >
-                {/* Category Image */}
-                <div className="relative h-32 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
+                <div className="relative h-32 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
                   <div
-                    className="absolute inset-0 bg-cover bg-center opacity-80 group-hover:scale-110 transition-transform duration-300"
-                    style={{ backgroundImage: `url(${category.image})` }}
+                    className="absolute inset-0 bg-cover bg-center opacity-80 transition-transform duration-300 group-hover:scale-110"
+                    style={{ backgroundImage: `url(${visual.image})` }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  
-                  {/* Icon */}
+
                   <div className="absolute bottom-3 left-3">
-                    <div className={`${category.color} p-2 rounded-lg`}>
-                      <Icon className="w-6 h-6 text-white" />
+                    <div className={`${visual.color} rounded-lg p-2`}>
+                      <Icon className="h-6 w-6 text-white" />
                     </div>
                   </div>
                 </div>
 
-                {/* Category Info */}
                 <div className="p-3 md:p-4">
-                  <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors leading-snug">
+                  <h3 className="mb-1 leading-snug font-semibold text-gray-900 transition-colors group-hover:text-primary-600">
                     {decodeHtmlEntities(category.name)}
                   </h3>
-                  <p className="text-xs md:text-sm text-gray-600">Browse products</p>
+                  <p className="text-xs text-gray-600 md:text-sm">
+                    {category.count > 0 ? `${category.count} products` : 'Browse products'}
+                  </p>
                 </div>
               </Link>
             );
           })}
         </div>
 
-        {/* Tablet horizontal scroller */}
-        <div className="hidden md:block lg:hidden -mx-4">
+        <div className="hidden -mx-4 md:block lg:hidden">
           <div className="overflow-x-auto px-4">
-            <div className="flex gap-3 min-w-max">
+            <div className="flex min-w-max gap-3">
               {categories.map((category) => {
-                const Icon = category.icon;
+                const visual = getCategoryVisual(category.slug, category.name);
+                const Icon = visual.icon;
+
                 return (
                   <Link
                     key={category.id}
                     href={`/category/${category.slug}`}
-                    className="flex flex-col items-center gap-2 group shrink-0 w-28"
+                className="group flex w-28 shrink-0 flex-col items-center gap-2 md:w-32"
                   >
-                    <div className="relative w-24 h-24 rounded-full overflow-hidden shadow-md bg-gray-100 group-hover:shadow-lg transition-shadow">
+                    <div className="relative h-24 w-24 overflow-hidden rounded-full bg-gray-100 shadow-md transition-shadow group-hover:shadow-lg">
                       <div
-                        className="absolute inset-0 bg-cover bg-center opacity-80 group-hover:scale-110 transition-transform duration-300"
-                        style={{ backgroundImage: `url(${category.image})` }}
+                        className="absolute inset-0 bg-cover bg-center opacity-80 transition-transform duration-300 group-hover:scale-110"
+                        style={{ backgroundImage: `url(${visual.image})` }}
                       />
                       <div className="absolute inset-0 bg-black/30" />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <div className={`${category.color} p-2 rounded-full`}>
-                          <Icon className="w-6 h-6 text-white" />
+                        <div className={`${visual.color} rounded-full p-2`}>
+                          <Icon className="h-6 w-6 text-white" />
                         </div>
                       </div>
                     </div>
-                    <p className="text-center text-xs font-semibold text-gray-900 leading-tight">
+                    <p className="text-center text-xs font-semibold leading-tight text-gray-900">
                       {decodeHtmlEntities(category.name)}
                     </p>
                   </Link>
@@ -198,13 +121,12 @@ export default function CategoriesPage() {
           </div>
         </div>
 
-        {/* Popular Categories Banner */}
-        <div className="mt-8 bg-gradient-to-r from-primary-600 to-primary-800 rounded-2xl p-6 md:p-8 text-white">
-          <h2 className="text-2xl font-bold mb-2">Can't find what you're looking for?</h2>
-          <p className="text-primary-100 mb-4">Use our search to find specific products</p>
+        <div className="mt-8 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-800 p-6 text-white md:p-8">
+          <h2 className="mb-2 text-2xl font-bold">Can't find what you're looking for?</h2>
+          <p className="mb-4 text-primary-100">Use our search to find specific products</p>
           <Link
             href="/"
-            className="inline-block bg-white text-primary-600 font-semibold px-6 py-3 rounded-lg hover:bg-primary-50 transition-colors"
+            className="inline-block rounded-lg bg-white px-6 py-3 font-semibold text-primary-600 transition-colors hover:bg-primary-50"
           >
             Go to Homepage
           </Link>
