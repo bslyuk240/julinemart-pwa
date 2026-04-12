@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown, X } from 'lucide-react';
 import { Product } from '@/types/product';
@@ -15,12 +16,10 @@ export default function CategoryPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
   const [sortBy, setSortBy] = useState<CategorySortOption>('date');
   const [showFilters, setShowFilters] = useState(false);
-  const perPage = 100;
+  const [visibleCount, setVisibleCount] = useState(24);
+  const perPage = 500;
 
   const categoryName = slug
     .split('-')
@@ -39,11 +38,11 @@ export default function CategoryPage() {
     return { orderby: sort as 'date' | 'popularity' | 'rating', order: 'desc' as const };
   };
 
-  const buildUrl = (pageNumber: number, sort: CategorySortOption) => {
+  const buildUrl = (sort: CategorySortOption) => {
     const sortParams = computeSortParams(sort);
     const qs = new URLSearchParams({
       per_page: String(perPage),
-      page: String(pageNumber),
+      page: '1',
       orderby: sortParams.orderby,
       order: sortParams.order,
     });
@@ -60,11 +59,10 @@ export default function CategoryPage() {
     const load = async () => {
       try {
         setLoading(true);
-        setHasMore(true);
-        setPage(1);
-        const { products: fetched } = await fetchFromApi(buildUrl(1, sortBy));
-        setProducts(filterProductsByCategory(fetched, slug));
-        setHasMore(fetched.length === perPage);
+        const { products: fetched } = await fetchFromApi(buildUrl(sortBy));
+        const filtered = filterProductsByCategory(fetched, slug);
+        setProducts(filtered);
+        setVisibleCount(24);
       } catch (error) {
         console.error('Error fetching category products:', error);
       } finally {
@@ -75,32 +73,19 @@ export default function CategoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, sortBy]);
 
-  const loadMore = async () => {
-    try {
-      setLoadingMore(true);
-      const nextPage = page + 1;
-      const { products: more } = await fetchFromApi(buildUrl(nextPage, sortBy));
-      const filtered = filterProductsByCategory(more, slug);
-      if (filtered.length > 0) {
-        setProducts((prev) => [...prev, ...filtered]);
-        setPage(nextPage);
-        setHasMore(more.length === perPage);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error('Error loading more products:', error);
-    } finally {
-      setLoadingMore(false);
-    }
+  const visibleProducts = useMemo(() => products.slice(0, visibleCount), [products, visibleCount]);
+  const hasMore = visibleCount < products.length;
+
+  const loadMore = () => {
+    setVisibleCount((current) => Math.min(current + 24, products.length));
   };
 
   if (loading) {
     return (
       <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
         <div className="container mx-auto px-4 py-6">
-          <div className="text-center py-20">
-            <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <div className="py-20 text-center">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
             <p className="text-gray-600">Loading products...</p>
           </div>
         </div>
@@ -111,37 +96,41 @@ export default function CategoryPage() {
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
       <div className="container mx-auto px-4 py-6">
-        <nav className="text-sm text-gray-600 mb-6">
-          <a href="/" className="hover:text-primary-600">Home</a>
+        <nav className="mb-6 text-sm text-gray-600">
+          <a href="/" className="hover:text-primary-600">
+            Home
+          </a>
           <span className="mx-2">/</span>
-          <a href="/categories" className="hover:text-primary-600">Categories</a>
+          <a href="/categories" className="hover:text-primary-600">
+            Categories
+          </a>
           <span className="mx-2">/</span>
           <span className="text-gray-900">{categoryName}</span>
         </nav>
 
         <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">{categoryName}</h1>
-          <p className="text-sm md:text-base text-gray-600">
+          <h1 className="mb-1 text-2xl font-bold text-gray-900 md:text-3xl">{categoryName}</h1>
+          <p className="text-sm text-gray-600 md:text-base">
             {products.length > 0 ? `${products.length} products found` : 'Browse products in this category'}
           </p>
         </div>
 
-        <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-lg shadow-sm">
+        <div className="mb-6 flex items-center justify-between rounded-lg bg-white p-4 shadow-sm">
           <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={() => setShowFilters((prev) => !prev)}
-              className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+              className={`flex items-center gap-2 rounded-lg border px-4 py-2 transition-colors ${
                 showFilters
                   ? 'border-primary-600 bg-primary-50 text-primary-700'
                   : 'border-gray-300 hover:bg-gray-50'
               }`}
             >
-              <Filter className="w-4 h-4" />
-              <span className="font-medium hidden md:inline">Filters</span>
+              <Filter className="h-4 w-4" />
+              <span className="hidden font-medium md:inline">Filters</span>
             </button>
-            <div className="hidden md:flex items-center gap-2">
-              <span className="text-sm text-gray-600">{products.length} products</span>
+            <div className="hidden items-center gap-2 md:flex">
+              <span className="text-sm text-gray-600">{visibleProducts.length} products</span>
             </div>
           </div>
 
@@ -149,7 +138,7 @@ export default function CategoryPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as CategorySortOption)}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors appearance-none pr-8 cursor-pointer text-sm"
+              className="cursor-pointer appearance-none rounded-lg border border-gray-300 px-4 py-2 pr-8 text-sm transition-colors hover:bg-gray-50"
             >
               <option value="date">Latest</option>
               <option value="popularity">Popular</option>
@@ -157,7 +146,7 @@ export default function CategoryPage() {
               <option value="price">Price: Low to High</option>
               <option value="price-desc">Price: High to Low</option>
             </select>
-            <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           </div>
         </div>
 
@@ -199,31 +188,30 @@ export default function CategoryPage() {
           </div>
         )}
 
-        {products.length > 0 ? (
+        {visibleProducts.length > 0 ? (
           <>
-            <ProductGrid products={products} columns={4} />
+            <ProductGrid products={visibleProducts} columns={4} />
             {hasMore && (
-              <div className="text-center mt-8">
+              <div className="mt-8 text-center">
                 <button
                   onClick={loadMore}
-                  disabled={loadingMore}
-                  className="bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
+                  className="rounded-lg bg-primary-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-primary-700"
                 >
-                  {loadingMore ? 'Loading...' : 'View More Products'}
+                  View More Products
                 </button>
               </div>
             )}
           </>
         ) : (
-          <div className="text-center py-16 bg-white rounded-lg">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-4">
-              <Filter className="w-10 h-10 text-gray-400" />
+          <div className="rounded-lg bg-white py-16 text-center">
+            <div className="mb-4 inline-flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">
+              <Filter className="h-10 w-10 text-gray-400" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No products found</h3>
-            <p className="text-gray-600 mb-6">This category is currently empty. Check back later!</p>
+            <h3 className="mb-2 text-xl font-semibold text-gray-900">No products found</h3>
+            <p className="mb-6 text-gray-600">This category is currently empty. Check back later!</p>
             <a
               href="/products"
-              className="inline-block bg-primary-600 hover:bg-primary-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
+              className="inline-block rounded-lg bg-primary-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-primary-700"
             >
               Browse All Products
             </a>

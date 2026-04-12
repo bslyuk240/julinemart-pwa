@@ -67,7 +67,7 @@ async function getHomepageTagProducts(tag: string, label: string): Promise<Produ
 // Pass the category slug directly to the catalog — no WC category ID lookup.
 async function getCategoryProducts(categorySlug: string, limit: number = 18): Promise<Product[]> {
   const rawProducts = await getProducts({
-    per_page: Math.max(limit * 3, 48),
+    per_page: Math.max(limit * 3, 500),
     orderby: 'date',
     order: 'desc',
   });

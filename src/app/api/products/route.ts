@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   const params: Record<string, any> = {};
   if (searchParams.get('per_page')) params.per_page = Number(searchParams.get('per_page'));
   if (searchParams.get('page')) params.page = Number(searchParams.get('page'));
+  if (searchParams.get('offset')) params.offset = Number(searchParams.get('offset'));
   if (searchParams.get('orderby')) params.orderby = searchParams.get('orderby');
   if (searchParams.get('order')) params.order = searchParams.get('order');
   if (searchParams.get('tag')) params.tag = searchParams.get('tag');

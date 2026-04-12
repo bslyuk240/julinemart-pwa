@@ -349,6 +349,7 @@ function buildProductsQS(params: ProductsQueryParams): string {
   const qs = new URLSearchParams();
   if (params.page) qs.set('page', String(params.page));
   if (params.per_page) qs.set('per_page', String(params.per_page));
+  if (params.offset != null) qs.set('offset', String(params.offset));
   if (params.include?.length) qs.set('include', params.include.join(','));
   if (params.search) qs.set('search', params.search);
   if (params.category) qs.set('category', String(params.category));
