@@ -1173,8 +1173,8 @@ export default function CheckoutPage() {
     !isProcessing;
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-4 md:py-6">
+    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+      <div className="container-custom min-w-0 py-4 md:py-6">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Link href="/cart" className="text-gray-600 hover:text-primary-600">
@@ -1189,11 +1189,11 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-3">
           {/* Checkout Form */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="min-w-0 space-y-6 lg:col-span-2">
             {/* Customer Information */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
               <div className="flex items-center gap-3 mb-4">
                 <MapPin className="w-6 h-6 text-primary-600" />
                 <h2 className="text-xl font-semibold text-gray-900">Contact Information</h2>
@@ -1243,16 +1243,16 @@ export default function CheckoutPage() {
             </div>
 
             {/* Delivery Information */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
               <div className="flex items-center gap-3 mb-4">
                 <Truck className="w-6 h-6 text-primary-600" />
                 <h2 className="text-xl font-semibold text-gray-900">Delivery Address</h2>
               </div>
               
               {hasSavedShipping && (
-                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+                <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
                       <p className="font-medium text-green-900 mb-1">Saved Address</p>
                       <p className="text-sm text-green-800">
                         {defaultShippingAddress?.first_name} {defaultShippingAddress?.last_name}{defaultShippingAddress?.first_name || defaultShippingAddress?.last_name ? ' • ' : ''}
@@ -1412,7 +1412,7 @@ export default function CheckoutPage() {
 
             {/* Shipping Method */}
             {(loading || shippingOptions.length > 0) && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Truck className="w-6 h-6 text-primary-600" />
                   <h2 className="text-xl font-semibold text-gray-900">Shipping Method</h2>
@@ -1441,10 +1441,10 @@ export default function CheckoutPage() {
                             onChange={(e) => handleShippingChange(e.target.value)}
                             className="mt-1 w-4 h-4 text-primary-600"
                           />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <p className="font-medium text-gray-900">{option.title}</p>
-                              <p className="font-semibold text-primary-600">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 items-center justify-between gap-2">
+                              <p className="min-w-0 break-words font-medium text-gray-900">{option.title}</p>
+                              <p className="shrink-0 font-semibold text-primary-600">
                                 {displayCost !== null
                                   ? (displayCost === 0
                                     ? 'FREE'
@@ -1476,7 +1476,7 @@ export default function CheckoutPage() {
 
             {/* NEW: Discount Code + Voucher */}
             {shippingCost !== null && shippingCost > 0 && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Tag className="w-6 h-6 text-primary-600" />
                   <h2 className="text-xl font-semibold text-gray-900">Discounts</h2>
@@ -1514,14 +1514,16 @@ export default function CheckoutPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Enter campaign voucher"
-                            value={voucherCode}
-                            onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                            disabled={isApplyingVoucher}
-                            fullWidth
-                          />
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                          <div className="min-w-0 w-full sm:flex-1">
+                            <Input
+                              placeholder="Enter campaign voucher"
+                              value={voucherCode}
+                              onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                              disabled={isApplyingVoucher}
+                              fullWidth
+                            />
+                          </div>
                           <Button
                             onClick={applyVoucher}
                             disabled={
@@ -1532,7 +1534,7 @@ export default function CheckoutPage() {
                             isLoading={isApplyingVoucher}
                             variant="secondary"
                             size="md"
-                            className="whitespace-nowrap"
+                            className="w-full shrink-0 whitespace-nowrap sm:w-auto"
                             type="button"
                           >
                             Apply
@@ -1571,21 +1573,23 @@ export default function CheckoutPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Enter influencer code"
-                            value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                            disabled={isApplyingCoupon || Boolean(appliedVoucher)}
-                            fullWidth
-                          />
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                          <div className="min-w-0 w-full sm:flex-1">
+                            <Input
+                              placeholder="Enter influencer code"
+                              value={couponCode}
+                              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                              disabled={isApplyingCoupon || Boolean(appliedVoucher)}
+                              fullWidth
+                            />
+                          </div>
                           <Button
                             onClick={applyCoupon}
                             disabled={!couponCode || isApplyingCoupon || Boolean(appliedVoucher)}
                             isLoading={isApplyingCoupon}
                             variant="secondary"
                             size="md"
-                            className="whitespace-nowrap"
+                            className="w-full shrink-0 whitespace-nowrap sm:w-auto"
                             type="button"
                           >
                             Apply
@@ -1608,7 +1612,7 @@ export default function CheckoutPage() {
 
             {/* Payment Method */}
             {(loading || paymentGateways.length > 0) && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <CreditCard className="w-6 h-6 text-primary-600" />
                   <h2 className="text-xl font-semibold text-gray-900">Payment Method</h2>
@@ -1662,10 +1666,10 @@ export default function CheckoutPage() {
                           onChange={(e) => setSelectedPayment(e.target.value)}
                           className="mt-1 w-4 h-4 text-primary-600"
                         />
-                        <div>
-                          <p className="font-medium text-gray-900">{gateway.title}</p>
+                        <div className="min-w-0">
+                          <p className="break-words font-medium text-gray-900">{gateway.title}</p>
                           {gateway.description && (
-                            <p className="text-sm text-gray-600 mt-1">{gateway.description}</p>
+                            <p className="mt-1 break-words text-sm text-gray-600">{gateway.description}</p>
                           )}
                         </div>
                       </label>
@@ -1700,17 +1704,17 @@ export default function CheckoutPage() {
           </div>
 
           {/* Order Summary */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-4">
+          <div className="min-w-0 lg:col-span-1">
+            <div className="sticky top-4 rounded-lg bg-white p-4 shadow-sm sm:p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Summary</h2>
               
-              <div className="space-y-3 mb-4 pb-4 border-b max-h-64 overflow-y-auto">
+              <div className="mb-4 max-h-64 space-y-3 overflow-y-auto overflow-x-hidden border-b pb-4">
                 {items.map((item: any) => (
                   <div
                     key={item.id}
                     className="grid grid-cols-[1fr_auto] gap-2 text-sm items-start"
                   >
-                    <span className="text-gray-600 leading-snug">
+                    <span className="min-w-0 break-words text-gray-600 leading-snug">
                       {item.name} x{item.quantity}
                     </span>
                     <span className="font-medium text-right whitespace-nowrap">

@@ -26,7 +26,7 @@ export default function CategoryProductsSection({
 }: CategoryProductsSectionProps) {
   return (
     <section className={`${sectionClassName} py-3 md:py-6`}>
-      <div className="container mx-auto px-4">
+      <div className="container-custom min-w-0">
         <div className="mb-3 flex items-center justify-between md:mb-4">
           <div className="flex items-center gap-2 md:gap-3">
             <div className={`rounded-lg p-1.5 shadow-md md:p-2 ${accentClassName}`}>

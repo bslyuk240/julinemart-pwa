@@ -12,7 +12,7 @@ interface TrendingSectionProps {
 export default function TrendingSection({ products }: TrendingSectionProps) {
   return (
     <section className="bg-gray-50 py-3 md:py-6">
-      <div className="container mx-auto px-4">
+      <div className="container-custom min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between mb-3 md:mb-4">
           <div className="flex items-center gap-2 md:gap-3">

@@ -12,7 +12,7 @@ interface FlashSalesProps {
 export default function FlashSales({ products }: FlashSalesProps) {
   return (
     <section className="bg-gradient-to-br from-secondary-200 via-secondary-100 to-white py-3 md:py-8">
-      <div className="container mx-auto px-4">
+      <div className="container-custom min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between mb-3 md:mb-4">
           <div className="flex items-center gap-2 md:gap-3">

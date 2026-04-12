@@ -201,8 +201,8 @@ function ProductsContent() {
 
   if (loading && products.length === 0) {
     return (
-      <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-        <div className="container mx-auto px-4 py-6">
+      <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+        <div className="container-custom min-w-0 py-6">
           <div className="mb-6">
             <div className="mb-2 h-8 w-48 animate-pulse rounded bg-gray-100" />
             <div className="h-4 w-72 animate-pulse rounded bg-gray-100" />
@@ -236,8 +236,8 @@ function ProductsContent() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6">
+    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+      <div className="container-custom min-w-0 py-6">
         <div className="mb-6">
           <h1 className="mb-1 text-xl font-bold text-gray-900 md:text-3xl">{sectionMeta.title}</h1>
           <p className="text-sm text-gray-600 md:text-base">{sectionMeta.description}</p>
@@ -399,8 +399,8 @@ export default function AllProductsPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-          <div className="container mx-auto px-4 py-6">
+        <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+          <div className="container-custom min-w-0 py-6">
             <div className="py-20 text-center">
               <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
               <p className="text-gray-600">Loading products...</p>

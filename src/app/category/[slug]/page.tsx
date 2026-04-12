@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown, X } from 'lucide-react';
 import { Product } from '@/types/product';
@@ -82,8 +81,8 @@ export default function CategoryPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-        <div className="container mx-auto px-4 py-6">
+      <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+        <div className="container-custom min-w-0 py-6">
           <div className="py-20 text-center">
             <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
             <p className="text-gray-600">Loading products...</p>
@@ -94,8 +93,8 @@ export default function CategoryPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6">
+    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+      <div className="container-custom min-w-0 py-6">
         <nav className="mb-6 text-sm text-gray-600">
           <a href="/" className="hover:text-primary-600">
             Home

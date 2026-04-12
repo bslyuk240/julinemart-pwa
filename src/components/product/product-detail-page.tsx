@@ -537,7 +537,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
   return (
     <main className="min-h-screen bg-white pb-24 md:pb-8 overflow-x-hidden">
-      <div className="container mx-auto px-4 py-4 md:py-6 max-w-full overflow-hidden">
+      <div className="container-custom py-4 md:py-6 overflow-x-hidden">
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-600 mb-4">
           <a href="/" className="hover:text-primary-600">Home</a>

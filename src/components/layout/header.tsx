@@ -156,8 +156,8 @@ export default function Header() {
       )}
       {/* ========================================================================== */}
 
-      {/* Main Header */}
-      <div className="container mx-auto px-4 py-3 md:py-4">
+      {/* Main Header — same width/padding as main pages (see globals .container-custom) */}
+      <div className="container-custom py-3 md:py-4">
         {/* Unified layout: logo + search, compact and inline */}
         <div className="flex items-center gap-3 md:gap-4">
           {/* Desktop menu toggle */}

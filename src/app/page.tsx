@@ -9,8 +9,8 @@ export default async function HomePage() {
   const sections = await getHomepageSectionsData();
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <section className="container mx-auto px-4 py-3 md:py-6">
+    <main className="min-h-screen overflow-x-hidden bg-gray-50">
+      <section className="container-custom py-3 md:py-6">
         <HeroSlider />
       </section>
 

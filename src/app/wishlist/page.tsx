@@ -101,8 +101,8 @@ export default function WishlistPage() {
   const availableProducts = products.filter(p => p?.stock_status === 'instock');
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6">
+    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+      <div className="container-custom min-w-0 py-6">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Link

@@ -14,7 +14,7 @@ import {
   Tv,
   Wrench,
 } from 'lucide-react';
-import { slugify } from '@/lib/utils/helpers';
+import { decodeHtmlEntities, slugify } from '@/lib/utils/helpers';
 
 export type CategoryVisual = {
   icon: LucideIcon;
@@ -159,9 +159,24 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
 
 const CATEGORY_VISUALS = new Map<string, CategoryVisual>();
 
+/** Extra slug keys from WooCommerce / CMS that should map to the same visual */
+const CATEGORY_SLUG_ALIASES: Record<string, string> = {
+  'home-and-living': 'home-living',
+  'sports-and-fitness': 'sports-fitness',
+  'tools-and-industrial': 'tools-industrial',
+  fashion: 'fashion-accessories',
+  grocery: 'grocery-foodstuff',
+  beauty: 'beauty-personal-care',
+};
+
 for (const definition of CATEGORY_DEFINITIONS) {
   CATEGORY_VISUALS.set(slugify(definition.slug), definition.visual);
   CATEGORY_VISUALS.set(slugify(definition.name), definition.visual);
+}
+
+for (const [alias, target] of Object.entries(CATEGORY_SLUG_ALIASES)) {
+  const visual = CATEGORY_VISUALS.get(target);
+  if (visual) CATEGORY_VISUALS.set(alias, visual);
 }
 
 const FALLBACK_VISUAL: CategoryVisual = {
@@ -171,7 +186,8 @@ const FALLBACK_VISUAL: CategoryVisual = {
 };
 
 export function getCategoryVisual(slug: string, name?: string): CategoryVisual {
-  const candidates = [slug, name].filter(Boolean).map((value) => slugify(value as string));
+  const raw = [slug, name].filter(Boolean) as string[];
+  const candidates = raw.map((value) => slugify(decodeHtmlEntities(value)));
 
   for (const candidate of candidates) {
     const visual = CATEGORY_VISUALS.get(candidate);

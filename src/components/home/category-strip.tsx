@@ -35,7 +35,7 @@ export default async function CategoryStrip() {
 
   return (
     <div className="w-full bg-white py-3 md:py-4">
-      <div className="container mx-auto px-4">
+      <div className="container-custom min-w-0">
         <div className="mb-2 flex items-center justify-between md:mb-4">
           <h2 className="text-sm font-bold text-primary-900 md:text-lg">Shop by Category</h2>
           <Link
@@ -46,7 +46,7 @@ export default async function CategoryStrip() {
           </Link>
         </div>
 
-        <div className="overflow-x-auto -mx-4 px-4 lg:hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6 lg:hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className="flex flex-nowrap gap-3 pb-1 md:gap-4">
             {visibleCategories.map((category) => {
               const visual = getCategoryVisual(category.slug, category.name);
@@ -72,7 +72,7 @@ export default async function CategoryStrip() {
           </div>
         </div>
 
-        <div className="hidden flex-wrap gap-4 md:gap-6 lg:flex">
+        <div className="hidden w-full lg:flex lg:flex-nowrap lg:gap-1 xl:gap-2">
           {visibleCategories.map((category) => {
             const visual = getCategoryVisual(category.slug, category.name);
             const Icon = visual.icon;
@@ -81,14 +81,14 @@ export default async function CategoryStrip() {
               <Link
                 key={category.id}
                 href={`/category/${category.slug}`}
-                className="group flex w-28 shrink-0 flex-col items-center md:w-32"
+                className="group flex min-w-0 flex-1 basis-0 flex-col items-center px-0.5"
               >
                 <div
-                  className={`mb-2 flex h-14 w-14 items-center justify-center rounded-full ${visual.color} text-white transition-all duration-200 group-hover:scale-110 group-hover:shadow-lg md:h-16 md:w-16`}
+                  className={`mb-1.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${visual.color} text-white transition-all duration-200 group-hover:scale-110 group-hover:shadow-lg xl:h-14 xl:w-14`}
                 >
-                  <Icon className="h-6 w-6 md:h-7 md:w-7" />
+                  <Icon className="h-5 w-5 xl:h-6 xl:w-6" />
                 </div>
-                <span className="text-center text-xs font-medium text-gray-700 transition-colors group-hover:text-primary-600 md:text-sm">
+                <span className="line-clamp-2 w-full text-center text-[10px] font-medium leading-tight text-gray-700 transition-colors group-hover:text-primary-600 xl:text-xs">
                   {decodeHtmlEntities(category.name)}
                 </span>
               </Link>
