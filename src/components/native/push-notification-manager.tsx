@@ -5,7 +5,8 @@ import { useEffect } from 'react';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 
 export default function PushNotificationManager() {
-  const { customer, customerId } = useCustomerAuth();
+  const { user, customer } = useCustomerAuth();
+  const customerId = user?.id ?? null;
   // Default to enabled on native. Set NEXT_PUBLIC_ENABLE_NATIVE_PUSH=false to turn it off.
   const enableNativePush = process.env.NEXT_PUBLIC_ENABLE_NATIVE_PUSH !== 'false';
 
@@ -136,7 +137,7 @@ export default function PushNotificationManager() {
         }
       });
     };
-  }, [customer, customerId, enableNativePush]);
+  }, [user, customer, enableNativePush]);
 
   return null;
 }

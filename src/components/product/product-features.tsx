@@ -10,7 +10,7 @@ interface ProductFeaturesProps {
 
 export default function ProductFeatures({ className = '' }: ProductFeaturesProps) {
   const [returnDays, setReturnDays] = useState(3); // Default
-  const [freeShippingMin, setFreeShippingMin] = useState(10000); // Default
+  const [freeShippingMin, setFreeShippingMin] = useState(100000); // Default
   const [loading, setLoading] = useState(true);
   const [bannerThreshold, setBannerThreshold] = useState<number | null>(null);
 
@@ -22,7 +22,7 @@ export default function ProductFeatures({ className = '' }: ProductFeaturesProps
           getFreeShippingThreshold(),
         ]);
 
-        // Override returns to 3 days as requested
+        // Keep the configured default return window.
         setReturnDays(3);
 
         setFreeShippingMin(threshold);

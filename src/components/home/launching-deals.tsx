@@ -22,7 +22,7 @@ function calculateDiscount(regularPrice: string, salePrice: string): number {
 export default function LaunchingDeals({ products }: LaunchingDealsProps) {
   return (
     <section className="bg-gradient-to-br from-green-50 via-emerald-50 to-white py-3 md:py-6">
-      <div className="container mx-auto px-4">
+      <div className="container-custom min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between mb-3 md:mb-4">
           <div className="flex items-center gap-2 md:gap-3">

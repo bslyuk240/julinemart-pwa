@@ -34,7 +34,7 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
         <Link href={`/product/${item.slug}`} className="flex-shrink-0">
           <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden bg-gray-100">
             <Image
-              src={item.image || '/images/placeholder.jpg'}
+              src={item.image || '/images/placeholder.svg'}
               alt={item.name}
               fill
               className="object-cover"

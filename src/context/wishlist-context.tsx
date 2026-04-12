@@ -12,5 +12,6 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
 
 export function useWishlistContext() {
   const context = useContext(WishlistContext);
-  return context ?? useWishlist();
+  const fallback = useWishlist();
+  return context ?? fallback;
 }

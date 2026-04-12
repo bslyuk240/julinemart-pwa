@@ -66,7 +66,8 @@ function resolveTargetPath(data: Record<string, string>) {
 
 export default function WebPushManager() {
   const router = useRouter();
-  const { customer, customerId, isAuthenticated, isLoading } = useCustomerAuth();
+  const { user, customer, isAuthenticated, isLoading } = useCustomerAuth();
+  const customerId = user?.id ?? null;
   const registrationCacheRef = useRef<string | null>(null);
   const onMessageCleanupRef = useRef<(() => void) | null>(null);
   const inFlightSetupRef = useRef<Promise<WebPushEnableResult> | null>(null);
@@ -330,7 +331,7 @@ export default function WebPushManager() {
         onMessageCleanupRef.current = null;
       }
     };
-  }, [customer, customerId, isAuthenticated, isLoading, router]);
+  }, [user, customer, isAuthenticated, isLoading, router]);
 
   return null;
 }

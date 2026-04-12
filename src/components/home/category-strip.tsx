@@ -1,115 +1,101 @@
-'use client';
-
 import Link from 'next/link';
-import { 
-  Shirt, Car, Tv, Home as HomeIcon, ShoppingCart, Sparkles,
-  Wrench, BookOpen, Dumbbell, Baby, Laptop
-} from 'lucide-react';
+import { decodeHtmlEntities } from '@/lib/utils/helpers';
+import { getTopLevelCategories } from '@/lib/woocommerce/categories';
+import {
+  FALLBACK_CATEGORY_SLUGS,
+  getCategoryVisual,
+  isVisibleCategorySlug,
+} from '@/lib/utils/category-display';
 
-interface Category {
+type StripCategory = {
   id: number;
   name: string;
   slug: string;
-  icon: React.ReactNode;
-  color: string;
-}
+};
 
-const defaultCategories: Category[] = [
-  { id: 1, name: 'Fashion', slug: 'fashion-accessories', icon: <Shirt />, color: 'bg-pink-500' },
-  { id: 2, name: 'Automotive', slug: 'automotive', icon: <Car />, color: 'bg-red-500' },
-  { id: 3, name: 'Electronics', slug: 'electronics', icon: <Tv />, color: 'bg-blue-500' },
-  { id: 4, name: 'Home', slug: 'home-living', icon: <HomeIcon />, color: 'bg-green-500' },
-  { id: 5, name: 'Grocery', slug: 'grocery-foodstuff', icon: <ShoppingCart />, color: 'bg-orange-500' },
-  { id: 6, name: 'Beauty', slug: 'beauty-personal-care', icon: <Sparkles />, color: 'bg-purple-500' },
-  { id: 7, name: 'Tools', slug: 'tools-industrial', icon: <Wrench />, color: 'bg-gray-700' },
-  { id: 8, name: 'Books', slug: 'books-education', icon: <BookOpen />, color: 'bg-amber-500' },
-  { id: 9, name: 'Sports', slug: 'sports-fitness', icon: <Dumbbell />, color: 'bg-teal-500' },
-  { id: 10, name: 'Baby', slug: 'baby-kids-toys', icon: <Baby />, color: 'bg-yellow-500' },
-  { id: 11, name: 'Digital', slug: 'digital-products', icon: <Laptop />, color: 'bg-indigo-500' },
-];
+const FALLBACK_CATEGORIES: StripCategory[] = FALLBACK_CATEGORY_SLUGS.map((slug, index) => ({
+  id: index + 1,
+  name: slug
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' '),
+  slug,
+}));
 
-export default function CategoryStrip({ categories = defaultCategories }: { categories?: Category[] }) {
+export default async function CategoryStrip() {
+  const liveCategories = await getTopLevelCategories(48);
+  const categories = (liveCategories.length > 0
+    ? liveCategories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+      }))
+    : FALLBACK_CATEGORIES);
+  const visibleCategories = categories.filter((category) => isVisibleCategorySlug(category.slug));
+
   return (
     <div className="w-full bg-white py-3 md:py-4">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between mb-2 md:mb-4">
-          <h2 className="text-sm md:text-lg font-bold text-primary-900">Shop by Category</h2>
-          <Link 
-            href="/categories" 
-            className="text-xs md:text-sm text-secondary-500 hover:text-secondary-600 font-medium"
+      <div className="container-custom min-w-0">
+        <div className="mb-2 flex items-center justify-between md:mb-4">
+          <h2 className="text-sm font-bold text-primary-900 md:text-lg">Shop by Category</h2>
+          <Link
+            href="/categories"
+            className="text-xs font-medium text-secondary-500 hover:text-secondary-600 md:text-sm"
           >
             View All
           </Link>
         </div>
 
-        {/* Mobile & Tablet: Horizontal Scrollable Category List */}
-        <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 lg:hidden">
-          <div className="flex flex-nowrap gap-3 md:gap-4 pb-1">
-            {categories.map((category) => (
-              <Link
-                key={category.id}
-                href={`/category/${category.slug}`}
-                className="flex flex-col items-center group min-w-[60px] md:min-w-[72px]"
-              >
-                {/* Icon Circle - Mobile & Tablet */}
-                <div className={`
-                  w-12 h-12 md:w-14 md:h-14 rounded-full ${category.color} 
-                  flex items-center justify-center text-white
-                  transform transition-all duration-200 
-                  group-hover:scale-110 group-hover:shadow-lg
-                `}>
-                  <div className="w-5 h-5 md:w-6 md:h-6">
-                    {category.icon}
-                  </div>
-                </div>
+        <div className="overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6 lg:hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div className="flex flex-nowrap gap-3 pb-1 md:gap-4">
+            {visibleCategories.map((category) => {
+              const visual = getCategoryVisual(category.slug, category.name);
+              const Icon = visual.icon;
 
-                {/* Category Name - Mobile & Tablet */}
-                <span className="text-[10px] md:text-xs font-medium text-gray-700 group-hover:text-primary-600 text-center transition-colors mt-1.5 line-clamp-2">
-                  {category.name}
-                </span>
-              </Link>
-            ))}
+              return (
+                <Link
+                  key={category.id}
+                  href={`/category/${category.slug}`}
+                  className="group flex min-w-[60px] flex-col items-center md:min-w-[72px]"
+                >
+                  <div
+                    className={`flex h-12 w-12 items-center justify-center rounded-full ${visual.color} text-white transition-all duration-200 group-hover:scale-110 group-hover:shadow-lg md:h-14 md:w-14`}
+                  >
+                    <Icon className="h-5 w-5 md:h-6 md:w-6" />
+                  </div>
+                  <span className="mt-1.5 text-center text-[10px] font-medium text-gray-700 transition-colors group-hover:text-primary-600 md:text-xs line-clamp-2">
+                    {decodeHtmlEntities(category.name)}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
 
-        {/* Desktop: Normal Grid Layout */}
-        <div className="hidden lg:flex lg:flex-wrap gap-4 md:gap-6">
-          {categories.map((category) => (
-            <Link
-              key={category.id}
-              href={`/category/${category.slug}`}
-              className="flex flex-col items-center group"
-            >
-              {/* Icon Circle - Desktop */}
-              <div className={`
-                w-14 h-14 md:w-16 md:h-16 rounded-full ${category.color} 
-                flex items-center justify-center text-white mb-2
-                transform transition-all duration-200 
-                group-hover:scale-110 group-hover:shadow-lg
-              `}>
-                <div className="w-6 h-6 md:w-7 md:h-7">
-                  {category.icon}
-                </div>
-              </div>
+        <div className="hidden w-full lg:flex lg:flex-nowrap lg:gap-1 xl:gap-2">
+          {visibleCategories.map((category) => {
+            const visual = getCategoryVisual(category.slug, category.name);
+            const Icon = visual.icon;
 
-              {/* Category Name - Desktop */}
-              <span className="text-xs md:text-sm font-medium text-gray-700 group-hover:text-primary-600 text-center transition-colors">
-                {category.name}
-              </span>
-            </Link>
-          ))}
+            return (
+              <Link
+                key={category.id}
+                href={`/category/${category.slug}`}
+                className="group flex min-w-0 flex-1 basis-0 flex-col items-center px-0.5"
+              >
+                <div
+                  className={`mb-1.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${visual.color} text-white transition-all duration-200 group-hover:scale-110 group-hover:shadow-lg xl:h-14 xl:w-14`}
+                >
+                  <Icon className="h-5 w-5 xl:h-6 xl:w-6" />
+                </div>
+                <span className="line-clamp-2 w-full text-center text-[10px] font-medium leading-tight text-gray-700 transition-colors group-hover:text-primary-600 xl:text-xs">
+                  {decodeHtmlEntities(category.name)}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </div>
-
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </div>
   );
 }

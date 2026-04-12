@@ -1,5 +1,3 @@
-import { wcApi, handleApiError } from './client';
-
 export interface ShippingZone {
   id: number;
   name: string;
@@ -44,70 +42,8 @@ export interface PaymentGateway {
   method_title: string;
   method_description: string;
   method_supports: string[];
-  settings: {
-    [key: string]: unknown;
-  };
+  settings: Record<string, unknown>;
   _links?: unknown;
-}
-
-let shippingMethodsCache: Promise<{
-  zone: ShippingZone;
-  methods: ShippingMethod[];
-  locations: ZoneLocation[];
-}[]> | null = null;
-
-let enabledPaymentGatewaysCache: Promise<PaymentGateway[]> | null = null;
-
-/**
- * Get all shipping zones
- */
-export async function getShippingZones(): Promise<ShippingZone[]> {
-  try {
-    const response = await wcApi.get('shipping/zones');
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    return [];
-  }
-}
-
-/**
- * Get a single shipping zone by ID
- */
-export async function getShippingZone(zoneId: number): Promise<ShippingZone | null> {
-  try {
-    const response = await wcApi.get(`shipping/zones/${zoneId}`);
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    return null;
-  }
-}
-
-/**
- * Get shipping methods for a specific zone
- */
-export async function getShippingMethods(zoneId: number): Promise<ShippingMethod[]> {
-  try {
-    const response = await wcApi.get(`shipping/zones/${zoneId}/methods`);
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    return [];
-  }
-}
-
-/**
- * Get locations for a specific shipping zone.
- */
-export async function getShippingZoneLocations(zoneId: number): Promise<ZoneLocation[]> {
-  try {
-    const response = await wcApi.get(`shipping/zones/${zoneId}/locations`);
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    return [];
-  }
 }
 
 export interface ShippingZoneWithMethods {
@@ -116,17 +52,54 @@ export interface ShippingZoneWithMethods {
   locations: ZoneLocation[];
 }
 
+type JloShippingSettingsResponse = {
+  success: boolean;
+  data?: ShippingZoneWithMethods[];
+  message?: string;
+};
+
+const DEFAULT_PAYMENT_GATEWAYS: PaymentGateway[] = [
+  {
+    id: 'paystack',
+    title: 'Paystack',
+    description: 'Pay securely with Paystack',
+    order: 0,
+    enabled: true,
+    method_title: 'Paystack',
+    method_description: 'Pay securely with Paystack',
+    method_supports: ['products'],
+    settings: {},
+  },
+];
+
+let shippingMethodsCache: Promise<ShippingZoneWithMethods[]> | null = null;
+let enabledPaymentGatewaysCache: Promise<PaymentGateway[]> | null = null;
+
 const normalizeLocationValue = (value: string | undefined | null) =>
   String(value || '')
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '');
 
-const scoreZoneMatch = (
-  locations: ZoneLocation[],
-  country: string,
-  state?: string
-) => {
+const pickDefaultZone = (zonesWithMethods: ShippingZoneWithMethods[]) => {
+  if (zonesWithMethods.length === 0) return null;
+
+  const ordered = [...zonesWithMethods].sort((a, b) => {
+    const aCost = Number(a.methods[0]?.settings?.cost?.value ?? Number.POSITIVE_INFINITY);
+    const bCost = Number(b.methods[0]?.settings?.cost?.value ?? Number.POSITIVE_INFINITY);
+    if (aCost !== bCost) return aCost - bCost;
+
+    const aOrder = Number(a.zone.order ?? 0);
+    const bOrder = Number(b.zone.order ?? 0);
+    if (aOrder !== bOrder) return aOrder - bOrder;
+
+    return a.zone.name.localeCompare(b.zone.name);
+  });
+
+  return ordered[0] || null;
+};
+
+const scoreZoneMatch = (locations: ZoneLocation[], country: string, state?: string) => {
   const normalizedCountry = normalizeLocationValue(country);
   const normalizedState = normalizeLocationValue(state);
   let bestScore = -1;
@@ -152,8 +125,24 @@ const scoreZoneMatch = (
   return bestScore;
 };
 
-const isRestOfWorldZone = (zone: ShippingZone) =>
-  zone.name.trim().toLowerCase() === 'rest of the world';
+const isRestOfWorldZone = (zone: ShippingZone) => zone.name.trim().toLowerCase() === 'rest of the world';
+
+async function fetchShippingSettings(): Promise<ShippingZoneWithMethods[]> {
+  const response = await fetch('/api/jlo/shipping-settings', {
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch shipping settings');
+  }
+
+  const payload = (await response.json()) as JloShippingSettingsResponse;
+  if (!payload.success || !Array.isArray(payload.data)) {
+    return [];
+  }
+
+  return payload.data;
+}
 
 export function getMatchingShippingZoneData(
   zonesWithMethods: ShippingZoneWithMethods[],
@@ -175,124 +164,73 @@ export function getMatchingShippingZoneData(
     return [bestMatch];
   }
 
-  const restOfWorldZone = zonesWithMethods.find((zoneData) =>
-    isRestOfWorldZone(zoneData.zone)
-  );
-
+  const restOfWorldZone = zonesWithMethods.find((zoneData) => isRestOfWorldZone(zoneData.zone));
   if (restOfWorldZone) {
     return [restOfWorldZone];
   }
 
-  return zonesWithMethods;
+  const defaultZone = pickDefaultZone(zonesWithMethods);
+  return defaultZone ? [defaultZone] : zonesWithMethods;
 }
 
-/**
- * Get all available shipping methods across all zones
- */
+export async function getShippingZones(): Promise<ShippingZone[]> {
+  const zones = await getAllShippingMethods();
+  return zones.map(({ zone }) => zone);
+}
+
+export async function getShippingZone(zoneId: number): Promise<ShippingZone | null> {
+  const zones = await getAllShippingMethods();
+  return zones.find((entry) => entry.zone.id === zoneId)?.zone ?? null;
+}
+
+export async function getShippingMethods(zoneId: number): Promise<ShippingMethod[]> {
+  const zones = await getAllShippingMethods();
+  return zones.find((entry) => entry.zone.id === zoneId)?.methods ?? [];
+}
+
+export async function getShippingZoneLocations(zoneId: number): Promise<ZoneLocation[]> {
+  const zones = await getAllShippingMethods();
+  return zones.find((entry) => entry.zone.id === zoneId)?.locations ?? [];
+}
+
 export async function getAllShippingMethods(): Promise<ShippingZoneWithMethods[]> {
   if (!shippingMethodsCache) {
-    shippingMethodsCache = (async () => {
-      try {
-        const zones = await getShippingZones();
-
-        const zonesWithMethods = await Promise.all(
-          zones.map(async (zone) => {
-            const [methods, locations] = await Promise.all([
-              getShippingMethods(zone.id),
-              getShippingZoneLocations(zone.id),
-            ]);
-            return {
-              zone,
-              methods: methods.filter((method) => method.enabled),
-              locations,
-            };
-          })
-        );
-
-        return zonesWithMethods.filter((zoneData) => zoneData.methods.length > 0);
-      } catch (error) {
-        shippingMethodsCache = null;
-        console.error('Error fetching shipping methods:', error);
-        return [];
-      }
-    })();
+    shippingMethodsCache = fetchShippingSettings().catch((error) => {
+      console.error('Failed to load JLO shipping settings:', error);
+      return [];
+    });
   }
 
   return shippingMethodsCache;
 }
 
-/**
- * Calculate shipping for a package
- * Note: This is simplified - actual calculation would need customer address
- */
 export async function calculateShipping(
   zoneId: number,
   methodId: string
-): Promise<{
-  cost: number;
-  label: string;
-} | null> {
-  try {
-    const methods = await getShippingMethods(zoneId);
-    const method = methods.find(m => m.method_id === methodId);
-    
-    if (!method) return null;
-    
-    // Extract cost from settings
-    const costSetting = method.settings?.cost?.value || '0';
-    
-    return {
-      cost: parseFloat(costSetting),
-      label: method.title,
-    };
-  } catch (error) {
-    handleApiError(error);
-    return null;
-  }
+): Promise<{ cost: number; label: string } | null> {
+  const methods = await getShippingMethods(zoneId);
+  const method = methods.find((m) => m.method_id === methodId);
+  if (!method) return null;
+
+  const costSetting = method.settings?.cost?.value || '0';
+  return {
+    cost: parseFloat(costSetting),
+    label: method.title,
+  };
 }
 
-/**
- * Get all payment gateways
- */
 export async function getPaymentGateways(): Promise<PaymentGateway[]> {
-  try {
-    const response = await wcApi.get('payment_gateways');
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    return [];
-  }
+  return DEFAULT_PAYMENT_GATEWAYS;
 }
 
-/**
- * Get enabled payment gateways only
- */
 export async function getEnabledPaymentGateways(): Promise<PaymentGateway[]> {
   if (!enabledPaymentGatewaysCache) {
-    enabledPaymentGatewaysCache = (async () => {
-      try {
-        const gateways = await getPaymentGateways();
-        return gateways.filter((gateway) => gateway.enabled);
-      } catch (error) {
-        enabledPaymentGatewaysCache = null;
-        handleApiError(error);
-        return [];
-      }
-    })();
+    enabledPaymentGatewaysCache = Promise.resolve(DEFAULT_PAYMENT_GATEWAYS.filter((gateway) => gateway.enabled));
   }
 
   return enabledPaymentGatewaysCache;
 }
 
-/**
- * Get a single payment gateway by ID
- */
 export async function getPaymentGateway(gatewayId: string): Promise<PaymentGateway | null> {
-  try {
-    const response = await wcApi.get(`payment_gateways/${gatewayId}`);
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    return null;
-  }
+  return DEFAULT_PAYMENT_GATEWAYS.find((gateway) => gateway.id === gatewayId) ?? null;
 }

@@ -8,13 +8,14 @@ import { Button } from '@/components/ui/button';
 import ProductGallery from '@/components/product/product-gallery';
 import ProductCarousel from '@/components/product/product-carousel';
 import { Badge } from '@/components/ui/badge';
-import { getRelatedProducts, getProductVariations, getProductReviews, createProductReview } from '@/lib/woocommerce/products';
+import { getProductVariations, getProductReviews, createProductReview } from '@/lib/woocommerce/products';
 import ProductFeatures from '@/components/product/product-features';
 import { useCartStore } from '@/store/cart-store';
 import { useWishlist } from '@/hooks/use-wishlist';
-import { Product, ProductVariation, ProductReview } from '@/types/product';
+import { Product, ProductAttribute, ProductVariation, ProductReview } from '@/types/product';
 import { toast } from 'sonner';
 import { decodeHtmlEntities } from '@/lib/utils/helpers';
+import { filterProductsByCategory } from '@/lib/utils/category-filters';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -29,6 +30,72 @@ const getBadgeConfig = (tagSlug: string) => {
 };
 
 const stripHtml = (value: string) => value.replace(/<[^>]*>/g, '').trim();
+
+const normalizeVariationKey = (value: string) =>
+  (value ?? '')
+    .toLowerCase()
+    .trim()
+    .replace(/^attribute[_-]/, '')
+    .replace(/^pa[_-]/, '')
+    .replace(/^product[_-]/, '')
+    .replace(/[^a-z0-9]+/g, '');
+
+const normalizeVariationValue = (value: string) =>
+  (value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+const dedupeOptions = (options: string[]) =>
+  Array.from(new Set(options.map((option) => option.trim()).filter(Boolean)));
+
+const inferVariationAttributes = (variations: ProductVariation[]): ProductAttribute[] => {
+  const map = new Map<
+    string,
+    {
+      name: string;
+      options: string[];
+    }
+  >();
+
+  variations.forEach((variation) => {
+    variation.attributes.forEach((attr) => {
+      const rawName = (attr.name ?? '').trim();
+      const rawOption = (attr.option ?? '').trim();
+      if (!rawName || !rawOption) return;
+
+      const key = normalizeVariationKey(rawName);
+      if (!key) return;
+
+      const existing = map.get(key);
+      if (existing) {
+        existing.options.push(rawOption);
+        if (!existing.name && rawName) existing.name = rawName;
+        return;
+      }
+
+      map.set(key, {
+        name: rawName,
+        options: [rawOption],
+      });
+    });
+  });
+
+  return Array.from(map.values()).map((attr, index) => ({
+    id: index + 1,
+    name: attr.name,
+    position: index,
+    visible: true,
+    variation: true,
+    options: dedupeOptions(attr.options),
+  }));
+};
+
+// Clean up raw CJ option codes for display: "1544707-White-Size" → "White"
+function cleanOptionLabel(option: string): string {
+  // Strip leading numeric CJ product code prefix: e.g. "1544707-" or "4001234-"
+  const withoutPrefix = option.replace(/^\d{4,}[\d-]*-/, '');
+  // Strip trailing "-Size" or "-size" artifact from CJ attribute naming
+  const withoutSuffix = withoutPrefix.replace(/-size$/i, '').trim();
+  return withoutSuffix || option;
+}
 
 interface ProductDetailPageProps {
   initialProduct: Product;
@@ -75,9 +142,16 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
   useEffect(() => {
     const fetchRelated = async () => {
       if (!product) return;
+      const categorySlug = product.categories?.[0]?.slug;
+      if (!categorySlug) return;
       try {
-        const related = await getRelatedProducts(product.id, 6);
-        setRelatedProducts(related);
+        const qs = new URLSearchParams({ per_page: '24' });
+        const res = await fetch(`/api/products?${qs.toString()}`);
+        if (!res.ok) return;
+        const { products: data } = await res.json();
+        setRelatedProducts(
+          filterProductsByCategory((data as Product[]).filter((p) => p.id !== product.id), categorySlug).slice(0, 6)
+        );
       } catch (error) {
         console.error('Error fetching related products:', error);
       }
@@ -177,7 +251,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       name: product.name,
       slug: product.slug,
       price: product.price,
-      image: product.images[0]?.src || '/images/placeholder.jpg',
+      image: product.images[0]?.src || '/images/placeholder.svg',
     });
   };
 
@@ -267,6 +341,47 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     alert('Link copied to clipboard!');
   };
 
+  const selectedVariationKeyedAttrs = useMemo(() => {
+    return Object.entries(selectedAttributes).reduce<Record<string, string>>((acc, [key, value]) => {
+      const normalizedKey = normalizeVariationKey(key);
+      if (normalizedKey && value) acc[normalizedKey] = value;
+      return acc;
+    }, {});
+  }, [selectedAttributes]);
+
+  const matchesVariationSelection = useMemo(
+    () =>
+      (
+        variation: ProductVariation,
+        overrides: Record<string, string> = {},
+        strict = false
+      ) => {
+        if (!variation.attributes.length) return false;
+
+        let matchedDimensions = 0;
+
+        return variation.attributes.every((attr) => {
+          const key = normalizeVariationKey(attr.name ?? '');
+          if (!key) return true;
+
+          const expected = Object.prototype.hasOwnProperty.call(overrides, key)
+            ? overrides[key]
+            : selectedVariationKeyedAttrs[key];
+
+          if (!expected) {
+            return strict ? false : true;
+          }
+
+          matchedDimensions += 1;
+          return (
+            normalizeVariationValue(expected) ===
+            normalizeVariationValue(attr.option ?? '')
+          );
+        }) && (!strict || matchedDimensions > 0);
+      },
+    [selectedVariationKeyedAttrs]
+  );
+
   const increaseQuantity = () => {
     if (product && effectiveStockQty && quantity < effectiveStockQty) {
       setQuantity(quantity + 1);
@@ -293,18 +408,24 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
       try {
         setLoadingVariations(true);
-        const data = await getProductVariations(product.id);
+        // Supabase products may expose either full inline variation objects or
+        // just variation IDs. Only trust the inline payload when it actually
+        // contains variation objects; otherwise fall back to fetching by WC id.
+        const inlineVariations = product._variations?.length ? product._variations : null;
+        const data = inlineVariations ?? await getProductVariations(product.id);
         setVariations(data);
 
         // Prefill defaults if available
         if (product.default_attributes?.length) {
           const defaults: Record<string, string> = {};
           product.default_attributes.forEach((attr: any) => {
-            if (attr.name && attr.option) {
-              defaults[attr.name.toLowerCase()] = attr.option;
-            }
+            const k = normalizeVariationKey(String(attr.name ?? ''));
+            const v = (attr.option ?? '').trim();
+            if (k && v) defaults[k] = v;
           });
           setSelectedAttributes(defaults);
+        } else {
+          setSelectedAttributes({});
         }
       } catch (err) {
         console.error('Error loading variations', err);
@@ -323,19 +444,19 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       return;
     }
 
-    const match = variations.find((variation) => {
-      return variation.attributes.every((attr) => {
-        const key = attr.name.toLowerCase();
-        return selectedAttributes[key] && selectedAttributes[key] === attr.option;
-      });
-    });
-
+    const match = variations.find((variation) => matchesVariationSelection(variation, {}, true));
     setSelectedVariation(match || null);
-  }, [selectedAttributes, variations]);
+  }, [matchesVariationSelection, variations]);
 
   const variationAttributes = useMemo(
-    () => product?.attributes?.filter((attr) => attr.variation) || [],
-    [product]
+    () => {
+      const inferredAttrs = inferVariationAttributes(variations);
+      if (inferredAttrs.length > 0) return inferredAttrs;
+
+      const attrs = product?.attributes?.filter((attr) => attr.variation) || [];
+      return attrs;
+    },
+    [product, variations]
   );
 
   const selectedPrice = useMemo(() => {
@@ -416,7 +537,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
   return (
     <main className="min-h-screen bg-white pb-24 md:pb-8 overflow-x-hidden">
-      <div className="container mx-auto px-4 py-4 md:py-6 max-w-full overflow-hidden">
+      <div className="container-custom py-4 md:py-6 overflow-x-hidden">
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-600 mb-4">
           <a href="/" className="hover:text-primary-600">Home</a>
@@ -550,50 +671,43 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
             {product.type === 'variable' && variationAttributes.length > 0 && (
               <div className="border-t pt-4 md:pt-5 space-y-4">
                 {variationAttributes.map((attr) => {
-                  const key = attr.name.toLowerCase();
-                  const selected = selectedAttributes[key];
+                  const key = normalizeVariationKey(attr.name ?? '');
+                  const selected = key ? selectedAttributes[key] : undefined;
 
                   const isOptionAvailable = (option: string) => {
                     if (!variations.length) return true;
                     return variations.some((variation) =>
-                      variation.attributes.every((va) => {
-                        const nameKey = va.name.toLowerCase();
-                        if (nameKey === key) {
-                          return va.option === option;
-                        }
-                        if (selectedAttributes[nameKey]) {
-                          return va.option === selectedAttributes[nameKey];
-                        }
-                        return true;
-                      })
+                      matchesVariationSelection(variation, key ? { [key]: option } : {}, false)
                     );
                   };
 
                   return (
-                    <div key={attr.id || attr.name} className="space-y-2">
+                    <div key={attr.id || attr.name || key} className="space-y-2">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <p className="text-sm font-medium text-gray-900">
                           {attr.name}
                         </p>
                         {selected && (
                           <span className="text-xs text-gray-500">
-                            Selected: {selected}
+                            Selected: {cleanOptionLabel(selected)}
                           </span>
                         )}
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {attr.options.map((option) => {
-                          const isSelected = selected === option;
-                          const disabled = !isOptionAvailable(option);
+                        {attr.options.map((option, index) => {
+                          const optionTrimmed = (option ?? '').trim();
+                          const isSelected = selected === optionTrimmed;
+                          const disabled = !isOptionAvailable(optionTrimmed);
                           return (
                             <button
-                              key={option}
+                              key={`${key || 'variation'}-${optionTrimmed || index}`}
                               type="button"
                               disabled={disabled}
                               onClick={() =>
+                                key &&
                                 setSelectedAttributes((prev) => ({
                                   ...prev,
-                                  [key]: option,
+                                  [key]: optionTrimmed,
                                 }))
                               }
                               className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
@@ -602,7 +716,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                                   : 'border-gray-300 text-gray-700 hover:border-primary-500'
                               } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                              {option}
+                              {cleanOptionLabel(optionTrimmed)}
                             </button>
                           );
                         })}
@@ -616,9 +730,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                 )}
 
                 {variationAttributes.length > 0 &&
-                  variationAttributes.every(
-                    (attr) => selectedAttributes[attr.name.toLowerCase()]
-                  ) &&
+                  variationAttributes.every((attr) => selectedAttributes[normalizeVariationKey(attr.name ?? '')]) &&
                   !selectedVariation && !loadingVariations && (
                     <p className="text-sm text-red-600">
                       This combination is not available. Please choose a different option.

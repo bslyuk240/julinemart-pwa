@@ -1,9 +1,8 @@
-// src/components/auth/google-sign-in-button.tsx
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCustomerAuth } from '@/context/customer-auth-context';
+import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
 interface GoogleSignInButtonProps {
@@ -20,39 +19,19 @@ export default function GoogleSignInButton({
   redirectTo = '/account',
 }: GoogleSignInButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null);
-  const { login } = useCustomerAuth();
   const router = useRouter();
   const [isNativePlatform, setIsNativePlatform] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-
-    const detectPlatform = async () => {
-      try {
-        const { Capacitor } = await import('@capacitor/core');
-        if (mounted) {
-          setIsNativePlatform(Capacitor.isNativePlatform());
-        }
-      } catch {
-        if (mounted) {
-          setIsNativePlatform(false);
-        }
-      }
-    };
-
-    detectPlatform();
-
-    return () => {
-      mounted = false;
-    };
+    import('@capacitor/core').then(({ Capacitor }) => {
+      setIsNativePlatform(Capacitor.isNativePlatform());
+    }).catch(() => setIsNativePlatform(false));
   }, []);
 
+  // ── Web: Google GSI button ──────────────────────────────────────────────────
   useEffect(() => {
-    if (isNativePlatform) {
-      return;
-    }
+    if (isNativePlatform) return;
 
-    // Load Google Sign-In script
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
@@ -67,7 +46,6 @@ export default function GoogleSignInButton({
           auto_select: false,
           cancel_on_tap_outside: true,
         });
-
         window.google.accounts.id.renderButton(buttonRef.current, {
           type: 'standard',
           theme: 'outline',
@@ -80,241 +58,111 @@ export default function GoogleSignInButton({
       }
     };
 
-    return () => {
-      document.body.removeChild(script);
-    };
+    return () => { try { document.body.removeChild(script); } catch {} };
   }, [isNativePlatform, text]);
 
+  // ── Native: deep link listener ──────────────────────────────────────────────
   useEffect(() => {
-    if (!isNativePlatform) {
-      return;
-    }
+    if (!isNativePlatform) return;
+    let remove: (() => void) | undefined;
 
-    let removeListener: (() => void) | undefined;
-
-    const setupDeepLinkListener = async () => {
-      const { App } = await import('@capacitor/app');
-      const listener = await App.addListener('appUrlOpen', async ({ url }) => {
+    import('@capacitor/app').then(({ App }) => {
+      App.addListener('appUrlOpen', async ({ url }) => {
         try {
-          console.log('📱 Deep link received:', url);
-          const parsedUrl = new URL(url);
-          
-          // Handle custom URI scheme (julinemart://oauth)
-          if (parsedUrl.protocol === 'julinemart:' && parsedUrl.hostname === 'oauth') {
-            console.log('✅ Custom URI OAuth callback detected');
-            const queryParams = new URLSearchParams(parsedUrl.search);
-            const code = queryParams.get('code');
-            
-            if (code) {
-              try {
-                const { Browser } = await import('@capacitor/browser');
-                await Browser.close();
-              } catch {
-                // Ignore errors
-              }
-              
-              console.log('✅ Authorization code received via custom URI, exchanging for token...');
-              await handleAuthorizationCode(code);
-            }
-            return;
-          }
-          
-          // Check if this is a Google OAuth callback (HTTPS App Link)
-          if (!parsedUrl.pathname.includes('/auth/google/callback')) {
-            console.log('⚠️ Not a Google OAuth callback, ignoring');
-            return;
-          }
-          
-          const queryParams = new URLSearchParams(parsedUrl.search);
-          
-          // Handle authorization code flow
-          const code = queryParams.get('code');
-          const error = queryParams.get('error');
-          
-          if (error) {
-            console.error('❌ OAuth error:', error);
-            toast.error(`Sign-in failed: ${error}`);
-            return;
-          }
+          const parsed = new URL(url);
+          const isOauthCallback =
+            (parsed.protocol === 'julinemart:' && parsed.hostname === 'oauth') ||
+            parsed.pathname.includes('/auth/google/callback');
+          if (!isOauthCallback) return;
 
-          if (!code) {
-            console.log('⚠️ No authorization code in URL');
-            return;
-          }
+          const code = new URLSearchParams(parsed.search).get('code');
+          if (!code) return;
 
-          try {
-            const { Browser } = await import('@capacitor/browser');
-            await Browser.close();
-          } catch {
-            // Ignore Browser.close errors; some Android versions auto-close.
-          }
-
-          console.log('✅ Authorization code received, exchanging for token...');
-          
-          // Exchange authorization code for tokens
+          try { const { Browser } = await import('@capacitor/browser'); await Browser.close(); } catch {}
           await handleAuthorizationCode(code);
-        } catch (error) {
-          console.error('Deep link auth handling error:', error);
+        } catch (err) {
+          console.error('Deep link auth error:', err);
           toast.error('Authentication failed');
         }
-      });
+      }).then(listener => { remove = () => listener.remove(); });
+    });
 
-      removeListener = () => {
-        listener.remove();
-      };
-    };
-
-    setupDeepLinkListener();
-
-    return () => {
-      if (removeListener) {
-        removeListener();
-      }
-    };
+    return () => { if (remove) remove(); };
   }, [isNativePlatform]);
 
+  // ── Shared: handle Google credential (JWT from GSI) ──────────────────────────
   const handleCredentialResponse = async (response: any) => {
     try {
-      console.log('🔑 Processing Google credential...');
-      
-      // Send credential to our backend
-      const result = await fetch('/api/auth/google', {
+      const res = await fetch('/api/auth/google', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          credential: response.credential,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential }),
+      });
+      const data = await res.json();
+
+      if (!data.success || !data.token_hash) {
+        throw new Error(data.message || 'Google sign-in failed');
+      }
+
+      // Exchange the server-generated token for a real Supabase session
+      const { error: verifyErr } = await supabase.auth.verifyOtp({
+        token_hash: data.token_hash,
+        type: 'email',
       });
 
-      const data = await result.json();
-      
-      console.log('📊 Backend response:', JSON.stringify(data, null, 2));
+      if (verifyErr) throw new Error(verifyErr.message);
 
-      if (data.success && data.customerId) {
-        // Login the customer
-        console.log('✅ Logging in customer:', data.customerId);
-        await login(data.customerId);
-        
-        toast.success(
-          data.customer?.first_name 
-            ? `Welcome back, ${data.customer.first_name}!` 
-            : 'Welcome to JulineMart!'
-        );
-        
-        if (onSuccess) {
-          onSuccess();
-        }
-        
-        router.push(redirectTo);
-      } else {
-        console.error('❌ Backend sign-in failed:', JSON.stringify(data, null, 2));
-        const errorMsg = data.message || data.error || 'Google sign-in failed';
-        toast.error(errorMsg);
-        
-        if (onError) {
-          onError(errorMsg);
-        }
-      }
-    } catch (error: any) {
-      console.error('❌ Google sign-in error:', error);
-      const errorMsg = error?.message || 'Failed to sign in with Google';
-      toast.error(errorMsg);
-      
-      if (onError) {
-        onError(errorMsg);
-      }
+      toast.success(data.first_name ? `Welcome, ${data.first_name}!` : 'Welcome to JulineMart!');
+      onSuccess?.();
+      router.push(redirectTo);
+    } catch (err: any) {
+      console.error('Google sign-in error:', err);
+      const msg = err?.message || 'Failed to sign in with Google';
+      toast.error(msg);
+      onError?.(msg);
     }
   };
 
+  // ── Native: open Google OAuth browser ────────────────────────────────────────
   const handleNativeGoogleSignIn = async () => {
-    let oauthUrl = '';
-
     try {
       const { Browser } = await import('@capacitor/browser');
-
-      // Use Android-specific Web OAuth client for Capacitor app
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
-      if (!clientId) {
-        throw new Error('Missing NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID');
-      }
-      
-      // Use HTTPS redirect URI (App Links) - custom domain
-      const redirectUri = 'https://julinemart.com/auth/google/callback';
-      
-      const scope = encodeURIComponent('openid email profile');
-      
-      console.log('🔐 Native Google Sign-In (Authorization Code Flow)');
-      console.log('Client ID:', clientId);
-      console.log('Redirect URI:', redirectUri);
+      if (!clientId) throw new Error('Missing NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID');
 
-      // Use authorization code flow (backend handles token exchange securely)
-      oauthUrl =
+      const redirectUri = 'https://julinemart.com/auth/google/callback';
+      const oauthUrl =
         `https://accounts.google.com/o/oauth2/v2/auth` +
         `?client_id=${encodeURIComponent(clientId)}` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&response_type=code` +
-        `&scope=${scope}` +
+        `&scope=${encodeURIComponent('openid email profile')}` +
         `&prompt=select_account`;
 
-      console.log('🌐 Opening Google OAuth...');
       await Browser.open({ url: oauthUrl });
-    } catch (error: any) {
-      console.error('Native Google sign-in launch error:', error);
-      if (oauthUrl) {
-        // Fallback: if Capacitor Browser bridge fails, use direct navigation.
-        window.location.href = oauthUrl;
-        return;
-      }
-
-      const errorMsg = `Failed to open Google sign-in${
-        error?.message ? `: ${error.message}` : ''
-      }`;
-      toast.error(errorMsg);
-      if (onError) onError(errorMsg);
+    } catch (err: any) {
+      const msg = `Failed to open Google sign-in: ${err?.message || ''}`;
+      toast.error(msg);
+      onError?.(msg);
     }
   };
 
-  // Handle authorization code exchange
+  // ── Native: exchange auth code for tokens ─────────────────────────────────
   async function handleAuthorizationCode(code: string) {
-    try {
-      const redirectUri = 'https://julinemart.com/auth/google/callback';
-
-      console.log('🔄 Exchanging code for tokens via backend...');
-      
-      // Use backend endpoint for secure token exchange
-      const tokenResponse = await fetch('/api/auth/google/token-exchange', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          code,
-          redirectUri,
-        }),
-      });
-
-      if (!tokenResponse.ok) {
-        const errorData = await tokenResponse.json();
-        throw new Error(errorData.error || 'Token exchange failed');
-      }
-
-      const data = await tokenResponse.json();
-      console.log('✅ Tokens received from backend');
-
-      // Use the ID token with NextAuth
-      if (data.id_token) {
-        console.log('🎫 Signing in with ID token...');
-        await handleCredentialResponse({ credential: data.id_token });
-      } else {
-        console.error('❌ No ID token in backend response:', data);
-        throw new Error('No ID token in response');
-      }
-    } catch (error) {
-      console.error('❌ Token exchange error:', error);
-      toast.error('Failed to complete sign-in');
-      if (onError) onError(error instanceof Error ? error.message : 'Token exchange failed');
+    const res = await fetch('/api/auth/google/token-exchange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, redirectUri: 'https://julinemart.com/auth/google/callback' }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Token exchange failed');
+    }
+    const data = await res.json();
+    if (data.id_token) {
+      await handleCredentialResponse({ credential: data.id_token });
+    } else {
+      throw new Error('No ID token in response');
     }
   }
 
@@ -324,8 +172,14 @@ export default function GoogleSignInButton({
         <button
           type="button"
           onClick={handleNativeGoogleSignIn}
-          className="w-full h-11 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="w-full h-11 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-3"
         >
+          <svg width="18" height="18" viewBox="0 0 48 48">
+            <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+            <path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+            <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+            <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+          </svg>
           Continue with Google
         </button>
       ) : (
@@ -335,9 +189,6 @@ export default function GoogleSignInButton({
   );
 }
 
-// Type declaration for Google Sign-In
 declare global {
-  interface Window {
-    google: any;
-  }
+  interface Window { google: any; }
 }

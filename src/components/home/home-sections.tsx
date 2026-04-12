@@ -135,7 +135,7 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
         launchingProducts.length === 0 &&
         electronicsProducts.length === 0 &&
         fashionProducts.length === 0 && (
-          <div className="container mx-auto px-4 py-12 text-center">
+          <div className="container-custom py-12 text-center">
             <p className="mb-4 text-gray-600">
               No featured products yet. Add tags to your products to display them here.
             </p>

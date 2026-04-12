@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, ShoppingCart, Star, BadgeCheck, Plane } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Heart, ShoppingCart, Star, BadgeCheck, Plane, SlidersHorizontal } from 'lucide-react';
 import { Product } from '@/types/product';
 import { useCart } from '@/hooks/use-cart';
 import { useWishlist } from '@/hooks/use-wishlist';
@@ -23,13 +24,16 @@ export default function ProductCard({
   fullWidth = false,
   floatingBadge 
 }: ProductCardProps) {
+  const isRemoteImage = (src: string) => /^https?:\/\//i.test(src);
   const decodedName = decodeHtmlEntities(product.name);
   const { addItem } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
+  const router = useRouter();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const inWishlist = isInWishlist(product.id);
-  
+  const isVariable = product.type === 'variable';
+
   // Price handling
   const price = parseFloat(product.price || '0');
   const regularPrice = parseFloat(product.regular_price || product.price || '0');
@@ -47,8 +51,14 @@ export default function ProductCard({
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (outOfStock) return;
+
+    // Variable products require variation selection — go to product page
+    if (isVariable) {
+      router.push(`/product/${product.slug}`);
+      return;
+    }
 
     setIsAddingToCart(true);
     try {
@@ -125,11 +135,11 @@ export default function ProductCard({
           {/* Product Tag Badges */}
           {productBadges.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {productBadges.map((tag) => {
+              {productBadges.map((tag, index) => {
                 const config = getBadgeConfig(tag.slug);
                 return (
                   <span
-                    key={tag.id}
+                    key={`${tag.slug || 'tag'}-${tag.id || index}`}
                     className={`${config.color} text-white text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded-md shadow-lg`}
                   >
                     {config.label}
@@ -172,11 +182,12 @@ export default function ProductCard({
         {/* Product Image */}
         <div className="relative aspect-square overflow-hidden rounded-t-lg bg-gray-50">
           <Image
-            src={product.images[0]?.src || '/images/placeholder.jpg'}
+            src={product.images[0]?.src || '/images/placeholder.svg'}
             alt={decodedName}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 220px"
             className="object-cover transition-transform duration-200 group-hover:scale-105"
+            unoptimized={isRemoteImage(product.images[0]?.src || '')}
           />
         </div>
       </div>
@@ -237,17 +248,23 @@ export default function ProductCard({
           type="button"
           disabled={outOfStock || isAddingToCart}
           onClick={handleAddToCart}
-          className="w-full flex items-center justify-center gap-1 md:gap-2 
-            bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 
-            text-white 
-            text-[10px] md:text-sm 
-            font-medium 
-            py-1.5 md:py-2 
+          className="w-full flex items-center justify-center gap-1 md:gap-2
+            bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300
+            text-white
+            text-[10px] md:text-sm
+            font-medium
+            py-1.5 md:py-2
             rounded transition-colors"
         >
-          <ShoppingCart className="h-3 w-3 md:h-4 md:w-4" />
-          <span className="md:hidden">{outOfStock ? 'Out' : isAddingToCart ? 'Adding...' : 'Add'}</span>
-          <span className="hidden md:inline">{outOfStock ? 'Unavailable' : isAddingToCart ? 'Adding...' : 'Add to Cart'}</span>
+          {isVariable
+            ? <SlidersHorizontal className="h-3 w-3 md:h-4 md:w-4" />
+            : <ShoppingCart className="h-3 w-3 md:h-4 md:w-4" />}
+          <span className="md:hidden">
+            {outOfStock ? 'Out' : isAddingToCart ? 'Adding...' : isVariable ? 'Options' : 'Add'}
+          </span>
+          <span className="hidden md:inline">
+            {outOfStock ? 'Unavailable' : isAddingToCart ? 'Adding...' : isVariable ? 'Select Options' : 'Add to Cart'}
+          </span>
         </button>
       </div>
     </Link>

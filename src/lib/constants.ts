@@ -1,7 +1,10 @@
 // App Configuration
 export const APP_NAME = 'JulineMart';
 export const APP_DESCRIPTION = 'Your one-stop online marketplace';
-export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+export const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  'http://localhost:3000';
 
 // Pagination
 export const PRODUCTS_PER_PAGE = 20;

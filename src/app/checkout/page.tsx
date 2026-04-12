@@ -20,7 +20,8 @@ import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
 import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
 import { getShippingFee } from '@/lib/shipping/jloShipping';
-import { updateCustomer } from '@/lib/woocommerce/customers';
+import { getSavedCards, upsertAddress, updateCustomerProfile, getAddresses } from '@/lib/supabase/customers';
+import type { CustomerAddress, SavedCard } from '@/types/customer';
 import { trackBeginCheckout, trackPurchase } from '@/lib/gtag';
 import { useCartStore } from '@/store/cart-store';
 
@@ -33,23 +34,17 @@ interface ShippingOption {
   methodId: string;
 }
 
-interface SavedCard {
-  id: string;
-  authorization_code: string;
-  card_type: string;
-  last4: string;
-  exp_month: string;
-  exp_year: string;
-  bank: string;
-  country_code: string;
-  is_default: boolean;
-}
 
 const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
 const DEFAULT_WEIGHT = 0.5;
+const JLO_BASE =
+  process.env.NEXT_PUBLIC_JLO_CATALOG_URL ||
+  'https://jlo.julinemart.com';
 const VOUCHER_VALIDATION_URL =
   process.env.NEXT_PUBLIC_VOUCHER_VALIDATION_URL ||
-  'https://jlo.julinemart.com/.netlify/functions/voucherHelpers';
+  `${JLO_BASE.replace(/\/$/, '')}/.netlify/functions/voucherHelpers`;
+const INFLUENCER_VALIDATION_URL =
+  `${JLO_BASE.replace(/\/$/, '')}/api/influencers/validate-coupon`;
 
 // Declare Paystack type
 declare global {
@@ -61,16 +56,11 @@ declare global {
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, clearCart } = useCart();
-  const { customer, customerId, isAuthenticated, refreshCustomer } = useCustomerAuth();
+  const { user, customer, isAuthenticated, refreshCustomer } = useCustomerAuth();
+  const customerId = user?.id ?? null;
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isCartHydrated, setIsCartHydrated] = useState(() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-
-    return useCartStore.persist?.hasHydrated?.() ?? true;
-  });
+  const [isCartHydrated, setIsCartHydrated] = useState(false);
   const currentOrderRef = useRef<any>(null);
   const hasTrackedBeginCheckoutRef = useRef(false);
   
@@ -78,6 +68,8 @@ export default function CheckoutPage() {
   const [defaultSavedCard, setDefaultSavedCard] = useState<SavedCard | null>(null);
   const [useSavedCard, setUseSavedCard] = useState(false);
   const [saveCard, setSaveCard] = useState(true);
+  // Saved address state (from Supabase customer_addresses)
+  const [defaultShippingAddress, setDefaultShippingAddress] = useState<CustomerAddress | null>(null);
   
   // Shipping & Payment
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
@@ -124,45 +116,25 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const applyShippingAddress = useCallback((): void => {
-    if (!customer?.shipping) return;
-
-    const shipping = customer.shipping;
-    const billing = customer.billing;
+    if (!defaultShippingAddress) return;
 
     setFormData((prev) => ({
       ...prev,
-      firstName: shipping.first_name || customer.first_name || prev.firstName,
-      lastName: shipping.last_name || customer.last_name || prev.lastName,
-      email: prev.email || customer.email || billing?.email || '',
-      phone: shipping.phone || billing?.phone || prev.phone,
-      address1: shipping.address_1 || prev.address1,
-      address2: shipping.address_2 || prev.address2,
-      city: shipping.city || prev.city,
-      state: shipping.state || prev.state,
-      postcode: shipping.postcode || prev.postcode,
-      country: shipping.country || prev.country || 'NG',
+      firstName: defaultShippingAddress.first_name || customer?.first_name || prev.firstName,
+      lastName: defaultShippingAddress.last_name || customer?.last_name || prev.lastName,
+      email: prev.email || customer?.email || '',
+      phone: defaultShippingAddress.phone || customer?.phone || prev.phone,
+      address1: defaultShippingAddress.address_1 || prev.address1,
+      address2: defaultShippingAddress.address_2 || prev.address2,
+      city: defaultShippingAddress.city || prev.city,
+      state: defaultShippingAddress.state || prev.state,
+      postcode: defaultShippingAddress.postcode || prev.postcode,
+      country: defaultShippingAddress.country || prev.country || 'NG',
     }));
-  }, [customer]);
+  }, [customer, defaultShippingAddress]);
 
-  const applyBillingAddress = useCallback((): void => {
-    if (!customer?.billing) return;
-
-    const billing = customer.billing;
-
-    setFormData((prev) => ({
-      ...prev,
-      firstName: billing.first_name || customer?.first_name || prev.firstName,
-      lastName: billing.last_name || customer?.last_name || prev.lastName,
-      email: billing.email || customer?.email || prev.email,
-      phone: billing.phone || prev.phone,
-      address1: billing.address_1 || prev.address1,
-      address2: billing.address_2 || prev.address2,
-      city: billing.city || prev.city,
-      state: billing.state || prev.state,
-      postcode: billing.postcode || prev.postcode,
-      country: billing.country || prev.country || 'NG',
-    }));
-  }, [customer]);
+  // No-op kept for compatibility; billing addresses not auto-applied
+  const applyBillingAddress = useCallback((): void => {}, []);
 
   const formatPrice = (price: number) => `NGN ${price.toLocaleString()}`;
   
@@ -310,6 +282,7 @@ export default function CheckoutPage() {
           orderId: orderId,
           saveCard: saveCard && isAuthenticated,
           customerId: customerId,
+          customerEmail: formData.email || customer?.email,
         }),
       });
 
@@ -318,7 +291,8 @@ export default function CheckoutPage() {
       console.log('🔍 Verification response:', verifyData);
 
       if (!verifyResponse.ok || !verifyData.success) {
-        toast.error('Payment verification failed', { id: 'payment-verify' });
+        const errMsg = verifyData.error || 'Payment verification failed';
+        toast.error(errMsg, { id: 'payment-verify' });
         console.error('Verification failed:', verifyData);
         setIsProcessing(false);
         return;
@@ -332,11 +306,13 @@ export default function CheckoutPage() {
       if (verifyData.cardSaved) {
         toast.success('Payment card saved for future use!');
       }
-      trackPurchaseForOrder(orderId);
+      const redirectOrderId = verifyData.order?.id ?? orderId;
+      trackPurchaseForOrder(redirectOrderId);
       clearCart();
       currentOrderRef.current = null;
-      
-      router.push(`/order-success?order=${orderId}`);
+
+      const orderNum = verifyData.order?.order_number;
+      router.push(`/order-success?ref=${orderNum || redirectOrderId}`);
       
     } catch (error: any) {
       console.error('❌ Payment verification error:', error);
@@ -402,12 +378,15 @@ export default function CheckoutPage() {
         });
 
         if (verifyResponse.ok) {
+          const savedCardVerify = await verifyResponse.json().catch(() => ({}));
+          const savedCardOrderId = savedCardVerify?.order?.id ?? orderId;
           await persistCheckoutProfileIfNeeded();
           setIsProcessing(false);
-          trackPurchaseForOrder(orderId);
+          trackPurchaseForOrder(savedCardOrderId);
           clearCart();
           toast.success('Payment successful!');
-          router.push(`/order-success?order=${orderId}`);
+          const savedCardOrderNum = savedCardVerify?.order?.order_number;
+          router.push(`/order-success?ref=${savedCardOrderNum || savedCardOrderId}`);
         } else {
           throw new Error('Failed to update order status');
         }
@@ -488,41 +467,51 @@ export default function CheckoutPage() {
   }, [items, formData.country, formData.state]);
 
   useEffect(() => {
-    if (customer) {
-      const savedCardsMeta = (customer as any)?.meta_data?.find((m: any) => m.key === 'saved_payment_cards');
-      if (savedCardsMeta?.value) {
-        try {
-          const parsed = typeof savedCardsMeta.value === 'string'
-            ? JSON.parse(savedCardsMeta.value)
-            : savedCardsMeta.value;
-          if (Array.isArray(parsed)) {
-            const def = parsed.find((c) => c.is_default) || parsed[0] || null;
-            setDefaultSavedCard(def || null);
-          }
-        } catch (err) {
-          console.error('Error parsing saved cards:', err);
-        }
-      }
+    if (customer && user) {
+      // Pre-fill basic contact info from Supabase profile
+      setFormData((prev) => ({
+        ...prev,
+        email: prev.email || customer.email || '',
+        firstName: prev.firstName || customer.first_name || '',
+        lastName: prev.lastName || customer.last_name || '',
+        phone: prev.phone || customer.phone || '',
+      }));
 
-      if (customer.shipping) {
-        applyShippingAddress();
-        setUseDifferentAddress(false);
-        setSaveNewAddress(false);
-      } else if (customer.billing) {
-        applyBillingAddress();
-        setUseDifferentAddress(true);
-      }
-    } else {
+      // Load saved cards from Supabase
+      getSavedCards(user.id)
+        .then((cards) => {
+          const def = cards.find((c) => c.is_default) || cards[0] || null;
+          setDefaultSavedCard(def || null);
+        })
+        .catch((err) => console.error('Error loading saved cards:', err));
+
+      // Load addresses from Supabase
+      getAddresses(user.id)
+        .then((addresses) => {
+          const shipping =
+            addresses.find((a) => a.type === 'shipping' && a.is_default) ||
+            addresses.find((a) => a.type === 'shipping') ||
+            null;
+          setDefaultShippingAddress(shipping);
+          if (shipping) {
+            setUseDifferentAddress(false);
+            setSaveNewAddress(false);
+          } else {
+            setUseDifferentAddress(true);
+          }
+        })
+        .catch((err) => console.error('Error loading addresses:', err));
+    } else if (!customer) {
       setUseDifferentAddress(true);
     }
-  }, [customer, applyBillingAddress, applyShippingAddress]);
+  }, [customer, user]);
 
   useEffect(() => {
-    if (!useDifferentAddress && customer?.shipping) {
+    if (!useDifferentAddress && defaultShippingAddress) {
       applyShippingAddress();
       setSaveNewAddress(false);
     }
-  }, [useDifferentAddress, customer, applyShippingAddress]);
+  }, [useDifferentAddress, defaultShippingAddress, applyShippingAddress]);
 
   useEffect(() => {
     if (!defaultSavedCard || selectedPayment !== 'paystack') {
@@ -613,61 +602,40 @@ export default function CheckoutPage() {
   };
 
   const persistCheckoutProfileIfNeeded = async () => {
-    if (!isAuthenticated || !customerId) return false;
+    if (!isAuthenticated || !customerId || !user) return false;
 
     const shouldSaveAddress = saveNewAddress && useDifferentAddress;
-    const existingShipping = customer?.shipping;
-    const existingBilling = customer?.billing;
-
-    const shippingPayload = {
-      first_name: formData.firstName,
-      last_name: formData.lastName,
-      address_1: shouldSaveAddress ? formData.address1 : existingShipping?.address_1 || '',
-      address_2: shouldSaveAddress ? formData.address2 : existingShipping?.address_2 || '',
-      city: shouldSaveAddress ? formData.city : existingShipping?.city || '',
-      state: shouldSaveAddress ? formData.state : existingShipping?.state || '',
-      postcode: shouldSaveAddress ? formData.postcode : existingShipping?.postcode || '',
-      country: shouldSaveAddress ? formData.country : existingShipping?.country || formData.country,
-      phone: formData.phone,
-      company: existingShipping?.company || '',
-    };
-
-    const billingPayload = {
-      first_name: formData.firstName,
-      last_name: formData.lastName,
-      address_1: shouldSaveAddress ? formData.address1 : existingBilling?.address_1 || '',
-      address_2: shouldSaveAddress ? formData.address2 : existingBilling?.address_2 || '',
-      city: shouldSaveAddress ? formData.city : existingBilling?.city || '',
-      state: shouldSaveAddress ? formData.state : existingBilling?.state || '',
-      postcode: shouldSaveAddress ? formData.postcode : existingBilling?.postcode || '',
-      country: shouldSaveAddress ? formData.country : existingBilling?.country || formData.country,
-      email: formData.email,
-      phone: formData.phone,
-      company: existingBilling?.company || '',
-    };
 
     try {
-      const updated = await updateCustomer(customerId, {
-        email: formData.email,
+      // Update basic profile (name, phone)
+      await updateCustomerProfile(user.id, {
         first_name: formData.firstName,
         last_name: formData.lastName,
-        shipping: shippingPayload,
-        billing: billingPayload,
+        phone: formData.phone || null,
       });
 
-      if (!updated) {
-        if (shouldSaveAddress) {
-          toast.error('Could not save address to your account');
-        }
-        return false;
-      }
-
-      await refreshCustomer();
-
+      // Save address to Supabase if requested
       if (shouldSaveAddress) {
+        await upsertAddress(user.id, {
+          type: 'shipping',
+          label: 'Home',
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          company: null,
+          address_1: formData.address1,
+          address_2: formData.address2 || null,
+          city: formData.city,
+          state: formData.state,
+          postcode: formData.postcode || null,
+          country: formData.country,
+          phone: formData.phone || null,
+          email: formData.email || null,
+          is_default: !defaultShippingAddress,
+        });
         toast.success('Address saved for future checkouts');
       }
 
+      await refreshCustomer();
       return true;
     } catch (error) {
       console.error('Checkout profile save error:', error);
@@ -729,22 +697,17 @@ export default function CheckoutPage() {
     setCouponError('');
 
     try {
-      const response = await fetch(
-        'https://gfikkrwhsedhwmkxybzm.supabase.co/functions/v1/influencers/validate-coupon',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            coupon_code: couponCode.toUpperCase(),
-            cart_total: subtotal,
-            shipping_cost: shippingCost,
-          }),
-        }
-      );
+      const response = await fetch(INFLUENCER_VALIDATION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          coupon_code: couponCode.toUpperCase(),
+          cart_total: subtotal,
+          shipping_cost: shippingCost,
+        }),
+      });
 
       const result = await response.json();
 
@@ -927,7 +890,6 @@ export default function CheckoutPage() {
       const shippingLineTotal = Math.max(0, (shippingCost ?? 0) - orderShippingDiscount);
 
       const orderData = {
-        customer_id: isAuthenticated && customerId ? customerId : undefined,
         payment_method: selectedPayment,
         payment_method_title: paymentGateways.find(g => g.id === selectedPayment)?.title || 'Payment',
         set_paid: false,
@@ -994,6 +956,12 @@ export default function CheckoutPage() {
                   ]
                 : []),
               ...attributeMeta,
+              ...(item.supabaseProductId
+                ? [{ key: '_supabase_product_id', value: item.supabaseProductId }]
+                : []),
+              ...(item.variation?.supabaseId
+                ? [{ key: '_supabase_variation_id', value: item.variation.supabaseId }]
+                : []),
             ],
           };
         }),
@@ -1084,7 +1052,8 @@ export default function CheckoutPage() {
       });
 
       if (!createOrderResponse.ok) {
-        throw new Error('Failed to create order');
+        const errData = await createOrderResponse.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Failed to create order');
       }
 
       const order = await createOrderResponse.json();
@@ -1106,12 +1075,12 @@ export default function CheckoutPage() {
           }
 
           if (useSavedCard && defaultSavedCard && isAuthenticated) {
-            await handleSavedCardPayment(order.id);
+            await handleSavedCardPayment(order.payment_reference ?? order.id);
           } else {
-            currentOrderRef.current = order.id;
-            
+            currentOrderRef.current = order.payment_reference ?? order.id;
+
             const paystackConfig = {
-              reference: `JLM_${order.id}_${Date.now()}`,
+              reference: order.payment_reference ?? `JLM_${order.id}_${Date.now()}`,
               email: formData.email,
               amount: amountKobo,
               publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
@@ -1119,15 +1088,15 @@ export default function CheckoutPage() {
                 order_id: order.id,
                 customer_id: customerId || 'guest',
                 custom_fields: [
-                  { 
-                    display_name: 'Order ID', 
-                    variable_name: 'order_id', 
-                    value: order.id.toString() 
+                  {
+                    display_name: 'Order Number',
+                    variable_name: 'order_number',
+                    value: order.order_number ? `#${order.order_number}` : order.id.toString(),
                   },
-                  { 
-                    display_name: 'Customer Name', 
-                    variable_name: 'customer_name', 
-                    value: `${formData.firstName} ${formData.lastName}` 
+                  {
+                    display_name: 'Customer Name',
+                    variable_name: 'customer_name',
+                    value: `${formData.firstName} ${formData.lastName}`
                   },
                 ],
               },
@@ -1144,7 +1113,7 @@ export default function CheckoutPage() {
           trackPurchaseForOrder(order.id);
           clearCart();
           toast.success('Order placed successfully!');
-          router.push(`/order-success?order=${order.id}`);
+          router.push(`/order-success?ref=${order.order_number || order.id}`);
           setIsProcessing(false);
         }
       } else {
@@ -1178,13 +1147,34 @@ export default function CheckoutPage() {
   const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
   const isPaystackGateway = selectedPayment === 'paystack';
   const hasSavedShipping = Boolean(
-    customer?.shipping &&
-    (customer.shipping.address_1 || customer.shipping.city || customer.shipping.state)
+    defaultShippingAddress &&
+    (defaultShippingAddress.address_1 || defaultShippingAddress.city || defaultShippingAddress.state)
   );
+  const hasRequiredAddress = Boolean(
+    formData.firstName.trim() &&
+    formData.lastName.trim() &&
+    formData.email.trim() &&
+    formData.phone.trim() &&
+    formData.address1.trim() &&
+    formData.city.trim() &&
+    formData.state.trim() &&
+    formData.country.trim()
+  );
+  const shippingReady =
+    Boolean(selectedOption) &&
+    (selectedOption?.methodId !== 'jlo_shipping' || shippingCost !== null);
+  const isCheckoutReady =
+    !loading &&
+    hasRequiredAddress &&
+    Boolean(selectedPayment) &&
+    Boolean(selectedShipping) &&
+    shippingReady &&
+    !shippingError &&
+    !isProcessing;
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-4 md:py-6">
+    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+      <div className="container-custom min-w-0 py-4 md:py-6">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Link href="/cart" className="text-gray-600 hover:text-primary-600">
@@ -1199,11 +1189,11 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-3">
           {/* Checkout Form */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="min-w-0 space-y-6 lg:col-span-2">
             {/* Customer Information */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
               <div className="flex items-center gap-3 mb-4">
                 <MapPin className="w-6 h-6 text-primary-600" />
                 <h2 className="text-xl font-semibold text-gray-900">Contact Information</h2>
@@ -1253,23 +1243,23 @@ export default function CheckoutPage() {
             </div>
 
             {/* Delivery Information */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
               <div className="flex items-center gap-3 mb-4">
                 <Truck className="w-6 h-6 text-primary-600" />
                 <h2 className="text-xl font-semibold text-gray-900">Delivery Address</h2>
               </div>
               
               {hasSavedShipping && (
-                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+                <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
                       <p className="font-medium text-green-900 mb-1">Saved Address</p>
                       <p className="text-sm text-green-800">
-                        {customer?.shipping?.first_name} {customer?.shipping?.last_name}{customer?.shipping?.first_name || customer?.shipping?.last_name ? ' • ' : ''}
-                        {customer?.shipping?.address_1}{customer?.shipping?.city ? `, ${customer.shipping.city}` : ''}{customer?.shipping?.state ? `, ${customer.shipping.state}` : ''}
+                        {defaultShippingAddress?.first_name} {defaultShippingAddress?.last_name}{defaultShippingAddress?.first_name || defaultShippingAddress?.last_name ? ' • ' : ''}
+                        {defaultShippingAddress?.address_1}{defaultShippingAddress?.city ? `, ${defaultShippingAddress.city}` : ''}{defaultShippingAddress?.state ? `, ${defaultShippingAddress.state}` : ''}
                       </p>
-                      {customer?.shipping?.phone && (
-                        <p className="text-xs text-green-700 mt-1">Phone: {customer.shipping.phone}</p>
+                      {defaultShippingAddress?.phone && (
+                        <p className="text-xs text-green-700 mt-1">Phone: {defaultShippingAddress.phone}</p>
                       )}
                     </div>
                     <button
@@ -1422,7 +1412,7 @@ export default function CheckoutPage() {
 
             {/* Shipping Method */}
             {(loading || shippingOptions.length > 0) && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Truck className="w-6 h-6 text-primary-600" />
                   <h2 className="text-xl font-semibold text-gray-900">Shipping Method</h2>
@@ -1451,10 +1441,10 @@ export default function CheckoutPage() {
                             onChange={(e) => handleShippingChange(e.target.value)}
                             className="mt-1 w-4 h-4 text-primary-600"
                           />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <p className="font-medium text-gray-900">{option.title}</p>
-                              <p className="font-semibold text-primary-600">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 items-center justify-between gap-2">
+                              <p className="min-w-0 break-words font-medium text-gray-900">{option.title}</p>
+                              <p className="shrink-0 font-semibold text-primary-600">
                                 {displayCost !== null
                                   ? (displayCost === 0
                                     ? 'FREE'
@@ -1486,10 +1476,10 @@ export default function CheckoutPage() {
 
             {/* NEW: Discount Code + Voucher */}
             {shippingCost !== null && shippingCost > 0 && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Tag className="w-6 h-6 text-primary-600" />
-                  <h2 className="text-xl font-semibold text-gray-900">Discount Code</h2>
+                  <h2 className="text-xl font-semibold text-gray-900">Discounts</h2>
                 </div>
 
                 <div className="space-y-5">
@@ -1524,14 +1514,16 @@ export default function CheckoutPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Enter campaign voucher"
-                            value={voucherCode}
-                            onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                            disabled={isApplyingVoucher}
-                            fullWidth
-                          />
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                          <div className="min-w-0 w-full sm:flex-1">
+                            <Input
+                              placeholder="Enter campaign voucher"
+                              value={voucherCode}
+                              onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                              disabled={isApplyingVoucher}
+                              fullWidth
+                            />
+                          </div>
                           <Button
                             onClick={applyVoucher}
                             disabled={
@@ -1542,7 +1534,7 @@ export default function CheckoutPage() {
                             isLoading={isApplyingVoucher}
                             variant="secondary"
                             size="md"
-                            className="whitespace-nowrap"
+                            className="w-full shrink-0 whitespace-nowrap sm:w-auto"
                             type="button"
                           >
                             Apply
@@ -1551,9 +1543,9 @@ export default function CheckoutPage() {
                         {voucherError && (
                           <p className="text-sm text-red-600">{voucherError}</p>
                         )}
-                        <p className="text-xs text-gray-500">
-                          Vouchers are validated once shipping has been calculated.
-                        </p>
+                          <p className="text-xs text-gray-500">
+                            Campaign vouchers discount products and are validated after shipping is calculated.
+                          </p>
                       </div>
                     )}
                   </div>
@@ -1581,21 +1573,23 @@ export default function CheckoutPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Enter influencer code"
-                            value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                            disabled={isApplyingCoupon || Boolean(appliedVoucher)}
-                            fullWidth
-                          />
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                          <div className="min-w-0 w-full sm:flex-1">
+                            <Input
+                              placeholder="Enter influencer code"
+                              value={couponCode}
+                              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                              disabled={isApplyingCoupon || Boolean(appliedVoucher)}
+                              fullWidth
+                            />
+                          </div>
                           <Button
                             onClick={applyCoupon}
                             disabled={!couponCode || isApplyingCoupon || Boolean(appliedVoucher)}
                             isLoading={isApplyingCoupon}
                             variant="secondary"
                             size="md"
-                            className="whitespace-nowrap"
+                            className="w-full shrink-0 whitespace-nowrap sm:w-auto"
                             type="button"
                           >
                             Apply
@@ -1609,7 +1603,7 @@ export default function CheckoutPage() {
                     <p className="text-xs text-gray-500">
                       {appliedVoucher
                         ? 'Remove the campaign voucher to use an influencer code.'
-                        : '💡 Have an influencer code? Save on shipping!'}
+                        : 'Influencer codes discount shipping.'}
                     </p>
                   </div>
                 </div>
@@ -1618,7 +1612,7 @@ export default function CheckoutPage() {
 
             {/* Payment Method */}
             {(loading || paymentGateways.length > 0) && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <CreditCard className="w-6 h-6 text-primary-600" />
                   <h2 className="text-xl font-semibold text-gray-900">Payment Method</h2>
@@ -1645,7 +1639,7 @@ export default function CheckoutPage() {
                           </span>
                         </div>
                         <p className="text-sm text-gray-600 mt-1">
-                          {defaultSavedCard.card_type.toUpperCase()} ending in {defaultSavedCard.last4}
+                          {(defaultSavedCard.card_type ?? 'Card').toUpperCase()} ending in {defaultSavedCard.last4}
                           {' • '}Expires {defaultSavedCard.exp_month}/{defaultSavedCard.exp_year}
                         </p>
                       </div>
@@ -1672,10 +1666,10 @@ export default function CheckoutPage() {
                           onChange={(e) => setSelectedPayment(e.target.value)}
                           className="mt-1 w-4 h-4 text-primary-600"
                         />
-                        <div>
-                          <p className="font-medium text-gray-900">{gateway.title}</p>
+                        <div className="min-w-0">
+                          <p className="break-words font-medium text-gray-900">{gateway.title}</p>
                           {gateway.description && (
-                            <p className="text-sm text-gray-600 mt-1">{gateway.description}</p>
+                            <p className="mt-1 break-words text-sm text-gray-600">{gateway.description}</p>
                           )}
                         </div>
                       </label>
@@ -1710,17 +1704,17 @@ export default function CheckoutPage() {
           </div>
 
           {/* Order Summary */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-4">
+          <div className="min-w-0 lg:col-span-1">
+            <div className="sticky top-4 rounded-lg bg-white p-4 shadow-sm sm:p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Summary</h2>
               
-              <div className="space-y-3 mb-4 pb-4 border-b max-h-64 overflow-y-auto">
+              <div className="mb-4 max-h-64 space-y-3 overflow-y-auto overflow-x-hidden border-b pb-4">
                 {items.map((item: any) => (
                   <div
                     key={item.id}
                     className="grid grid-cols-[1fr_auto] gap-2 text-sm items-start"
                   >
-                    <span className="text-gray-600 leading-snug">
+                    <span className="min-w-0 break-words text-gray-600 leading-snug">
                       {item.name} x{item.quantity}
                     </span>
                     <span className="font-medium text-right whitespace-nowrap">
@@ -1783,9 +1777,7 @@ export default function CheckoutPage() {
                 isLoading={isProcessing}
                 onClick={handlePlaceOrder}
                 disabled={
-                  isProcessing ||
-                  loading ||
-                  !selectedPayment ||
+                  !isCheckoutReady ||
                   (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null)
                 }
               >

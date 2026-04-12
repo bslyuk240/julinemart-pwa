@@ -1,5 +1,7 @@
 export interface Product {
   id: number;
+  supabaseId?: string;
+  _variations?: ProductVariation[];
   name: string;
   slug: string;
   permalink: string;
@@ -98,6 +100,7 @@ export interface VariationAttribute {
 
 export interface ProductVariation {
   id: number;
+  supabaseId?: string;
   sku: string;
   price: string;
   regular_price: string;
@@ -180,4 +183,5 @@ export interface ProductsQueryParams {
   min_price?: string;
   max_price?: string;
   stock_status?: 'instock' | 'outofstock' | 'onbackorder';
+  woo_vendor_id?: number | string;
 }

@@ -26,6 +26,7 @@ interface CartState {
     quantity?: number,
     variation?: {
       id: number;
+      supabaseId?: string;
       attributes: Record<string, string>;
       price: number;
       regularPrice: number;
@@ -67,6 +68,7 @@ const buildAddToCartAnalyticsItem = (
   unitPrice: number,
   variation?: {
     id: number;
+    supabaseId?: string;
     attributes: Record<string, string>;
     price: number;
     regularPrice: number;
@@ -108,6 +110,7 @@ export const useCartStore = create<CartState>()(
         quantity = 1,
         variation?: {
           id: number;
+          supabaseId?: string;
           attributes: Record<string, string>;
           price: number;
           regularPrice: number;
@@ -235,6 +238,7 @@ const numericWeight =
         const newItem: CartItem = {
   id: Date.now(),
   productId: product.id,
+  supabaseProductId: product.supabaseId,
   name: product.name,
   slug: product.slug,
   price: displayPrice,
@@ -243,7 +247,7 @@ const numericWeight =
     variation?.salePrice ??
     (product.sale_price ? parseFloat(product.sale_price) : undefined),
   quantity,
-  image: variation?.image || product.images[0]?.src || '/placeholder.png',
+  image: variation?.image || product.images[0]?.src || '/images/placeholder.svg',
   stockStatus: effectiveStockStatus,
   stockQuantity: effectiveStockQty,
   sku: variation?.sku || product.sku,
@@ -255,6 +259,7 @@ const numericWeight =
   variation: variation
     ? {
         id: variation.id,
+        supabaseId: variation.supabaseId,
         attributes: variation.attributes,
         price: variation.price,
         regularPrice: variation.regularPrice,

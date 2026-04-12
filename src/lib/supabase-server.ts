@@ -24,10 +24,19 @@ function deriveProjectRefFromAnonKey(anonKey?: string) {
 
 export function resolveSupabaseUrlFromEnv() {
   const explicitUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  if (explicitUrl) return explicitUrl;
-
   const projectRef = deriveProjectRefFromAnonKey(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-  return projectRef ? `https://${projectRef}.supabase.co` : null;
+  if (!projectRef) return explicitUrl || null;
+
+  if (!explicitUrl) return `https://${projectRef}.supabase.co`;
+
+  try {
+    const hostname = new URL(explicitUrl).hostname;
+    if (hostname.includes(projectRef)) return explicitUrl;
+  } catch {
+    // Fall through to the derived project URL below.
+  }
+
+  return `https://${projectRef}.supabase.co`;
 }
 
 export function getSupabaseServerClient() {

@@ -21,7 +21,7 @@ export default function CartPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container-custom py-6">
         {/* Header */}
         <div className="flex items-center gap-2 md:gap-3 mb-5">
           <Link

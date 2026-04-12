@@ -6,10 +6,10 @@ import Image from 'next/image';
 import { Search, Menu, ShoppingCart, MessageCircle } from 'lucide-react';
 import MobileMenu from '@/components/layout/mobile-menu';
 import { useCart } from '@/hooks/use-cart';
-import { searchProducts } from '@/lib/woocommerce/products';
 import { Product } from '@/types/product';
 import { useRouter } from 'next/navigation';
 import { trackWhatsappClick } from '@/lib/gtag';
+import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 
 // WhatsApp configuration
 const WHATSAPP_NUMBER = '2347048929309';
@@ -39,7 +39,7 @@ export default function Header() {
   // ==================== BANNER STATE (NEW!) ====================
   const [banner, setBanner] = useState<BannerData>({
     enabled: true,
-    text: 'Free Shipping on Orders Over ₦10,000 🎉',
+    text: 'Free Shipping on Orders Over ₦100,000 🎉',
     background_color: '#77088a',
     text_color: '#ffffff',
   });
@@ -54,28 +54,28 @@ export default function Header() {
   useEffect(() => {
     async function fetchBanner() {
       try {
-        console.log('📢 Fetching banner from WordPress...');
+        console.log('Fetching banner from Supabase settings...');
         const response = await fetch('/api/pwa-settings');
         
         if (response.ok) {
           const data = await response.json();
           
           if (data.banner && Object.keys(data.banner).length > 0) {
-            console.log('✅ WordPress banner loaded:', data.banner);
+            console.log('Banner loaded:', data.banner);
             setBanner({
               enabled: data.banner.enabled ?? true,
-              text: data.banner.text || 'Free Shipping on Orders Over ₦10,000 🎉',
+              text: data.banner.text || 'Free Shipping on Orders Over ₦100,000 🎉',
               background_color: data.banner.background_color || '#77088a',
               text_color: data.banner.text_color || '#ffffff',
             });
           } else {
-            console.log('⚠️ No WordPress banner found, using default');
+            console.log('No banner found, using default');
           }
         } else {
-          console.log('⚠️ WordPress API failed, using default banner');
+          console.log('Banner API failed, using default banner');
         }
       } catch (error) {
-        console.error('❌ Error fetching banner:', error);
+        console.error('Error fetching banner:', error);
       } finally {
         setBannerLoading(false);
       }
@@ -90,18 +90,35 @@ export default function Header() {
       setResults([]);
       return;
     }
-    const handle = setTimeout(async () => {
+    let cancelled = false;
+    const handle = window.setTimeout(async () => {
       try {
         setIsSearching(true);
-        const data = await searchProducts(query.trim(), { per_page: 6 });
-        setResults(data);
+        const qs = new URLSearchParams({
+          search: query.trim(),
+          per_page: '6',
+        });
+        const response = await fetch(`/api/products?${qs.toString()}`);
+        if (!response.ok) throw new Error(`Search API error: ${response.status}`);
+        const { products } = await response.json();
+        const filtered = await filterActiveVendorProducts(products ?? []);
+        if (!cancelled) {
+          setResults(filtered);
+        }
       } catch {
-        setResults([]);
+        if (!cancelled) {
+          setResults([]);
+        }
       } finally {
-        setIsSearching(false);
+        if (!cancelled) {
+          setIsSearching(false);
+        }
       }
     }, 250);
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [query]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -139,8 +156,8 @@ export default function Header() {
       )}
       {/* ========================================================================== */}
 
-      {/* Main Header */}
-      <div className="container mx-auto px-4 py-3 md:py-4">
+      {/* Main Header — same width/padding as main pages (see globals .container-custom) */}
+      <div className="container-custom py-3 md:py-4">
         {/* Unified layout: logo + search, compact and inline */}
         <div className="flex items-center gap-3 md:gap-4">
           {/* Desktop menu toggle */}

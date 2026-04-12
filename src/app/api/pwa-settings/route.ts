@@ -1,41 +1,55 @@
 import { NextResponse } from 'next/server';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
-const WP_URL = process.env.NEXT_PUBLIC_WP_URL;
+export const revalidate = 300;
 
-export async function GET() {
+function normalizeHeroSlides(content: unknown) {
+  if (Array.isArray(content)) return content;
+  if (content && typeof content === 'object' && Array.isArray((content as { slides?: unknown }).slides)) {
+    return (content as { slides: unknown[] }).slides;
+  }
+  return null;
+}
+
+async function getSettingsFromSupabase(): Promise<Record<string, unknown> | null> {
   try {
-    console.log('📡 API Route: Fetching PWA settings from WordPress...');
-    
-    const response = await fetch(
-      `${WP_URL}/wp-json/julinemart-pwa/v1/settings`,
-      {
-        next: { revalidate: 300 }, // Cache for 5 minutes
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('homepage_content')
+      .select('key, content')
+      .in('key', ['hero_slider', 'announcement_bar', 'banner', 'settings']);
 
-    if (!response.ok) {
-      console.error('❌ WordPress API error:', response.status);
-      return NextResponse.json(
-        { error: 'Failed to fetch settings' },
-        { status: response.status }
-      );
+    if (error || !data || data.length === 0) return null;
+
+    const result: Record<string, unknown> = {};
+    for (const row of data) {
+      if (row.key === 'hero_slider') {
+        const slides = normalizeHeroSlides(row.content);
+        if (slides) result.sliders = slides;
+        continue;
+      }
+
+      if (row.key === 'announcement_bar' || row.key === 'banner') {
+        result.banner = row.content;
+        continue;
+      }
+
+      result[row.key] = row.content;
     }
 
-    const data = await response.json();
-    console.log('✅ Settings fetched successfully:', {
-      sliders: data.sliders?.length || 0,
-      banner: data.banner?.enabled ? 'enabled' : 'disabled',
-    });
-
-    return NextResponse.json(data);
-  } catch (error: any) {
-    console.error('❌ Error fetching PWA settings:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    // Only return if we got at least sliders
+    if (!result.sliders) return null;
+    return result;
+  } catch {
+    return null;
   }
+}
+
+export async function GET() {
+  const supabaseData = await getSettingsFromSupabase();
+  if (supabaseData) {
+    return NextResponse.json(supabaseData);
+  }
+
+  return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
 }
