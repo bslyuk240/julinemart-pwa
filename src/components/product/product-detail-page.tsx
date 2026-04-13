@@ -534,6 +534,10 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
   const primaryBrandName = product.brands?.[0]?.name
     ? decodeHtmlEntities(product.brands[0].name)
     : '';
+  const displaySku =
+    (selectedVariation?.sku && String(selectedVariation.sku).trim()) ||
+    (product.sku && String(product.sku).trim()) ||
+    '';
 
   return (
     <main className="min-h-screen bg-white pb-24 md:pb-8 overflow-x-hidden">
@@ -741,12 +745,12 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
             {/* SKU & BRAND - ADD THIS SECTION */}
 <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-6 pb-6 border-b border-gray-200">
-  {/* SKU */}
-  {product.sku && (
+  {/* SKU: parent and/or selected variation (variable products often only have variation SKUs) */}
+  {displaySku && (
     <div className="flex items-center gap-2">
       <span className="font-medium text-gray-900">SKU:</span>
       <span className="bg-gray-100 px-2 py-1 rounded font-mono text-xs">
-        {product.sku}
+        {displaySku}
       </span>
     </div>
   )}
