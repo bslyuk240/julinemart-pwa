@@ -27,7 +27,7 @@ export default function CartSummary({
   const formatPrice = (price: number = 0) => `₦${Number(price || 0).toLocaleString()}`;
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 sticky top-4">
+    <div className="sticky top-4 min-w-0 max-w-full rounded-lg bg-white p-4 shadow-md sm:p-6">
       {/* Header */}
       <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-200">
         <ShoppingBag className="w-5 h-5 text-primary-600" />
@@ -37,19 +37,21 @@ export default function CartSummary({
       {/* Summary Details */}
       <div className="space-y-4 mb-6">
         {/* Subtotal */}
-        <div className="flex justify-between text-gray-700">
-          <span>Subtotal ({itemCount} {itemCount === 1 ? 'item' : 'items'})</span>
-          <span className="font-medium">{formatPrice(subtotal)}</span>
+        <div className="flex min-w-0 items-start justify-between gap-3 text-gray-700">
+          <span className="min-w-0 flex-1 break-words">
+            Subtotal ({itemCount} {itemCount === 1 ? 'item' : 'items'})
+          </span>
+          <span className="shrink-0 text-right font-medium tabular-nums">{formatPrice(subtotal)}</span>
         </div>
 
         {/* Discount */}
         {discount > 0 && (
-          <div className="flex justify-between text-green-600">
-            <span className="flex items-center gap-1">
-              <Tag className="w-4 h-4" />
+          <div className="flex min-w-0 items-start justify-between gap-3 text-green-600">
+            <span className="flex min-w-0 flex-1 items-center gap-1">
+              <Tag className="h-4 w-4 shrink-0" />
               Discount
             </span>
-            <span className="font-medium">-{formatPrice(discount)}</span>
+            <span className="shrink-0 font-medium tabular-nums">-{formatPrice(discount)}</span>
           </div>
         )}
 
@@ -65,17 +67,19 @@ export default function CartSummary({
 
         {/* Tax */}
         {tax > 0 && (
-          <div className="flex justify-between text-gray-700">
-            <span>Tax</span>
-            <span className="font-medium">{formatPrice(tax)}</span>
+          <div className="flex min-w-0 items-start justify-between gap-3 text-gray-700">
+            <span className="min-w-0 flex-1">Tax</span>
+            <span className="shrink-0 font-medium tabular-nums">{formatPrice(tax)}</span>
           </div>
         )}
 
         {/* Divider */}
         <div className="border-t border-gray-200 pt-4">
-          <div className="flex justify-between items-center">
+          <div className="flex min-w-0 items-center justify-between gap-3">
             <span className="text-lg font-bold text-gray-900">Total</span>
-            <span className="text-2xl font-bold text-primary-600">{formatPrice(total)}</span>
+            <span className="shrink-0 text-right text-xl font-bold tabular-nums text-primary-600 sm:text-2xl">
+              {formatPrice(total)}
+            </span>
           </div>
         </div>
       </div>
@@ -110,14 +114,14 @@ export default function CartSummary({
       </div>
 
       {/* Promo Code Section */}
-      <div className="mt-6 pt-6 border-t border-gray-200">
-        <div className="flex gap-2">
+      <div className="mt-6 border-t border-gray-200 pt-6">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
           <input
             type="text"
             placeholder="Enter promo code"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
-          <Button variant="outline" size="md">
+          <Button variant="outline" size="md" className="w-full shrink-0 sm:w-auto">
             Apply
           </Button>
         </div>

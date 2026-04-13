@@ -29,8 +29,16 @@ async function jloFetch<T>(path: string): Promise<T | null> {
   if (!base) return null;
 
   try {
+    // Storefront catalog must not serve stale rows after delete/unpublish (avoid Next Data Cache / SWR).
+    const pathBase = path.split('?')[0];
+    const isCatalogList =
+      path.startsWith('/.netlify/functions/catalog-products') ||
+      path.includes('/catalog-products?');
+    const isCatalogProductDetail = pathBase === '/.netlify/functions/catalog-product';
     const res = await fetch(`${base}${path}`, {
-      next: { revalidate: 300 },
+      ...(isCatalogList || isCatalogProductDetail
+        ? { cache: 'no-store' as const }
+        : { next: { revalidate: 300 } }),
       headers: { 'Content-Type': 'application/json' },
     });
     if (!res.ok) return null;
@@ -373,9 +381,16 @@ export async function catalogGetProductsWithMeta(
   const qs = buildProductsQS(params);
   const path = `/.netlify/functions/catalog-products${qs ? `?${qs}` : ''}`;
   const resp = await jloFetch<JloListResponse>(path);
-  if (!resp?.success || !Array.isArray(resp.data) || resp.data.length === 0) return null;
+  if (!resp?.success || !Array.isArray(resp.data)) return null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const meta = resp.meta as any;
+  if (resp.data.length === 0) {
+    return {
+      products: [],
+      total: Number(meta?.total ?? 0),
+      totalPages: Number(meta?.total_pages ?? 0),
+    };
+  }
   return {
     products: resp.data.map(toWcProduct),
     total: Number(meta?.total ?? resp.data.length),

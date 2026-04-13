@@ -49,7 +49,12 @@ export default function ProductGrid({
   return (
     <div className={`grid ${gridCols[columns]} gap-2 md:gap-3 lg:gap-4`}>
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} showBadge={showBadge} fullWidth />
+        <ProductCard
+          key={product.supabaseId ?? product.slug ?? `wc-${product.id}`}
+          product={product}
+          showBadge={showBadge}
+          fullWidth
+        />
       ))}
     </div>
   );

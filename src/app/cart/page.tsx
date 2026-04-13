@@ -20,18 +20,18 @@ export default function CartPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom py-6">
-        {/* Header */}
-        <div className="flex items-center gap-2 md:gap-3 mb-5">
+    <main className="min-h-screen min-w-0 overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+      <div className="container-custom min-w-0 py-6">
+        {/* Header — wrap + min-w-0 so long titles never force horizontal scroll */}
+        <div className="mb-5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 md:gap-3">
           <Link
             href="/"
-            className="flex items-center gap-2 text-gray-600 hover:text-primary-600 text-sm md:text-base"
+            className="flex shrink-0 items-center gap-2 text-sm text-gray-600 hover:text-primary-600 md:text-base"
           >
-            <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
+            <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
             <span className="hidden md:inline">Continue Shopping</span>
           </Link>
-          <h1 className="text-lg md:text-2xl font-bold text-gray-900 leading-tight">
+          <h1 className="min-w-0 flex-1 text-lg font-bold leading-tight text-gray-900 md:text-2xl">
             Shopping Cart ({itemCount})
           </h1>
         </div>
@@ -44,7 +44,7 @@ export default function CartPage() {
             </div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h2>
             <p className="text-sm md:text-base text-gray-600 mb-6 text-center max-w-md">
-              Looks like you haven't added anything to your cart yet. Start shopping to fill it up!
+              Looks like you have not added anything to your cart yet. Start shopping to fill it up!
             </p>
             <Link
               href="/"
@@ -56,9 +56,9 @@ export default function CartPage() {
           </div>
         ) : (
           /* Cart with Items */
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid min-w-0 gap-6 lg:grid-cols-3">
             {/* Cart Items */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="min-w-0 space-y-4 lg:col-span-2">
               {items.map((item) => (
                 <CartItem
                   key={item.id}
@@ -79,7 +79,7 @@ export default function CartPage() {
             </div>
 
             {/* Cart Summary */}
-            <div className="lg:col-span-1">
+            <div className="min-w-0 lg:col-span-1">
               <CartSummary
                 subtotal={subtotal}
                 discount={discount}

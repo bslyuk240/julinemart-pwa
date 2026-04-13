@@ -3,7 +3,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Minus, Plus, Trash2 } from 'lucide-react';
-import { Button } from '../ui/button';
 import { CartItem as CartItemType } from '@/types/cart';
 
 interface CartItemProps {
@@ -28,10 +27,10 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
   const itemTotal = item.price * item.quantity;
 
   return (
-    <div className="bg-white rounded-lg p-3 md:p-4 shadow-sm border border-gray-100">
-      <div className="flex gap-3 md:gap-4">
+    <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-100 bg-white p-3 shadow-sm md:p-4">
+      <div className="flex min-w-0 gap-3 md:gap-4">
         {/* Product Image */}
-        <Link href={`/product/${item.slug}`} className="flex-shrink-0">
+        <Link href={`/product/${item.slug}`} className="shrink-0">
           <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden bg-gray-100">
             <Image
               src={item.image || '/images/placeholder.svg'}
@@ -46,10 +45,10 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
         {/* Product Info - MOBILE OPTIMIZED */}
         <div className="flex-1 min-w-0 flex flex-col justify-between">
           {/* Top Row: Name + Remove Button */}
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <Link 
+          <div className="mb-2 flex min-w-0 items-start justify-between gap-2">
+            <Link
               href={`/product/${item.slug}`}
-              className="text-sm md:text-base font-medium text-gray-900 hover:text-primary-600 line-clamp-2 flex-1"
+              className="line-clamp-2 min-w-0 flex-1 text-sm font-medium text-gray-900 hover:text-primary-600 md:text-base"
             >
               {item.name}
             </Link>
@@ -85,10 +84,10 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
             )}
           </div>
 
-          {/* Bottom Row: Quantity Controls + Total */}
-          <div className="flex items-center justify-between gap-3">
+          {/* Qty + line total: stack on narrow viewports (prevents clipping in WebView / large font) */}
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             {/* Quantity Controls */}
-            <div className="flex items-center border border-gray-300 rounded-lg bg-white">
+            <div className="flex w-fit max-w-full shrink-0 items-center rounded-lg border border-gray-300 bg-white">
               <button
                 onClick={handleDecrease}
                 disabled={item.quantity <= 1}
@@ -111,9 +110,9 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
             </div>
 
             {/* Item Total */}
-            <div className="text-right">
-              <div className="text-xs text-gray-500 md:hidden">Total</div>
-              <span className="text-base md:text-lg font-bold text-gray-900">
+            <div className="min-w-0 text-left tabular-nums sm:text-right">
+              <div className="text-xs text-gray-500 sm:hidden">Line total</div>
+              <span className="text-base font-bold text-gray-900 break-all sm:text-lg sm:break-normal">
                 {formatPrice(itemTotal)}
               </span>
             </div>
