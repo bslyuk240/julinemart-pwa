@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 
 interface GlobalPullToRefreshProps {
@@ -10,9 +10,12 @@ interface GlobalPullToRefreshProps {
 
 export default function GlobalPullToRefresh({ children }: GlobalPullToRefreshProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const vendorPullHandledLocally = pathname.startsWith('/vendor');
 
   const { pullDistance, isRefreshing } = usePullToRefresh({
+    disabled: vendorPullHandledLocally,
     onRefresh: async () => {
       // Force a full page reload to ensure data/state is fresh
       await new Promise((resolve) => setTimeout(resolve, 150));

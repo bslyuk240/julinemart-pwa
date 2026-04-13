@@ -48,16 +48,28 @@ export function usePullToRefresh({
 
       startYRef.current = event.touches[0].clientY;
       pullingRef.current = true;
-      // Temporarily disable touch scrolling on the target to prevent rubber-band
-      scrollElement.style.touchAction = 'none';
+      // Do not set touchAction = 'none' here: it blocks normal page scroll (finger moving up)
+      // for the whole gesture until touchend — scrollbar still works, wheel/trackpad feels broken.
     };
 
     const handleMove = (event: TouchEvent) => {
       if (!pullingRef.current || startYRef.current === null) return;
+
+      const scrollTop = document.scrollingElement?.scrollTop ?? window.scrollY;
+      if (scrollTop > 0) {
+        scrollElement.style.touchAction = previousTouchActionRef.current || '';
+        pullingRef.current = false;
+        startYRef.current = null;
+        distanceRef.current = 0;
+        setPullDistance(0);
+        return;
+      }
+
       const currentY = event.touches[0].clientY;
       const delta = currentY - startYRef.current;
 
       if (delta > 0) {
+        scrollElement.style.touchAction = 'none';
         // Prevent the native browser rubber-band bounce while pulling
         try {
           event.preventDefault();
@@ -68,6 +80,9 @@ export function usePullToRefresh({
         distanceRef.current = distance;
         setPullDistance(distance);
       } else {
+        scrollElement.style.touchAction = previousTouchActionRef.current || '';
+        pullingRef.current = false;
+        startYRef.current = null;
         distanceRef.current = 0;
         setPullDistance(0);
       }
