@@ -29,12 +29,16 @@ async function jloFetch<T>(path: string): Promise<T | null> {
   if (!base) return null;
 
   try {
-    // Avoid Next.js Data Cache mixing catalog-products responses across query strings (e.g. category A vs B).
+    // Storefront catalog must not serve stale rows after delete/unpublish (avoid Next Data Cache / SWR).
+    const pathBase = path.split('?')[0];
     const isCatalogList =
       path.startsWith('/.netlify/functions/catalog-products') ||
       path.includes('/catalog-products?');
+    const isCatalogProductDetail = pathBase === '/.netlify/functions/catalog-product';
     const res = await fetch(`${base}${path}`, {
-      ...(isCatalogList ? { cache: 'no-store' as const } : { next: { revalidate: 300 } }),
+      ...(isCatalogList || isCatalogProductDetail
+        ? { cache: 'no-store' as const }
+        : { next: { revalidate: 300 } }),
       headers: { 'Content-Type': 'application/json' },
     });
     if (!res.ok) return null;
