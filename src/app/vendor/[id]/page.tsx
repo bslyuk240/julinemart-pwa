@@ -153,8 +153,8 @@ export default function VendorStorePage() {
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-        <div className="container mx-auto px-4 py-6">
+      <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+        <div className="container-custom min-w-0 py-6">
           <div className="text-center py-20">
             <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4" />
             <p className="text-gray-600">Loading store...</p>
@@ -167,8 +167,8 @@ export default function VendorStorePage() {
   // ── Vendor disabled ──────────────────────────────────────────────────────────
   if (vendor && vendor.enabled === false) {
     return (
-      <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-        <div className="container mx-auto px-4 py-6">
+      <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+        <div className="container-custom min-w-0 py-6">
           <div className="text-center py-20">
             <Store className="w-16 h-16 mx-auto text-gray-300 mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Store Unavailable</h2>
@@ -185,8 +185,8 @@ export default function VendorStorePage() {
   // ── Vacation mode ────────────────────────────────────────────────────────────
   if (vendor && vendor.is_store_vacation === true) {
     return (
-      <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-        <div className="container mx-auto px-4 py-6">
+      <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+        <div className="container-custom min-w-0 py-6">
           <div className="text-center py-20">
             <Store className="w-16 h-16 mx-auto text-yellow-500 mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Store on Vacation</h2>
@@ -219,8 +219,8 @@ export default function VendorStorePage() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <main ref={scrollRef} className="min-h-screen bg-gray-50 pb-24 md:pb-8 overscroll-contain" style={{ touchAction: 'pan-y' }}>
-      <div className="container mx-auto px-4 py-6">
+    <main ref={scrollRef} className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8 overscroll-contain" style={{ touchAction: 'pan-y' }}>
+      <div className="container-custom min-w-0 py-6">
 
         {/* Pull-to-refresh indicator */}
         {(pullDistance > 0 || isRefreshing || refreshing) && (
