@@ -29,8 +29,12 @@ async function jloFetch<T>(path: string): Promise<T | null> {
   if (!base) return null;
 
   try {
+    // Avoid Next.js Data Cache mixing catalog-products responses across query strings (e.g. category A vs B).
+    const isCatalogList =
+      path.startsWith('/.netlify/functions/catalog-products') ||
+      path.includes('/catalog-products?');
     const res = await fetch(`${base}${path}`, {
-      next: { revalidate: 300 },
+      ...(isCatalogList ? { cache: 'no-store' as const } : { next: { revalidate: 300 } }),
       headers: { 'Content-Type': 'application/json' },
     });
     if (!res.ok) return null;

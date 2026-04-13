@@ -23,9 +23,16 @@ export async function GET(request: NextRequest) {
   if (searchParams.get('woo_vendor_id')) params.woo_vendor_id = searchParams.get('woo_vendor_id');
 
   const result = await getProductsWithPagination(params);
+  const varies =
+    Boolean(searchParams.get('category')) ||
+    Boolean(searchParams.get('tag')) ||
+    Boolean(searchParams.get('search'));
   return NextResponse.json(result, {
     headers: {
-      'Cache-Control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=600',
+      // Category/tag/search must not share a cached response across query strings at the edge.
+      'Cache-Control': varies
+        ? 'private, no-store, must-revalidate'
+        : 'public, max-age=0, s-maxage=300, stale-while-revalidate=600',
     },
   });
 }

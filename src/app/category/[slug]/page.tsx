@@ -53,28 +53,34 @@ export default function CategoryPage() {
     return `/api/products?${qs.toString()}`;
   };
 
-  const fetchFromApi = async (url: string): Promise<{ products: Product[]; total: number; totalPages: number }> => {
-    const res = await fetch(url);
+  const fetchFromApi = async (
+    url: string,
+    signal?: AbortSignal
+  ): Promise<{ products: Product[]; total: number; totalPages: number }> => {
+    const res = await fetch(url, { cache: 'no-store', signal });
     if (!res.ok) throw new Error(`Products API error: ${res.status}`);
     return res.json();
   };
 
   useEffect(() => {
+    const ac = new AbortController();
     const load = async () => {
       try {
         setLoading(true);
         setApiPage(1);
-        const { products: fetched, totalPages: pages } = await fetchFromApi(buildUrl(sortBy, 1));
+        const { products: fetched, totalPages: pages } = await fetchFromApi(buildUrl(sortBy, 1), ac.signal);
         setProducts(fetched);
         setTotalPages(Math.max(1, pages));
         setVisibleCount(24);
       } catch (error) {
+        if ((error as Error).name === 'AbortError') return;
         console.error('Error fetching category products:', error);
       } finally {
-        setLoading(false);
+        if (!ac.signal.aborted) setLoading(false);
       }
     };
-    load();
+    void load();
+    return () => ac.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, sortBy]);
 
