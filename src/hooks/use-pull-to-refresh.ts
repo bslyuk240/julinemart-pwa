@@ -11,6 +11,10 @@ interface PullToRefreshOptions {
 /**
  * Lightweight pull-to-refresh for mobile web.
  * Listens to touch events at the top of the page and triggers a refresh callback.
+ *
+ * Skipped when the primary pointer is "fine" (mouse / trackpad): on Windows,
+ * two-finger trackpad scrolling can synthesize touch events; our touchmove +
+ * preventDefault() would block that scrolling while the scrollbar still works.
  */
 export function usePullToRefresh({
   onRefresh,
@@ -28,6 +32,9 @@ export function usePullToRefresh({
 
   useEffect(() => {
     if (disabled) return undefined;
+    if (typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches) {
+      return undefined;
+    }
 
     const target = (targetRef?.current ?? window) as HTMLElement | Window;
 
