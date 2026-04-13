@@ -5,9 +5,11 @@ import { useParams } from 'next/navigation';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown, X } from 'lucide-react';
 import { Product } from '@/types/product';
-import { filterProductsByCategory } from '@/lib/utils/category-filters';
 
 type CategorySortOption = 'date' | 'popularity' | 'rating' | 'price' | 'price-desc';
+
+/** JLO catalog-products caps per_page at 100; request that and paginate by category server-side. */
+const CATALOG_PER_PAGE = 100;
 
 export default function CategoryPage() {
   const params = useParams();
@@ -15,10 +17,12 @@ export default function CategoryPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [sortBy, setSortBy] = useState<CategorySortOption>('date');
   const [showFilters, setShowFilters] = useState(false);
   const [visibleCount, setVisibleCount] = useState(24);
-  const perPage = 500;
+  const [apiPage, setApiPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const categoryName = slug
     .split('-')
@@ -37,11 +41,12 @@ export default function CategoryPage() {
     return { orderby: sort as 'date' | 'popularity' | 'rating', order: 'desc' as const };
   };
 
-  const buildUrl = (sort: CategorySortOption) => {
+  const buildUrl = (sort: CategorySortOption, page: number) => {
     const sortParams = computeSortParams(sort);
     const qs = new URLSearchParams({
-      per_page: String(perPage),
-      page: '1',
+      per_page: String(CATALOG_PER_PAGE),
+      page: String(page),
+      category: slug,
       orderby: sortParams.orderby,
       order: sortParams.order,
     });
@@ -58,9 +63,10 @@ export default function CategoryPage() {
     const load = async () => {
       try {
         setLoading(true);
-        const { products: fetched } = await fetchFromApi(buildUrl(sortBy));
-        const filtered = filterProductsByCategory(fetched, slug);
-        setProducts(filtered);
+        setApiPage(1);
+        const { products: fetched, totalPages: pages } = await fetchFromApi(buildUrl(sortBy, 1));
+        setProducts(fetched);
+        setTotalPages(Math.max(1, pages));
         setVisibleCount(24);
       } catch (error) {
         console.error('Error fetching category products:', error);
@@ -73,10 +79,29 @@ export default function CategoryPage() {
   }, [slug, sortBy]);
 
   const visibleProducts = useMemo(() => products.slice(0, visibleCount), [products, visibleCount]);
-  const hasMore = visibleCount < products.length;
+  const hasMoreInBuffer = visibleCount < products.length;
+  const hasMoreFromApi = apiPage < totalPages;
+  const hasMore = hasMoreInBuffer || hasMoreFromApi;
 
-  const loadMore = () => {
-    setVisibleCount((current) => Math.min(current + 24, products.length));
+  const loadMore = async () => {
+    if (visibleCount < products.length) {
+      setVisibleCount((current) => Math.min(current + 24, products.length));
+      return;
+    }
+    if (apiPage >= totalPages || loadingMore) return;
+    try {
+      setLoadingMore(true);
+      const nextPage = apiPage + 1;
+      const { products: more, totalPages: pages } = await fetchFromApi(buildUrl(sortBy, nextPage));
+      setProducts((prev) => [...prev, ...more]);
+      setApiPage(nextPage);
+      setTotalPages(Math.max(totalPages, pages));
+      setVisibleCount((current) => current + Math.min(24, more.length));
+    } catch (error) {
+      console.error('Error loading more category products:', error);
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   if (loading) {
@@ -193,10 +218,12 @@ export default function CategoryPage() {
             {hasMore && (
               <div className="mt-8 text-center">
                 <button
-                  onClick={loadMore}
-                  className="rounded-lg bg-primary-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-primary-700"
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="rounded-lg bg-primary-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
                 >
-                  View More Products
+                  {loadingMore ? 'Loading…' : 'View More Products'}
                 </button>
               </div>
             )}

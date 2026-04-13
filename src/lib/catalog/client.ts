@@ -373,9 +373,16 @@ export async function catalogGetProductsWithMeta(
   const qs = buildProductsQS(params);
   const path = `/.netlify/functions/catalog-products${qs ? `?${qs}` : ''}`;
   const resp = await jloFetch<JloListResponse>(path);
-  if (!resp?.success || !Array.isArray(resp.data) || resp.data.length === 0) return null;
+  if (!resp?.success || !Array.isArray(resp.data)) return null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const meta = resp.meta as any;
+  if (resp.data.length === 0) {
+    return {
+      products: [],
+      total: Number(meta?.total ?? 0),
+      totalPages: Number(meta?.total_pages ?? 0),
+    };
+  }
   return {
     products: resp.data.map(toWcProduct),
     total: Number(meta?.total ?? resp.data.length),
