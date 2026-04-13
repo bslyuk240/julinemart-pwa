@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown } from 'lucide-react';
@@ -16,22 +16,29 @@ const sortFromParam = (value: string | null): 'date' | 'popularity' | 'rating' |
   return null;
 };
 
+function dedupeKey(product: Product): string {
+  if (product.supabaseId) return `sb:${product.supabaseId}`;
+  if (product.slug) return `slug:${product.slug}`;
+  return `id:${product.id}`;
+}
+
 function ProductsContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
-  const initialSort = sortFromParam(searchParams.get('sort')) || 'date';
+  const sortBy = sortFromParam(searchParams.get('sort')) || 'date';
+  const tagFilter = searchParams.get('tag');
+  const searchKey = searchParams.toString();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showShell, setShowShell] = useState(false);
-  const [sortBy, setSortBy] = useState<'date' | 'popularity' | 'rating' | 'price' | 'price-desc'>(initialSort);
   const [showFilters, setShowFilters] = useState(false);
   const [totalProducts, setTotalProducts] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [nextPageToLoad, setNextPageToLoad] = useState(1);
 
-  const tagFilter = searchParams.get('tag');
-  const searchKey = searchParams.toString();
   const BATCH_SIZE = 100;
 
   const sectionMeta = useMemo(() => {
@@ -93,13 +100,11 @@ function ProductsContent() {
     return qs.toString() ? `/products?${qs.toString()}` : '/products';
   };
 
-  const buildFetchUrl = (options?: { overrideSort?: typeof sortBy; page?: number }) => {
-    const { overrideSort, page = 1 } = options ?? {};
-    const activeSort = overrideSort || sortBy;
-    const sortParams = computeSortParams(activeSort);
+  const buildFetchUrl = (pageNum: number) => {
+    const sortParams = computeSortParams(sortBy);
     const qs = new URLSearchParams({
       per_page: String(BATCH_SIZE),
-      page: String(page),
+      page: String(pageNum),
       orderby: sortParams.orderby,
       order: sortParams.order,
     });
@@ -107,20 +112,14 @@ function ProductsContent() {
     return `/api/products?${qs.toString()}`;
   };
 
-  const fetchFromApi = async (url: string) => {
-    const res = await fetch(url);
+  const fetchFromApi = async (url: string, signal?: AbortSignal) => {
+    const res = await fetch(url, { cache: 'no-store', signal });
     if (!res.ok) throw new Error(`Products API error: ${res.status}`);
     return res.json() as Promise<{ products: Product[]; total: number; totalPages: number }>;
   };
 
   useEffect(() => {
-    const urlSort = sortFromParam(searchParams.get('sort'));
-    if (urlSort && urlSort !== sortBy) {
-      setSortBy(urlSort);
-    }
-  }, [searchParams, sortBy]);
-
-  useEffect(() => {
+    const ac = new AbortController();
     let cancelled = false;
 
     const fetchProducts = async () => {
@@ -128,35 +127,40 @@ function ProductsContent() {
         setLoading(true);
         setProducts([]);
         setTotalProducts(0);
+        setTotalPages(1);
         setNextPageToLoad(1);
-        const { products: fetchedProducts, total } = await fetchFromApi(buildFetchUrl({ page: 1 }));
-        if (cancelled) return;
+        const { products: fetchedProducts, total } = await fetchFromApi(buildFetchUrl(1), ac.signal);
+        if (cancelled || ac.signal.aborted) return;
         setProducts(fetchedProducts);
-        setTotalProducts(total || fetchedProducts.length);
+        const t = typeof total === 'number' && total >= 0 ? total : fetchedProducts.length;
+        setTotalProducts(t);
+        const tp = t > 0 ? Math.max(1, Math.ceil(t / BATCH_SIZE)) : 1;
+        setTotalPages(tp);
         setNextPageToLoad(2);
       } catch (error) {
+        if ((error as Error).name === 'AbortError') return;
         console.error('Error fetching products:', error);
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !ac.signal.aborted) {
           setLoading(false);
         }
       }
     };
 
-    fetchProducts();
+    void fetchProducts();
     return () => {
       cancelled = true;
+      ac.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchKey, sortBy]);
+  }, [searchKey]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setShowShell(true), 120);
     return () => window.clearTimeout(timer);
   }, []);
 
-  const visibleProducts = useMemo(() => products, [products]);
-  const hasMore = products.length < (totalProducts || products.length);
+  const hasMore = nextPageToLoad <= totalPages && products.length < totalProducts;
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
@@ -165,29 +169,31 @@ function ProductsContent() {
 
     try {
       setLoadingMore(true);
-      const { products: moreProducts, total } = await fetchFromApi(
-        buildFetchUrl({ page: pageToLoad })
-      );
+      const { products: moreProducts, total } = await fetchFromApi(buildFetchUrl(pageToLoad));
 
       if (typeof total === 'number' && total > 0) {
         setTotalProducts(total);
+        setTotalPages(Math.max(1, Math.ceil(total / BATCH_SIZE)));
       }
 
       if (moreProducts.length === 0) {
+        setTotalPages((p) => Math.min(p, pageToLoad - 1));
         return;
       }
 
-      const seen = new Set(products.map((product) => product.id));
-      const next = [...products];
-      moreProducts.forEach((product) => {
-        if (!seen.has(product.id)) {
-          seen.add(product.id);
-          next.push(product);
+      setProducts((prev) => {
+        const seen = new Set(prev.map(dedupeKey));
+        const next = [...prev];
+        for (const product of moreProducts) {
+          const k = dedupeKey(product);
+          if (!seen.has(k)) {
+            seen.add(k);
+            next.push(product);
+          }
         }
+        return next;
       });
-
-      setProducts(next);
-      setNextPageToLoad((current) => current + 1);
+      setNextPageToLoad(pageToLoad + 1);
     } catch (error) {
       console.error('Error loading more products:', error);
     } finally {
@@ -195,8 +201,15 @@ function ProductsContent() {
     }
   };
 
-  const handleSort = (newSortBy: 'date' | 'popularity' | 'rating' | 'price' | 'price-desc') => {
-    setSortBy(newSortBy);
+  const setSortInUrl = (newSortBy: typeof sortBy) => {
+    const p = new URLSearchParams(searchParams.toString());
+    if (newSortBy === 'date') {
+      p.delete('sort');
+    } else {
+      p.set('sort', newSortBy);
+    }
+    const qs = p.toString();
+    router.replace(qs ? `/products?${qs}` : '/products', { scroll: false });
   };
 
   if (loading && products.length === 0) {
@@ -246,6 +259,7 @@ function ProductsContent() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-3 shadow-sm md:p-4">
           <div className="flex items-center gap-3 md:gap-4">
             <button
+              type="button"
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors md:px-4 md:text-base ${
                 showFilters
@@ -259,7 +273,7 @@ function ProductsContent() {
 
             <div className="hidden items-center gap-2 md:flex">
               <span className="text-sm text-gray-600">
-                Showing {visibleProducts.length} of {totalProducts || visibleProducts.length} products
+                Showing {products.length} of {totalProducts || products.length} products
               </span>
             </div>
           </div>
@@ -269,7 +283,7 @@ function ProductsContent() {
               value={sortBy}
               disabled={loading}
               onChange={(e) => {
-                handleSort(e.target.value as 'date' | 'popularity' | 'rating' | 'price' | 'price-desc');
+                setSortInUrl(e.target.value as typeof sortBy);
               }}
               className="flex cursor-pointer appearance-none items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 pr-8 text-sm transition-colors hover:bg-gray-50 md:px-4 md:text-base disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -363,14 +377,15 @@ function ProductsContent() {
           </div>
         )}
 
-        {visibleProducts.length > 0 ? (
+        {products.length > 0 ? (
           <>
-            <ProductGrid products={visibleProducts} columns={6} />
+            <ProductGrid products={products} columns={6} />
 
             {hasMore && (
               <div className="mt-8 text-center">
                 <button
-                  onClick={loadMore}
+                  type="button"
+                  onClick={() => void loadMore()}
                   disabled={loadingMore}
                   className="rounded-lg bg-primary-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-gray-400"
                 >
@@ -379,9 +394,9 @@ function ProductsContent() {
               </div>
             )}
 
-            {!hasMore && (totalProducts || products.length) > BATCH_SIZE && (
+            {!hasMore && totalProducts > BATCH_SIZE && (
               <div className="mt-8 text-center">
-                <p className="text-gray-600">You've reached the end of the catalog</p>
+                <p className="text-gray-600">You&apos;ve reached the end of the catalog</p>
               </div>
             )}
           </>
