@@ -38,29 +38,50 @@ export async function getProduct(id: number): Promise<Product | null> {
 }
 
 /**
- * Get reviews for a specific product
+ * Get approved reviews for a product (Supabase via Next.js API).
  */
 export async function getProductReviews(
   productId: number,
-  params: { page?: number; per_page?: number } = {}
+  params: { page?: number; per_page?: number; supabaseId?: string } = {}
 ): Promise<ProductReview[]> {
-  void productId;
-  void params;
-  return [];
+  const qs = new URLSearchParams();
+  if (params.supabaseId) qs.set('supabase_id', params.supabaseId);
+  if (productId > 0) qs.set('woo_product_id', String(productId));
+  if (!params.supabaseId && productId <= 0) return [];
+
+  try {
+    const res = await fetch(`/api/product-reviews?${qs}`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { reviews?: ProductReview[] };
+    return data.reviews ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /**
- * Create a new product review
+ * Submit a review (stored as `pending` until staff approves).
  */
 export async function createProductReview(payload: {
   product_id: number;
+  supabase_product_id?: string;
   review: string;
   reviewer: string;
   reviewer_email: string;
   rating: number;
 }): Promise<ProductReview | null> {
-  void payload;
-  return null;
+  try {
+    const res = await fetch('/api/product-reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { review?: ProductReview };
+    return data.review ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**

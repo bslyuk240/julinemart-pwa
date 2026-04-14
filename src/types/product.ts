@@ -82,7 +82,8 @@ export interface Product {
 }
 
 export interface ProductReview {
-  id: number;
+  /** Supabase `product_reviews.id` (uuid string). */
+  id: string;
   date_created: string;
   review: string;
   rating: number;

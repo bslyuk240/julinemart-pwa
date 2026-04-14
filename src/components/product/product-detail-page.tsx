@@ -129,7 +129,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     if (!product) return;
     try {
       setLoadingReviews(true);
-      const productReviews = await getProductReviews(product.id);
+      const productReviews = await getProductReviews(product.id, { supabaseId: product.supabaseId });
       setReviews(productReviews);
     } catch (error) {
       console.error('Error loading reviews:', error);
@@ -291,6 +291,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     try {
       const newReview = await createProductReview({
         product_id: product.id,
+        supabase_product_id: product.supabaseId,
         review: reviewForm.review.trim(),
         reviewer: reviewForm.reviewer.trim(),
         reviewer_email: reviewForm.reviewerEmail.trim(),
