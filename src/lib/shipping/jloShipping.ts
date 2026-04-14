@@ -4,6 +4,8 @@ export type JloShippingItem = {
   hubId: string;
   quantity: number;
   weight: number;
+  /** Line total value — calc-shipping can use when reconciling order value from items. */
+  price?: number;
 };
 
 export type JloShippingPayload = {

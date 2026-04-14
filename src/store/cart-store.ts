@@ -6,6 +6,7 @@ import type { CartItem as TypedCartItem } from '@/types/cart';
 import { calculateTax, areTaxesEnabled } from '@/lib/woocommerce/tax-calculator';
 import { getAllShippingMethods } from '@/lib/woocommerce/shipping';
 import { trackAddToCart } from '@/lib/gtag';
+import { parseProductWeightKg } from '@/lib/shipping/cart-weight';
 
 export interface CartItem extends TypedCartItem {
   weight?: number;
@@ -190,10 +191,7 @@ const hubNameMeta = product.meta_data?.find((m) =>
 );
 const hubName = hubNameMeta ? String(hubNameMeta.value) : null;
 
-const numericWeight =
-  product.weight !== undefined && product.weight !== null && product.weight !== ''
-    ? parseFloat(String(product.weight))
-    : undefined;
+        const numericWeight = parseProductWeightKg(product.weight);
 
         // Extract vendor info from WCFM-friendly fields
         const getVendorInfo = () => {

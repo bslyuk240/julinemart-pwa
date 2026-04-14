@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CreditCard, Truck, Package, MapPin, Tag } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
@@ -20,6 +20,10 @@ import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
 import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
 import { getShippingFee } from '@/lib/shipping/jloShipping';
+import {
+  resolveLineWeightKg,
+  DEFAULT_SHIPPING_LINE_WEIGHT_KG,
+} from '@/lib/shipping/cart-weight';
 import { getSavedCards, upsertAddress, updateCustomerProfile, getAddresses } from '@/lib/supabase/customers';
 import type { CustomerAddress, SavedCard } from '@/types/customer';
 import { trackBeginCheckout, trackPurchase } from '@/lib/gtag';
@@ -36,7 +40,6 @@ interface ShippingOption {
 
 
 const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
-const DEFAULT_WEIGHT = 0.5;
 const JLO_BASE =
   process.env.NEXT_PUBLIC_JLO_CATALOG_URL ||
   'https://jlo.julinemart.com';
@@ -143,6 +146,25 @@ export default function CheckoutPage() {
   const discountedShipping = Math.max(0, (shippingCost || 0) - activeShippingDiscount);
   const discountedSubtotal = Math.max(0, subtotal - voucherDiscount); // Vouchers discount products
   const total = discountedSubtotal + discountedShipping + taxAmount;
+
+  /** Total kg sent to JLO calc-shipping (per line: DB weight or default). */
+  const jloCartWeightKg = useMemo(
+    () =>
+      items.reduce(
+        (sum, item: any) =>
+          sum + resolveLineWeightKg(item.weight) * (Number(item.quantity) || 1),
+        0
+      ),
+    [items]
+  );
+
+  const linesMissingProductWeight = useMemo(
+    () =>
+      items.filter(
+        (item: any) => item.weight == null || !Number.isFinite(Number(item.weight))
+      ).length,
+    [items]
+  );
 
   const toAnalyticsItems = useCallback(
     () =>
@@ -557,7 +579,8 @@ export default function CheckoutPage() {
         const shippingItems = (items as any[]).map((item) => ({
           hubId: item.hubId ?? DEFAULT_HUB_ID,
           quantity: item.quantity,
-          weight: item.weight ?? DEFAULT_WEIGHT,
+          weight: resolveLineWeightKg(item.weight),
+          price: Number(item.price) || 0,
         }));
 
         const res = await getShippingFee({
@@ -1748,6 +1771,13 @@ export default function CheckoutPage() {
                         : 'Calculated at checkout'}
                   </span>
                 </div>
+                {selectedOption?.methodId === 'jlo_shipping' && items.length > 0 && (
+                  <p className="text-xs text-gray-500">
+                    Est. weight for quote: {jloCartWeightKg.toFixed(2)} kg
+                    {linesMissingProductWeight > 0                      ? ` (${linesMissingProductWeight} line(s) use ${DEFAULT_SHIPPING_LINE_WEIGHT_KG} kg default — add weight on the product in admin for accuracy)`
+                      : ''}
+                  </p>
+                )}
                 
                 {/* ✅ Show shipping discount from influencer coupon */}
                 {activeShippingDiscount > 0 && (
