@@ -91,6 +91,18 @@ export async function createProductReview(payload: {
 export async function getProductVariations(
   productId: number
 ): Promise<ProductVariation[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const qs = new URLSearchParams({ product_id: String(productId) });
+      const res = await fetch(`/api/product-variations?${qs.toString()}`, { cache: 'no-store' });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { variations?: ProductVariation[] };
+      return data.variations ?? [];
+    } catch {
+      return [];
+    }
+  }
+
   const catalogVariations = await catalogGetVariations(productId);
   return catalogVariations ?? [];
 }
