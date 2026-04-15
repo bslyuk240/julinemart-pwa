@@ -399,6 +399,17 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
   // Load variations for variable products
   useEffect(() => {
+    const hasUsableInlineVariations = (items: ProductVariation[] | undefined | null) => {
+      if (!items?.length) return false;
+      return items.every(
+        (variation) =>
+          Array.isArray(variation.attributes) &&
+          variation.attributes.some(
+            (attr) => Boolean((attr.name ?? '').trim()) && Boolean((attr.option ?? '').trim())
+          )
+      );
+    };
+
     const loadVariations = async () => {
       if (!product || product.type !== 'variable') {
         setVariations([]);
@@ -410,9 +421,12 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       try {
         setLoadingVariations(true);
         // Supabase products may expose either full inline variation objects or
-        // just variation IDs. Only trust the inline payload when it actually
-        // contains variation objects; otherwise fall back to fetching by WC id.
-        const inlineVariations = product._variations?.length ? product._variations : null;
+        // just variation IDs. For CJ imports, inline records may be present but
+        // have incomplete/misaligned attributes which can bind the wrong image
+        // to an option. Only trust inline data when attributes are usable.
+        const inlineVariations = hasUsableInlineVariations(product._variations)
+          ? product._variations
+          : null;
         const data = inlineVariations ?? await getProductVariations(product.id);
         setVariations(data);
 
