@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useState, useEffect, useRef } from 'react';
+import { Fragment, useCallback, useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Store, Star } from 'lucide-react';
@@ -49,7 +49,6 @@ const sortProducts = (items: Product[], sortBy: VendorSortOption) => {
 export default function VendorStorePage() {
   const params    = useParams();
   const vendorId  = params.id as string;
-  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const [vendor,       setVendor]       = useState<VendorData | null>(null);
   const [products,     setProducts]     = useState<Product[]>([]);
@@ -147,7 +146,6 @@ export default function VendorStorePage() {
   const { pullDistance, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
     disabled: loading,
-    targetRef: scrollRef,
   });
 
   // ── Loading ──────────────────────────────────────────────────────────────────
@@ -219,7 +217,7 @@ export default function VendorStorePage() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <main ref={scrollRef} className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8 overscroll-contain" style={{ touchAction: 'pan-y' }}>
+    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
       <div className="container-custom min-w-0 py-6">
 
         {/* Pull-to-refresh indicator */}
