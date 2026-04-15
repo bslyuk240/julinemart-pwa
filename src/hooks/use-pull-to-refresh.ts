@@ -28,7 +28,6 @@ export function usePullToRefresh({
   const startYRef = useRef<number | null>(null);
   const pullingRef = useRef(false);
   const distanceRef = useRef(0);
-  const previousTouchActionRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (disabled) return undefined;
@@ -43,8 +42,6 @@ export function usePullToRefresh({
     const scrollElement: HTMLElement = target instanceof Window ? document.body : target;
     const previousOverscroll = root.style.overscrollBehavior;
     const previousScrollOverscroll = scrollElement.style.overscrollBehaviorY;
-    const previousScrollTouchAction = scrollElement.style.touchAction;
-    previousTouchActionRef.current = previousScrollTouchAction;
     root.style.overscrollBehavior = 'contain';
     scrollElement.style.overscrollBehaviorY = 'contain';
 
@@ -64,7 +61,6 @@ export function usePullToRefresh({
 
       const scrollTop = document.scrollingElement?.scrollTop ?? window.scrollY;
       if (scrollTop > 0) {
-        scrollElement.style.touchAction = previousTouchActionRef.current || '';
         pullingRef.current = false;
         startYRef.current = null;
         distanceRef.current = 0;
@@ -76,7 +72,6 @@ export function usePullToRefresh({
       const delta = currentY - startYRef.current;
 
       if (delta > 0) {
-        scrollElement.style.touchAction = 'none';
         // Prevent the native browser rubber-band bounce while pulling
         try {
           event.preventDefault();
@@ -87,7 +82,6 @@ export function usePullToRefresh({
         distanceRef.current = distance;
         setPullDistance(distance);
       } else {
-        scrollElement.style.touchAction = previousTouchActionRef.current || '';
         pullingRef.current = false;
         startYRef.current = null;
         distanceRef.current = 0;
@@ -102,8 +96,6 @@ export function usePullToRefresh({
       const shouldRefresh = distanceRef.current >= threshold;
       distanceRef.current = 0;
       setPullDistance(0);
-      // Restore touch action after gesture ends
-      scrollElement.style.touchAction = previousTouchActionRef.current || '';
 
       if (shouldRefresh && !isRefreshing) {
         setIsRefreshing(true);
@@ -115,17 +107,25 @@ export function usePullToRefresh({
       }
     };
 
+    const handleCancel = () => {
+      pullingRef.current = false;
+      startYRef.current = null;
+      distanceRef.current = 0;
+      setPullDistance(0);
+    };
+
     target.addEventListener('touchstart', handleStart as EventListener, { passive: false });
     target.addEventListener('touchmove', handleMove as EventListener, { passive: false });
     target.addEventListener('touchend', handleEnd as EventListener);
+    target.addEventListener('touchcancel', handleCancel as EventListener);
 
     return () => {
       root.style.overscrollBehavior = previousOverscroll;
       scrollElement.style.overscrollBehaviorY = previousScrollOverscroll;
-      scrollElement.style.touchAction = previousScrollTouchAction;
       target.removeEventListener('touchstart', handleStart as EventListener);
       target.removeEventListener('touchmove', handleMove as EventListener);
       target.removeEventListener('touchend', handleEnd as EventListener);
+      target.removeEventListener('touchcancel', handleCancel as EventListener);
     };
   }, [onRefresh, threshold, maxPull, disabled, isRefreshing, targetRef]);
 
