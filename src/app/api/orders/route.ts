@@ -148,7 +148,11 @@ export async function POST(request: Request) {
       }
     }
 
-    const voucherCode = getMeta('_campaign_voucher_code') || undefined;
+    const rawCampaignVoucher = getMeta('_campaign_voucher_code');
+    const voucherCode =
+      rawCampaignVoucher != null && String(rawCampaignVoucher).trim() !== ''
+        ? String(rawCampaignVoucher).trim().toUpperCase()
+        : undefined;
 
     // Map line items — prefer Supabase UUIDs stored in meta_data
     const items = lineItems
@@ -175,7 +179,7 @@ export async function POST(request: Request) {
       })
       .filter((i: any) => i.product_id);
 
-    const jloPayload = {
+    const jloPayload: Record<string, unknown> = {
       customer_name: `${billing.first_name || ''} ${billing.last_name || ''}`.trim(),
       customer_email: billing.email || '',
       customer_phone: billing.phone || '',
@@ -187,11 +191,13 @@ export async function POST(request: Request) {
       delivery_landmark: getMeta('_delivery_landmark') || undefined,
       items,
       shipping_fee: shippingFee,
-      voucher_code: voucherCode,
       influencer_coupon_code: influencerCouponCode,
       special_instructions: customerNote || undefined,
       order_notes: customerNote || undefined,
     };
+    if (voucherCode) {
+      jloPayload.voucher_code = voucherCode;
+    }
 
     const jloRes = await fetch(`${JLO_BASE}/api/create-order`, {
       method: 'POST',

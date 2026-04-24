@@ -825,7 +825,13 @@ export default function CheckoutPage() {
         ? normalizedDiscount
         : 0;
 
-      setAppliedVoucher(result.data);
+      // JLO `voucherHelpers` may not echo `code` on `data` — we must keep the
+      // canonical string for order meta and create-order, or JLO returns "Invalid or expired voucher code".
+      const appliedCode = voucherCode.trim().toUpperCase();
+      setAppliedVoucher({
+        ...result.data,
+        code: result.data?.code ?? result.data?.coupon_code ?? appliedCode,
+      });
       setVoucherDiscount(voucherValue);
       setVoucherError('');
       setVoucherCode('');
