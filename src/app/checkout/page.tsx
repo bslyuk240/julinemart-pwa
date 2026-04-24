@@ -28,6 +28,7 @@ import { getSavedCards, upsertAddress, updateCustomerProfile, getAddresses } fro
 import type { CustomerAddress, SavedCard } from '@/types/customer';
 import { trackBeginCheckout, trackPurchase } from '@/lib/gtag';
 import { useCartStore } from '@/store/cart-store';
+import { jloItemIdsFromCartLine } from '@/lib/jlo/line-identity';
 
 interface ShippingOption {
   id: string;
@@ -797,14 +798,18 @@ export default function CheckoutPage() {
           cart_total: subtotal,
           shipping_cost: shippingCost ?? 0,
           customer_email: formData.email || customer?.email || '',
-          items: items.map((item: any) => ({
-            product_id: item.productId,
-            sku: item.sku || item.variation?.sku || '',
-            variation_id: item.variation?.id,
-            quantity: item.quantity,
-            price: item.price,
-            vendor_id: item.vendorId,
-          })),
+          // Must match POST /api/orders → JLO create-order line identity (see jlo/line-identity).
+          items: items.map((item: any) => {
+            const { product_id, variation_id } = jloItemIdsFromCartLine(item);
+            return {
+              product_id,
+              sku: item.sku || item.variation?.sku || '',
+              variation_id,
+              quantity: item.quantity,
+              price: item.price,
+              vendor_id: item.vendorId,
+            };
+          }),
         }),
       });
 

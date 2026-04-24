@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jloItemIdsFromOrderLineItem } from '@/lib/jlo/line-identity';
 
 const JLO_BASE = (
   process.env.JLO_API_BASE_URL ||
@@ -36,13 +37,6 @@ function deriveOrderStatus(o: any): string {
     5: 'delivered',
   };
   return rankToWc[minRank] ?? dbStatus;
-}
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function isUuidString(value: string): boolean {
-  return UUID_RE.test(String(value).trim());
 }
 
 function adaptOrder(o: any) {
@@ -154,28 +148,11 @@ export async function POST(request: Request) {
         ? String(rawCampaignVoucher).trim().toUpperCase()
         : undefined;
 
-    // Map line items — prefer Supabase UUIDs stored in meta_data
+    // Map line items — same identity rules as voucherHelpers (src/lib/jlo/line-identity.ts)
     const items = lineItems
       .map((item: any) => {
-        const itemMeta: any[] = item.meta_data || [];
-        const getMi = (key: string) =>
-          itemMeta.find((m: any) => m.key === key)?.value ?? null;
-        const productId =
-          getMi('_supabase_product_id') || String(item.product_id || '');
-        const supaVarId = getMi('_supabase_variation_id');
-        const rawVariation =
-          supaVarId ||
-          (item.variation_id != null && item.variation_id !== 0
-            ? String(item.variation_id)
-            : undefined);
-        // CJ / catalog: numeric WC-style ids are often synthetic (hashed) when the real
-        // key is a Supabase variation row. Never send that number to JLO for UUID products
-        // without _supabase_variation_id (fix: PDP now passes supabaseId into cart).
-        let variationId = rawVariation;
-        if (!supaVarId && isUuidString(productId) && rawVariation && /^\d+$/.test(String(rawVariation))) {
-          variationId = undefined;
-        }
-        return { product_id: productId, variation_id: variationId, quantity: item.quantity };
+        const { product_id, variation_id } = jloItemIdsFromOrderLineItem(item);
+        return { product_id, variation_id, quantity: item.quantity };
       })
       .filter((i: any) => i.product_id);
 
@@ -197,6 +174,10 @@ export async function POST(request: Request) {
     };
     if (voucherCode) {
       jloPayload.voucher_code = voucherCode;
+      const campaignVoucherId = getMeta('_campaign_voucher_id');
+      if (campaignVoucherId != null && String(campaignVoucherId).trim() !== '') {
+        jloPayload.campaign_voucher_id = String(campaignVoucherId).trim();
+      }
     }
 
     const jloRes = await fetch(`${JLO_BASE}/api/create-order`, {
