@@ -151,7 +151,7 @@ export default function VendorStorePage() {
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+      <main className="min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8">
         <div className="container-custom min-w-0 py-6">
           <div className="text-center py-20">
             <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4" />
@@ -183,7 +183,7 @@ export default function VendorStorePage() {
   // ── Vacation mode ────────────────────────────────────────────────────────────
   if (vendor && vendor.is_store_vacation === true) {
     return (
-      <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+      <main className="min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8">
         <div className="container-custom min-w-0 py-6">
           <div className="text-center py-20">
             <Store className="w-16 h-16 mx-auto text-yellow-500 mb-4" />
@@ -217,7 +217,7 @@ export default function VendorStorePage() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+    <main className="min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8">
       <div className="container-custom min-w-0 py-6">
 
         {/* Pull-to-refresh indicator */}

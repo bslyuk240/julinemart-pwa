@@ -50,7 +50,7 @@ export const viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="h-auto overflow-x-clip">
       <head>
         {/* Favicon Links (from RealFaviconGenerator) */}
         <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
@@ -86,7 +86,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           `}
         </Script>
       </head>
-      <body className={`${inter.className} overflow-x-hidden`}>
+      <body className={`${inter.className} min-h-0 overflow-x-clip`}>
         <StatusBarManager />
         <CustomerAuthProvider>
           <PushNotificationManager />

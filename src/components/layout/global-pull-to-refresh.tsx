@@ -31,8 +31,7 @@ export default function GlobalPullToRefresh({ children }: GlobalPullToRefreshPro
   return (
     <div
       ref={scrollRef}
-      className="min-h-screen overscroll-contain"
-      style={{ touchAction: 'pan-y' }}
+      className="w-full min-h-0 touch-pan-y md:touch-auto"
     >
       {(pullDistance > 0 || isRefreshing) && (
         <div

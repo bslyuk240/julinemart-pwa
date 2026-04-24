@@ -40,9 +40,18 @@ interface ShippingOption {
 
 
 const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
-/** Same-origin proxy → JLO `voucherHelpers` Netlify function (avoids CORS / HTML error bodies). */
-const VOUCHER_VALIDATION_URL =
-  process.env.NEXT_PUBLIC_VOUCHER_VALIDATION_URL || '/api/vouchers/validate';
+
+/**
+ * Campaign vouchers: browser must call same-origin `/api/vouchers/validate` only.
+ * That route server-proxies to JLO `voucherHelpers`. Do not set
+ * `NEXT_PUBLIC_VOUCHER_VALIDATION_URL` to `https://jlo...` — the browser will hit CORS
+ * (JLO allows production origin only). Optional override: a path on this app, e.g. `/api/vouchers/validate`.
+ */
+function getVoucherValidationUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_VOUCHER_VALIDATION_URL?.trim();
+  if (raw?.startsWith('/')) return raw;
+  return '/api/vouchers/validate';
+}
 /** Same-origin API proxies to Supabase or JLO — do not use JLO catalog /api (404). */
 const INFLUENCER_VALIDATION_URL =
   process.env.NEXT_PUBLIC_INFLUENCER_COUPON_VALIDATION_URL ||
@@ -778,7 +787,7 @@ export default function CheckoutPage() {
     setVoucherError('');
 
     try {
-      const response = await fetch(VOUCHER_VALIDATION_URL, {
+      const response = await fetch(getVoucherValidationUrl(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
