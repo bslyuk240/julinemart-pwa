@@ -120,8 +120,26 @@ export async function POST(request: Request) {
       billing.state ||
       '';
 
-    const shippingFee =
+    const influencerCouponCode = getMeta('_influencer_coupon_code') || undefined;
+
+    const getShippingLineMeta = (key: string) => {
+      const lineMeta: any[] = shippingLines[0]?.meta_data || [];
+      return lineMeta.find((m: any) => m.key === key)?.value ?? null;
+    };
+
+    // Checkout sends discounted total in shipping_lines[0].total when an influencer
+    // code applies; JLO create-order expects base shipping and re-applies the discount.
+    let shippingFee =
       shippingLines.length > 0 ? parseFloat(shippingLines[0].total || '0') : 0;
+    if (influencerCouponCode) {
+      const originalRaw = getShippingLineMeta('_original_shipping_cost');
+      if (originalRaw != null && String(originalRaw).trim() !== '') {
+        const original = parseFloat(String(originalRaw));
+        if (Number.isFinite(original) && original >= 0) {
+          shippingFee = original;
+        }
+      }
+    }
 
     const voucherCode = getMeta('_campaign_voucher_code') || undefined;
 
@@ -153,6 +171,7 @@ export async function POST(request: Request) {
       items,
       shipping_fee: shippingFee,
       voucher_code: voucherCode,
+      influencer_coupon_code: influencerCouponCode,
       special_instructions: customerNote || undefined,
       order_notes: customerNote || undefined,
     };

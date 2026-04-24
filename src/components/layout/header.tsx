@@ -23,11 +23,15 @@ interface BannerData {
   text_color: string;
 }
 
+const DEFAULT_LOGO = '/images/logo.png';
+const LOGO_FALLBACK_CHAIN = [DEFAULT_LOGO, '/favicon.svg'] as const;
+
 export default function Header() {
-  const logoSrc = process.env.NEXT_PUBLIC_LOGO_URL || '/images/logo.png';
+  const envLogo = process.env.NEXT_PUBLIC_LOGO_URL?.trim();
   const logoWidth = Number(process.env.NEXT_PUBLIC_LOGO_WIDTH) || 40;
   const logoHeight = Number(process.env.NEXT_PUBLIC_LOGO_HEIGHT) || 40;
   const logoAlt = process.env.NEXT_PUBLIC_LOGO_TEXT || 'Home';
+  const [logoSrc, setLogoSrc] = useState(() => envLogo || DEFAULT_LOGO);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -49,6 +53,10 @@ export default function Header() {
   useEffect(() => {
     router.prefetch('/');
   }, [router]);
+
+  useEffect(() => {
+    setLogoSrc(envLogo || DEFAULT_LOGO);
+  }, [envLogo]);
 
   // ==================== FETCH BANNER FROM WORDPRESS (NEW!) ====================
   useEffect(() => {
@@ -177,6 +185,13 @@ export default function Header() {
               height={logoHeight}
               priority
               className="h-9 w-auto md:h-10 object-contain"
+              onError={() => {
+                setLogoSrc((prev) => {
+                  const i = LOGO_FALLBACK_CHAIN.indexOf(prev as (typeof LOGO_FALLBACK_CHAIN)[number]);
+                  const next = LOGO_FALLBACK_CHAIN[i + 1];
+                  return next ?? prev;
+                });
+              }}
             />
           </Link>
 

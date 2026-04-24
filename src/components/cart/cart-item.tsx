@@ -2,8 +2,11 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import { CartItem as CartItemType } from '@/types/cart';
+
+const PLACEHOLDER = '/images/placeholder.svg';
 
 interface CartItemProps {
   item: CartItemType;
@@ -12,6 +15,13 @@ interface CartItemProps {
 }
 
 export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemProps) {
+  const resolved = (item.image || '').trim() || PLACEHOLDER;
+  const [imgSrc, setImgSrc] = useState(resolved);
+
+  useEffect(() => {
+    setImgSrc((item.image || '').trim() || PLACEHOLDER);
+  }, [item.id, item.image]);
+
   const handleIncrease = () => {
     onUpdateQuantity(item.id, item.quantity + 1);
   };
@@ -33,11 +43,12 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
         <Link href={`/product/${item.slug}`} className="shrink-0">
           <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden bg-gray-100">
             <Image
-              src={item.image || '/images/placeholder.svg'}
+              src={imgSrc}
               alt={item.name}
               fill
               className="object-cover"
               sizes="(max-width: 768px) 80px, 96px"
+              onError={() => setImgSrc(PLACEHOLDER)}
             />
           </div>
         </Link>
