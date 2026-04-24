@@ -201,6 +201,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     const variationPayload = selectedVariation
       ? {
           id: selectedVariation.id,
+          supabaseId: selectedVariation.supabaseId,
           attributes: selectedVariation.attributes.reduce<Record<string, string>>(
             (acc, attr) => {
               acc[attr.name] = attr.option;
@@ -236,6 +237,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     const variationPayload = selectedVariation
       ? {
           id: selectedVariation.id,
+          supabaseId: selectedVariation.supabaseId,
           attributes: selectedVariation.attributes.reduce<Record<string, string>>(
             (acc, attr) => {
               acc[attr.name] = attr.option;

@@ -38,6 +38,13 @@ function deriveOrderStatus(o: any): string {
   return rankToWc[minRank] ?? dbStatus;
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuidString(value: string): boolean {
+  return UUID_RE.test(String(value).trim());
+}
+
 function adaptOrder(o: any) {
   const nameParts = (o.customer_name || '').split(' ');
   const firstName = nameParts[0] || '';
@@ -151,9 +158,19 @@ export async function POST(request: Request) {
           itemMeta.find((m: any) => m.key === key)?.value ?? null;
         const productId =
           getMi('_supabase_product_id') || String(item.product_id || '');
-        const variationId =
-          getMi('_supabase_variation_id') ||
-          (item.variation_id ? String(item.variation_id) : undefined);
+        const supaVarId = getMi('_supabase_variation_id');
+        const rawVariation =
+          supaVarId ||
+          (item.variation_id != null && item.variation_id !== 0
+            ? String(item.variation_id)
+            : undefined);
+        // CJ / catalog: numeric WC-style ids are often synthetic (hashed) when the real
+        // key is a Supabase variation row. Never send that number to JLO for UUID products
+        // without _supabase_variation_id (fix: PDP now passes supabaseId into cart).
+        let variationId = rawVariation;
+        if (!supaVarId && isUuidString(productId) && rawVariation && /^\d+$/.test(String(rawVariation))) {
+          variationId = undefined;
+        }
         return { product_id: productId, variation_id: variationId, quantity: item.quantity };
       })
       .filter((i: any) => i.product_id);
