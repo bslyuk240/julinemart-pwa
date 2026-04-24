@@ -40,14 +40,13 @@ interface ShippingOption {
 
 
 const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
-const JLO_BASE =
-  process.env.NEXT_PUBLIC_JLO_CATALOG_URL ||
-  'https://jlo.julinemart.com';
+/** Same-origin proxy → JLO `voucherHelpers` Netlify function (avoids CORS / HTML error bodies). */
 const VOUCHER_VALIDATION_URL =
-  process.env.NEXT_PUBLIC_VOUCHER_VALIDATION_URL ||
-  `${JLO_BASE.replace(/\/$/, '')}/.netlify/functions/voucherHelpers`;
+  process.env.NEXT_PUBLIC_VOUCHER_VALIDATION_URL || '/api/vouchers/validate';
+/** Same-origin API proxies to Supabase or JLO — do not use JLO catalog /api (404). */
 const INFLUENCER_VALIDATION_URL =
-  `${JLO_BASE.replace(/\/$/, '')}/api/influencers/validate-coupon`;
+  process.env.NEXT_PUBLIC_INFLUENCER_COUPON_VALIDATION_URL ||
+  '/api/influencers/validate-coupon';
 
 // Declare Paystack type
 declare global {
