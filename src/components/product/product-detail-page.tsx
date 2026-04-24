@@ -16,6 +16,7 @@ import { Product, ProductAttribute, ProductVariation, ProductReview } from '@/ty
 import { toast } from 'sonner';
 import { decodeHtmlEntities } from '@/lib/utils/helpers';
 import { filterProductsByCategory } from '@/lib/utils/category-filters';
+import { minVariationListPrice, parseMoney } from '@/lib/utils/parse-money';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -165,8 +166,9 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
   }, [product?.id]);
 
   const formatPrice = (price: string | number) => {
-    const numeric = typeof price === 'number' ? price : parseFloat(price);
-    return `₦${numeric.toLocaleString()}`;
+    const numeric = typeof price === 'number' ? price : parseFloat(String(price ?? ''));
+    const n = Number.isFinite(numeric) ? numeric : 0;
+    return `₦${n.toLocaleString()}`;
   };
 
   const handleAddToCart = () => {
@@ -477,23 +479,31 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
   const selectedPrice = useMemo(() => {
     if (!product) return 0;
     if (selectedVariation) {
-      const sale = selectedVariation.sale_price ? parseFloat(selectedVariation.sale_price) : null;
-      return sale && !isNaN(sale)
-        ? sale
-        : selectedVariation.price
-        ? parseFloat(selectedVariation.price)
-        : parseFloat(product.price);
+      const sale = selectedVariation.sale_price
+        ? parseFloat(String(selectedVariation.sale_price))
+        : NaN;
+      if (Number.isFinite(sale) && sale > 0) return sale;
+      const fromVariation = parseMoney(selectedVariation.price, selectedVariation.regular_price);
+      if (fromVariation > 0) return fromVariation;
+      return parseMoney(product.sale_price, product.price, product.min_price);
     }
-    return parseFloat(product.sale_price || product.price);
-  }, [product, selectedVariation]);
+    return parseMoney(
+      product.sale_price,
+      product.price,
+      product.min_price,
+      variations.length ? minVariationListPrice(variations) : undefined
+    );
+  }, [product, selectedVariation, variations]);
 
   const selectedRegularPrice = useMemo(() => {
     if (!product) return 0;
     if (selectedVariation?.regular_price) {
-      const reg = parseFloat(selectedVariation.regular_price);
-      if (!isNaN(reg)) return reg;
+      const reg = parseFloat(String(selectedVariation.regular_price));
+      if (Number.isFinite(reg) && reg > 0) return reg;
     }
-    return product.regular_price ? parseFloat(product.regular_price) : selectedPrice;
+    const fromParent = parseMoney(product.regular_price, product.price, product.min_price);
+    if (fromParent > 0) return fromParent;
+    return selectedPrice;
   }, [product, selectedPrice, selectedVariation]);
 
   const reviewCount = reviews.length || product?.rating_count || 0;
