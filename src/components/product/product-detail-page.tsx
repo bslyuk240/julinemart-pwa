@@ -15,8 +15,8 @@ import { useWishlist } from '@/hooks/use-wishlist';
 import { Product, ProductAttribute, ProductVariation, ProductReview } from '@/types/product';
 import { toast } from 'sonner';
 import { decodeHtmlEntities } from '@/lib/utils/helpers';
-import { filterProductsByCategory } from '@/lib/utils/category-filters';
 import { minVariationListPrice, parseMoney } from '@/lib/utils/parse-money';
+import { mergeUniqueById, selectRelatedProducts } from '@/lib/utils/related-products';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -143,16 +143,34 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
   useEffect(() => {
     const fetchRelated = async () => {
       if (!product) return;
-      const categorySlug = product.categories?.[0]?.slug;
-      if (!categorySlug) return;
+      const limit = 6;
       try {
-        const qs = new URLSearchParams({ per_page: '24' });
-        const res = await fetch(`/api/products?${qs.toString()}`);
-        if (!res.ok) return;
-        const { products: data } = await res.json();
-        setRelatedProducts(
-          filterProductsByCategory((data as Product[]).filter((p) => p.id !== product.id), categorySlug).slice(0, 6)
-        );
+        const primary: Product[] = [];
+        const ids = (product.related_ids ?? [])
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0 && id !== product.id)
+          .slice(0, limit);
+        if (ids.length) {
+          const r = await fetch(
+            `/api/products?include=${ids.join(',')}&per_page=${String(Math.min(ids.length, 100))}`
+          );
+          if (r.ok) {
+            const { products: fromIds } = await r.json();
+            primary.push(
+              ...(fromIds as Product[]).filter((p) => p && p.id > 0 && p.id !== product.id)
+            );
+          }
+        }
+
+        const res = await fetch('/api/products?per_page=100&orderby=date&order=desc&page=1');
+        if (!res.ok) {
+          if (primary.length) setRelatedProducts(primary.slice(0, limit));
+          return;
+        }
+        const { products: pool } = await res.json();
+        const candidates = (pool as Product[]).filter((p) => p && p.id !== product.id);
+        const scored = selectRelatedProducts(product, candidates, limit);
+        setRelatedProducts(mergeUniqueById(primary, scored, limit));
       } catch (error) {
         console.error('Error fetching related products:', error);
       }

@@ -11,6 +11,14 @@ export async function GET(request: NextRequest) {
   const page = Math.max(Number(searchParams.get('page')) || 1, 1);
   params.per_page = perPage;
   params.page = page;
+  const includeParam = searchParams.get('include');
+  if (includeParam) {
+    const include = includeParam
+      .split(',')
+      .map((x) => Number(x.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (include.length) params.include = include;
+  }
   if (searchParams.get('offset')) params.offset = Number(searchParams.get('offset'));
   if (searchParams.get('orderby')) params.orderby = searchParams.get('orderby');
   if (searchParams.get('order')) params.order = searchParams.get('order');
