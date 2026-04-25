@@ -7,6 +7,7 @@ const JLO_BASE = getJloBaseUrl();
 // Map sub-order status → numeric rank for comparison
 const SUB_STATUS_RANK: Record<string, number> = {
   pending: 1,
+  vendor_dispatched: 2,
   assigned: 2,
   pickup_scheduled: 2,
   in_transit: 3,
