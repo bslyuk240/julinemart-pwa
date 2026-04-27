@@ -245,9 +245,10 @@ export default function AccountPage() {
             <Button
               variant="outline"
               onClick={handleLogout}
-              className="hidden md:flex bg-white/10 border-white/20 text-white hover:bg-white/20"
+              className="flex bg-white/10 border-white/20 text-white hover:bg-white/20"
             >
-              <LogOut className="w-4 h-4 mr-2" /> Logout
+              <LogOut className="w-4 h-4 md:mr-2" />
+              <span className="hidden md:inline">Logout</span>
             </Button>
           </div>
         </div>
