@@ -30,11 +30,14 @@ function hasAnyMissingSections(sections: HomepageSectionsData) {
 }
 
 export default function HomeSections({ initialSections }: HomeSectionsProps) {
+  const needsFetch = hasAnyMissingSections(initialSections || EMPTY_SECTIONS);
   const [sections, setSections] = useState<HomepageSectionsData>(
     initialSections || EMPTY_SECTIONS
   );
+  const [loading, setLoading] = useState(needsFetch);
+
   useEffect(() => {
-    if (!hasAnyMissingSections(initialSections)) {
+    if (!needsFetch) {
       return;
     }
 
@@ -66,6 +69,8 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
         }
       } catch (error) {
         console.error('Failed to refresh homepage sections:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -127,7 +132,8 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
         />
       )}
 
-      {flashSaleProducts.length === 0 &&
+      {!loading &&
+        flashSaleProducts.length === 0 &&
         dealProducts.length === 0 &&
         trendingProducts.length === 0 &&
         topSellerProducts.length === 0 &&
