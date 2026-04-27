@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getHomepageSectionsData } from '@/lib/homepage-sections';
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export async function GET() {
   try {
