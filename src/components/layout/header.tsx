@@ -168,9 +168,9 @@ export default function Header() {
       <div className="container-custom py-3 md:py-4">
         {/* Unified layout: logo + search, compact and inline */}
         <div className="flex items-center gap-3 md:gap-4">
-          {/* Desktop menu toggle */}
+          {/* Menu toggle — visible on all screen sizes */}
           <button
-            className="hidden md:inline-flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 border border-gray-200"
+            className="inline-flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 border border-gray-200"
             onClick={() => setIsMenuOpen(true)}
             aria-label="Open menu"
           >
