@@ -10,6 +10,8 @@ const SUB_STATUS_RANK: Record<string, number> = {
   vendor_dispatched: 2,
   assigned: 2,
   pickup_scheduled: 2,
+  pending_pickup: 2,
+  picked_up: 3,
   in_transit: 3,
   out_for_delivery: 4,
   delivered: 5,
