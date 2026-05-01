@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { Product } from '@/types/product';
+import { resolveProductStoreFromCatalogRow } from '@/lib/catalog/product-store';
 
 const JLO_BASE = (
   process.env.NEXT_PUBLIC_JLO_CATALOG_URL ||
@@ -49,9 +50,6 @@ function normalizedRowToProduct(p: any): Product {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ? p.tags.map((t: any) => ({ id: t.id ?? 0, name: t.name ?? '', slug: t.slug ?? '' }))
     : [];
-
-  const vendor = p.vendor ?? null;
-  const wooVendorId = Number(vendor?.woocommerce_vendor_id ?? 0);
 
   return {
     id: Number(p.woo_product_id ?? p.id ?? 0),
@@ -111,16 +109,8 @@ function normalizedRowToProduct(p: any): Product {
     variations: [],
     grouped_products: [],
     menu_order: 0,
-    meta_data: [],
-    store: wooVendorId
-      ? {
-          id: wooVendorId,
-          name: vendor?.store_name ?? `Vendor ${wooVendorId}`,
-          shop_name: vendor?.store_name ?? `Vendor ${wooVendorId}`,
-          url: `/vendor/${wooVendorId}`,
-          address: {},
-        }
-      : undefined,
+    meta_data: Array.isArray(p.meta_data) ? p.meta_data : [],
+    store: resolveProductStoreFromCatalogRow(p),
   } as unknown as Product;
 }
 
@@ -176,12 +166,14 @@ export async function GET(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const firstRow = body.data[0] as any;
     const vendorRow = firstRow?.vendor ?? null;
+    const resolvedWcId =
+      resolveProductStoreFromCatalogRow(firstRow)?.id ?? numericId;
     const vendor = vendorRow
       ? {
-          id: Number(vendorRow.woocommerce_vendor_id ?? numericId),
-          store_name: vendorRow.store_name ?? `Vendor ${numericId}`,
+          id: resolvedWcId,
+          store_name: vendorRow.store_name ?? `Vendor ${resolvedWcId}`,
           store_slug: vendorRow.store_slug ?? '',
-          store_url: `/vendor/${vendorRow.woocommerce_vendor_id ?? numericId}`,
+          store_url: `/vendor/${resolvedWcId}`,
           vendor_display_name: vendorRow.store_name ?? '',
           vendor_shop_name: vendorRow.store_name ?? '',
           enabled: true,

@@ -11,6 +11,7 @@
  */
 
 import type { Product, ProductAttribute, ProductVariation, ProductsQueryParams } from '@/types/product';
+import { resolveProductStoreFromCatalogRow } from '@/lib/catalog/product-store';
 
 function getJloCatalogBase(): string | null {
   const url =
@@ -313,20 +314,7 @@ export function toWcProduct(row: any): Product {
     min_price: minPriceMeta || undefined,
     max_price: maxPriceMeta || undefined,
     meta_data: Array.isArray(row.meta_data) ? row.meta_data : [],
-    store: (() => {
-      if (row.store) return row.store;
-      // Supabase data has a nested vendor object: { id, store_name, store_slug, woocommerce_vendor_id }
-      const vendor = row.vendor;
-      const vendorId = Number(vendor?.woocommerce_vendor_id ?? row.woocommerce_vendor_id ?? row.wc_vendor_id ?? 0);
-      if (!vendorId) return undefined;
-      return {
-        id: vendorId,
-        name: vendor?.store_name ?? `Vendor ${vendorId}`,
-        shop_name: vendor?.store_name ?? `Vendor ${vendorId}`,
-        url: `/vendor/${vendorId}`,
-        address: {},
-      };
-    })(),
+    store: resolveProductStoreFromCatalogRow(row),
   };
 }
 
