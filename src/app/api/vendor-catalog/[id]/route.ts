@@ -5,7 +5,7 @@
  * (via catalog-products Netlify function) and maps them to the WC Product shape.
  *
  * Runs server-side only, so JLO CORS restrictions don't apply.
- * The vendor [id] must be the WooCommerce numeric vendor ID.
+ * [id] = WooCommerce numeric vendor user id, or JLO `jlo-{uuid}` (vendors.woocommerce_vendor_id).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -125,9 +125,9 @@ export async function GET(
     );
   }
 
-  const { id } = await params;
-  const numericId = parseInt(id, 10);
-  if (!numericId || isNaN(numericId)) {
+  const { id: rawId } = await params;
+  const wooVendorKey = decodeURIComponent(String(rawId ?? '')).trim();
+  if (!wooVendorKey) {
     return NextResponse.json(
       { success: false, error: 'Invalid vendor ID', products: [], total: 0 },
       { status: 400 }
@@ -138,7 +138,7 @@ export async function GET(
   // Use per_page=500 to fetch the full vendor catalog in one shot.
   const catalogUrl =
     `${JLO_BASE}/.netlify/functions/catalog-products` +
-    `?woo_vendor_id=${encodeURIComponent(id)}&per_page=500&status=published`;
+    `?woo_vendor_id=${encodeURIComponent(wooVendorKey)}&per_page=500&status=published`;
 
   try {
     const res = await fetch(catalogUrl, {
@@ -167,7 +167,7 @@ export async function GET(
     const firstRow = body.data[0] as any;
     const vendorRow = firstRow?.vendor ?? null;
     const resolvedWcId =
-      resolveProductStoreFromCatalogRow(firstRow)?.id ?? numericId;
+      resolveProductStoreFromCatalogRow(firstRow)?.id ?? wooVendorKey;
     const vendor = vendorRow
       ? {
           id: resolvedWcId,

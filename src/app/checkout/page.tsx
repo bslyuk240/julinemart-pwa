@@ -903,16 +903,22 @@ export default function CheckoutPage() {
 
     try {
       const orderVendorMeta = (() => {
-        const vendorBuckets: Record<number, { vendor_id: number; vendor_name: string; items: number[] }> = {};
+        const vendorBuckets: Record<
+          string,
+          { vendor_id: string; vendor_name: string; items: number[] }
+        > = {};
 
         items.forEach((item: any, idx: number) => {
-          const vid = item.vendorId ? Number(item.vendorId) : undefined;
+          const vk =
+            item.vendorId != null && item.vendorId !== ''
+              ? String(item.vendorId)
+              : '';
           const vname = item.vendorName || 'Vendor';
-          if (!vid) return;
-          if (!vendorBuckets[vid]) {
-            vendorBuckets[vid] = { vendor_id: vid, vendor_name: vname, items: [] };
+          if (!vk) return;
+          if (!vendorBuckets[vk]) {
+            vendorBuckets[vk] = { vendor_id: vk, vendor_name: vname, items: [] };
           }
-          vendorBuckets[vid].items.push(idx);
+          vendorBuckets[vk].items.push(idx);
         });
 
         const vendorsMetaValue = Object.values(vendorBuckets);
@@ -960,7 +966,8 @@ export default function CheckoutPage() {
           company: '',
         },
         line_items: items.map((item: any) => {
-          const vendorId = item.vendorId ? Number(item.vendorId) : undefined;
+          const vendorIdStr =
+            item.vendorId != null && item.vendorId !== '' ? String(item.vendorId) : '';
           const vendorName = item.vendorName || 'JulineMart Vendor';
           const attributeMeta = item.variation?.attributes
             ? Object.entries(item.variation.attributes).map(([key, value]) => ({
@@ -982,13 +989,13 @@ export default function CheckoutPage() {
                 key: '_hub_name',
                 value: item.hubName || 'Default Hub',
               },
-              ...(vendorId
+              ...(vendorIdStr
                 ? [
-                    { key: '_vendor_id', value: vendorId.toString() },
-                    { key: '_wcfm_vendor_id', value: vendorId.toString() },
-                    { key: '_wcfmmp_vendor_id', value: vendorId.toString() },
-                    { key: '_wcfmmp_product_author', value: vendorId.toString() },
-                    { key: '_wcfmmp_sold_by', value: vendorId.toString() },
+                    { key: '_vendor_id', value: vendorIdStr },
+                    { key: '_wcfm_vendor_id', value: vendorIdStr },
+                    { key: '_wcfmmp_vendor_id', value: vendorIdStr },
+                    { key: '_wcfmmp_product_author', value: vendorIdStr },
+                    { key: '_wcfmmp_sold_by', value: vendorIdStr },
                   ]
                 : []),
               ...(vendorName
@@ -1011,7 +1018,14 @@ export default function CheckoutPage() {
           ...orderVendorMeta,
           {
             key: 'wcfm_order_vendors',
-            value: Array.from(new Set(items.map((item: any) => item.vendorId).filter(Boolean))).join(','),
+            value: Array.from(
+              new Set(
+                items
+                  .map((item: any) => item.vendorId)
+                  .filter((id: unknown) => id != null && id !== '')
+                  .map((id: unknown) => String(id))
+              )
+            ).join(','),
           },
           {
             key: '_hub_id',

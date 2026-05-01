@@ -22,7 +22,7 @@ export function scoreProductRelatedness(current: Product, candidate: Product): n
 
   const va = current.store?.id;
   const vb = candidate.store?.id;
-  if (va != null && vb != null && Number(va) === Number(vb)) {
+  if (va != null && vb != null && String(va) === String(vb)) {
     score += 5;
   }
 

@@ -13,78 +13,105 @@ const VENDOR_META_KEYS = new Set([
   'wcfm_vendor_id',
 ]);
 
-function parseWooVendorId(value: unknown): number {
-  if (value == null || value === '') return 0;
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-    return Math.min(Math.floor(value), Number.MAX_SAFE_INTEGER);
+/** Canonical vendor key for `/vendor/[id]` + JLO `woo_vendor_id` catalog filter. */
+export type CatalogVendorRouteKey = number | string;
+
+/**
+ * JLO stores non–WooCommerce marketplace vendors as `woocommerce_vendor_id = "jlo-{application_uuid}"`
+ * (see vendor-approve.js). Those must stay strings; Number("jlo-…") is NaN and would hide vendor links.
+ */
+export function parseCatalogVendorRouteKey(v: unknown): CatalogVendorRouteKey | null {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number' && Number.isFinite(v) && v > 0) {
+    return Math.min(Math.floor(v), Number.MAX_SAFE_INTEGER);
   }
-  if (typeof value === 'string') {
-    const t = value.trim();
-    if (!t || UUID_RE.test(t)) return 0;
-    const n = Number(t);
-    return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), Number.MAX_SAFE_INTEGER) : 0;
+  if (typeof v === 'string') {
+    const t = v.trim();
+    if (!t || UUID_RE.test(t)) return null;
+    if (/^[0-9]+$/.test(t)) {
+      const n = Number(t);
+      return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), Number.MAX_SAFE_INTEGER) : null;
+    }
+    return t;
   }
-  return 0;
+  return null;
 }
 
-function vendorIdFromMeta(meta: unknown): number {
-  if (!Array.isArray(meta)) return 0;
+function vendorKeyFromMeta(meta: unknown): CatalogVendorRouteKey | null {
+  if (!Array.isArray(meta)) return null;
   for (const m of meta as { key?: string; value?: unknown }[]) {
     if (!m?.key || !VENDOR_META_KEYS.has(m.key)) continue;
-    const id = parseWooVendorId(m.value);
-    if (id) return id;
+    const k = parseCatalogVendorRouteKey(m.value);
+    if (k != null) return k;
   }
-  return 0;
+  return null;
+}
+
+function pickVendorRouteKeyFromRow(row: {
+  vendor?: Record<string, unknown> | null;
+  woocommerce_vendor_id?: unknown;
+  wc_vendor_id?: unknown;
+  woo_vendor_id?: unknown;
+  wcfm_vendor_id?: unknown;
+  meta_data?: unknown;
+}): CatalogVendorRouteKey | null {
+  const vendor = row?.vendor;
+  const candidates = [
+    vendor?.woocommerce_vendor_id,
+    vendor?.woo_vendor_id,
+    vendor?.wcfm_vendor_id,
+    vendor?.wc_vendor_id,
+    row?.woocommerce_vendor_id,
+    row?.wc_vendor_id,
+    row?.woo_vendor_id,
+    row?.wcfm_vendor_id,
+  ];
+
+  for (const c of candidates) {
+    const k = parseCatalogVendorRouteKey(c);
+    if (k != null) return k;
+  }
+
+  if (vendor?.id != null && !UUID_RE.test(String(vendor.id).trim())) {
+    const k = parseCatalogVendorRouteKey(vendor.id);
+    if (k != null) return k;
+  }
+
+  return vendorKeyFromMeta(row?.meta_data);
 }
 
 /**
  * Build `Product.store` from a JLO / Supabase catalog row.
- * Supports multiple vendor id field names (migration + CJ import paths) and WC-style meta_data.
+ * Supports numeric WC vendor ids and JLO synthetic ids (`jlo-…`), plus WC-style meta_data.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function resolveProductStoreFromCatalogRow(row: any): Product['store'] {
   const rawStore = row?.store;
-  if (rawStore && typeof rawStore === 'object') {
-    const sid = parseWooVendorId(rawStore.id);
-    if (sid > 0) {
+  if (rawStore && typeof rawStore === 'object' && rawStore.id != null) {
+    const key = parseCatalogVendorRouteKey(rawStore.id);
+    if (key != null) {
       return {
-        id: sid,
+        id: key,
         name: String(rawStore.name ?? ''),
         shop_name: String(rawStore.shop_name ?? rawStore.name ?? ''),
         url:
           typeof rawStore.url === 'string' && rawStore.url
             ? rawStore.url
-            : `/vendor/${sid}`,
+            : `/vendor/${key}`,
         address: rawStore.address ?? {},
       };
     }
   }
 
   const vendor = row?.vendor;
-  let vid =
-    parseWooVendorId(vendor?.woocommerce_vendor_id) ||
-    parseWooVendorId(vendor?.woo_vendor_id) ||
-    parseWooVendorId(vendor?.wcfm_vendor_id) ||
-    parseWooVendorId(vendor?.wc_vendor_id) ||
-    parseWooVendorId(row?.woocommerce_vendor_id) ||
-    parseWooVendorId(row?.wc_vendor_id) ||
-    parseWooVendorId(row?.woo_vendor_id) ||
-    parseWooVendorId(row?.wcfm_vendor_id);
-
-  // Some rows use vendor.id as the WC vendor user id (numeric); never treat UUID as id.
-  if (!vid && vendor?.id != null && !UUID_RE.test(String(vendor.id).trim())) {
-    vid = parseWooVendorId(vendor.id);
-  }
-
-  if (!vid) vid = vendorIdFromMeta(row?.meta_data);
-
-  if (!vid) return undefined;
+  const key = pickVendorRouteKeyFromRow(row);
+  if (key == null) return undefined;
 
   return {
-    id: vid,
-    name: vendor?.store_name ?? `Vendor ${vid}`,
-    shop_name: vendor?.store_name ?? `Vendor ${vid}`,
-    url: `/vendor/${vid}`,
+    id: key,
+    name: vendor?.store_name ?? `Vendor ${key}`,
+    shop_name: vendor?.store_name ?? `Vendor ${key}`,
+    url: `/vendor/${key}`,
     address: {},
   };
 }

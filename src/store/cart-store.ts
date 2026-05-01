@@ -8,6 +8,7 @@ import { getAllShippingMethods } from '@/lib/woocommerce/shipping';
 import { trackAddToCart } from '@/lib/gtag';
 import { parseProductWeightKg } from '@/lib/shipping/cart-weight';
 import { parseMoney } from '@/lib/utils/parse-money';
+import { parseCatalogVendorRouteKey } from '@/lib/catalog/product-store';
 
 export interface CartItem extends TypedCartItem {
   weight?: number;
@@ -215,10 +216,10 @@ const hubName = hubNameMeta ? String(hubNameMeta.value) : null;
               ['_vendor_name', 'vendor_name', '_wcfm_vendor_name'].includes(m.key)
             ) || null;
 
-          const id = vendorMeta?.value ? Number(vendorMeta.value) : undefined;
+          const id = vendorMeta?.value != null ? parseCatalogVendorRouteKey(vendorMeta.value) : undefined;
 
           return {
-            id,
+            id: id ?? undefined,
             name: vendorNameMeta?.value || 'Vendor',
           };
         };

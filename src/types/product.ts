@@ -76,8 +76,9 @@ export interface Product {
   /** 👇 This is where hub_id is located */
   meta_data: MetaData[];
 
+  /** `id` is numeric for WooCommerce/WCFM vendors, or a string (e.g. `jlo-{uuid}` from JLO vendor onboarding). */
   store?: {
-    id: number;
+    id: number | string;
     name: string;
     shop_name: string;
     url: string;

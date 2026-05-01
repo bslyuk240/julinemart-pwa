@@ -174,6 +174,11 @@ export async function filterActiveVendorProducts(products: Product[]): Promise<P
         return true;
       }
 
+      // JLO onboarding uses non-numeric vendor keys (e.g. `jlo-{uuid}`) not present in Woo vendors-status.
+      if (typeof vendorId === 'string') {
+        return true;
+      }
+
       const isActive = activeVendorIds.has(vendorId);
 
       if (!isActive) {

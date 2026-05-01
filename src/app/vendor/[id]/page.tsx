@@ -14,7 +14,7 @@ type VendorSortOption = 'date' | 'popularity' | 'price' | 'price-desc';
 const INITIAL_PAGE_SIZE = 12;
 
 interface VendorData {
-  id: number;
+  id: number | string;
   store_name: string;
   store_logo?: string | null;
   banner?: string | null;
@@ -67,7 +67,10 @@ export default function VendorStorePage() {
     const { silent = false, page = 1, perPage = INITIAL_PAGE_SIZE, append = false } = opts;
     if (!silent) setLoading(true);
     try {
-      const res  = await fetch(`/api/vendor/${vendorId}?page=${page}&per_page=${perPage}`, { cache: 'no-store' });
+      const res  = await fetch(
+        `/api/vendor/${encodeURIComponent(vendorId)}?page=${page}&per_page=${perPage}`,
+        { cache: 'no-store' }
+      );
       const data = await res.json() as {
         vendor: VendorData;
         products: Product[];
