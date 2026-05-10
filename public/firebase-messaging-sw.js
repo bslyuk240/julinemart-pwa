@@ -132,6 +132,11 @@ async function initFirebaseMessaging() {
   return initPromise;
 }
 
+// Activate the new service worker immediately so push fixes take effect
+// without requiring users to close all tabs first.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+
 void initFirebaseMessaging();
 
 self.addEventListener('notificationclick', (event) => {
