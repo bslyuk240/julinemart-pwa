@@ -108,18 +108,21 @@ async function initFirebaseMessaging() {
 
     const messaging = firebase.messaging();
     messaging.onBackgroundMessage((messagePayload) => {
-      // Avoid duplicate notifications when FCM/browser already displays
-      // a notification payload automatically.
+      const { title, options } = buildNotification(messagePayload);
+
+      // Chrome/Android: FCM displays notification messages natively, so skip
+      // to avoid duplicates. iOS Safari PWA: FCM never displays natively —
+      // the service worker must always call showNotification.
       const hasManagedNotification = Boolean(
-        messagePayload &&
-          messagePayload.notification &&
-          (messagePayload.notification.title || messagePayload.notification.body)
+        messagePayload?.notification?.title || messagePayload?.notification?.body
       );
-      if (hasManagedNotification) {
+      const ua = (self.navigator && self.navigator.userAgent) || '';
+      const isIOS = /iPhone|iPad|iPod/.test(ua);
+
+      if (hasManagedNotification && !isIOS) {
         return;
       }
 
-      const { title, options } = buildNotification(messagePayload);
       self.registration.showNotification(title, options);
     });
   })().catch((error) => {

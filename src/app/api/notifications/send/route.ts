@@ -515,7 +515,8 @@ export async function POST(request: NextRequest) {
       if (audience === 'all_customers') {
         const { data: tokenRows, error } = await supabase
           .from('device_tokens')
-          .select('fcm_token');
+          .select('fcm_token')
+          .eq('user_type', 'customer');
 
         if (error) {
           throw new Error(`Database error: ${error.message}`);
