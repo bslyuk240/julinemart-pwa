@@ -50,20 +50,30 @@ export default function NotificationPermissionPrompt() {
     if (!('Notification' in window)) return;
     if (Notification.permission !== 'default') return;
 
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-    if (!isStandalone) return;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+    // iOS web push only works when installed as a standalone PWA.
+    // On Android/desktop, web push works in the browser too — don't gate on standalone.
+    if (isIOS) {
+      const isStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+      if (!isStandalone) return;
+    }
 
     const seen = localStorage.getItem(PROMPT_SEEN_KEY);
     if (seen) {
       const snoozedAt = localStorage.getItem(PROMPT_SNOOZED_KEY);
-      if (!snoozedAt) return;
+      if (!snoozedAt) {
+        // Prompt was shown before but no snooze was recorded (user navigated away
+        // without interacting). Start a snooze timer now so it can re-appear.
+        localStorage.setItem(PROMPT_SNOOZED_KEY, Date.now().toString());
+        return;
+      }
       const daysSince = (Date.now() - parseInt(snoozedAt)) / (1000 * 60 * 60 * 24);
       if (daysSince < SNOOZE_DAYS) return;
     }
 
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     setPlatform(isIOS ? 'ios' : 'android_pwa');
 
     const timer = setTimeout(() => setShow(true), 2000);
