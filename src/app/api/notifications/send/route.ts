@@ -605,24 +605,21 @@ export async function POST(request: NextRequest) {
     const matchedTokensCount = dedupedTokens.length;
 
     if (matchedTokensCount === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          audience,
-          message:
-            audience === 'single'
-              ? 'No devices registered for this customer'
-              : 'No devices matched the selected audience',
-          matchedTokensCount: 0,
-          sent: 0,
-          failed: 0,
-          totalDevices: 0,
-          invalidTokenCount: 0,
-          cleanedUpInvalidTokens: 0,
-          errors: [],
-        },
-        { status: 404 }
-      );
+      return NextResponse.json({
+        success: false,
+        audience,
+        message:
+          audience === 'single'
+            ? 'No devices registered for this customer'
+            : 'No devices matched the selected audience',
+        matchedTokensCount: 0,
+        sent: 0,
+        failed: 0,
+        totalDevices: 0,
+        invalidTokenCount: 0,
+        cleanedUpInvalidTokens: 0,
+        errors: [],
+      });
     }
 
     const useFcmV1 = hasServiceAccountConfig();
