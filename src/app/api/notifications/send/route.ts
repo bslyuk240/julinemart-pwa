@@ -173,21 +173,32 @@ function normalizePushPlatform(value: unknown): PushTargetDevice['platform'] {
 }
 
 function dedupeTargets(rows: DeviceTokenRow[]): PushTargetDevice[] {
-  const seen = new Set<string>();
-  const targets: PushTargetDevice[] = [];
+  // Prefer web when a token appears with mixed platform rows.
+  // Browser tokens historically got saved as "android" in some flows;
+  // sending web tokens as android can trigger generic Chrome background updates.
+  const byToken = new Map<string, PushTargetDevice['platform']>();
 
   for (const row of rows) {
     const token = typeof row?.fcm_token === 'string' ? row.fcm_token.trim() : '';
-    if (!token || seen.has(token)) continue;
-    seen.add(token);
+    if (!token) continue;
 
-    targets.push({
-      token,
-      platform: normalizePushPlatform(row?.platform),
-    });
+    const nextPlatform = normalizePushPlatform(row?.platform);
+    const existing = byToken.get(token);
+
+    if (!existing) {
+      byToken.set(token, nextPlatform);
+      continue;
+    }
+
+    if (existing !== 'web' && nextPlatform === 'web') {
+      byToken.set(token, 'web');
+    }
   }
 
-  return targets;
+  return Array.from(byToken.entries()).map(([token, platform]) => ({
+    token,
+    platform,
+  }));
 }
 
 function isAdminRequest(request: NextRequest) {
