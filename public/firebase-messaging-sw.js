@@ -37,6 +37,22 @@ function scopedAbsUrl(pathOrUrl) {
   return `${prefix}${p}`.replace(/\/+/g, '/');
 }
 
+/** Absolute URLs avoid Android PWAs rejecting invalid relative icon URLs (breaks showNotification). */
+function absoluteNotifyAssetUrl(relPath) {
+  const localized = scopedAbsUrl(relPath);
+  if (
+    typeof localized !== 'string' ||
+    localized.startsWith('http://') ||
+    localized.startsWith('https://')
+  ) {
+    return localized;
+  }
+  return new URL(
+    localized.startsWith('/') ? localized : `/${localized}`,
+    self.location.origin
+  ).href;
+}
+
 /** Prefix app paths when the SW is scoped under a subpath (e.g. /julinemart-pwa). */
 function withScope(relPath) {
   const prefix = scopePathPrefix();
@@ -125,8 +141,8 @@ function buildNotification(payload) {
     title,
     options: {
       body,
-      icon: scopedAbsUrl(JULINEMART_ICON),
-      badge: scopedAbsUrl(JULINEMART_BADGE),
+      icon: absoluteNotifyAssetUrl(JULINEMART_ICON),
+      badge: absoluteNotifyAssetUrl(JULINEMART_BADGE),
       tag: payloadData.type || 'julinemart-notification',
       renotify: true,
       data: {
