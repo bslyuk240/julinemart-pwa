@@ -109,20 +109,9 @@ async function initFirebaseMessaging() {
     const messaging = firebase.messaging();
     messaging.onBackgroundMessage((messagePayload) => {
       const { title, options } = buildNotification(messagePayload);
-
-      // Chrome/Android: FCM displays notification messages natively, so skip
-      // to avoid duplicates. iOS Safari PWA: FCM never displays natively —
-      // the service worker must always call showNotification.
-      const hasManagedNotification = Boolean(
-        messagePayload?.notification?.title || messagePayload?.notification?.body
-      );
-      const ua = (self.navigator && self.navigator.userAgent) || '';
-      const isIOS = /iPhone|iPad|iPod/.test(ua);
-
-      if (hasManagedNotification && !isIOS) {
-        return;
-      }
-
+      // For web push (PWA), the onBackgroundMessage handler is solely responsible
+      // for displaying notifications on ALL platforms — the compat SDK does not
+      // auto-display. The `tag` option in buildNotification prevents duplicates.
       self.registration.showNotification(title, options);
     });
   })().catch((error) => {
