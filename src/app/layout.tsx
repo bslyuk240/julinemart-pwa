@@ -7,6 +7,7 @@ import { Toaster } from 'sonner';
 import { CustomerAuthProvider } from '@/context/customer-auth-context';
 import WhatsAppFloat from '@/components/layout/whatsapp-float';
 import PWAInstallPrompt from '@/components/pwa/pwa-install-prompt';
+import NotificationPermissionPrompt from '@/components/pwa/notification-permission-prompt';
 import PWAStandaloneTracker from '@/components/pwa/pwa-standalone-tracker';
 import Footer from '@/components/layout/footer';
 import GlobalPullToRefresh from '@/components/layout/global-pull-to-refresh';
@@ -100,6 +101,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <BottomNav />
             <Toaster position="top-center" richColors />
             <PWAInstallPrompt />
+            <NotificationPermissionPrompt />
           </GlobalPullToRefresh>
         </CustomerAuthProvider>
         <WhatsAppFloat />
