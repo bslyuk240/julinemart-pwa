@@ -77,6 +77,8 @@ function firebaseConfigFetchUrl() {
 }
 const DEFAULT_CLICK_PATH = '/';
 let initPromise = null;
+let lastShownSignature = null;
+let lastShownAt = 0;
 
 function toStringMap(input) {
   const result = {};
@@ -154,6 +156,33 @@ function buildNotification(payload) {
   };
 }
 
+function isDuplicateNotification(title, options) {
+  const signature = `${String(title || '')}|${String(options?.body || '')}|${String(
+    options?.data?.targetPath || ''
+  )}`;
+  const now = Date.now();
+  const duplicate = signature === lastShownSignature && now - lastShownAt < 2500;
+  if (!duplicate) {
+    lastShownSignature = signature;
+    lastShownAt = now;
+  }
+  return duplicate;
+}
+
+function showBuiltNotification(built) {
+  const { title: nTitle, options } = built;
+  if (isDuplicateNotification(nTitle, options)) {
+    return Promise.resolve();
+  }
+  return self.registration.showNotification(nTitle, options).catch((showErr) => {
+    console.error('[jm-sw] showNotification failed, retrying minimal:', showErr);
+    return self.registration.showNotification(String(nTitle || 'JulineMart'), {
+      body: String(options.body || 'You have a new update.'),
+      data: options.data || {},
+    });
+  });
+}
+
 async function initFirebaseMessaging() {
   if (initPromise) return initPromise;
 
@@ -179,15 +208,8 @@ async function initFirebaseMessaging() {
     messaging.onBackgroundMessage((messagePayload) => {
       try {
         const built = buildNotification(messagePayload);
-        const { title: nTitle, options } = built;
         // Returning the promise keeps the SW alive until Chrome records the notification.
-        return self.registration.showNotification(nTitle, options).catch((showErr) => {
-          console.error('[jm-sw] showNotification failed, retrying minimal:', showErr);
-          return self.registration.showNotification(String(nTitle || 'JulineMart'), {
-            body: String(options.body || 'You have a new update.'),
-            data: options.data || {},
-          });
-        });
+        return showBuiltNotification(built);
       } catch (err) {
         console.error('[jm-sw] background message handler error:', err, messagePayload);
         return self.registration.showNotification('JulineMart', {
@@ -230,6 +252,30 @@ self.addEventListener('activate', (event) => {
 });
 
 void initFirebaseMessaging().catch((e) => console.error('[jm-sw] eager init:', e));
+
+// Fallback: handle raw Push API payloads directly.
+// This covers Android/Chrome cases where Firebase's onBackgroundMessage isn't invoked.
+self.addEventListener('push', (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const rawText = event.data ? event.data.text() : '';
+        let payload = {};
+        if (rawText) {
+          try {
+            payload = JSON.parse(rawText);
+          } catch {
+            payload = { data: { message: rawText } };
+          }
+        }
+        const built = buildNotification(payload);
+        await showBuiltNotification(built);
+      } catch (error) {
+        console.error('[jm-sw] push fallback handler failed:', error);
+      }
+    })()
+  );
+});
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
