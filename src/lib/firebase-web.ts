@@ -2,6 +2,7 @@
 
 import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
 import { Messaging, getMessaging, isSupported } from 'firebase/messaging';
+import { withPublicBasePath } from '@/lib/constants';
 
 type FirebaseWebConfig = {
   apiKey: string;
@@ -26,7 +27,7 @@ export async function getFirebaseWebRuntimeConfig(): Promise<FirebaseWebRuntimeC
   if (!configPromise) {
     configPromise = (async () => {
       try {
-        const response = await fetch('/api/notifications/firebase-config', {
+        const response = await fetch(withPublicBasePath('/api/notifications/firebase-config'), {
           method: 'GET',
           cache: 'no-store',
         });

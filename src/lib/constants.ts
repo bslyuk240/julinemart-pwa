@@ -6,6 +6,18 @@ export const APP_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
   'http://localhost:3000';
 
+/** When the app lives under a URL prefix (matches `next.config.js` `basePath` if used). */
+export const PUBLIC_BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH || '')
+  .trim()
+  .replace(/\/+$/, '');
+
+/** Prefix absolute app paths for fetches and links (e.g. `/julinemart-pwa/api/...`). */
+export function withPublicBasePath(path: string): string {
+  const p = path.startsWith('/') ? path : `/${path}`;
+  if (!PUBLIC_BASE_PATH) return p;
+  return `${PUBLIC_BASE_PATH}${p}`.replace(/\/+/g, '/');
+}
+
 // Pagination
 export const PRODUCTS_PER_PAGE = 20;
 export const CATEGORIES_PER_PAGE = 20;

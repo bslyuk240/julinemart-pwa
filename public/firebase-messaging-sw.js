@@ -1,10 +1,64 @@
 /* global importScripts, firebase, self, clients */
 
-importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
+importScripts(
+  `https://www.gstatic.com/firebasejs/12.9.0/firebase-app-compat.js`
+);
+importScripts(
+  `https://www.gstatic.com/firebasejs/12.9.0/firebase-messaging-compat.js`
+);
 
 const JULINEMART_ICON = '/icon-192.png';
 const JULINEMART_BADGE = '/favicon-96x96.png';
+
+/** Path prefix for subpath installs (registration scope minus trailing slash). */
+function scopePathPrefix() {
+  try {
+    if (self.registration?.scope) {
+      const p = new URL(self.registration.scope).pathname.replace(/\/$/, '');
+      return p ? p : '';
+    }
+  } catch (_) {
+    /* noop */
+  }
+  return '';
+}
+
+function scopedAbsUrl(pathOrUrl) {
+  if (
+    typeof pathOrUrl !== 'string' ||
+    pathOrUrl.startsWith('http://') ||
+    pathOrUrl.startsWith('https://')
+  ) {
+    return pathOrUrl;
+  }
+  const prefix = scopePathPrefix();
+  if (!prefix) return pathOrUrl;
+  const p = pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`;
+  return `${prefix}${p}`.replace(/\/+/g, '/');
+}
+
+/** Prefix app paths when the SW is scoped under a subpath (e.g. /julinemart-pwa). */
+function withScope(relPath) {
+  const prefix = scopePathPrefix();
+  if (!relPath || relPath === '/') {
+    const root = prefix ? `${prefix}/` : '/';
+    return root.replace(/\/+/g, '/');
+  }
+  const normalized = relPath.startsWith('/') ? relPath : `/${relPath}`;
+  if (!prefix) return normalized;
+  if (normalized === prefix || normalized.startsWith(`${prefix}/`)) {
+    return normalized;
+  }
+  return `${prefix}${normalized}`.replace(/\/+/g, '/');
+}
+
+function firebaseConfigFetchUrl() {
+  const prefix = scopePathPrefix();
+  const path = prefix
+    ? `${prefix}/api/notifications/firebase-config`
+    : `/api/notifications/firebase-config`;
+  return new URL(path, self.location.origin).href;
+}
 const DEFAULT_CLICK_PATH = '/';
 let initPromise = null;
 
@@ -54,7 +108,8 @@ function resolveTargetPath(data) {
 
 function buildNotification(payload) {
   const payloadData = toStringMap(payload && payload.data ? payload.data : {});
-  const targetPath = resolveTargetPath(payloadData) || DEFAULT_CLICK_PATH;
+  const rawTarget = resolveTargetPath(payloadData) || DEFAULT_CLICK_PATH;
+  const targetPath = withScope(rawTarget);
 
   const title =
     (payload && payload.notification && payload.notification.title) ||
@@ -70,8 +125,8 @@ function buildNotification(payload) {
     title,
     options: {
       body,
-      icon: JULINEMART_ICON,
-      badge: JULINEMART_BADGE,
+      icon: scopedAbsUrl(JULINEMART_ICON),
+      badge: scopedAbsUrl(JULINEMART_BADGE),
       tag: payloadData.type || 'julinemart-notification',
       renotify: true,
       data: {
@@ -86,12 +141,9 @@ async function initFirebaseMessaging() {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    const response = await fetch(
-      `${self.location.origin}/api/notifications/firebase-config`,
-      {
-        cache: 'no-store',
-      }
-    );
+    const response = await fetch(firebaseConfigFetchUrl(), {
+      cache: 'no-store',
+    });
 
     if (!response.ok) {
       throw new Error(`firebase-config fetch failed (HTTP ${response.status})`);
@@ -109,10 +161,8 @@ async function initFirebaseMessaging() {
     const messaging = firebase.messaging();
     messaging.onBackgroundMessage((messagePayload) => {
       const { title, options } = buildNotification(messagePayload);
-      // For web push (PWA), the onBackgroundMessage handler is solely responsible
-      // for displaying notifications on ALL platforms — the compat SDK does not
-      // auto-display. The `tag` option in buildNotification prevents duplicates.
-      self.registration.showNotification(title, options);
+      // Returning the promise keeps the SW alive until Chrome records the notification.
+      return self.registration.showNotification(title, options);
     });
   })().catch((error) => {
     console.error('firebase-messaging-sw init error:', error);
@@ -132,7 +182,8 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const data = toStringMap(event.notification.data || {});
-  const targetPath = resolveTargetPath(data) || DEFAULT_CLICK_PATH;
+  const rawTarget = resolveTargetPath(data) || DEFAULT_CLICK_PATH;
+  const targetPath = withScope(rawTarget);
   const destination = new URL(targetPath, self.location.origin).href;
 
   event.waitUntil(

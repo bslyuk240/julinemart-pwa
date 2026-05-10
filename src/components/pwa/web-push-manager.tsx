@@ -13,10 +13,26 @@ import {
   WEB_PUSH_ENABLE_EVENT,
   type WebPushEnableResult,
 } from '@/lib/web-push-events';
+import { PUBLIC_BASE_PATH, withPublicBasePath } from '@/lib/constants';
 
 const PENDING_TOKEN_STORAGE_KEY = 'jm_pending_fcm_token';
 const LAST_TOKEN_STORAGE_KEY = 'jm_last_fcm_token';
 const DEV_CACHE_RESET_KEY = 'jm_dev_cache_reset_done';
+
+function firebaseMessagingServiceWorkerRegistration(): {
+  scriptUrl: string;
+  registrationOptions?: RegistrationOptions;
+} {
+  if (!PUBLIC_BASE_PATH || PUBLIC_BASE_PATH === '/') {
+    return { scriptUrl: '/firebase-messaging-sw.js' };
+  }
+  const base = PUBLIC_BASE_PATH.startsWith('/') ? PUBLIC_BASE_PATH : `/${PUBLIC_BASE_PATH}`;
+  const scriptUrl = `${base}/firebase-messaging-sw.js`.replace(/\/+/g, '/');
+  return {
+    scriptUrl,
+    registrationOptions: { scope: `${base}/`.replace(/\/+/g, '/') },
+  };
+}
 
 function toStringMap(input?: Record<string, unknown>) {
   const result: Record<string, string> = {};
@@ -123,7 +139,7 @@ export default function WebPushManager() {
       }
 
       try {
-        const response = await fetch('/api/notifications/register-device', {
+        const response = await fetch(withPublicBasePath('/api/notifications/register-device'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -193,9 +209,12 @@ export default function WebPushManager() {
             } satisfies WebPushEnableResult;
           }
 
-          const swRegistration = await navigator.serviceWorker.register(
-            '/firebase-messaging-sw.js'
-          );
+          const { scriptUrl, registrationOptions } =
+            firebaseMessagingServiceWorkerRegistration();
+          const swRegistration =
+            registrationOptions !== undefined
+              ? await navigator.serviceWorker.register(scriptUrl, registrationOptions)
+              : await navigator.serviceWorker.register(scriptUrl);
 
           let permission = Notification.permission;
           if (permission === 'default' && interactivePermissionRequest) {

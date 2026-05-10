@@ -24,6 +24,8 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_APP_NAME: 'JulineMart',
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    /** Set to `/julinemart-pwa` when hosting the Next app under that path (SW + `/api`). */
+    NEXT_PUBLIC_BASE_PATH: (process.env.NEXT_PUBLIC_BASE_PATH || '').trim(),
   },
   
   experimental: {

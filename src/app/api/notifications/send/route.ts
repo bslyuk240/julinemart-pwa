@@ -639,6 +639,11 @@ export async function POST(request: NextRequest) {
     const normalizedData = normalizeDataPayload({
       type: type || 'general',
       ...(data || {}),
+      // Redundant copies for SW parsing: web clients often only receive robust `data` keys,
+      // and `onBackgroundMessage` must still show meaningful copy.
+      title: String(title),
+      body: String(message),
+      message: String(message),
     });
     const webLinkPath = resolveWebLinkPath(normalizedData);
     // Use the configured storefront origin so notification clicks always open
@@ -648,6 +653,14 @@ export async function POST(request: NextRequest) {
       process.env.NEXT_PUBLIC_SITE_URL ||
       request.nextUrl.origin;
     const webLinkUrl = new URL(webLinkPath, storefrontOrigin).toString();
+
+    const pathPrefix = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/+$/, '');
+    const webpushIcon = pathPrefix
+      ? `${pathPrefix}/icon-192.png`.replace(/\/+/g, '/')
+      : '/icon-192.png';
+    const webpushBadge = pathPrefix
+      ? `${pathPrefix}/favicon-96x96.png`.replace(/\/+/g, '/')
+      : '/favicon-96x96.png';
 
     const results: TokenSendResult[] = await Promise.all(
       dedupedTokens.map(async (token) => {
@@ -676,8 +689,8 @@ export async function POST(request: NextRequest) {
                   notification: {
                     title,
                     body: message,
-                    icon: '/icon-192.png',
-                    badge: '/favicon-96x96.png',
+                    icon: webpushIcon,
+                    badge: webpushBadge,
                   },
                   fcm_options: {
                     link: webLinkUrl,
