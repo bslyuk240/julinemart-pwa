@@ -166,13 +166,6 @@ export default function WebPushManager() {
             } satisfies WebPushEnableResult;
           }
 
-          if (!isAuthenticated || !(customerId ?? customer?.id)) {
-            return {
-              success: false,
-              message: 'Sign in required before enabling browser notifications.',
-            } satisfies WebPushEnableResult;
-          }
-
           if (
             !('Notification' in window) ||
             !('serviceWorker' in navigator) ||
@@ -241,6 +234,17 @@ export default function WebPushManager() {
             return {
               success: false,
               message: 'Could not obtain a browser push token.',
+            } satisfies WebPushEnableResult;
+          }
+
+          // Auth check is intentionally after getToken: if the user isn't signed in
+          // yet, we still fetch the token and park it in localStorage as pending so
+          // that rebindLocalTokenIfAvailable() can register it once they log in.
+          if (!isAuthenticated || !(customerId ?? customer?.id)) {
+            localStorage.setItem(PENDING_TOKEN_STORAGE_KEY, token);
+            return {
+              success: false,
+              message: 'Sign in required before enabling browser notifications.',
             } satisfies WebPushEnableResult;
           }
 
