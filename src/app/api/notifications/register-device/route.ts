@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const { customerId, fcmToken, platform } = body;
     const normalizedPlatform =
       platform === undefined || platform === null || platform === ''
-        ? 'android'
+        ? 'web'
         : platform === 'android' || platform === 'web'
           ? platform
           : null;

@@ -143,8 +143,9 @@ function buildNotification(payload) {
       body,
       icon: absoluteNotifyAssetUrl(JULINEMART_ICON),
       badge: absoluteNotifyAssetUrl(JULINEMART_BADGE),
-      tag: payloadData.type || 'julinemart-notification',
-      renotify: true,
+      // Distinct tag helps Android avoid renotify edge cases; renotify can break some Chrome builds.
+      tag: `${payloadData.type || 'jm'}-${Date.now().toString(36)}`,
+      renotify: false,
       data: {
         ...payloadData,
         targetPath,
@@ -176,23 +177,59 @@ async function initFirebaseMessaging() {
 
     const messaging = firebase.messaging();
     messaging.onBackgroundMessage((messagePayload) => {
-      const { title, options } = buildNotification(messagePayload);
-      // Returning the promise keeps the SW alive until Chrome records the notification.
-      return self.registration.showNotification(title, options);
+      try {
+        const built = buildNotification(messagePayload);
+        const { title: nTitle, options } = built;
+        // Returning the promise keeps the SW alive until Chrome records the notification.
+        return self.registration.showNotification(nTitle, options).catch((showErr) => {
+          console.error('[jm-sw] showNotification failed, retrying minimal:', showErr);
+          return self.registration.showNotification(String(nTitle || 'JulineMart'), {
+            body: String(options.body || 'You have a new update.'),
+            data: options.data || {},
+          });
+        });
+      } catch (err) {
+        console.error('[jm-sw] background message handler error:', err, messagePayload);
+        return self.registration.showNotification('JulineMart', {
+          body: 'You have a new update.',
+        });
+      }
     });
-  })().catch((error) => {
-    console.error('firebase-messaging-sw init error:', error);
-  });
+  })();
+
+  try {
+    await initPromise;
+  } catch (error) {
+    initPromise = null;
+    throw error;
+  }
 
   return initPromise;
 }
 
-// Activate the new service worker immediately so push fixes take effect
-// without requiring users to close all tabs first.
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    (async () => {
+      await initFirebaseMessaging().catch((e) =>
+        console.error('[jm-sw] init during install:', e)
+      );
+      await self.skipWaiting();
+    })()
+  );
+});
 
-void initFirebaseMessaging();
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      await initFirebaseMessaging().catch((e) =>
+        console.error('[jm-sw] init during activate:', e)
+      );
+      await self.clients.claim();
+    })()
+  );
+});
+
+void initFirebaseMessaging().catch((e) => console.error('[jm-sw] eager init:', e));
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();

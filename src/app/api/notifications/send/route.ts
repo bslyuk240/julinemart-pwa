@@ -167,7 +167,9 @@ function parseSegmentPlatform(value: unknown) {
 }
 
 function normalizePushPlatform(value: unknown): PushTargetDevice['platform'] {
-  return value === 'web' ? 'web' : 'android';
+  if (value === 'android') return 'android';
+  // Default web: storefront + browser PWAs. Native/Android app tokens MUST send explicit "android".
+  return 'web';
 }
 
 function dedupeTargets(rows: DeviceTokenRow[]): PushTargetDevice[] {
@@ -452,6 +454,8 @@ function buildFcmV1MessageBody(args: {
           Urgency: 'high',
           TTL: '2419200',
         },
+        // Some Chromium builds deliver data more reliably when mirrored on webpush.
+        data: { ...data },
         fcm_options: {
           link: webLinkUrl,
         },
