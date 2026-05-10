@@ -643,7 +643,13 @@ export async function POST(request: NextRequest) {
       ...(data || {}),
     });
     const webLinkPath = resolveWebLinkPath(normalizedData);
-    const webLinkUrl = new URL(webLinkPath, request.nextUrl.origin).toString();
+    // Use the configured storefront origin so notification clicks always open
+    // the customer PWA, not the server's own hostname (which may differ).
+    const storefrontOrigin =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      request.nextUrl.origin;
+    const webLinkUrl = new URL(webLinkPath, storefrontOrigin).toString();
 
     const results: TokenSendResult[] = await Promise.all(
       dedupedTokens.map(async (token) => {
