@@ -247,8 +247,10 @@ export function toWcProduct(row: any): Product {
   return {
     supabaseId: row.id ?? undefined,
     _variations: inlineVariations,
-    // Use woo_product_id as the numeric WC id; fall back to wc_id or 0
-    id: Number(row.woo_product_id ?? row.wc_id ?? row.id ?? 0),
+    // Prefer WC product ID; fall back to a stable hash of the Supabase UUID so
+    // products not yet synced to WooCommerce still get a positive numeric id and
+    // pass the p.id > 0 guard used in related-products filtering.
+    id: Number(row.woo_product_id ?? row.wc_id ?? 0) || stableNumericId(String(row.id ?? '')),
     name: row.name ?? '',
     slug: row.slug ?? '',
     permalink: row.permalink ?? '',
