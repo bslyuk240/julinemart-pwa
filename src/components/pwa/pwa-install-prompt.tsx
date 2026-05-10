@@ -10,6 +10,41 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+function getOrCreateAnonymousId(): string {
+  try {
+    const key = 'jm_anon_id';
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+    return id;
+  } catch {
+    return 'unknown';
+  }
+}
+
+async function logPwaEvent(params: {
+  event_name: string;
+  platform: string;
+  is_standalone?: boolean;
+  customer_id?: string | null;
+  source_page?: string;
+}) {
+  try {
+    await fetch('/api/analytics/pwa-install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...params,
+        anonymous_id: getOrCreateAnonymousId(),
+        source_page: params.source_page ?? window.location.pathname,
+      }),
+    });
+  } catch {
+    // non-critical
+  }
+}
+
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -18,36 +53,26 @@ export default function PWAInstallPrompt() {
   const hasTrackedPromptShownRef = useRef(false);
 
   useEffect(() => {
-    // Check if already installed (standalone mode)
-    const isInStandalone = 
+    const isInStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone === true;
-    
+
     setIsStandalone(isInStandalone);
 
-    // Check if iOS
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     setIsIOS(iOS);
 
-    // Check if user has dismissed the prompt before
     const dismissed = localStorage.getItem('pwa-install-dismissed');
     const dismissedTime = dismissed ? parseInt(dismissed) : 0;
     const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
 
-    // Show prompt if:
-    // 1. Not installed
-    // 2. Not dismissed, or dismissed more than 7 days ago
-    // 3. Is iOS (needs manual instructions) OR has beforeinstallprompt event
     if (!isInStandalone && daysSinceDismissed > 7) {
       if (iOS) {
-        // Show iOS instructions after 3 seconds
         setTimeout(() => setShowPrompt(true), 3000);
       } else {
-        // Listen for beforeinstallprompt event (Android/Desktop)
         const handler = (e: Event) => {
           e.preventDefault();
           setDeferredPrompt(e as BeforeInstallPromptEvent);
-          // Show prompt after 3 seconds
           setTimeout(() => setShowPrompt(true), 3000);
         };
 
@@ -55,6 +80,15 @@ export default function PWAInstallPrompt() {
         return () => window.removeEventListener('beforeinstallprompt', handler);
       }
     }
+  }, []);
+
+  // Track appinstalled event (Android/Chrome confirms install)
+  useEffect(() => {
+    const handleAppInstalled = () => {
+      logPwaEvent({ event_name: 'pwa_appinstalled', platform: 'android_desktop' });
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+    return () => window.removeEventListener('appinstalled', handleAppInstalled);
   }, []);
 
   useEffect(() => {
@@ -65,40 +99,39 @@ export default function PWAInstallPrompt() {
 
     if (isStandalone || hasTrackedPromptShownRef.current) return;
 
-    trackPwaInstallPromptShown({
-      platform: isIOS ? 'ios' : 'android_desktop',
-    });
+    const platform = isIOS ? 'ios' : 'android_desktop';
+    trackPwaInstallPromptShown({ platform });
+    logPwaEvent({ event_name: 'pwa_install_prompt_shown', platform });
     hasTrackedPromptShownRef.current = true;
   }, [showPrompt, isStandalone, isIOS]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
 
-    // Show the install prompt
-    await deferredPrompt.prompt();
+    logPwaEvent({ event_name: 'pwa_install_clicked', platform: 'android_desktop' });
 
-    // Wait for the user's response
+    await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    
+
     if (outcome === 'accepted') {
       trackPwaInstallAccepted({ platform: 'android_desktop' });
-      console.log('✅ User accepted PWA install');
+      logPwaEvent({ event_name: 'pwa_install_accepted', platform: 'android_desktop' });
     } else {
-      console.log('❌ User dismissed PWA install');
+      logPwaEvent({ event_name: 'pwa_install_dismissed', platform: 'android_desktop' });
     }
 
-    // Clear the deferred prompt
     setDeferredPrompt(null);
     setShowPrompt(false);
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    // Remember dismissal for 7 days
     localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+    if (isIOS) {
+      logPwaEvent({ event_name: 'pwa_ios_guide_dismissed', platform: 'ios' });
+    }
   };
 
-  // Don't show if already installed or dismissed
   if (isStandalone || !showPrompt) {
     return null;
   }
