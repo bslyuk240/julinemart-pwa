@@ -89,20 +89,27 @@ function SectionSkeleton() {
 }
 
 export default function HomeSections({ initialSections }: HomeSectionsProps) {
-  // Seed from cache immediately so returning visitors see data on first paint
-  const [sections, setSections] = useState<HomepageSectionsData>(() => {
-    if (hasData(initialSections || EMPTY_SECTIONS)) return initialSections;
-    if (typeof window !== 'undefined') {
-      const cached = readCache();
-      if (cached && hasData(cached)) return cached;
-    }
-    return EMPTY_SECTIONS;
-  });
+  // Hydration-safe: SSR and first client render must agree. Reading localStorage
+  // inside useState() breaks that (server = skeletons, client = cached products → #418).
+  const initialFromServer = initialSections ?? EMPTY_SECTIONS;
+  const serverHasData = hasData(initialFromServer);
 
-  const [loading, setLoading] = useState(() => !hasData(sections));
+  const [sections, setSections] = useState<HomepageSectionsData>(() =>
+    serverHasData ? initialFromServer : EMPTY_SECTIONS,
+  );
+
+  const [loading, setLoading] = useState(() => !serverHasData);
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!serverHasData) {
+      const cached = readCache();
+      if (cached && hasData(cached)) {
+        setSections(cached);
+        setLoading(false);
+      }
+    }
 
     const refresh = async () => {
       try {
@@ -122,7 +129,7 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
 
     refresh();
     return () => { cancelled = true; };
-  }, []);
+  }, [serverHasData]);
 
   const {
     flashSaleProducts,
