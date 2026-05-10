@@ -52,14 +52,16 @@ export default function NotificationPermissionPrompt() {
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-    // iOS web push only works when installed as a standalone PWA.
-    // On Android/desktop, web push works in the browser too — don't gate on standalone.
-    if (isIOS) {
-      const isStandalone =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-      if (!isStandalone) return;
-    }
+    // Require standalone on both iOS and Android:
+    // - iOS: web push only works in standalone mode
+    // - Android: install prompt (3 s) and notification prompt (2 s) are both
+    //   bottom sheets — showing both in browser mode creates a stacked-overlay
+    //   conflict. The right UX flow is install first, then enable notifications
+    //   once the app is running as a standalone PWA.
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+    if (!isStandalone) return;
 
     const seen = localStorage.getItem(PROMPT_SEEN_KEY);
     if (seen) {
