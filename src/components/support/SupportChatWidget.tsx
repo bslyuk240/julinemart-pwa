@@ -46,7 +46,13 @@ function formatTime(iso: string): string {
 export default function SupportChatWidget() {
   const { user, customer } = useCustomerAuth();
 
-  const [screen, setScreen]         = useState<WidgetScreen>(() => { screenRef.current = 'closed'; return 'closed'; });
+  // screenRef must be declared before the useState that references it to avoid TDZ
+  const screenRef      = useRef<WidgetScreen>('closed');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef       = useRef<HTMLInputElement>(null);
+  const channelRef     = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  const [screen, setScreen]         = useState<WidgetScreen>('closed');
   const setScreenSynced = useCallback((s: WidgetScreen | ((prev: WidgetScreen) => WidgetScreen)) => {
     setScreen(prev => {
       const next = typeof s === 'function' ? s(prev) : s;
@@ -67,11 +73,6 @@ export default function SupportChatWidget() {
   const [preEmail, setPreEmail]     = useState('');
   const [preError, setPreError]     = useState('');
   const [preLoading, setPreLoading] = useState(false);
-
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef       = useRef<HTMLInputElement>(null);
-  const channelRef     = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const screenRef      = useRef<WidgetScreen>('closed');
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
