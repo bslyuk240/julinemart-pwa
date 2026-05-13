@@ -5,7 +5,7 @@ import './globals.css';
 import Header from '@/components/layout/header';
 import { Toaster } from 'sonner';
 import { CustomerAuthProvider } from '@/context/customer-auth-context';
-import WhatsAppFloat from '@/components/layout/whatsapp-float';
+import SupportChatWidget from '@/components/support/SupportChatWidget';
 import PWAInstallPrompt from '@/components/pwa/pwa-install-prompt';
 import NotificationPermissionPrompt from '@/components/pwa/notification-permission-prompt';
 import PWAStandaloneTracker from '@/components/pwa/pwa-standalone-tracker';
@@ -103,8 +103,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <PWAInstallPrompt />
             <NotificationPermissionPrompt />
           </GlobalPullToRefresh>
+          <SupportChatWidget />
         </CustomerAuthProvider>
-        <WhatsAppFloat />
       </body>
     </html>
   );
