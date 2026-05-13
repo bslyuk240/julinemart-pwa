@@ -66,8 +66,11 @@ export default function SupportChatWidget() {
   const [inputText, setInputText]   = useState('');
   const [sending, setSending]       = useState(false);
   const [aiTyping, setAiTyping]     = useState(false);
+  const [staffTyping, setStaffTyping] = useState(false);
   const [unreadDot, setUnreadDot]   = useState(false);
   const [agentJoined, setAgentJoined] = useState(false);
+
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Pre-chat form state
   const [preName, setPreName]       = useState('');
@@ -124,13 +127,21 @@ export default function SupportChatWidget() {
         (payload) => {
           const updated = payload.new as SupportSession;
           setSession(updated);
-          // Detect when a human agent joins
           if (updated.assigned_staff_name && updated.mode === 'human') {
             setAgentJoined(true);
             setTimeout(() => setAgentJoined(false), 6000);
           }
         }
       )
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        if (payload.payload?.role === 'staff') {
+          setStaffTyping(true);
+          setTimeout(() => setStaffTyping(false), 3000);
+        }
+      })
+      .on('broadcast', { event: 'stop_typing' }, (payload) => {
+        if (payload.payload?.role === 'staff') setStaffTyping(false);
+      })
       .subscribe();
 
     channelRef.current = channel;
@@ -472,6 +483,18 @@ export default function SupportChatWidget() {
                   </div>
                 )}
 
+                {/* Staff typing indicator */}
+                {staffTyping && !aiTyping && (
+                  <div className="flex items-start gap-2">
+                    <div className="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
+                      <User className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                      <TypingDots />
+                    </div>
+                  </div>
+                )}
+
                 <div ref={messagesEndRef} />
               </div>
 
@@ -496,7 +519,15 @@ export default function SupportChatWidget() {
                     ref={inputRef}
                     type="text"
                     value={inputText}
-                    onChange={e => setInputText(e.target.value)}
+                    onChange={e => {
+                      setInputText(e.target.value);
+                      if (!channelRef.current) return;
+                      channelRef.current.send({ type: 'broadcast', event: 'typing', payload: { role: 'customer' } });
+                      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+                      typingTimerRef.current = setTimeout(() => {
+                        channelRef.current?.send({ type: 'broadcast', event: 'stop_typing', payload: { role: 'customer' } });
+                      }, 2000);
+                    }}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                     placeholder="Type a message…"
                     disabled={!session || sessionLoading || session?.status === 'closed'}
