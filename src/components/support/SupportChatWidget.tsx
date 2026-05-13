@@ -70,7 +70,9 @@ export default function SupportChatWidget() {
   const [unreadDot, setUnreadDot]   = useState(false);
   const [agentJoined, setAgentJoined] = useState(false);
 
-  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelReadyRef   = useRef(false);
 
   // Pre-chat form state
   const [preName, setPreName]       = useState('');
@@ -99,6 +101,7 @@ export default function SupportChatWidget() {
   const subscribeToSession = useCallback((sessionId: string) => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
+      channelReadyRef.current = false;
     }
 
     const channel = supabase
@@ -109,7 +112,6 @@ export default function SupportChatWidget() {
         (payload) => {
           const newMsg = payload.new as SupportMessage;
           setMessages(prev => {
-            // Remove optimistic customer messages when the real one arrives
             const base = newMsg.sender_type === 'customer'
               ? prev.filter(m => !m.id.startsWith('optimistic-'))
               : prev;
@@ -126,11 +128,13 @@ export default function SupportChatWidget() {
         { event: 'UPDATE', schema: 'public', table: 'support_sessions', filter: `id=eq.${sessionId}` },
         (payload) => {
           const updated = payload.new as SupportSession;
-          setSession(updated);
-          if (updated.assigned_staff_name && updated.mode === 'human') {
-            setAgentJoined(true);
-            setTimeout(() => setAgentJoined(false), 6000);
-          }
+          setSession(prev => {
+            if (updated.mode === 'human' && prev?.mode !== 'human' && updated.assigned_staff_name) {
+              setAgentJoined(true);
+              setTimeout(() => setAgentJoined(false), 6000);
+            }
+            return updated;
+          });
         }
       )
       .on('broadcast', { event: 'typing' }, (payload) => {
@@ -142,10 +146,50 @@ export default function SupportChatWidget() {
       .on('broadcast', { event: 'stop_typing' }, (payload) => {
         if (payload.payload?.role === 'staff') setStaffTyping(false);
       })
-      .subscribe();
+      .subscribe((status) => {
+        channelReadyRef.current = status === 'SUBSCRIBED';
+      });
 
     channelRef.current = channel;
   }, [scrollToBottom]);
+
+  // ── Polling fallback (catches msgs/session updates when Realtime is unreliable for anon clients) ──
+
+  const startPolling = useCallback((sessionKey: string) => {
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    pollTimerRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/support/session?key=${encodeURIComponent(sessionKey)}`);
+        if (!res.ok) return;
+        const { session: s, messages: msgs } = await res.json();
+        if (s) {
+          setSession(prev => {
+            if (s.mode === 'human' && prev?.mode !== 'human' && s.assigned_staff_name) {
+              setAgentJoined(true);
+              setTimeout(() => setAgentJoined(false), 6000);
+            }
+            return s;
+          });
+        }
+        if (msgs) {
+          setMessages(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const newMsgs = (msgs as SupportMessage[]).filter(m => !existingIds.has(m.id));
+            if (!newMsgs.length) return prev;
+            const withoutOptimistic = prev.filter(m => !m.id.startsWith('optimistic-'));
+            setAiTyping(false);
+            if (screenRef.current === 'closed' && newMsgs.some(m => m.sender_type !== 'customer')) setUnreadDot(true);
+            setTimeout(scrollToBottom, 50);
+            return [...withoutOptimistic, ...newMsgs.filter(m => !withoutOptimistic.some(p => p.id === m.id))];
+          });
+        }
+      } catch { /* silent */ }
+    }, 4000);
+  }, [scrollToBottom]);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+  }, []);
 
   // ── Load existing session on mount ────────────────────────────────────────
 
@@ -161,11 +205,12 @@ export default function SupportChatWidget() {
           setSession(s);
           setMessages(msgs ?? []);
           subscribeToSession(s.id);
+          startPolling(key);
           localStorage.setItem(SESSION_ID_STORAGE, s.id);
         }
       })
       .catch(() => {});
-  }, [getSessionKey, subscribeToSession]);
+  }, [getSessionKey, subscribeToSession, startPolling]);
 
   // ── Scroll to bottom when messages change ────────────────────────────────
 
@@ -181,13 +226,14 @@ export default function SupportChatWidget() {
     }
   }, [screen]);
 
-  // ── Cleanup realtime on unmount ───────────────────────────────────────────
+  // ── Cleanup realtime + polling on unmount ─────────────────────────────────
 
   useEffect(() => {
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
+      stopPolling();
     };
-  }, []);
+  }, [stopPolling]);
 
   // ── Open widget ───────────────────────────────────────────────────────────
 
@@ -230,6 +276,7 @@ export default function SupportChatWidget() {
         setSession(s);
         localStorage.setItem(SESSION_ID_STORAGE, s.id);
         subscribeToSession(s.id);
+        startPolling(user!.id);
       }
     } catch { /* session creation errors are silent */ }
     finally { setSessionLoading(false); }
@@ -269,6 +316,7 @@ export default function SupportChatWidget() {
         setSession(s);
         localStorage.setItem(SESSION_ID_STORAGE, s.id);
         subscribeToSession(s.id);
+        startPolling(key);
         setScreenSynced('chatting');
       }
     } catch {
@@ -521,11 +569,13 @@ export default function SupportChatWidget() {
                     value={inputText}
                     onChange={e => {
                       setInputText(e.target.value);
-                      if (!channelRef.current) return;
+                      if (!channelRef.current || !channelReadyRef.current) return;
                       channelRef.current.send({ type: 'broadcast', event: 'typing', payload: { role: 'customer' } });
                       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
                       typingTimerRef.current = setTimeout(() => {
-                        channelRef.current?.send({ type: 'broadcast', event: 'stop_typing', payload: { role: 'customer' } });
+                        if (channelReadyRef.current) {
+                          channelRef.current?.send({ type: 'broadcast', event: 'stop_typing', payload: { role: 'customer' } });
+                        }
                       }, 2000);
                     }}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
