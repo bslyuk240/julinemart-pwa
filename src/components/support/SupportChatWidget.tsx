@@ -177,7 +177,8 @@ export default function SupportChatWidget() {
             const newMsgs = (msgs as SupportMessage[]).filter(m => !existingIds.has(m.id));
             if (!newMsgs.length) return prev;
             const withoutOptimistic = prev.filter(m => !m.id.startsWith('optimistic-'));
-            setAiTyping(false);
+            // Only clear AI typing when an AI or staff reply actually arrives
+            if (newMsgs.some(m => m.sender_type === 'ai' || m.sender_type === 'staff')) setAiTyping(false);
             if (screenRef.current === 'closed' && newMsgs.some(m => m.sender_type !== 'customer')) setUnreadDot(true);
             setTimeout(scrollToBottom, 50);
             return [...withoutOptimistic, ...newMsgs.filter(m => !withoutOptimistic.some(p => p.id === m.id))];
