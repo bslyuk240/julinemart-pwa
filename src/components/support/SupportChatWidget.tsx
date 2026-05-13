@@ -61,6 +61,7 @@ export default function SupportChatWidget() {
     });
   }, []);
   const [session, setSession]       = useState<SupportSession | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(false);
   const [messages, setMessages]     = useState<SupportMessage[]>([]);
   const [inputText, setInputText]   = useState('');
   const [sending, setSending]       = useState(false);
@@ -201,6 +202,7 @@ export default function SupportChatWidget() {
   const startSessionForLoggedInUser = async () => {
     setScreenSynced('chatting');
     if (session) return;
+    setSessionLoading(true);
     try {
       const res  = await fetch('/api/support/session', {
         method:  'POST',
@@ -219,6 +221,7 @@ export default function SupportChatWidget() {
         subscribeToSession(s.id);
       }
     } catch { /* session creation errors are silent */ }
+    finally { setSessionLoading(false); }
   };
 
   // ── Pre-chat form submit ──────────────────────────────────────────────────
@@ -428,8 +431,16 @@ export default function SupportChatWidget() {
               )}
 
               <div className="flex-1 overflow-y-auto px-4 py-3 bg-gray-50 flex flex-col gap-2">
+                {/* Session loading indicator */}
+                {sessionLoading && (
+                  <div className="flex items-center justify-center gap-2 py-6 text-gray-400 text-sm">
+                    <span className="w-4 h-4 border-2 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+                    Connecting…
+                  </div>
+                )}
+
                 {/* Welcome message when no messages yet */}
-                {messages.length === 0 && (
+                {!sessionLoading && messages.length === 0 && (
                   <div className="flex items-start gap-2 mt-2">
                     <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{ backgroundColor: '#77088a' }}>
@@ -488,12 +499,12 @@ export default function SupportChatWidget() {
                     onChange={e => setInputText(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                     placeholder="Type a message…"
-                    disabled={session?.status === 'closed'}
+                    disabled={!session || sessionLoading || session?.status === 'closed'}
                     className="flex-1 bg-gray-100 rounded-full px-4 py-2.5 text-sm outline-none placeholder:text-gray-400 disabled:opacity-50"
                   />
                   <button
                     onClick={sendMessage}
-                    disabled={!inputText.trim() || sending || session?.status === 'closed'}
+                    disabled={!inputText.trim() || sending || !session || sessionLoading || session?.status === 'closed'}
                     className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-opacity disabled:opacity-40"
                     style={{ backgroundColor: '#77088a' }}
                     aria-label="Send message"
