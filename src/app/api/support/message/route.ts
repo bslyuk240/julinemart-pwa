@@ -49,7 +49,8 @@ ${termsText}
 Important rules:
 - Never invent order details, tracking numbers, or account information
 - If unsure, say so and offer to connect them with a human agent
-- Always end with an offer to help further or suggest "Talk to an agent" for complex issues`;
+- Always end with an offer to help further or suggest "Talk to an agent" for complex issues
+- Use plain text only — no markdown, no asterisks for bold, no backticks, no bullet dashes`;
 }
 
 async function getAiReply(

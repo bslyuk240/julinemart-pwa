@@ -212,11 +212,11 @@ export default function SupportChatWidget() {
       .catch(() => {});
   }, [getSessionKey, subscribeToSession, startPolling]);
 
-  // ── Scroll to bottom when messages change ────────────────────────────────
+  // ── Scroll to bottom when messages or typing indicators change ───────────
 
   useEffect(() => {
     if (screen === 'chatting') scrollToBottom();
-  }, [messages, screen, scrollToBottom]);
+  }, [messages, aiTyping, staffTyping, screen, scrollToBottom]);
 
   // ── Focus input when chatting screen opens ────────────────────────────────
 
@@ -543,7 +543,7 @@ export default function SupportChatWidget() {
                   </div>
                 )}
 
-                <div ref={messagesEndRef} />
+                <div ref={messagesEndRef} className="h-1" />
               </div>
 
               {/* Input footer */}
@@ -608,6 +608,25 @@ export default function SupportChatWidget() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+function renderMessageContent(text: string) {
+  const lines = text.split('\n');
+  return lines.map((line, li) => {
+    // Strip leading bullet markers
+    const stripped = line.replace(/^[\-\*•]\s+/, '');
+    // Split by **bold**
+    const parts = stripped.split(/\*\*(.+?)\*\*/g);
+    const nodes = parts.map((part, i) =>
+      i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+    );
+    return (
+      <span key={li}>
+        {nodes}
+        {li < lines.length - 1 && <br />}
+      </span>
+    );
+  });
+}
+
 function MessageBubble({ msg }: { msg: SupportMessage }) {
   const isCustomer = msg.sender_type === 'customer';
   const isAi       = msg.sender_type === 'ai';
@@ -636,7 +655,7 @@ function MessageBubble({ msg }: { msg: SupportMessage }) {
       </div>
       <div className="max-w-[78%]">
         <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm text-sm text-gray-800 leading-relaxed">
-          {msg.content}
+          {renderMessageContent(msg.content)}
         </div>
         <p className="text-gray-400 text-[11px] mt-0.5">
           {msg.sender_name ?? (isAi ? 'JulineMart AI' : 'Support')} · {formatTime(msg.created_at)}
