@@ -81,3 +81,83 @@ export function trackPwaInstallAccepted(params: { platform: string }) {
     platform: params.platform,
   });
 }
+
+// ─── Funnel events (missing before) ──────────────────────────────────────────
+
+export function trackProductViewed(params: {
+  itemId: string;
+  itemName: string;
+  price: number;
+  currency?: string;
+  itemBrand?: string;
+  itemCategory?: string;
+}) {
+  gaEvent('view_item', {
+    currency: params.currency ?? 'NGN',
+    value: params.price,
+    items: [{
+      item_id: params.itemId,
+      item_name: params.itemName,
+      price: params.price,
+      quantity: 1,
+      item_brand: params.itemBrand,
+      item_category: params.itemCategory,
+    }],
+  });
+}
+
+export function trackSearchUsed(params: { searchTerm: string; resultCount?: number }) {
+  gaEvent('search', {
+    search_term: params.searchTerm,
+    result_count: params.resultCount,
+  });
+}
+
+export function trackCheckoutAbandoned(params: {
+  currency?: string;
+  value: number;
+  step: 'address' | 'payment' | 'review';
+  items: EcommerceItem[];
+}) {
+  gaEvent('checkout_abandoned', {
+    currency: params.currency ?? 'NGN',
+    value: params.value,
+    checkout_step: params.step,
+    items: params.items,
+  });
+}
+
+export function trackAddToWishlist(params: {
+  itemId: string;
+  itemName: string;
+  price: number;
+  currency?: string;
+}) {
+  gaEvent('add_to_wishlist', {
+    currency: params.currency ?? 'NGN',
+    value: params.price,
+    items: [{
+      item_id: params.itemId,
+      item_name: params.itemName,
+      price: params.price,
+      quantity: 1,
+    }],
+  });
+}
+
+export function trackLoginSuccess(params: { method: string }) {
+  gaEvent('login', { method: params.method });
+}
+
+export function trackSignupSuccess(params: { method: string }) {
+  gaEvent('sign_up', { method: params.method });
+}
+
+export function trackShareProduct(params: { itemId: string; itemName: string; method: string }) {
+  gaEvent('share', {
+    method: params.method,
+    content_type: 'product',
+    item_id: params.itemId,
+    content_id: params.itemName,
+  });
+}
