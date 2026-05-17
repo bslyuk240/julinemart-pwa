@@ -17,6 +17,11 @@ export default function PushNotificationManager() {
 
     const setupPushNotifications = async () => {
       try {
+        // window.Capacitor is only present in a real Capacitor iOS/Android shell.
+        // Importing @capacitor/core in a plain browser crashes via its LCP observer
+        // trying to call window.webkit.messageHandlers (e.g. Facebook in-app browser).
+        if (!(window as unknown as { Capacitor?: unknown }).Capacitor) return;
+
         const { Capacitor } = await import('@capacitor/core');
         if (!Capacitor.isNativePlatform()) {
           console.log('Push notifications: Web platform detected, skipping setup');

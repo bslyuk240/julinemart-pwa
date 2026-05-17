@@ -33,6 +33,10 @@ Sentry.init({
     // Android Chrome throws SecurityError (DOMException code 18) when storage
     // or push subscriptions are blocked by browser privacy settings — not actionable
     'SecurityError: The request was denied.',
+    // Capacitor's LCP observer crashes in Facebook's iOS in-app browser where
+    // window.webkit exists but window.webkit.messageHandlers is undefined.
+    // Real fix: guard @capacitor/core imports with window.Capacitor check.
+    /window\.webkit\.messageHandlers/,
     /^NetworkError/,
     /^ChunkLoadError/,
     /Loading chunk \d+ failed/,

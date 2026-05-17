@@ -175,8 +175,11 @@ export default function WebPushManager() {
 
       inFlightSetupRef.current = (async () => {
         try {
-          const { Capacitor } = await import('@capacitor/core');
-          if (Capacitor.isNativePlatform()) {
+          // Guard before importing @capacitor/core — its initialization code
+          // crashes in Facebook's iOS in-app browser (window.webkit.messageHandlers undefined).
+          // window.Capacitor is only injected by the real native Capacitor bridge.
+          const isCapacitorNative = !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+          if (isCapacitorNative) {
             return {
               success: false,
               message: 'Native platform detected; web push setup skipped.',
