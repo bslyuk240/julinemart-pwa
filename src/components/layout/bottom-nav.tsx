@@ -45,7 +45,15 @@ export default function BottomNav() {
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-50 pb-[env(safe-area-inset-bottom)]"
-      style={{ transform: 'translateZ(0)', willChange: 'transform' }}
+      style={{
+        // Track the visual viewport bottom, not the CSS layout viewport bottom.
+        // When Chrome's address bar is visible, 100dvh < 100vh by the bar height,
+        // so this offsets the nav upward to sit flush at the visual bottom.
+        // When UI is hidden, 100dvh === 100vh → bottom = 0.
+        bottom: 'max(0px, calc(100vh - 100dvh))',
+        transform: 'translateZ(0)',
+        willChange: 'transform',
+      }}
     >
       <div className="flex items-center justify-around py-1">
         {navItems.map((item) => {
