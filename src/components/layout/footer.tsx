@@ -21,7 +21,7 @@ export default function Footer() {
           <Link href="/page/about" className="block text-gray-200 hover:text-primary-200">
             About Us
           </Link>
-          <Link href="/page/contact" className="block text-gray-200 hover:text-primary-200">
+          <Link href="/contact" className="block text-gray-200 hover:text-primary-200">
             Contact Us
           </Link>
           <div className="flex items-center gap-2 pt-1">
