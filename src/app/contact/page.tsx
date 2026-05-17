@@ -62,8 +62,8 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Email</p>
-                  <a href="mailto:info@julinemart.com" className="text-sm font-medium text-gray-800 hover:text-purple-600 transition-colors">
-                    info@julinemart.com
+                  <a href="mailto:support@julinemart.com" className="text-sm font-medium text-gray-800 hover:text-purple-600 transition-colors">
+                    support@julinemart.com
                   </a>
                 </div>
               </div>
@@ -73,8 +73,11 @@ export default function ContactPage() {
                   <Phone className="w-4 h-4 text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Support Hours</p>
-                  <p className="text-sm font-medium text-gray-800">Mon – Fri, 9am – 6pm WAT</p>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Phone / WhatsApp</p>
+                  <a href="tel:+2347075825761" className="text-sm font-medium text-gray-800 hover:text-purple-600 transition-colors">
+                    +234 707 582 5761
+                  </a>
+                  <p className="text-xs text-gray-500 mt-0.5">WhatsApp available 24/7</p>
                 </div>
               </div>
 
@@ -83,8 +86,19 @@ export default function ContactPage() {
                   <MapPin className="w-4 h-4 text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Location</p>
-                  <p className="text-sm font-medium text-gray-800">Lagos, Nigeria</p>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Address</p>
+                  <p className="text-sm font-medium text-gray-800">No. 9 Jesus Is Lord Street</p>
+                  <p className="text-sm text-gray-600">Off Refinery Road, Effurun</p>
+                  <p className="text-sm text-gray-600">Warri, Delta State, Nigeria</p>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4 space-y-1.5">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Response Times</p>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <p>⚡ Urgent (payment/delivery): <span className="font-medium text-gray-800">within 2 hours</span></p>
+                  <p>💬 General inquiries: <span className="font-medium text-gray-800">within 24 hours</span></p>
+                  <p>🔍 Complex cases: <span className="font-medium text-gray-800">within 48 hours</span></p>
                 </div>
               </div>
             </div>
