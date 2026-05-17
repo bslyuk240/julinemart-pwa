@@ -73,7 +73,7 @@ export default function NotificationPermissionPrompt() {
       if (daysSince < SNOOZE_DAYS) return;
     }
 
-    setPlatform(isIOS ? 'ios' : 'android_pwa');
+    setPlatform(isIOS ? 'ios_pwa' : 'android_pwa');
 
     // Wait 90 seconds — user should be settled and have navigated at least once
     const timer = setTimeout(() => setShow(true), 90 * 1000);

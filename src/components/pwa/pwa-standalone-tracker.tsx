@@ -30,7 +30,7 @@ export default function PWAStandaloneTracker() {
     if (sessionStorage.getItem(sessionKey)) return;
     sessionStorage.setItem(sessionKey, '1');
 
-    const platform = /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'ios' : 'android_desktop';
+    const platform = /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'ios_pwa' : 'android_pwa';
 
     fetch('/api/analytics/pwa-install', {
       method: 'POST',
