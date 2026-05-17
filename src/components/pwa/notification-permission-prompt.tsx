@@ -6,7 +6,7 @@ import { WEB_PUSH_ENABLE_EVENT } from '@/lib/web-push-events';
 
 const PROMPT_SEEN_KEY = 'jm_notif_prompt_seen';
 const PROMPT_SNOOZED_KEY = 'jm_notif_prompt_snoozed';
-const SNOOZE_DAYS = 3;
+const SNOOZE_DAYS = 7; // re-show after 1 week, not 3 days
 
 function getOrCreateAnonymousId(): string {
   try {
@@ -78,7 +78,8 @@ export default function NotificationPermissionPrompt() {
 
     setPlatform(isIOS ? 'ios' : 'android_pwa');
 
-    const timer = setTimeout(() => setShow(true), 2000);
+    // Wait 90 seconds — user should be settled and have navigated at least once
+    const timer = setTimeout(() => setShow(true), 90 * 1000);
     return () => clearTimeout(timer);
   }, []);
 
