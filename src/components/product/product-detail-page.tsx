@@ -303,7 +303,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       name: product.name,
       slug: product.slug,
       price: product.price,
-      image: product.images[0]?.src || '/images/placeholder.svg',
+      image: product.images?.[0]?.src || '/images/placeholder.svg',
     });
 
     if (wasAdded) {
