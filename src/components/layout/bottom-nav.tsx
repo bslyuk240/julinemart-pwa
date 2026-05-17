@@ -44,8 +44,11 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-[60] pb-[env(safe-area-inset-bottom)]"
-      style={{ transform: 'translateZ(0)' }}
+      className="fixed left-0 right-0 bg-white border-t border-gray-200 md:hidden z-[60] pb-[env(safe-area-inset-bottom)]"
+      style={{
+        transform: 'translateZ(0)',
+        bottom: 'var(--jm-vv-bottom-inset, 0px)',
+      }}
     >
       <div className="flex items-center justify-around py-1">
         {navItems.map((item) => {

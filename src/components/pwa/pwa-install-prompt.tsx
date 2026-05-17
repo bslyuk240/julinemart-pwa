@@ -172,7 +172,7 @@ export default function PWAInstallPrompt() {
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 animate-in fade-in duration-300" />
 
       {/* Install Prompt */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 md:bottom-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md md:rounded-t-2xl">
+      <div className="fixed bottom-[var(--jm-vv-bottom-inset,0px)] left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 md:bottom-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md md:rounded-t-2xl">
         <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl p-6 relative">
           {/* Close Button */}
           <button

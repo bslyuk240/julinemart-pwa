@@ -16,6 +16,7 @@ import { StatusBarManager } from '@/components/native/status-bar-manager';
 import PushNotificationManager from '@/components/native/push-notification-manager';
 import WebPushManager from '@/components/pwa/web-push-manager';
 import CookieConsentBanner from '@/components/pwa/cookie-consent-banner';
+import VisualViewportBottomSync from '@/components/layout/visual-viewport-bottom-sync';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -49,6 +50,8 @@ export const viewport = {
   userScalable: true,
   themeColor: '#77088a',
   viewportFit: 'cover',
+  // Chrome/Android: resize layout with browser UI so fixed bottom bars stay aligned with visible viewport.
+  interactiveWidget: 'resizes-content',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -102,6 +105,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </Script>
       </head>
       <body className={`${inter.className} min-h-0 overflow-x-clip`}>
+        <VisualViewportBottomSync />
         <StatusBarManager />
         <PWAStandaloneTracker />
         <CustomerAuthProvider>
@@ -109,8 +113,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <WebPushManager />
           <GlobalPullToRefresh>
             <Header />
-            {/* pb clears the fixed bottom nav (≈44px) + iOS safe-area on mobile; none on desktop */}
-            <main className="pb-[calc(3rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+            {/* pb: nav row (~4rem) + safe-area + visual-viewport/browser-chrome inset on mobile */}
+            <main className="pb-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] md:pb-0">
               {children}
             </main>
             <Footer />
