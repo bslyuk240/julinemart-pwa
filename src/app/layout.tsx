@@ -109,7 +109,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <WebPushManager />
           <GlobalPullToRefresh>
             <Header />
-            {children}
+            {/* pb clears the fixed bottom nav (≈44px) + iOS safe-area on mobile; none on desktop */}
+            <main className="pb-[calc(3rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+              {children}
+            </main>
             <Footer />
             <BottomNav />
             <Toaster position="top-center" richColors />
