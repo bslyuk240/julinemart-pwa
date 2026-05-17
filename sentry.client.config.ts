@@ -30,6 +30,9 @@ Sentry.init({
     'ResizeObserver loop limit exceeded',
     'ResizeObserver loop completed with undelivered notifications',
     'Non-Error promise rejection captured',
+    // Android Chrome throws SecurityError (DOMException code 18) when storage
+    // or push subscriptions are blocked by browser privacy settings — not actionable
+    'SecurityError: The request was denied.',
     /^NetworkError/,
     /^ChunkLoadError/,
     /Loading chunk \d+ failed/,

@@ -308,17 +308,22 @@ export default function WebPushManager() {
     };
 
     const rebindLocalTokenIfAvailable = async () => {
-      const activeCustomerId = customerId ?? customer?.id;
-      if (!activeCustomerId) return;
+      try {
+        const activeCustomerId = customerId ?? customer?.id;
+        if (!activeCustomerId) return;
 
-      const pendingToken = localStorage.getItem(PENDING_TOKEN_STORAGE_KEY);
-      if (pendingToken) {
-        await registerTokenForCustomer(pendingToken);
-      }
+        const pendingToken = localStorage.getItem(PENDING_TOKEN_STORAGE_KEY);
+        if (pendingToken) {
+          await registerTokenForCustomer(pendingToken);
+        }
 
-      const lastKnownToken = localStorage.getItem(LAST_TOKEN_STORAGE_KEY);
-      if (lastKnownToken) {
-        await registerTokenForCustomer(lastKnownToken);
+        const lastKnownToken = localStorage.getItem(LAST_TOKEN_STORAGE_KEY);
+        if (lastKnownToken) {
+          await registerTokenForCustomer(lastKnownToken);
+        }
+      } catch {
+        // localStorage may throw SecurityError when storage is blocked
+        // (e.g. Android Chrome with cookies/storage restricted). Non-critical.
       }
     };
 
