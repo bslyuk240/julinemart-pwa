@@ -71,6 +71,7 @@ export default function SupportChatWidget() {
   const [agentJoined, setAgentJoined] = useState(false);
 
   const typingTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelReadyRef   = useRef(false);
 
@@ -140,7 +141,8 @@ export default function SupportChatWidget() {
       .on('broadcast', { event: 'typing' }, (payload) => {
         if (payload.payload?.role === 'staff') {
           setStaffTyping(true);
-          setTimeout(() => setStaffTyping(false), 3000);
+          if (typingClearTimerRef.current) clearTimeout(typingClearTimerRef.current);
+          typingClearTimerRef.current = setTimeout(() => setStaffTyping(false), 3000);
         }
       })
       .on('broadcast', { event: 'stop_typing' }, (payload) => {
@@ -231,6 +233,8 @@ export default function SupportChatWidget() {
 
   useEffect(() => {
     return () => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      if (typingClearTimerRef.current) clearTimeout(typingClearTimerRef.current);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       stopPolling();
     };
@@ -355,6 +359,10 @@ export default function SupportChatWidget() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: session.id, customer_session_key: key, content: text }),
       });
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      if (channelReadyRef.current) {
+        channelRef.current?.send({ type: 'broadcast', event: 'stop_typing', payload: { role: 'customer' } });
+      }
       // Realtime will deliver the AI reply and replace optimistic msg
     } catch {
       setAiTyping(false);
@@ -385,7 +393,7 @@ export default function SupportChatWidget() {
       {/* Floating action button */}
       <button
         onClick={openWidget}
-        className="fixed bottom-24 right-4 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95 md:bottom-6"
+        className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] right-4 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95 md:bottom-6"
         style={{ backgroundColor: '#77088a' }}
         aria-label="Open support chat"
       >
@@ -402,7 +410,7 @@ export default function SupportChatWidget() {
 
       {/* Chat panel */}
       {screen !== 'closed' && (
-        <div className="fixed bottom-40 right-4 z-50 w-[calc(100vw-2rem)] max-w-sm md:bottom-20 md:right-6 md:w-96 flex flex-col rounded-2xl shadow-2xl overflow-hidden animate-slide-in"
+        <div className="fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom,0px))] right-4 z-[70] w-[calc(100vw-2rem)] max-w-sm md:bottom-20 md:right-6 md:w-96 flex flex-col rounded-2xl shadow-2xl overflow-hidden animate-slide-in"
           style={{ height: 'min(540px, calc(100vh - 180px))' }}
         >
           {/* Header */}
@@ -578,6 +586,12 @@ export default function SupportChatWidget() {
                           channelRef.current?.send({ type: 'broadcast', event: 'stop_typing', payload: { role: 'customer' } });
                         }
                       }, 2000);
+                    }}
+                    onBlur={() => {
+                      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+                      if (channelReadyRef.current) {
+                        channelRef.current?.send({ type: 'broadcast', event: 'stop_typing', payload: { role: 'customer' } });
+                      }
                     }}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                     placeholder="Type a message…"
