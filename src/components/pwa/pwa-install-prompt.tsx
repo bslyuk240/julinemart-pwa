@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Download, Share } from 'lucide-react';
 import Image from 'next/image';
 import { trackPwaInstallAccepted, trackPwaInstallPromptShown } from '@/lib/gtag';
+import { safeStorage } from '@/lib/safe-storage';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -15,16 +16,12 @@ const VISIT_COUNT_KEY = 'jm_visit_count';
 const DISMISS_COOLDOWN_DAYS = 14; // don't re-show for 2 weeks after dismiss
 
 function getOrCreateAnonymousId(): string {
-  try {
-    const key = 'jm_anon_id';
-    const existing = localStorage.getItem(key);
-    if (existing) return existing;
-    const id = crypto.randomUUID();
-    localStorage.setItem(key, id);
-    return id;
-  } catch {
-    return 'unknown';
-  }
+  const key = 'jm_anon_id';
+  const existing = safeStorage.getItem(key);
+  if (existing) return existing;
+  const id = crypto.randomUUID();
+  safeStorage.setItem(key, id);
+  return id;
 }
 
 async function logPwaEvent(params: {
@@ -50,15 +47,11 @@ async function logPwaEvent(params: {
 }
 
 function incrementAndGetVisitCount(): number {
-  try {
-    const raw = localStorage.getItem(VISIT_COUNT_KEY);
-    const prev = raw ? parseInt(raw, 10) : 0;
-    const next = prev + 1;
-    localStorage.setItem(VISIT_COUNT_KEY, String(next));
-    return next;
-  } catch {
-    return 1;
-  }
+  const raw = safeStorage.getItem(VISIT_COUNT_KEY);
+  const prev = raw ? parseInt(raw, 10) : 0;
+  const next = prev + 1;
+  safeStorage.setItem(VISIT_COUNT_KEY, String(next));
+  return next;
 }
 
 export default function PWAInstallPrompt() {
@@ -81,7 +74,7 @@ export default function PWAInstallPrompt() {
     setIsIOS(iOS);
 
     // Check dismiss cooldown
-    const dismissed = localStorage.getItem(DISMISSED_KEY);
+    const dismissed = safeStorage.getItem(DISMISSED_KEY);
     const dismissedTime = dismissed ? parseInt(dismissed, 10) : 0;
     const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
     if (daysSinceDismissed < DISMISS_COOLDOWN_DAYS) return;
@@ -156,7 +149,7 @@ export default function PWAInstallPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem(DISMISSED_KEY, Date.now().toString());
+    safeStorage.setItem(DISMISSED_KEY, Date.now().toString());
     if (isIOS) {
       logPwaEvent({ event_name: 'pwa_ios_guide_dismissed', platform: 'ios' });
     }

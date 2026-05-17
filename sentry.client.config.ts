@@ -37,4 +37,15 @@ Sentry.init({
     /^ChunkLoadError/,
     /Loading chunk \d+ failed/,
   ],
+
+  // beforeSend catches handled errors that ignoreErrors misses
+  beforeSend(event) {
+    const isLocalStorageSecurityError = event.exception?.values?.some(
+      (v) =>
+        v.type === 'SecurityError' &&
+        (v.value?.includes('localStorage') || v.value?.includes('The request was denied'))
+    );
+    if (isLocalStorageSecurityError) return null;
+    return event;
+  },
 });

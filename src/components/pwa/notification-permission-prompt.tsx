@@ -3,22 +3,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell, Package, Truck, Tag, X } from 'lucide-react';
 import { WEB_PUSH_ENABLE_EVENT } from '@/lib/web-push-events';
+import { safeStorage } from '@/lib/safe-storage';
 
 const PROMPT_SEEN_KEY = 'jm_notif_prompt_seen';
 const PROMPT_SNOOZED_KEY = 'jm_notif_prompt_snoozed';
 const SNOOZE_DAYS = 7; // re-show after 1 week, not 3 days
 
 function getOrCreateAnonymousId(): string {
-  try {
-    const key = 'jm_anon_id';
-    const existing = localStorage.getItem(key);
-    if (existing) return existing;
-    const id = crypto.randomUUID();
-    localStorage.setItem(key, id);
-    return id;
-  } catch {
-    return 'unknown';
-  }
+  const key = 'jm_anon_id';
+  const existing = safeStorage.getItem(key);
+  if (existing) return existing;
+  const id = crypto.randomUUID();
+  safeStorage.setItem(key, id);
+  return id;
 }
 
 async function logNotifEvent(eventName: string, platform: string) {
@@ -63,13 +60,13 @@ export default function NotificationPermissionPrompt() {
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
     if (!isStandalone) return;
 
-    const seen = localStorage.getItem(PROMPT_SEEN_KEY);
+    const seen = safeStorage.getItem(PROMPT_SEEN_KEY);
     if (seen) {
-      const snoozedAt = localStorage.getItem(PROMPT_SNOOZED_KEY);
+      const snoozedAt = safeStorage.getItem(PROMPT_SNOOZED_KEY);
       if (!snoozedAt) {
         // Prompt was shown before but no snooze was recorded (user navigated away
         // without interacting). Start a snooze timer now so it can re-appear.
-        localStorage.setItem(PROMPT_SNOOZED_KEY, Date.now().toString());
+        safeStorage.setItem(PROMPT_SNOOZED_KEY, Date.now().toString());
         return;
       }
       const daysSince = (Date.now() - parseInt(snoozedAt)) / (1000 * 60 * 60 * 24);
@@ -86,7 +83,7 @@ export default function NotificationPermissionPrompt() {
   useEffect(() => {
     if (!show || trackedRef.current) return;
     trackedRef.current = true;
-    localStorage.setItem(PROMPT_SEEN_KEY, '1');
+    safeStorage.setItem(PROMPT_SEEN_KEY, '1');
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     void logNotifEvent('notification_prompt_shown', isIOS ? 'ios' : 'android_pwa');
   }, [show]);
@@ -107,13 +104,13 @@ export default function NotificationPermissionPrompt() {
     } finally {
       setRequesting(false);
       setShow(false);
-      localStorage.removeItem(PROMPT_SNOOZED_KEY);
+      safeStorage.removeItem(PROMPT_SNOOZED_KEY);
     }
   };
 
   const handleSnooze = () => {
     void logNotifEvent('notification_prompt_snoozed', platform);
-    localStorage.setItem(PROMPT_SNOOZED_KEY, Date.now().toString());
+    safeStorage.setItem(PROMPT_SNOOZED_KEY, Date.now().toString());
     setShow(false);
   };
 
