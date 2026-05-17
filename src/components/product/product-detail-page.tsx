@@ -17,6 +17,12 @@ import { toast } from 'sonner';
 import { decodeHtmlEntities } from '@/lib/utils/helpers';
 import { minVariationListPrice, parseMoney } from '@/lib/utils/parse-money';
 import { mergeUniqueById, selectRelatedProducts } from '@/lib/utils/related-products';
+import {
+  trackProductViewed,
+  trackAddToCart,
+  trackAddToWishlist,
+  trackShareProduct,
+} from '@/lib/gtag';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -183,6 +189,19 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     fetchReviews();
   }, [product?.id]);
 
+  // track product view on mount
+  useEffect(() => {
+    if (!product) return;
+    trackProductViewed({
+      itemId: String(product.id),
+      itemName: product.name,
+      price: parseMoney(product.price),
+      itemBrand: (product as any).brands?.[0] ?? undefined,
+      itemCategory: product.categories?.[0]?.name ?? undefined,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id]);
+
   const formatPrice = (price: string | number) => {
     const numeric = typeof price === 'number' ? price : parseFloat(String(price ?? ''));
     const n = Number.isFinite(numeric) ? numeric : 0;
@@ -223,6 +242,17 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
     addToCart(product, quantity, variationPayload);
     toast.success('Added to cart');
+    trackAddToCart({
+      value: selectedPrice * quantity,
+      items: [{
+        item_id: String(product.id),
+        item_name: product.name,
+        price: selectedPrice,
+        quantity,
+        item_brand: (product as any).brands?.[0] ?? undefined,
+        item_category: product.categories?.[0]?.name ?? undefined,
+      }],
+    });
   };
 
   const handleBuyNow = () => {
@@ -267,14 +297,22 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
   const handleWishlist = () => {
     if (!product) return;
-    
-    toggleWishlist(product.id, {
+
+    const wasAdded = toggleWishlist(product.id, {
       id: product.id,
       name: product.name,
       slug: product.slug,
       price: product.price,
       image: product.images[0]?.src || '/images/placeholder.svg',
     });
+
+    if (wasAdded) {
+      trackAddToWishlist({
+        itemId: String(product.id),
+        itemName: product.name,
+        price: parseMoney(product.price),
+      });
+    }
   };
 
   const handleShare = async () => {
@@ -285,13 +323,18 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
           text: product.short_description.replace(/<[^>]*>/g, ''),
           url: window.location.href,
         });
+        trackShareProduct({ itemId: String(product.id), itemName: product.name, method: 'native' });
       } catch (error) {
+        // User cancelled — don't track
         console.log('Error sharing:', error);
       }
     } else {
       // Fallback: copy to clipboard
       navigator.clipboard.writeText(window.location.href);
       alert('Link copied to clipboard!');
+      if (product) {
+        trackShareProduct({ itemId: String(product.id), itemName: product.name, method: 'clipboard' });
+      }
     }
   };
 

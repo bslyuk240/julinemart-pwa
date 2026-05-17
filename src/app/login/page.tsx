@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
 import GoogleSignInButton from '@/components/auth/google-sign-in-button';
+import { trackLoginSuccess } from '@/lib/gtag';
 
 function LoginContent() {
   const router = useRouter();
@@ -57,6 +58,7 @@ function LoginContent() {
       }
 
       toast.success('Welcome back!');
+      trackLoginSuccess({ method: 'email' });
       router.push(redirect);
     } catch (err: any) {
       toast.error('Login failed. Please try again.');

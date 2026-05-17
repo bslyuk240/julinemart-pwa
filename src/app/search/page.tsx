@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import ProductGrid from '@/components/product/product-grid';
 import { Product } from '@/types/product';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
+import { trackSearchUsed } from '@/lib/gtag';
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -32,7 +33,10 @@ function SearchContent() {
         if (!res.ok) throw new Error(`Search API error: ${res.status}`);
         const { products: data } = await res.json();
         const filtered = await filterActiveVendorProducts(data ?? []);
-        if (!isCancelled) setProducts(filtered);
+        if (!isCancelled) {
+          setProducts(filtered);
+          trackSearchUsed({ searchTerm: query, resultCount: filtered.length });
+        }
       } catch (error) {
         console.error('Error searching products:', error);
         if (!isCancelled) setProducts([]);

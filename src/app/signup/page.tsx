@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import GoogleSignInButton from '@/components/auth/google-sign-in-button';
+import { trackSignupSuccess } from '@/lib/gtag';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -88,6 +89,7 @@ export default function SignupPage() {
       }
 
       toast.success('Account created! Welcome to JulineMart!');
+      trackSignupSuccess({ method: 'email' });
       router.push('/account');
     } catch (err: any) {
       console.error('Registration error:', err);
