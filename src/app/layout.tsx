@@ -74,7 +74,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#77088a" />
 
         {/* Google Analytics — Consent Mode v2 */}
-        {/* Consent defaults to denied; CookieConsentBanner upgrades it on accept */}
+        {/* Read stored consent synchronously so returning users don't hit the wait_for_update race */}
+        <Script id="ga-consent-init" strategy="afterInteractive">
+          {`
+            try { window.__jmConsent = localStorage.getItem('jm_cookie_consent'); } catch(e) {}
+          `}
+        </Script>
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-T0X3ZR08FD"
           strategy="afterInteractive"
@@ -83,10 +88,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
+            var alreadyGranted = window.__jmConsent === 'all';
             gtag('consent', 'default', {
-              analytics_storage: 'denied',
+              analytics_storage: alreadyGranted ? 'granted' : 'denied',
               ad_storage: 'denied',
-              wait_for_update: 500,
+              wait_for_update: alreadyGranted ? 0 : 500,
             });
             gtag('js', new Date());
             gtag('config', 'G-T0X3ZR08FD', {
