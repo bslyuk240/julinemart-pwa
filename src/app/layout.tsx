@@ -15,6 +15,7 @@ import BottomNav from '@/components/layout/BottomNavClient';
 import { StatusBarManager } from '@/components/native/status-bar-manager';
 import PushNotificationManager from '@/components/native/push-notification-manager';
 import WebPushManager from '@/components/pwa/web-push-manager';
+import CookieConsentBanner from '@/components/pwa/cookie-consent-banner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -72,7 +73,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Theme Color */}
         <meta name="theme-color" content="#77088a" />
 
-        {/* Google Analytics */}
+        {/* Google Analytics — Consent Mode v2 */}
+        {/* Consent defaults to denied; CookieConsentBanner upgrades it on accept */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-T0X3ZR08FD"
           strategy="afterInteractive"
@@ -81,6 +83,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
+            gtag('consent', 'default', {
+              analytics_storage: 'denied',
+              ad_storage: 'denied',
+              wait_for_update: 500,
+            });
             gtag('js', new Date());
             gtag('config', 'G-T0X3ZR08FD', {
               page_path: window.location.pathname,
@@ -102,6 +109,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Toaster position="top-center" richColors />
             <PWAInstallPrompt />
             <NotificationPermissionPrompt />
+            <CookieConsentBanner />
           </GlobalPullToRefresh>
           <SupportChatWidget />
         </CustomerAuthProvider>
