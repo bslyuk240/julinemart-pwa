@@ -131,6 +131,7 @@ export default function HeroSlider() {
 
         if (!cancelled) setSlides(transformedSlides);
       } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return;
         console.error('Error fetching hero slides:', error);
         if (!cancelled) setSlides(DEFAULT_SLIDES);
       } finally {

@@ -83,6 +83,7 @@ export default function Header() {
           console.log('Banner API failed, using default banner');
         }
       } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return;
         console.error('Error fetching banner:', error);
       } finally {
         setBannerLoading(false);

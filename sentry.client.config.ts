@@ -44,12 +44,20 @@ Sentry.init({
 
   // beforeSend catches handled errors that ignoreErrors misses
   beforeSend(event) {
-    const isLocalStorageSecurityError = event.exception?.values?.some(
+    const values = event.exception?.values ?? [];
+
+    const isLocalStorageSecurityError = values.some(
       (v) =>
         v.type === 'SecurityError' &&
         (v.value?.includes('localStorage') || v.value?.includes('The request was denied'))
     );
     if (isLocalStorageSecurityError) return null;
+
+    // AbortError is thrown when the browser cancels a fetch (e.g. Facebook
+    // in-app browser navigating away mid-request). Not actionable — drop it.
+    const isAbortError = values.some((v) => v.type === 'AbortError');
+    if (isAbortError) return null;
+
     return event;
   },
 });
