@@ -86,15 +86,14 @@ export default function PWAInstallPrompt() {
     if (iOS) {
       // iOS: only show on 2nd+ visit — user already knows the site
       if (visitCount < 2) return;
-      // 2 min delay so user is engaged before we interrupt
-      const t = setTimeout(() => setShowPrompt(true), 2 * 60 * 1000);
+      const t = setTimeout(() => setShowPrompt(true), 15 * 1000);
       return () => clearTimeout(t);
     } else {
-      // Android: wait for the browser install prompt, then wait 2 minutes
+      // Android: wait for the browser install prompt, then wait 15 seconds
       const handler = (e: Event) => {
         e.preventDefault();
         setDeferredPrompt(e as BeforeInstallPromptEvent);
-        const t = setTimeout(() => setShowPrompt(true), 2 * 60 * 1000);
+        const t = setTimeout(() => setShowPrompt(true), 15 * 1000);
         // store timeout id for cleanup — we do it via returned cleanup
         (handler as any)._timeout = t;
       };
