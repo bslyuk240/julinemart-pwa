@@ -38,9 +38,12 @@ export default function CookieConsentBanner() {
   return (
     <div
       className={[
-        // Fixed above the bottom nav on mobile (bottom nav ≈ 56px),
-        // flush to the bottom on md+ (no bottom nav on desktop)
-        'fixed bottom-14 md:bottom-0 left-0 right-0 z-40',
+        // Mobile: sit above bottom nav (3.5rem) + iOS home-indicator safe area.
+        // md+: flush to bottom (no bottom nav on desktop).
+        // Tailwind arbitrary value keeps specificity equal so md:bottom-0 wins
+        // on desktop via source order (responsive utilities come last in output).
+        'fixed left-0 right-0 z-40',
+        'bottom-[calc(3.5rem_+_env(safe-area-inset-bottom,_0px))] md:bottom-0',
         'animate-in slide-in-from-bottom duration-300',
       ].join(' ')}
     >
