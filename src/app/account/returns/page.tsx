@@ -173,32 +173,15 @@ export default function ReturnsPage() {
                       >
                         View
                       </Link>
-                      {returnRequestId ? (
-                        <>
-                          <Link
-                            href={`/returns/${returnRequestId}/add-tracking`}
-                            className="text-primary-600 text-sm font-medium hover:underline"
-                          >
-                            Add tracking
-                          </Link>
-                          {fezTrackingUrl ? (
-                            <a
-                              href={fezTrackingUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-primary-600 text-sm font-medium hover:underline"
-                            >
-                              Track
-                            </a>
-                          ) : (
-                            <Link
-                              href={`/returns/${returnRequestId}/track`}
-                              className="text-primary-600 text-sm font-medium hover:underline"
-                            >
-                              Track
-                            </Link>
-                          )}
-                        </>
+                      {returnRequestId && fezTrackingUrl ? (
+                        <a
+                          href={fezTrackingUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary-600 text-sm font-medium hover:underline"
+                        >
+                          Track
+                        </a>
                       ) : null}
                     </div>
                   </div>
@@ -207,11 +190,6 @@ export default function ReturnsPage() {
                     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusDisplay.bgColor} ${statusDisplay.color}`}>
                       {statusDisplay.label}
                     </span>
-                    {item.preferred_resolution ? (
-                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 capitalize">
-                        {item.preferred_resolution}
-                      </span>
-                    ) : null}
                   </div>
                 </div>
               );
