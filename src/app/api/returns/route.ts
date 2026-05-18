@@ -16,11 +16,10 @@ export async function GET(request: Request) {
   // Map to the correct JLO Netlify function paths
   let path: string;
   if (orderId) {
-    // get-order-returns accepts ?order_id=<supabase-uuid>
+    // Accepts both Supabase UUIDs and legacy WC numeric ids
     path = `/.netlify/functions/get-order-returns?order_id=${encodeURIComponent(orderId)}`;
   } else if (customerEmail) {
-    // returns-list by email — not yet implemented in JLO, return empty gracefully
-    return NextResponse.json([], { status: 200 });
+    path = `/api/returns-list?customer_email=${encodeURIComponent(customerEmail)}`;
   } else if (customerId) {
     path = `/api/returns-list?wc_customer_id=${encodeURIComponent(customerId)}`;
   } else {
