@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
           customer_name:    customer_name    || null,
           customer_email:   customer_email   || null,
           customer_user_id: customer_user_id || null,
+          source_app:       'storefront',
         },
         { onConflict: 'customer_session_key', ignoreDuplicates: false }
       )
