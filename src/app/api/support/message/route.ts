@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
 
     // If in AI mode, generate and save AI reply
     if (session.mode === 'ai') {
+      let aiText = 'Thanks for your message. A support agent will assist you shortly.';
       try {
         const { data: history } = await supabase
           .from('support_messages')
@@ -148,15 +149,14 @@ export async function POST(request: NextRequest) {
           .limit(30);
 
         const systemPrompt = await buildSystemPrompt();
-        const aiText       = await getAiReply(systemPrompt, history ?? []);
-
-        await supabase
-          .from('support_messages')
-          .insert({ session_id, sender_type: 'ai', sender_name: 'JulineMart AI', content: aiText });
+        aiText = await getAiReply(systemPrompt, history ?? []);
       } catch (aiErr) {
-        // AI failure is non-fatal — customer message is already saved
         console.error('[support/message] AI reply failed:', aiErr instanceof Error ? aiErr.message : aiErr);
       }
+
+      await supabase
+        .from('support_messages')
+        .insert({ session_id, sender_type: 'ai', sender_name: 'JulineMart AI', content: aiText });
     }
 
     return NextResponse.json({ message: customerMsg });
