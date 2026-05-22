@@ -410,11 +410,16 @@ export default function SupportChatWidget() {
 
       {/* Chat panel */}
       {screen !== 'closed' && (
-        <div className="fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] right-4 z-[70] w-[calc(100vw-2rem)] max-w-sm md:bottom-20 md:right-6 md:w-96 flex flex-col rounded-2xl shadow-2xl overflow-hidden animate-slide-in"
-          style={{ height: 'min(540px, calc(100vh - 180px))' }}
+        <>
+          {/* Mobile backdrop */}
+          <div
+            className="fixed inset-0 z-[60] bg-black/40 md:hidden"
+            onClick={() => setScreenSynced('closed')}
+          />
+          <div className="fixed inset-x-0 bottom-0 z-[70] flex flex-col rounded-t-2xl shadow-2xl overflow-hidden animate-slide-in h-[calc(100dvh-64px)] md:inset-x-auto md:bottom-20 md:right-6 md:w-96 md:rounded-2xl md:h-[560px]"
         >
           {/* Header */}
-          <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0" style={{ backgroundColor: '#77088a' }}>
+          <div className="flex items-center gap-3 px-4 py-4 md:py-3 flex-shrink-0" style={{ backgroundColor: '#77088a' }}>
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
               <Headphones className="w-5 h-5 text-white" />
             </div>
@@ -428,7 +433,7 @@ export default function SupportChatWidget() {
             </div>
             <button
               onClick={() => setScreenSynced('closed')}
-              className="text-white/75 hover:text-white transition-colors p-1 flex-shrink-0"
+              className="text-white/75 hover:text-white transition-colors p-2 -mr-1 flex-shrink-0"
               aria-label="Close chat"
             >
               <X className="w-5 h-5" />
@@ -514,7 +519,7 @@ export default function SupportChatWidget() {
                       style={{ backgroundColor: '#77088a' }}>
                       <Bot className="w-4 h-4 text-white" />
                     </div>
-                    <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm max-w-[78%]">
+                    <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm max-w-[78%] break-words">
                       <p className="text-gray-800 text-sm">
                         Hi{customer?.first_name ? ` ${customer.first_name}` : ''}! 👋 I&apos;m the JulineMart support assistant. How can I help you today?
                       </p>
@@ -556,13 +561,13 @@ export default function SupportChatWidget() {
               </div>
 
               {/* Input footer */}
-              <div className="bg-white border-t border-gray-100 flex-shrink-0">
+              <div className="bg-white border-t border-gray-100 flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
                 {/* Talk to human button */}
                 {session?.mode === 'ai' && (
                   <div className="px-4 pt-2 flex justify-center">
                     <button
                       onClick={requestHuman}
-                      className="text-xs font-medium flex items-center gap-1.5 px-3 py-1 rounded-full border transition-colors hover:bg-purple-50"
+                      className="text-xs font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-colors hover:bg-purple-50"
                       style={{ color: '#77088a', borderColor: '#77088a' }}
                     >
                       <User className="w-3 h-3" />
@@ -596,16 +601,16 @@ export default function SupportChatWidget() {
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                     placeholder="Type a message…"
                     disabled={!session || sessionLoading || session?.status === 'closed'}
-                    className="flex-1 bg-gray-100 rounded-full px-4 py-2.5 text-sm outline-none placeholder:text-gray-400 disabled:opacity-50"
+                    className="flex-1 bg-gray-100 rounded-full px-4 py-3 text-base md:py-2.5 md:text-sm outline-none placeholder:text-gray-400 disabled:opacity-50"
                   />
                   <button
                     onClick={sendMessage}
                     disabled={!inputText.trim() || sending || !session || sessionLoading || session?.status === 'closed'}
-                    className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-opacity disabled:opacity-40"
+                    className="w-11 h-11 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-opacity disabled:opacity-40"
                     style={{ backgroundColor: '#77088a' }}
                     aria-label="Send message"
                   >
-                    <Send className="w-4 h-4 text-white" />
+                    <Send className="w-5 h-5 md:w-4 md:h-4 text-white" />
                   </button>
                 </div>
 
@@ -615,7 +620,8 @@ export default function SupportChatWidget() {
               </div>
             </>
           )}
-        </div>
+          </div>
+        </>
       )}
     </>
   );
@@ -623,19 +629,48 @@ export default function SupportChatWidget() {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+const URL_REGEX = /https?:\/\/[^\s<>"']+/g;
+
+function renderInlineSegment(text: string, keyPrefix: string) {
+  return text.split(/\*\*(.+?)\*\*/g).map((part, i) =>
+    i % 2 === 1 ? <strong key={`${keyPrefix}-b${i}`}>{part}</strong> : part
+  );
+}
+
 function renderMessageContent(text: string) {
   const lines = text.split('\n');
   return lines.map((line, li) => {
-    // Strip leading bullet markers
     const stripped = line.replace(/^[\-\*•]\s+/, '');
-    // Split by **bold**
-    const parts = stripped.split(/\*\*(.+?)\*\*/g);
-    const nodes = parts.map((part, i) =>
-      i % 2 === 1 ? <strong key={i}>{part}</strong> : part
-    );
+    const segments: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    URL_REGEX.lastIndex = 0;
+
+    while ((match = URL_REGEX.exec(stripped)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push(...renderInlineSegment(stripped.slice(lastIndex, match.index), `${li}-t${lastIndex}`));
+      }
+      segments.push(
+        <a
+          key={`${li}-url${match.index}`}
+          href={match[0]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline break-all"
+          style={{ color: '#77088a' }}
+        >
+          {match[0]}
+        </a>
+      );
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < stripped.length) {
+      segments.push(...renderInlineSegment(stripped.slice(lastIndex), `${li}-t${lastIndex}`));
+    }
+
     return (
       <span key={li}>
-        {nodes}
+        {segments}
         {li < lines.length - 1 && <br />}
       </span>
     );
@@ -650,7 +685,7 @@ function MessageBubble({ msg }: { msg: SupportMessage }) {
     return (
       <div className="flex justify-end">
         <div className="max-w-[78%]">
-          <div className="text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed"
+          <div className="text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed break-words"
             style={{ backgroundColor: '#77088a' }}>
             {msg.content}
           </div>
@@ -669,7 +704,7 @@ function MessageBubble({ msg }: { msg: SupportMessage }) {
           : <User className="w-4 h-4 text-white" />}
       </div>
       <div className="max-w-[78%]">
-        <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm text-sm text-gray-800 leading-relaxed">
+        <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm text-sm text-gray-800 leading-relaxed break-words">
           {renderMessageContent(msg.content)}
         </div>
         <p className="text-gray-400 text-[11px] mt-0.5">
