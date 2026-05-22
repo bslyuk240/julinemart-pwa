@@ -1,7 +1,8 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { logActivity } from '@/lib/logActivity';
 import Link from 'next/link';
 import { CheckCircle, Package, Truck, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,10 @@ function OrderSuccessContent() {
   const searchParams = useSearchParams();
   // New flow passes ?ref=1042 (order_number); legacy flow may pass ?order=<uuid>
   const ref = searchParams.get('ref') || searchParams.get('order');
+
+  useEffect(() => {
+    if (ref) logActivity({ action: 'ORDER_PLACED', resource_type: 'orders', details: { order_ref: ref } });
+  }, [ref]);
 
   // Determine display label — if it's a plain number show #1042, else show as-is
   const isNumeric = ref && /^\d+$/.test(ref);

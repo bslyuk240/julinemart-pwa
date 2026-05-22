@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
 import GoogleSignInButton from '@/components/auth/google-sign-in-button';
 import { trackLoginSuccess } from '@/lib/gtag';
+import { logActivity } from '@/lib/logActivity';
 
 function LoginContent() {
   const router = useRouter();
@@ -59,6 +60,7 @@ function LoginContent() {
 
       toast.success('Welcome back!');
       trackLoginSuccess({ method: 'email' });
+      logActivity({ action: 'LOGIN', details: { method: 'email' } });
       router.push(redirect);
     } catch (err: any) {
       toast.error('Login failed. Please try again.');
