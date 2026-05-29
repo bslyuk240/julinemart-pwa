@@ -17,8 +17,5 @@ pnpm-debug.log*
 .vscode/
 *.local
 
-# Firebase config (contains secrets)
-android/app/google-services.json
-
 # Local Netlify folder
 .netlify
