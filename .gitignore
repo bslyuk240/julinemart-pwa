@@ -17,5 +17,8 @@ pnpm-debug.log*
 .vscode/
 *.local
 
+# Android Firebase config (client key — keep local for APK builds; not needed on Netlify)
+android/app/google-services.json
+
 # Local Netlify folder
 .netlify
