@@ -11,7 +11,6 @@ import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import GoogleSignInButton from '@/components/auth/google-sign-in-button';
 import { trackSignupSuccess } from '@/lib/gtag';
-import { logActivity } from '@/lib/logActivity';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -91,7 +90,7 @@ export default function SignupPage() {
 
       toast.success('Account created! Welcome to JulineMart!');
       trackSignupSuccess({ method: 'email' });
-      logActivity({ action: 'SIGNUP', resource_type: 'customers', details: { method: 'email' } });
+      // SIGNUP is logged server-side via the handle_new_customer DB trigger.
       router.push('/account');
     } catch (err: any) {
       console.error('Registration error:', err);
