@@ -2,8 +2,6 @@
 
 import { supabase } from '@/lib/supabase/client';
 
-const JLO_BASE = (process.env.NEXT_PUBLIC_JLO_CATALOG_URL || '').replace(/\/$/, '');
-
 export async function logActivity(params: {
   action: string;
   resource_type?: string;
@@ -12,15 +10,17 @@ export async function logActivity(params: {
 }) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return;
+    if (!session?.user) return;
 
-    await fetch(`${JLO_BASE}/api/log-activity`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ ...params, source: 'storefront' }),
+    const { user } = session;
+    await supabase.from('activity_logs').insert({
+      user_id: user.id,
+      actor_email: user.email ?? null,
+      action: params.action.trim().toUpperCase(),
+      resource_type: params.resource_type ?? null,
+      resource_id: params.resource_id ?? null,
+      details: params.details ?? null,
+      source: 'storefront',
     });
   } catch {
     // Non-critical — never block the user flow

@@ -17,6 +17,7 @@ import {
 } from '@/lib/woocommerce/shipping';
 // Orders are created via server API to avoid client-side CORS
 import { toast } from 'sonner';
+import { logActivity } from '@/lib/logActivity';
 import PageLoading from '@/components/ui/page-loading';
 import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
 import { getShippingFee } from '@/lib/shipping/jloShipping';
@@ -1116,6 +1117,7 @@ export default function CheckoutPage() {
 
       if (order && order.id) {
         console.log('✅ Order created:', order.id);
+        logActivity({ action: 'ORDER_PLACED', resource_type: 'orders', resource_id: String(order.id), details: { total, payment_method: selectedPayment } });
         
         const selectedGateway = paymentGateways.find(g => g.id === selectedPayment);
         const requiresPayment = selectedGateway?.id !== 'cod' && 
