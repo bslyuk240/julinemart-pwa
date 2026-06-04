@@ -88,6 +88,23 @@ export default function SignupPage() {
         await supabase.from('customers').update({ phone: formData.phone }).eq('id', user.id);
       }
 
+      // Enrich the SIGNUP audit log with IP + name (DB trigger creates the row;
+      // this enriches it server-side so IP is captured from the request context).
+      if (user) {
+        fetch('/api/audit/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.id,
+            email: user.email,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            phone: formData.phone || null,
+            provider: 'email',
+          }),
+        }).catch(() => { /* non-critical */ });
+      }
+
       toast.success('Account created! Welcome to JulineMart!');
       trackSignupSuccess({ method: 'email' });
       // SIGNUP is logged server-side via the handle_new_customer DB trigger.
