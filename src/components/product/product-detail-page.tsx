@@ -23,6 +23,7 @@ import {
   trackAddToWishlist,
   trackShareProduct,
 } from '@/lib/gtag';
+import { useCustomerAuth } from '@/context/customer-auth-context';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -128,6 +129,22 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     rating: 0,
     review: '',
   });
+
+  const { user, customer } = useCustomerAuth();
+
+  // Prefill review form for authenticated users
+  useEffect(() => {
+    if (user) {
+      const name = customer
+        ? [customer.first_name, customer.last_name].filter(Boolean).join(' ')
+        : (user.user_metadata?.full_name ?? user.user_metadata?.name ?? '');
+      setReviewForm((prev) => ({
+        ...prev,
+        reviewer: prev.reviewer || name,
+        reviewerEmail: prev.reviewerEmail || (user.email ?? ''),
+      }));
+    }
+  }, [user, customer]);
 
   const addToCart = useCartStore((state) => state.addItem);
   const { toggleWishlist, isInWishlist } = useWishlist();
@@ -366,12 +383,12 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       if (newReview) {
         setReviews((prev) => [newReview, ...prev]);
         toast.success('Review submitted!');
-        setReviewForm({
-          reviewer: '',
-          reviewerEmail: '',
+        setReviewForm((prev) => ({
+          reviewer: prev.reviewer,
+          reviewerEmail: prev.reviewerEmail,
           rating: 0,
           review: '',
-        });
+        }));
       } else {
         toast.error('Unable to submit review right now.');
       }
@@ -1177,7 +1194,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                             type="text"
                             value={reviewForm.reviewer}
                             onChange={(e) => setReviewForm((prev) => ({ ...prev, reviewer: e.target.value }))}
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+                            className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 ${user ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-gray-300'}`}
                             placeholder="Your name"
                           />
                         </div>
@@ -1187,7 +1204,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                             type="email"
                             value={reviewForm.reviewerEmail}
                             onChange={(e) => setReviewForm((prev) => ({ ...prev, reviewerEmail: e.target.value }))}
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+                            className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 ${user ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-gray-300'}`}
                             placeholder="you@example.com"
                           />
                         </div>
