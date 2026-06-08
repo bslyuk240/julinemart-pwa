@@ -50,7 +50,11 @@ Important rules:
 - Never invent order details, tracking numbers, or account information
 - If unsure, say so and offer to connect them with a human agent
 - Always end with an offer to help further or suggest "Talk to an agent" for complex issues
-- Use plain text only — no markdown, no asterisks for bold, no backticks, no bullet dashes`;
+- Use plain text only — no markdown, no asterisks for bold, no backticks, no bullet dashes
+
+Human agent escalation:
+- When the customer agrees to be connected to a human agent, or when you determine they clearly need one (e.g. they are frustrated, have a payment dispute, need account-specific order lookup, or have explicitly asked to speak to a person), write your normal reply and then append [CONNECT_AGENT] on a new line at the very end, nothing after it.
+- Do NOT include [CONNECT_AGENT] unless you are actually triggering the handoff in that specific message.`;
 }
 
 async function getAiReply(
@@ -138,6 +142,7 @@ export async function POST(request: NextRequest) {
     if (insertError) throw insertError;
 
     // If in AI mode, generate and save AI reply
+    let escalate = false;
     if (session.mode === 'ai') {
       let aiText = 'Thanks for your message. A support agent will assist you shortly.';
       try {
@@ -149,17 +154,42 @@ export async function POST(request: NextRequest) {
           .limit(30);
 
         const systemPrompt = await buildSystemPrompt();
-        aiText = await getAiReply(systemPrompt, history ?? []);
+        const aiRaw = await getAiReply(systemPrompt, history ?? []);
+
+        // Detect escalation sentinel
+        const SENTINEL = '[CONNECT_AGENT]';
+        if (aiRaw.includes(SENTINEL)) {
+          escalate = true;
+          aiText = aiRaw.replace(SENTINEL, '').trim();
+        } else {
+          aiText = aiRaw;
+        }
       } catch (aiErr) {
         console.error('[support/message] AI reply failed:', aiErr instanceof Error ? aiErr.message : aiErr);
       }
 
+      // Save AI reply (stripped of sentinel)
       await supabase
         .from('support_messages')
         .insert({ session_id, sender_type: 'ai', sender_name: 'JulineMart AI', content: aiText });
+
+      // If AI decided to escalate, flip session to human and insert handoff message
+      if (escalate) {
+        await supabase
+          .from('support_sessions')
+          .update({ mode: 'human', status: 'open' })
+          .eq('id', session_id);
+
+        await supabase.from('support_messages').insert({
+          session_id,
+          sender_type: 'ai',
+          sender_name: 'JulineMart Support',
+          content: 'You have been connected to our support team. An agent will join shortly.',
+        });
+      }
     }
 
-    return NextResponse.json({ message: customerMsg });
+    return NextResponse.json({ message: customerMsg, escalate });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to send message';
     console.error('[support/message POST]', message);
