@@ -186,6 +186,41 @@ export async function POST(request: NextRequest) {
           sender_name: 'JulineMart Support',
           content: 'You have been connected to our support team. An agent will join shortly.',
         });
+
+        // Fetch session details + first customer message for the staff notification
+        const [{ data: sessionMeta }, { data: firstMsg }] = await Promise.all([
+          supabase
+            .from('support_sessions')
+            .select('customer_name, customer_email')
+            .eq('id', session_id)
+            .single(),
+          supabase
+            .from('support_messages')
+            .select('content')
+            .eq('session_id', session_id)
+            .eq('sender_type', 'customer')
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
+        // Fire-and-forget staff notification (same as manual "Talk to agent" button)
+        const jloUrl = process.env.JLO_BASE_URL?.trim();
+        const secret = process.env.SUPPORT_NOTIFY_SECRET?.trim();
+        if (jloUrl && secret) {
+          fetch(`${jloUrl}/.netlify/functions/support-notify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-support-notify-secret': secret },
+            body: JSON.stringify({
+              action: 'human_requested',
+              session: {
+                customer_name:  sessionMeta?.customer_name  || 'Customer',
+                customer_email: sessionMeta?.customer_email || '',
+                first_message:  firstMsg?.content           || '',
+              },
+            }),
+          }).catch(() => {});
+        }
       }
     }
 
