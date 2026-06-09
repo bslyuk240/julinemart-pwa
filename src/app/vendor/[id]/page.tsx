@@ -86,8 +86,8 @@ export default function VendorStorePage() {
           if (!append) return sortProducts(data.products, sortBy);
           // Deduplicate by supabase_id then woo id — prevents duplicates when
           // catalog pagination is unstable (products with identical created_at).
-          const seen = new Set(prev.map(p => String(p.supabaseId || p.id)));
-          const fresh = data.products.filter(p => !seen.has(String(p.supabaseId || p.id)));
+          const seen = new Set(prev.map(p => p.slug || String(p.id)));
+          const fresh = data.products.filter(p => !seen.has(p.slug || String(p.id)));
           return sortProducts([...prev, ...fresh], sortBy);
         });
         setTotal(data.total ?? data.products.length);
