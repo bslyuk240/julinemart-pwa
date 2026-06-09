@@ -68,8 +68,7 @@ export default function VendorStorePage() {
     if (!silent) setLoading(true);
     try {
       const res  = await fetch(
-        `/api/vendor/${encodeURIComponent(vendorId)}?page=${page}&per_page=${perPage}`,
-        { cache: 'no-store' }
+        `/api/vendor/${encodeURIComponent(vendorId)}?page=${page}&per_page=${perPage}`
       );
       const data = await res.json() as {
         vendor: VendorData;

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 300; // Cache vendor pages for 5 minutes
 
 /**
  * GET /api/vendor/[id]
@@ -159,15 +158,23 @@ export async function GET(
       (p: any) => p.status === 'publish' || p.status === 'published'
     );
 
-    return NextResponse.json({
-      vendor,
-      products,
-      total: Number(body?.meta?.total ?? products.length),
-      totalPages: Number(body?.meta?.total_pages ?? 1),
-      page,
-      perPage,
-      source: 'supabase',
-    });
+    return NextResponse.json(
+      {
+        vendor,
+        products,
+        total: Number(body?.meta?.total ?? products.length),
+        totalPages: Number(body?.meta?.total_pages ?? 1),
+        page,
+        perPage,
+        source: 'supabase',
+      },
+      {
+        headers: {
+          // Allow the browser to serve from cache for 5 min; revalidate in background after
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60',
+        },
+      }
+    );
 
   } catch (err) {
     console.error('[/api/vendor] error:', err);
