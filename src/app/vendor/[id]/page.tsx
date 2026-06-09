@@ -83,8 +83,12 @@ export default function VendorStorePage() {
       if (data.vendor) setVendor(data.vendor);
       if (data.products) {
         setProducts(prev => {
-          const next = append ? [...prev, ...data.products] : data.products;
-          return sortProducts(next, sortBy);
+          if (!append) return sortProducts(data.products, sortBy);
+          // Deduplicate by supabase_id then woo id — prevents duplicates when
+          // catalog pagination is unstable (products with identical created_at).
+          const seen = new Set(prev.map(p => String(p.supabase_id || p.id)));
+          const fresh = data.products.filter(p => !seen.has(String(p.supabase_id || p.id)));
+          return sortProducts([...prev, ...fresh], sortBy);
         });
         setTotal(data.total ?? data.products.length);
         setCurrentPage(data.page ?? page);
