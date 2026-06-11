@@ -50,7 +50,7 @@ export default function BottomNav() {
         bottom: 'var(--jm-vv-bottom-inset, 0px)',
       }}
     >
-      <div className="flex items-center justify-around py-1">
+      <div className="flex items-center justify-around py-2">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
@@ -60,21 +60,21 @@ export default function BottomNav() {
               key={item.name}
               href={item.href}
               className={clsx(
-                'flex flex-col items-center gap-0.5 px-1.5 py-0.5 rounded-lg transition-colors min-w-[48px]',
+                'flex flex-col items-center gap-1 px-2 py-1 rounded-lg transition-colors min-w-[52px]',
                 isActive
                   ? 'text-primary-600'
                   : 'text-gray-600 hover:text-primary-600'
               )}
             >
               <div className="relative">
-                <Icon className="w-4 h-4" />
+                <Icon className="w-5 h-5" />
                 {(item.badge ?? 0) > 0 && (
-                  <span className="absolute -top-2 -right-1 bg-secondary-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  <span className="absolute -top-2 -right-1.5 bg-secondary-500 text-white text-[10px] font-bold rounded-full w-[18px] h-[18px] flex items-center justify-center">
                     {item.badge! > 9 ? '9+' : item.badge}
                   </span>
                 )}
               </div>
-              <span className="text-[9.5px] font-medium leading-tight">{item.name}</span>
+              <span className="text-[11px] font-medium leading-tight">{item.name}</span>
             </Link>
           );
         })}

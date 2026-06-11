@@ -40,10 +40,10 @@ export default async function CategoriesPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="mb-1 text-2xl font-bold text-gray-900 md:text-3xl">Shop by Category</h1>
-          <p className="text-sm text-gray-600 md:text-base">
+      <div className="container mx-auto px-4 py-5 md:py-6">
+        <div className="mb-4 md:mb-6">
+          <h1 className="mb-1 text-base font-bold text-gray-900 md:text-xl">Shop by Category</h1>
+          <p className="text-xs text-gray-600 md:text-sm">
             Browse all {categories.length} product categories
           </p>
         </div>

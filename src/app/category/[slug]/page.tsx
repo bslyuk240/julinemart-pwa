@@ -139,13 +139,13 @@ export default function CategoryPage() {
         </nav>
 
         <div className="mb-6">
-          <h1 className="mb-1 text-2xl font-bold text-gray-900 md:text-3xl">{categoryName}</h1>
-          <p className="text-sm text-gray-600 md:text-base">
+          <h1 className="mb-1 text-base font-bold text-gray-900 md:text-xl">{categoryName}</h1>
+          <p className="text-xs text-gray-600 md:text-sm">
             {products.length > 0 ? `${products.length} products found` : 'Browse products in this category'}
           </p>
         </div>
 
-        <div className="mb-6 flex items-center justify-between rounded-lg bg-white p-4 shadow-sm">
+        <div className="mb-6 flex items-center justify-between rounded-2xl bg-white p-3 md:p-4 shadow-sm">
           <div className="flex items-center gap-4">
             <button
               type="button"

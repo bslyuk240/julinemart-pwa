@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CreditCard, Truck, Package, MapPin, Tag } from 'lucide-react';
+import { CreditCard, Truck, Package, MapPin, Tag } from 'lucide-react';
+import PageHeader from '@/components/layout/page-header';
 import { useCart } from '@/hooks/use-cart';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { Button } from '@/components/ui/button';
@@ -1192,8 +1193,8 @@ export default function CheckoutPage() {
       <main className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">Your cart is empty</h2>
-          <Link href="/" className="text-primary-600 hover:text-primary-700 font-medium">
+          <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-4">Your cart is empty</h2>
+          <Link href="/" className="text-xs md:text-sm text-primary-600 hover:text-primary-700 font-medium">
             Continue Shopping
           </Link>
         </div>
@@ -1231,14 +1232,13 @@ export default function CheckoutPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom min-w-0 py-4 md:py-6">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Link href="/cart" className="text-gray-600 hover:text-primary-600">
-            <ArrowLeft className="w-6 h-6" />
-          </Link>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Checkout</h1>
-        </div>
+      <div className="container-custom min-w-0 py-5 md:py-6">
+        <PageHeader
+          title="Checkout"
+          subtitle="Review your details and place your order"
+          backHref="/cart"
+          backLabel="Back to cart"
+        />
 
         {loading && (
           <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -1250,10 +1250,10 @@ export default function CheckoutPage() {
           {/* Checkout Form */}
           <div className="min-w-0 space-y-6 lg:col-span-2">
             {/* Customer Information */}
-            <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+            <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
               <div className="flex items-center gap-3 mb-4">
-                <MapPin className="w-6 h-6 text-primary-600" />
-                <h2 className="text-xl font-semibold text-gray-900">Contact Information</h2>
+                <MapPin className="w-5 h-5 text-primary-600" />
+                <h2 className="text-sm md:text-base font-semibold text-gray-900">Contact Information</h2>
               </div>
               
               <div className="space-y-4">
@@ -1300,10 +1300,10 @@ export default function CheckoutPage() {
             </div>
 
             {/* Delivery Information */}
-            <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+            <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
               <div className="flex items-center gap-3 mb-4">
                 <Truck className="w-6 h-6 text-primary-600" />
-                <h2 className="text-xl font-semibold text-gray-900">Delivery Address</h2>
+                <h2 className="text-sm md:text-base font-semibold text-gray-900">Delivery Address</h2>
               </div>
               
               {hasSavedShipping && (
@@ -1469,10 +1469,10 @@ export default function CheckoutPage() {
 
             {/* Shipping Method */}
             {(loading || shippingOptions.length > 0) && (
-              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+              <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <div className="flex items-center gap-3 mb-4">
                   <Truck className="w-6 h-6 text-primary-600" />
-                  <h2 className="text-xl font-semibold text-gray-900">Shipping Method</h2>
+                  <h2 className="text-sm md:text-base font-semibold text-gray-900">Shipping Method</h2>
                 </div>
 
                 {shippingOptions.length > 0 ? (
@@ -1533,10 +1533,10 @@ export default function CheckoutPage() {
 
             {/* NEW: Discount Code + Voucher */}
             {shippingCost !== null && shippingCost > 0 && (
-              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+              <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <div className="flex items-center gap-3 mb-4">
                   <Tag className="w-6 h-6 text-primary-600" />
-                  <h2 className="text-xl font-semibold text-gray-900">Discounts</h2>
+                  <h2 className="text-sm md:text-base font-semibold text-gray-900">Discounts</h2>
                 </div>
 
                 <div className="space-y-5">
@@ -1590,7 +1590,7 @@ export default function CheckoutPage() {
                             }
                             isLoading={isApplyingVoucher}
                             variant="secondary"
-                            size="md"
+                            size="sm"
                             className="w-full shrink-0 whitespace-nowrap sm:w-auto"
                             type="button"
                           >
@@ -1645,7 +1645,7 @@ export default function CheckoutPage() {
                             disabled={!couponCode || isApplyingCoupon || Boolean(appliedVoucher)}
                             isLoading={isApplyingCoupon}
                             variant="secondary"
-                            size="md"
+                            size="sm"
                             className="w-full shrink-0 whitespace-nowrap sm:w-auto"
                             type="button"
                           >
@@ -1669,10 +1669,10 @@ export default function CheckoutPage() {
 
             {/* Payment Method */}
             {(loading || paymentGateways.length > 0) && (
-              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+              <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <div className="flex items-center gap-3 mb-4">
                   <CreditCard className="w-6 h-6 text-primary-600" />
-                  <h2 className="text-xl font-semibold text-gray-900">Payment Method</h2>
+                  <h2 className="text-sm md:text-base font-semibold text-gray-900">Payment Method</h2>
                 </div>
 
                 {paymentGateways.length === 0 ? (
@@ -1762,8 +1762,8 @@ export default function CheckoutPage() {
 
           {/* Order Summary */}
           <div className="min-w-0 lg:col-span-1">
-            <div className="sticky top-4 rounded-lg bg-white p-4 shadow-sm sm:p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Summary</h2>
+            <div className="sticky top-4 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+              <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-4">Order Summary</h2>
               
               <div className="mb-4 max-h-64 space-y-3 overflow-y-auto overflow-x-hidden border-b pb-4">
                 {items.map((item: any) => (
@@ -1836,7 +1836,7 @@ export default function CheckoutPage() {
 
               <Button
                 variant="primary"
-                size="lg"
+                size="sm"
                 fullWidth
                 isLoading={isProcessing}
                 onClick={handlePlaceOrder}

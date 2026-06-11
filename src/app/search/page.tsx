@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProductGrid from '@/components/product/product-grid';
+import PageHeader from '@/components/layout/page-header';
 import { Product } from '@/types/product';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 import { trackSearchUsed } from '@/lib/gtag';
@@ -51,16 +52,16 @@ function SearchContent() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-12">
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Search results</h1>
-          <p className="text-gray-600 mt-1">
-            {query ? `Showing matches for "${query}"` : 'Enter a search term above to see matching products.'}
-          </p>
-        </div>
+      <div className="container mx-auto px-4 py-5 md:py-6">
+        <PageHeader
+          title="Search results"
+          subtitle={query ? `Showing matches for "${query}"` : 'Enter a search term above to see matching products.'}
+          backHref="/"
+          backLabel="Back to home"
+        />
 
         {loading && (
-          <div className="bg-white rounded-lg shadow-sm p-10 text-center">
+          <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
             <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-gray-600">Searching products...</p>
           </div>
@@ -76,8 +77,8 @@ function SearchContent() {
         )}
 
         {!loading && query && hasSearched && products.length === 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">No products found</h2>
+          <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
+            <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-2">No products found</h2>
             <p className="text-gray-600">
               We could not find any results for &quot;{query}&quot;. Try another search term.
             </p>

@@ -717,7 +717,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                 </div>
               )}
 
-              <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2">
+              <h1 className="text-base md:text-xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2">
                 {decodedProductName}
               </h1>
               
@@ -744,7 +744,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
               {/* Price */}
               <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className="text-xl md:text-2xl font-bold text-primary-600">
+                <span className="text-lg md:text-xl font-bold text-primary-600">
                   {formatPrice(selectedPrice.toString())}
                 </span>
                 {discountPercentage > 0 && (
@@ -933,7 +933,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                 <Button
                   onClick={handleAddToCart}
                   variant="primary"
-                  size="md"
+                  size="sm"
                   fullWidth
                   disabled={
                     effectiveStockStatus === 'outofstock' ||
@@ -950,7 +950,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                 <Button 
                   onClick={handleWishlist}
                   variant={inWishlist ? "primary" : "outline"}
-                  size="md"
+                  size="sm"
                 >
                   <Heart className={`w-4 h-4 md:w-5 md:h-5 ${inWishlist ? 'fill-current' : ''}`} />
                 </Button>
@@ -960,7 +960,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                   <Button 
                     onClick={() => setShowShareMenu(!showShareMenu)}
                     variant="outline" 
-                    size="md"
+                    size="sm"
                   >
                     <Share2 className="w-4 h-4 md:w-5 md:h-5" />
                   </Button>
@@ -1036,7 +1036,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
               <Button 
                 onClick={handleBuyNow}
                 variant="secondary" 
-                size="md" 
+                size="sm" 
                 fullWidth
                 disabled={
                   effectiveStockStatus === 'outofstock' ||
@@ -1224,7 +1224,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                       <Button
                         type="submit"
                         variant="primary"
-                        size="md"
+                        size="sm"
                         fullWidth
                         disabled={submittingReview}
                       >
@@ -1241,7 +1241,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
         {/* Related Products */}
         {relatedProducts.length > 0 && (
           <section className="border-t pt-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Related Products</h2>
+            <h2 className="text-sm md:text-base font-bold text-gray-900 mb-4 md:mb-6">Related Products</h2>
             <ProductCarousel products={relatedProducts} />
           </section>
         )}

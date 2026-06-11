@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Package, MapPin, CreditCard, Phone, Mail, Download, Share2 } from 'lucide-react';
+import { Package, MapPin, CreditCard, Phone, Mail, Download, Share2 } from 'lucide-react';
+import PageHeader from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import PageLoading from '@/components/ui/page-loading';
@@ -199,9 +200,9 @@ export default function OrderDetailPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Order not found</h2>
+          <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-4">Order not found</h2>
           <Link href="/orders">
-            <Button variant="primary">Back to Orders</Button>
+            <Button variant="primary" size="sm">Back to Orders</Button>
           </Link>
         </div>
       </div>
@@ -214,29 +215,23 @@ export default function OrderDetailPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Link href="/orders" className="text-gray-600 hover:text-primary-600">
-              <ArrowLeft className="w-6 h-6" />
-            </Link>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                Order #{order.number}
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Placed on {formatDate(order.date_created)}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleShare}>
-              <Share2 className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
+      <div className="container mx-auto px-4 py-5 md:py-6">
+        <PageHeader
+          title={`Order #${order.number}`}
+          subtitle={`Placed on ${formatDate(order.date_created)}`}
+          backHref="/orders"
+          backLabel="Back to orders"
+          action={(
+            <button
+              type="button"
+              onClick={handleShare}
+              aria-label="Share order"
+              className="flex-shrink-0 w-9 h-9 rounded-xl border border-gray-200 bg-white flex items-center justify-center hover:bg-gray-50 transition-colors active:scale-95"
+            >
+              <Share2 className="w-4 h-4 text-gray-600" />
+            </button>
+          )}
+        />
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Main Content */}

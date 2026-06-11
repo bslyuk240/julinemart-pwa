@@ -27,11 +27,10 @@ export default function CartSummary({
   const formatPrice = (price: number = 0) => `₦${Number(price || 0).toLocaleString()}`;
 
   return (
-    <div className="sticky top-4 min-w-0 max-w-full rounded-lg bg-white p-4 shadow-md sm:p-6">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-200">
-        <ShoppingBag className="w-5 h-5 text-primary-600" />
-        <h2 className="text-xl font-bold text-primary-900">Order Summary</h2>
+    <div className="sticky top-4 min-w-0 max-w-full rounded-2xl bg-white p-4 shadow-sm md:p-5">
+      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200">
+        <ShoppingBag className="w-4 h-4 text-primary-600" />
+        <h2 className="text-sm md:text-base font-bold text-primary-900">Order Summary</h2>
       </div>
 
       {/* Summary Details */}
@@ -76,8 +75,8 @@ export default function CartSummary({
         {/* Divider */}
         <div className="border-t border-gray-200 pt-4">
           <div className="flex min-w-0 items-center justify-between gap-3">
-            <span className="text-lg font-bold text-gray-900">Total</span>
-            <span className="shrink-0 text-right text-xl font-bold tabular-nums text-primary-600 sm:text-2xl">
+            <span className="text-sm md:text-base font-bold text-gray-900">Total</span>
+            <span className="shrink-0 text-right text-base md:text-xl font-bold tabular-nums text-primary-600">
               {formatPrice(total)}
             </span>
           </div>
@@ -88,11 +87,11 @@ export default function CartSummary({
       <Button
         onClick={onCheckout}
         variant="primary"
-        size="lg"
+        size="sm"
         fullWidth
         isLoading={isLoading}
         disabled={itemCount === 0}
-        className="mb-4"
+        className="mb-3"
       >
         {isLoading ? 'Processing...' : 'Proceed to Checkout'}
       </Button>
@@ -121,7 +120,7 @@ export default function CartSummary({
             placeholder="Enter promo code"
             className="min-w-0 flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
-          <Button variant="outline" size="md" className="w-full shrink-0 sm:w-auto">
+          <Button variant="outline" size="sm" className="w-full shrink-0 sm:w-auto">
             Apply
           </Button>
         </div>
