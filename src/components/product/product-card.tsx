@@ -65,7 +65,7 @@ export default function ProductCard({
 
     // Variable products require variation selection — go to product page
     if (isVariable) {
-      router.push(`/product/${product.slug}`);
+      if (product.slug) router.push(`/product/${product.slug}`);
       return;
     }
 

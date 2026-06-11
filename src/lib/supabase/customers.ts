@@ -52,7 +52,7 @@ export async function upsertAddress(
       .eq('type', address.type);
   }
 
-  const payload: any = { customer_id: customerId, ...address };
+  const payload: any = { customer_id: customerId, ...address, updated_at: new Date().toISOString() };
   if (id) payload.id = id;
 
   const { data, error } = await supabase
