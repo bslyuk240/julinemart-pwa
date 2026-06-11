@@ -88,7 +88,7 @@ export default function OrdersPage() {
     }
   };
 
-  const formatPrice = (amount: number | string, currency: string = 'NGN') => {
+  const formatPrice = (amount: number | string) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
     return `₦${(isNaN(num) ? 0 : num).toLocaleString()}`;
   };
@@ -111,25 +111,16 @@ export default function OrdersPage() {
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
       <div className="container mx-auto px-4 py-5 md:py-6">
-        <div className="mb-5 md:mb-6">
-          <Link
-            href="/account"
-            className="inline-flex items-center gap-1.5 text-xs md:text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors mb-3"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to account
-          </Link>
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-base md:text-xl font-bold text-gray-900">My Orders</h1>
-              <p className="text-xs md:text-base text-gray-600 mt-0.5 md:mt-1">Track your recent purchases and order history.</p>
+        <AccountPageHeader
+          title="My Orders"
+          subtitle="Track your recent purchases and order history."
+          action={(
+            <div className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm">
+              <Package className="w-3.5 h-3.5 text-primary-600" />
+              <span>{totalOrders}</span>
             </div>
-            <div className="inline-flex flex-shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs md:text-sm font-medium text-gray-700 shadow-sm">
-              <Package className="w-4 h-4 text-primary-600" />
-              <span>{totalOrders} {totalOrders === 1 ? 'order' : 'orders'}</span>
-            </div>
-          </div>
-        </div>
+          )}
+        />
 
         {orders.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
