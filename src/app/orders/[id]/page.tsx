@@ -24,6 +24,12 @@ function canOrderBeReturned(status: string) {
   return eligible.includes(status);
 }
 
+// Order can be cancelled if it hasn't been picked up / shipped yet
+function canOrderBeCancelled(status: string) {
+  const cancellable = ['pending', 'processing', 'confirmed'];
+  return cancellable.includes(status);
+}
+
 export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -34,6 +40,8 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [returns, setReturns] = useState<JloReturn[]>([]);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
 
   const activeReturn = useMemo(() => {
     if (!returns.length) return null;
@@ -191,6 +199,34 @@ export default function OrderDetailPage() {
     }
   };
 
+  const handleCancelOrder = async () => {
+    if (!order) return;
+    setIsCancelling(true);
+    try {
+      const supabaseId = (order as any)._supabase_id ?? order.id;
+      const res = await fetch(`/api/orders/${supabaseId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Customer requested cancellation' }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        toast.error(data.error || 'Could not cancel this order. Please contact support.');
+        return;
+      }
+
+      toast.success(data.message || 'Order cancelled successfully.');
+      setCancelConfirm(false);
+      // Reload order to reflect cancelled status
+      await loadOrder();
+    } catch {
+      toast.error('Failed to cancel order. Please try again or contact support.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   if (authLoading || loading) {
     return <PageLoading text="Loading order details..." />;
   }
@@ -212,6 +248,7 @@ export default function OrderDetailPage() {
   const returnRequestsCount = returns.length;
   const returnEligible = canOrderBeReturned(order.status) && !activeReturn && returnRequestsCount < 2;
   const returnShipment = activeReturn?.return_shipment;
+  const cancelEligible = canOrderBeCancelled(order.status);
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
@@ -378,6 +415,49 @@ export default function OrderDetailPage() {
                 Continue Shopping
               </Button>
             </Link>
+              {cancelEligible && (
+                <div className="space-y-2">
+                  {cancelConfirm ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 space-y-3">
+                      <p className="text-sm font-medium text-red-800">Are you sure you want to cancel this order?</p>
+                      {order.transaction_id && (
+                        <p className="text-xs text-red-700">Your payment will be refunded within 5–10 business days.</p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          fullWidth
+                          isLoading={isCancelling}
+                          onClick={handleCancelOrder}
+                          className="!bg-red-600 hover:!bg-red-700"
+                        >
+                          Yes, cancel order
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          fullWidth
+                          onClick={() => setCancelConfirm(false)}
+                          disabled={isCancelling}
+                        >
+                          Keep order
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      fullWidth
+                      onClick={() => setCancelConfirm(true)}
+                      className="!border-red-300 !text-red-600 hover:!bg-red-50"
+                    >
+                      Cancel Order
+                    </Button>
+                  )}
+                </div>
+              )}
+
               <Link href={`/account/orders/${order.id}/return`} className="block">
                 <Button
                   variant="secondary"

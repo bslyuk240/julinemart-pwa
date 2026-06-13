@@ -75,6 +75,8 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [isCartHydrated, setIsCartHydrated] = useState(false);
   const currentOrderRef = useRef<any>(null);
+  const pendingPaystackConfigRef = useRef<any>(null);
+  const [hasPendingPayment, setHasPendingPayment] = useState(false);
   const hasTrackedBeginCheckoutRef = useRef(false);
   
   // Saved card state
@@ -270,9 +272,9 @@ export default function CheckoutPage() {
         metadata: config.metadata,
         onClose: function() {
           console.log('Payment window closed');
-          toast.warning('Payment cancelled. Your order is still pending payment.');
+          toast.warning('Payment cancelled. Click "Retry Payment" to complete your order.');
           setIsProcessing(false);
-          currentOrderRef.current = null;
+          setHasPendingPayment(true);
         },
         callback: function(response: any) {
           console.log('Payment callback received:', response);
@@ -342,6 +344,8 @@ export default function CheckoutPage() {
       trackPurchaseForOrder(redirectOrderId);
       clearCart();
       currentOrderRef.current = null;
+      pendingPaystackConfigRef.current = null;
+      setHasPendingPayment(false);
 
       const orderNum = verifyData.order?.order_number;
       router.push(`/order-success?ref=${orderNum || redirectOrderId}`);
@@ -1160,8 +1164,10 @@ export default function CheckoutPage() {
               },
             };
 
+            pendingPaystackConfigRef.current = paystackConfig;
+            setHasPendingPayment(false);
             toast.success('Opening payment window...');
-            
+
             setTimeout(() => {
               initializePaystackPayment(paystackConfig);
             }, 500);
@@ -1834,23 +1840,68 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <Button
-                variant="primary"
-                size="sm"
-                fullWidth
-                isLoading={isProcessing}
-                onClick={handlePlaceOrder}
-                disabled={
-                  !isCheckoutReady ||
-                  (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null)
-                }
-              >
-                {isProcessing
-                  ? 'Processing...'
-                  : loading
-                    ? 'Loading checkout options...'
-                    : 'Place Order'}
-              </Button>
+              {hasPendingPayment ? (
+                <div className="space-y-2">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-center text-xs text-amber-800">
+                    Your order was created but payment was not completed.
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    fullWidth
+                    isLoading={isProcessing}
+                    onClick={() => {
+                      if (pendingPaystackConfigRef.current) {
+                        setIsProcessing(true);
+                        initializePaystackPayment(pendingPaystackConfigRef.current);
+                      }
+                    }}
+                  >
+                    {isProcessing ? 'Processing...' : 'Retry Payment'}
+                  </Button>
+                  <button
+                    type="button"
+                    className="w-full text-center text-xs text-gray-500 underline hover:text-gray-700"
+                    onClick={async () => {
+                      const orderId = currentOrderRef.current;
+                      if (orderId) {
+                        try {
+                          await fetch(`/api/orders/${orderId}/cancel`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ reason: 'Customer cancelled before completing payment' }),
+                          });
+                        } catch {
+                          // best-effort — don't block the user if cancel call fails
+                        }
+                      }
+                      currentOrderRef.current = null;
+                      pendingPaystackConfigRef.current = null;
+                      setHasPendingPayment(false);
+                    }}
+                  >
+                    Cancel and place a new order instead
+                  </button>
+                </div>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  fullWidth
+                  isLoading={isProcessing}
+                  onClick={handlePlaceOrder}
+                  disabled={
+                    !isCheckoutReady ||
+                    (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null)
+                  }
+                >
+                  {isProcessing
+                    ? 'Processing...'
+                    : loading
+                      ? 'Loading checkout options...'
+                      : 'Place Order'}
+                </Button>
+              )}
 
               <p className="text-xs text-gray-500 text-center mt-4">
                 By placing your order, you agree to our{' '}
