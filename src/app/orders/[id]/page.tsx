@@ -3,13 +3,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Package, MapPin, CreditCard, Phone, Mail, Download, Share2 } from 'lucide-react';
+import { Package, MapPin, CreditCard, Phone, Mail, Share2, Send } from 'lucide-react';
 import PageHeader from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import PageLoading from '@/components/ui/page-loading';
 import { toast } from 'sonner';
-import { generateInvoicePDF } from '@/lib/invoice-generator';
 import OrderStatusTracker from '@/components/orders/order-status-tracker';
 import { JloReturn, formatJloRefundStatus, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
 import type { Order as WooOrder } from '@/types/order';
@@ -191,24 +190,51 @@ export default function OrderDetailPage() {
     }
   };
 
-  const handleDownloadInvoice = async () => {
+  const handleEmailInvoice = async () => {
     if (!order) return;
-    
+    const email = order.billing?.email;
+    if (!email) {
+      toast.error('No email address found for this order.');
+      return;
+    }
+
     const toastId = toast.loading('Generating invoice...');
     try {
-      await generateInvoicePDF({
+      // Generate the PDF and get it as a base64 string instead of downloading
+      const { generateInvoicePDFBase64 } = await import('@/lib/invoice-generator');
+      const base64 = await generateInvoicePDFBase64({
         order: {
           ...order,
           subtotal: order.subtotal ?? '0',
           total_tax: order.total_tax ?? order.tax_total ?? '0',
         },
       });
+
+      toast.loading('Sending to your email...', { id: toastId });
+
+      const supabaseId = (order as any)._supabase_id ?? order.id;
+      const res = await fetch(`/api/orders/${supabaseId}/email-invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_email: email,
+          pdf_base64: base64,
+          file_name: `Invoice-${order.number}.pdf`,
+        }),
+      });
+
+      const data = await res.json();
       toast.dismiss(toastId);
-      toast.success('Invoice downloaded successfully!');
+
+      if (!res.ok || !data.success) {
+        toast.error(data.error || 'Failed to send invoice. Please try again.');
+      } else {
+        toast.success(`Invoice sent to ${email}`);
+      }
     } catch (error) {
-      console.error('Error generating invoice:', error);
+      console.error('Error sending invoice:', error);
       toast.dismiss(toastId);
-      toast.error('Failed to generate invoice. Please try again.');
+      toast.error('Failed to send invoice. Please try again.');
     }
   };
 
@@ -553,10 +579,10 @@ export default function OrderDetailPage() {
                 variant="outline"
                 size="sm"
                 fullWidth
-                onClick={handleDownloadInvoice}
+                onClick={handleEmailInvoice}
               >
-                <Download className="w-4 h-4 mr-2" />
-                Download Invoice
+                <Send className="w-4 h-4 mr-2" />
+                Email Invoice
               </Button>
 
               {showReturns && (

@@ -126,7 +126,7 @@ const loadImageAsBase64 = async (url: string): Promise<string> => {
   }
 };
 
-export const generateInvoicePDF = async (data: InvoiceData) => {
+const buildInvoiceDoc = async (data: InvoiceData): Promise<jsPDF> => {
   const { order } = data;
   const doc = new jsPDF();
   
@@ -418,12 +418,21 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   doc.setFont('helvetica', 'normal');
   doc.text('Need help? Contact: support@julinemart.com', 105, pageHeight - 3, { align: 'center' });
 
-  // Save the PDF.
-  // jsPDF's doc.save() relies on an <a download> click, which silently fails
-  // inside Android PWA / TWA WebViews. Use a WebView-friendly strategy:
-  //   1. Native share sheet (best on mobile — lets user save/share the file)
-  //   2. Open the blob in a new tab (viewer with its own download/print)
-  //   3. Fall back to the classic anchor download (desktop browsers)
+  return doc;
+};
+
+/**
+ * Generates the invoice PDF and returns it as a base64 string (no download).
+ * Used to email the PDF via the server.
+ */
+export const generateInvoicePDFBase64 = async (data: InvoiceData): Promise<string> => {
+  const doc = await buildInvoiceDoc(data);
+  return doc.output('datauristring').split(',')[1]; // strip the data URI prefix
+};
+
+export const generateInvoicePDF = async (data: InvoiceData) => {
+  const doc = await buildInvoiceDoc(data);
+  const { order } = data;
   const fileName = `Invoice-${order.number}.pdf`;
   const blob = doc.output('blob');
 
@@ -439,7 +448,6 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         return;
       }
     } catch (err) {
-      // user cancelled or share unsupported — fall through
       if ((err as Error)?.name === 'AbortError') return;
     }
   }
