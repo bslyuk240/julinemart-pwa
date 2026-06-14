@@ -293,19 +293,26 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Always open Paystack with a FRESH transaction reference. Reusing the ref
+    // from an abandoned/cancelled attempt makes Paystack treat it as a duplicate
+    // and the iframe hangs on an endless loading spinner. The JLO order is still
+    // located via currentOrderRef (the stable payment_reference) at verify time,
+    // so a fresh Paystack ref is safe. config.reference is the stable base.
+    const freshRef = `${config.reference}-R${Date.now().toString(36).toUpperCase()}`;
+
     try {
       logActivity({
         action: 'PAYMENT_INITIATED',
         resource_type: 'orders',
         resource_id: orderResourceId,
-        details: { reference: config.reference, amount: config.amount },
+        details: { reference: freshRef, amount: config.amount },
       });
 
       const handler = window.PaystackPop.setup({
         key: config.publicKey,
         email: config.email,
         amount: config.amount,
-        ref: config.reference,
+        ref: freshRef,
         metadata: config.metadata,
         onClose: function() {
           console.log('Payment window closed');
@@ -316,7 +323,7 @@ export default function CheckoutPage() {
             action: 'PAYMENT_CANCELLED',
             resource_type: 'orders',
             resource_id: orderResourceId,
-            details: { reference: config.reference, stage: 'popup_closed' },
+            details: { reference: freshRef, stage: 'popup_closed' },
           });
         },
         callback: function(response: any) {
@@ -336,7 +343,7 @@ export default function CheckoutPage() {
         action: 'PAYMENT_GATEWAY_OPEN_FAILED',
         resource_type: 'orders',
         resource_id: orderResourceId,
-        details: { reference: config.reference, error: String((error as Error)?.message || error) },
+        details: { reference: freshRef, error: String((error as Error)?.message || error) },
       });
     }
   };
