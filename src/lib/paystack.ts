@@ -28,14 +28,17 @@ function paystackAvailable(): boolean {
 
 function injectScript(): HTMLScriptElement {
   const existing = document.querySelector<HTMLScriptElement>(
-    `script[src="${PAYSTACK_SRC}"], script[data-paystack="true"]`
+    `script[src="${PAYSTACK_SRC}"], script#paystack-inline-js`
   );
   if (existing) return existing;
 
   const script = document.createElement('script');
   script.src = PAYSTACK_SRC;
   script.async = true;
-  script.dataset.paystack = 'true';
+  // NB: do NOT set any data-* attributes here. inline.js treats a data-* on its
+  // own script tag as drop-in mode and auto-runs setup(), which throws
+  // "put your Paystack Inline javascript file inside of a form element".
+  script.id = 'paystack-inline-js';
   document.body.appendChild(script);
   return script;
 }
