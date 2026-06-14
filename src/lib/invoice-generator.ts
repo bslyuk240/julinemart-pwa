@@ -418,6 +418,45 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   doc.setFont('helvetica', 'normal');
   doc.text('Need help? Contact: support@julinemart.com', 105, pageHeight - 3, { align: 'center' });
 
-  // Save the PDF
-  doc.save(`Invoice-${order.number}.pdf`);
+  // Save the PDF.
+  // jsPDF's doc.save() relies on an <a download> click, which silently fails
+  // inside Android PWA / TWA WebViews. Use a WebView-friendly strategy:
+  //   1. Native share sheet (best on mobile — lets user save/share the file)
+  //   2. Open the blob in a new tab (viewer with its own download/print)
+  //   3. Fall back to the classic anchor download (desktop browsers)
+  const fileName = `Invoice-${order.number}.pdf`;
+  const blob = doc.output('blob');
+
+  const nav =
+    typeof navigator !== 'undefined' ? (navigator as Navigator & { canShare?: (d: any) => boolean }) : undefined;
+
+  // 1. Native share with file (mobile)
+  if (nav?.canShare) {
+    try {
+      const file = new File([blob], fileName, { type: 'application/pdf' });
+      if (nav.canShare({ files: [file] })) {
+        await nav.share({ files: [file], title: fileName });
+        return;
+      }
+    } catch (err) {
+      // user cancelled or share unsupported — fall through
+      if ((err as Error)?.name === 'AbortError') return;
+    }
+  }
+
+  // 2. Open blob in a new tab (works in most WebViews)
+  try {
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    if (win) {
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    }
+    URL.revokeObjectURL(url);
+  } catch {
+    // fall through to anchor download
+  }
+
+  // 3. Classic anchor download (desktop)
+  doc.save(fileName);
 };

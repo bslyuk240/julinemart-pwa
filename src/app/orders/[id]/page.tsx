@@ -17,6 +17,8 @@ import type { Order as WooOrder } from '@/types/order';
 type OrderDetail = WooOrder & {
   subtotal?: string;
   tax_total?: string;
+  payment_status?: string;
+  _supabase_id?: string;
 };
 
 function canOrderBeReturned(status: string) {
@@ -42,6 +44,7 @@ export default function OrderDetailPage() {
   const [returns, setReturns] = useState<JloReturn[]>([]);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
 
   const activeReturn = useMemo(() => {
     if (!returns.length) return null;
@@ -61,6 +64,16 @@ export default function OrderDetailPage() {
       }
     }
   }, [authLoading, isAuthenticated, orderId]);
+
+  // Load Paystack inline script so customers can complete payment from here
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !(window as any).PaystackPop) {
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
   const loadOrder = async () => {
     try {
@@ -199,6 +212,81 @@ export default function OrderDetailPage() {
     }
   };
 
+  const verifyCompletedPayment = async (paystackRef: string) => {
+    toast.loading('Verifying payment...', { id: 'pay-verify' });
+    try {
+      const res = await fetch('/api/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reference: paystackRef,
+          orderId: order?.transaction_id, // JLO payment_reference lookup key
+          customerEmail: order?.billing?.email,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        toast.error(data.error || 'Payment verification failed', { id: 'pay-verify' });
+        setIsPaying(false);
+        return;
+      }
+      toast.success('Payment successful! Your order is confirmed.', { id: 'pay-verify' });
+      setIsPaying(false);
+      await loadOrder();
+    } catch {
+      toast.error('Payment verification failed. Please contact support.', { id: 'pay-verify' });
+      setIsPaying(false);
+    }
+  };
+
+  const handleCompletePayment = () => {
+    if (!order) return;
+    const w = window as any;
+    if (!w.PaystackPop) {
+      toast.error('Payment system is still loading. Please try again in a moment.');
+      return;
+    }
+    const email = order.billing?.email;
+    const amountKobo = Math.round(parseFloat(order.total || '0') * 100);
+
+    if (!order.transaction_id || !email || amountKobo <= 0) {
+      toast.error('Unable to start payment for this order. Please contact support.');
+      return;
+    }
+
+    // Fresh Paystack reference for the retry — avoids "Duplicate Transaction
+    // Reference" if the first attempt left an abandoned transaction. The JLO
+    // order is still located via order.transaction_id during verification.
+    const reference = `${order.transaction_id}-R${Date.now().toString(36).toUpperCase()}`;
+
+    setIsPaying(true);
+    try {
+      const handler = w.PaystackPop.setup({
+        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
+        email,
+        amount: amountKobo,
+        ref: reference,
+        metadata: {
+          order_id: order._supabase_id ?? order.id,
+          custom_fields: [
+            { display_name: 'Order Number', variable_name: 'order_number', value: `#${order.number}` },
+          ],
+        },
+        onClose: () => {
+          setIsPaying(false);
+          toast.warning('Payment cancelled. You can complete it anytime from this page.');
+        },
+        callback: (response: any) => {
+          verifyCompletedPayment(response.reference);
+        },
+      });
+      handler.openIframe();
+    } catch {
+      setIsPaying(false);
+      toast.error('Could not open the payment window. Please try again.');
+    }
+  };
+
   const handleCancelOrder = async () => {
     if (!order) return;
     setIsCancelling(true);
@@ -249,6 +337,10 @@ export default function OrderDetailPage() {
   const returnEligible = canOrderBeReturned(order.status) && !activeReturn && returnRequestsCount < 2;
   const returnShipment = activeReturn?.return_shipment;
   const cancelEligible = canOrderBeCancelled(order.status);
+  const isPaid = order.payment_status === 'paid' || Boolean(order.date_paid);
+  const paymentPending = order.status === 'pending' && !isPaid;
+  const canCompletePayment = paymentPending && Boolean(order.transaction_id);
+  const showReturns = returnEligible || Boolean(activeReturn);
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
@@ -270,9 +362,41 @@ export default function OrderDetailPage() {
           )}
         />
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        {/* Complete Payment banner — shown when order is created but unpaid */}
+        {paymentPending && (
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <CreditCard className="w-5 h-5 text-amber-700" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-amber-900 text-sm">Payment not completed</p>
+                <p className="text-xs text-amber-700">
+                  Pay {formatPrice(order.total, order.currency)} to confirm this order.
+                </p>
+              </div>
+            </div>
+            {canCompletePayment ? (
+              <Button
+                variant="primary"
+                size="sm"
+                fullWidth
+                isLoading={isPaying}
+                onClick={handleCompletePayment}
+              >
+                Complete Payment
+              </Button>
+            ) : (
+              <p className="text-xs text-amber-700">
+                Please contact support to complete payment for this order.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="grid lg:grid-cols-3 gap-4 md:gap-6">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 md:space-y-6">
             {/* Dynamic Status Tracker */}
             <OrderStatusTracker
               status={order.status}
@@ -283,8 +407,8 @@ export default function OrderDetailPage() {
             />
 
             {/* Order Items */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Items</h2>
+            <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+              <h2 className="text-base md:text-xl font-semibold text-gray-900 mb-3 md:mb-4">Order Items</h2>
               <div className="space-y-4">
                 {order.line_items.map((item) => (
                   <div
@@ -312,9 +436,9 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             {/* Order Summary */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
                 Order Summary
               </h3>
@@ -349,7 +473,7 @@ export default function OrderDetailPage() {
             </div>
 
             {/* Shipping Address */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
               <div className="flex items-center gap-2 mb-3">
                 <MapPin className="w-5 h-5 text-primary-600" />
                 <h3 className="font-semibold text-gray-900">Shipping Address</h3>
@@ -369,21 +493,32 @@ export default function OrderDetailPage() {
             </div>
 
             {/* Payment Method */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center gap-2 mb-3">
-                <CreditCard className="w-5 h-5 text-primary-600" />
-                <h3 className="font-semibold text-gray-900">Payment Method</h3>
+            <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-primary-600" />
+                  <h3 className="font-semibold text-gray-900">Payment Method</h3>
+                </div>
+                <span
+                  className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${
+                    isPaid
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}
+                >
+                  {isPaid ? 'Paid' : 'Awaiting payment'}
+                </span>
               </div>
               <p className="text-sm text-gray-600">{order.payment_method_title}</p>
               {order.transaction_id && (
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-gray-500 mt-2 break-all">
                   Transaction ID: {order.transaction_id}
                 </p>
               )}
             </div>
 
             {/* Contact Information */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
               <div className="flex items-center gap-2 mb-3">
                 <Phone className="w-5 h-5 text-primary-600" />
                 <h3 className="font-semibold text-gray-900">Contact Information</h3>
@@ -401,103 +536,90 @@ export default function OrderDetailPage() {
             </div>
 
             {/* Actions */}
-            <div className="space-y-2">
-            <Button 
-              variant="outline" 
-              fullWidth
-              onClick={handleDownloadInvoice}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download Invoice
-            </Button>
-            <Link href="/" className="block">
-              <Button variant="primary" fullWidth>
-                Continue Shopping
-              </Button>
-            </Link>
-              {cancelEligible && (
-                <div className="space-y-2">
-                  {cancelConfirm ? (
-                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 space-y-3">
-                      <p className="text-sm font-medium text-red-800">Are you sure you want to cancel this order?</p>
-                      {order.transaction_id && (
-                        <p className="text-xs text-red-700">Your payment will be refunded within 5–10 business days.</p>
-                      )}
-                      <div className="flex gap-2">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          fullWidth
-                          isLoading={isCancelling}
-                          onClick={handleCancelOrder}
-                          className="!bg-red-600 hover:!bg-red-700"
-                        >
-                          Yes, cancel order
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          fullWidth
-                          onClick={() => setCancelConfirm(false)}
-                          disabled={isCancelling}
-                        >
-                          Keep order
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      fullWidth
-                      onClick={() => setCancelConfirm(true)}
-                      className="!border-red-300 !text-red-600 hover:!bg-red-50"
-                    >
-                      Cancel Order
-                    </Button>
-                  )}
-                </div>
+            <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 space-y-2.5">
+              {canCompletePayment && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  fullWidth
+                  isLoading={isPaying}
+                  onClick={handleCompletePayment}
+                >
+                  Complete Payment
+                </Button>
               )}
 
-              <Link href={`/account/orders/${order.id}/return`} className="block">
-                <Button
-                  variant="secondary"
-                  fullWidth
-                  disabled={!returnEligible && !activeReturn}
-                >
-                  {activeReturn
-                    ? 'View return request'
-                    : returnEligible
-                    ? 'Request a return'
-                    : 'Return unavailable'}
-                </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                fullWidth
+                onClick={handleDownloadInvoice}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Invoice
+              </Button>
+
+              {showReturns && (
+                <Link href={`/account/orders/${order.id}/return`} className="block">
+                  <Button variant="secondary" size="sm" fullWidth>
+                    {activeReturn ? 'View return request' : 'Request a return'}
+                  </Button>
+                </Link>
+              )}
+
+              {cancelEligible &&
+                (cancelConfirm ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-2.5">
+                    <p className="text-sm font-medium text-red-800">Cancel this order?</p>
+                    {isPaid && (
+                      <p className="text-xs text-red-700">
+                        Your payment will be refunded within 5–10 business days.
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        fullWidth
+                        isLoading={isCancelling}
+                        onClick={handleCancelOrder}
+                        className="!bg-red-600 hover:!bg-red-700"
+                      >
+                        Yes, cancel
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        fullWidth
+                        disabled={isCancelling}
+                        onClick={() => setCancelConfirm(false)}
+                      >
+                        Keep order
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    fullWidth
+                    onClick={() => setCancelConfirm(true)}
+                    className="!border-red-300 !text-red-600 hover:!bg-red-50"
+                  >
+                    Cancel Order
+                  </Button>
+                ))}
+
+              <Link href="/" className="block pt-1">
+                <span className="block w-full text-center text-sm text-gray-500 hover:text-gray-700 py-1">
+                  Continue shopping
+                </span>
               </Link>
-              <div className="text-center space-y-1">
-                {activeReturn && returnStatusDisplay && (
-                  <span
-                    className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full ${returnStatusDisplay.bgColor} ${returnStatusDisplay.color}`}
-                  >
-                    {returnStatusDisplay.label}
-                  </span>
-                )}
-                {activeReturn && refundStatusDisplay && (
-                  <span
-                    className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full ${refundStatusDisplay.bgColor} ${refundStatusDisplay.color}`}
-                  >
-                    {refundStatusDisplay.label}
-                  </span>
-                )}
-                {!activeReturn && (
-                  <p className="text-xs text-gray-500 text-center">
-                    {returnRequestsCount >= 2
-                      ? 'Return limit reached for this order.'
-                      : 'Returns are available after delivery/completion.'}
-                  </p>
-                )}
-              </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Returns & Refunds</h3>
+            {showReturns && (
+            <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+              <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-3 md:mb-4">Returns &amp; Refunds</h3>
               {activeReturn ? (
                 <div className="space-y-3 text-sm text-gray-700">
                   {returnStatusDisplay && (
@@ -559,12 +681,12 @@ export default function OrderDetailPage() {
                   ) : null}
                 </div>
               ) : (
-                <div className="text-sm text-gray-700 space-y-2">
-                  <p>No return has been requested for this order.</p>
-                  <p>Returns are managed by JulineMart Logistics in partnership with Fez Delivery after delivery.</p>
-                </div>
+                <p className="text-sm text-gray-600">
+                  Returns are managed by JulineMart Logistics in partnership with Fez Delivery.
+                </p>
               )}
             </div>
+            )}
           </div>
         </div>
       </div>

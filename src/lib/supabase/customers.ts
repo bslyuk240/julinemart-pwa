@@ -145,6 +145,11 @@ const SUB_STATUS_RANK: Record<string, number> = {
 };
 
 function deriveDisplayStatus(subOrders: { status: string }[], dbStatus: string): string {
+  // Unpaid / not-yet-confirmed orders stay 'pending'. Sub-orders are created at
+  // checkout (before payment) with status 'pending', so we must NOT let that
+  // derive a 'pending' order forward to 'processing'.
+  if (dbStatus === 'pending') return 'pending';
+  if (dbStatus === 'cancelled' || dbStatus === 'refunded') return dbStatus;
   if (!subOrders.length) return dbStatus;
   const ranks = subOrders.map((so) => SUB_STATUS_RANK[so.status] ?? 1);
   if (ranks.every((r) => r === 5)) return 'delivered';
