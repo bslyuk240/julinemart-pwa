@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 import OrderStatusTracker from '@/components/orders/order-status-tracker';
 import { JloReturn, formatJloRefundStatus, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
 import type { Order as WooOrder } from '@/types/order';
+import { ensurePaystackReady, resetPaystackLoader } from '@/lib/paystack';
+import { logActivity } from '@/lib/logActivity';
 
 type OrderDetail = WooOrder & {
   subtotal?: string;
@@ -64,14 +66,11 @@ export default function OrderDetailPage() {
     }
   }, [authLoading, isAuthenticated, orderId]);
 
-  // Load Paystack inline script so customers can complete payment from here
+  // Preload Paystack via the robust loader so "Complete Payment" opens reliably.
   useEffect(() => {
-    if (typeof window !== 'undefined' && !(window as any).PaystackPop) {
-      const script = document.createElement('script');
-      script.src = 'https://js.paystack.co/v1/inline.js';
-      script.async = true;
-      document.body.appendChild(script);
-    }
+    ensurePaystackReady().catch(() => {
+      /* surfaced when the user actually taps Complete Payment */
+    });
   }, []);
 
   const loadOrder = async () => {
@@ -265,13 +264,8 @@ export default function OrderDetailPage() {
     }
   };
 
-  const handleCompletePayment = () => {
+  const handleCompletePayment = async () => {
     if (!order) return;
-    const w = window as any;
-    if (!w.PaystackPop) {
-      toast.error('Payment system is still loading. Please try again in a moment.');
-      return;
-    }
     const email = order.billing?.email;
     const amountKobo = Math.round(parseFloat(order.total || '0') * 100);
 
@@ -280,13 +274,41 @@ export default function OrderDetailPage() {
       return;
     }
 
+    const resourceId = (order as any)._supabase_id ?? order.id;
+
+    setIsPaying(true);
+
+    // Wait for the gateway to be ready rather than failing if it's still loading.
+    try {
+      await ensurePaystackReady();
+    } catch {
+      resetPaystackLoader();
+      setIsPaying(false);
+      toast.error('The payment window is taking too long to load. Check your connection and try again.');
+      logActivity({
+        action: 'PAYMENT_GATEWAY_LOAD_FAILED',
+        resource_type: 'orders',
+        resource_id: resourceId,
+        details: { reference: order.transaction_id, context: 'order_detail_complete_payment' },
+      });
+      return;
+    }
+
+    const w = window as any;
+
     // Fresh Paystack reference for the retry — avoids "Duplicate Transaction
     // Reference" if the first attempt left an abandoned transaction. The JLO
     // order is still located via order.transaction_id during verification.
     const reference = `${order.transaction_id}-R${Date.now().toString(36).toUpperCase()}`;
 
-    setIsPaying(true);
     try {
+      logActivity({
+        action: 'PAYMENT_INITIATED',
+        resource_type: 'orders',
+        resource_id: resourceId,
+        details: { reference, amount: amountKobo, context: 'order_detail_complete_payment' },
+      });
+
       const handler = w.PaystackPop.setup({
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
         email,
@@ -301,15 +323,27 @@ export default function OrderDetailPage() {
         onClose: () => {
           setIsPaying(false);
           toast.warning('Payment cancelled. You can complete it anytime from this page.');
+          logActivity({
+            action: 'PAYMENT_CANCELLED',
+            resource_type: 'orders',
+            resource_id: resourceId,
+            details: { reference, stage: 'popup_closed', context: 'order_detail_complete_payment' },
+          });
         },
         callback: (response: any) => {
           verifyCompletedPayment(response.reference);
         },
       });
       handler.openIframe();
-    } catch {
+    } catch (error) {
       setIsPaying(false);
       toast.error('Could not open the payment window. Please try again.');
+      logActivity({
+        action: 'PAYMENT_GATEWAY_OPEN_FAILED',
+        resource_type: 'orders',
+        resource_id: resourceId,
+        details: { reference, error: String((error as Error)?.message || error), context: 'order_detail_complete_payment' },
+      });
     }
   };
 

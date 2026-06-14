@@ -30,6 +30,8 @@ import type { CustomerAddress, SavedCard } from '@/types/customer';
 import { trackBeginCheckout, trackPurchase } from '@/lib/gtag';
 import { useCartStore } from '@/store/cart-store';
 import { jloItemIdsFromCartLine } from '@/lib/jlo/line-identity';
+import { ensurePaystackReady, resetPaystackLoader } from '@/lib/paystack';
+import { logActivity } from '@/lib/logActivity';
 
 interface ShippingOption {
   id: string;
@@ -77,6 +79,7 @@ export default function CheckoutPage() {
   const currentOrderRef = useRef<any>(null);
   const pendingPaystackConfigRef = useRef<any>(null);
   const [hasPendingPayment, setHasPendingPayment] = useState(false);
+  const [paystackReady, setPaystackReady] = useState(false);
   const hasTrackedBeginCheckoutRef = useRef(false);
   
   // Saved card state
@@ -208,14 +211,21 @@ export default function CheckoutPage() {
     [discountedShipping, toAnalyticsItems, total]
   );
 
-  // Load Paystack script
+  // Preload Paystack as soon as checkout mounts so the popup is ready well
+  // before the user taps Place Order. Readiness gates nothing hard — the open
+  // path awaits ensurePaystackReady() — but it lets us surface load failures.
   useEffect(() => {
-    if (typeof window !== 'undefined' && !window.PaystackPop) {
-      const script = document.createElement('script');
-      script.src = 'https://js.paystack.co/v1/inline.js';
-      script.async = true;
-      document.body.appendChild(script);
-    }
+    let cancelled = false;
+    ensurePaystackReady()
+      .then(() => {
+        if (!cancelled) setPaystackReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setPaystackReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -249,21 +259,48 @@ export default function CheckoutPage() {
     hasTrackedBeginCheckoutRef.current = true;
   }, [discountedSubtotal, items.length, toAnalyticsItems]);
 
-  // Initialize Paystack payment with inline callbacks
-  const initializePaystackPayment = (config: any) => {
-    console.log('Initializing Paystack with config:', { 
-      ref: config.reference, 
-      email: config.email, 
-      amount: config.amount 
+  // Initialize Paystack payment with inline callbacks.
+  // Awaits the robust loader (no fixed setTimeout guess) so the popup opens as
+  // soon as the gateway is genuinely ready, with an honest message + retry path
+  // if it never loads. Gateway problems are logged to JLO activity logs.
+  const initializePaystackPayment = async (config: any) => {
+    console.log('Initializing Paystack with config:', {
+      ref: config.reference,
+      email: config.email,
+      amount: config.amount,
     });
 
-    if (typeof window === 'undefined' || !window.PaystackPop) {
-      toast.error('Payment system not loaded. Please refresh the page.');
+    const orderResourceId = config?.metadata?.order_id;
+
+    // Wait for the gateway to be ready instead of guessing with a timer.
+    try {
+      await ensurePaystackReady();
+      setPaystackReady(true);
+    } catch {
+      setPaystackReady(false);
+      resetPaystackLoader();
+      toast.error(
+        'The payment window is taking too long to load. Check your connection and tap "Retry Payment".'
+      );
       setIsProcessing(false);
+      setHasPendingPayment(true);
+      logActivity({
+        action: 'PAYMENT_GATEWAY_LOAD_FAILED',
+        resource_type: 'orders',
+        resource_id: orderResourceId,
+        details: { reference: config.reference, reason: 'inline.js failed to load before timeout' },
+      });
       return;
     }
 
     try {
+      logActivity({
+        action: 'PAYMENT_INITIATED',
+        resource_type: 'orders',
+        resource_id: orderResourceId,
+        details: { reference: config.reference, amount: config.amount },
+      });
+
       const handler = window.PaystackPop.setup({
         key: config.publicKey,
         email: config.email,
@@ -275,6 +312,12 @@ export default function CheckoutPage() {
           toast.warning('Payment cancelled. Click "Retry Payment" to complete your order.');
           setIsProcessing(false);
           setHasPendingPayment(true);
+          logActivity({
+            action: 'PAYMENT_CANCELLED',
+            resource_type: 'orders',
+            resource_id: orderResourceId,
+            details: { reference: config.reference, stage: 'popup_closed' },
+          });
         },
         callback: function(response: any) {
           console.log('Payment callback received:', response);
@@ -288,6 +331,13 @@ export default function CheckoutPage() {
       console.error('Error initializing Paystack:', error);
       toast.error('Failed to open payment window. Please try again.');
       setIsProcessing(false);
+      setHasPendingPayment(true);
+      logActivity({
+        action: 'PAYMENT_GATEWAY_OPEN_FAILED',
+        resource_type: 'orders',
+        resource_id: orderResourceId,
+        details: { reference: config.reference, error: String((error as Error)?.message || error) },
+      });
     }
   };
 
@@ -1166,11 +1216,12 @@ export default function CheckoutPage() {
 
             pendingPaystackConfigRef.current = paystackConfig;
             setHasPendingPayment(false);
-            toast.success('Opening payment window...');
+            toast.loading('Opening payment window...', { id: 'paystack-open' });
 
-            setTimeout(() => {
-              initializePaystackPayment(paystackConfig);
-            }, 500);
+            // Await the robust loader rather than guessing with a timer; the
+            // toast clears as soon as the popup opens (or an error is shown).
+            await initializePaystackPayment(paystackConfig);
+            toast.dismiss('paystack-open');
           }
         } else {
           await persistCheckoutProfileIfNeeded();
@@ -1850,10 +1901,10 @@ export default function CheckoutPage() {
                     size="sm"
                     fullWidth
                     isLoading={isProcessing}
-                    onClick={() => {
+                    onClick={async () => {
                       if (pendingPaystackConfigRef.current) {
                         setIsProcessing(true);
-                        initializePaystackPayment(pendingPaystackConfigRef.current);
+                        await initializePaystackPayment(pendingPaystackConfigRef.current);
                       }
                     }}
                   >
@@ -1901,6 +1952,12 @@ export default function CheckoutPage() {
                       ? 'Loading checkout options...'
                       : 'Place Order'}
                 </Button>
+              )}
+
+              {!paystackReady && !loading && !hasPendingPayment && (
+                <p className="mt-2 text-center text-xs text-gray-400">
+                  Preparing secure payment…
+                </p>
               )}
 
               <p className="text-xs text-gray-500 text-center mt-4">

@@ -103,6 +103,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             });
           `}
         </Script>
+
+        {/* Preload Paystack inline.js globally so it's ready before the user
+            reaches checkout/payment. The robust loader in lib/paystack.ts dedupes
+            against this tag and waits for readiness instead of guessing a delay. */}
+        <Script
+          src="https://js.paystack.co/v1/inline.js"
+          strategy="afterInteractive"
+          data-paystack="true"
+        />
       </head>
       <body className={`${inter.className} min-h-0 overflow-x-clip`}>
         <VisualViewportBottomSync />
