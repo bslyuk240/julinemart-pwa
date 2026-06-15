@@ -279,6 +279,7 @@ export default function CheckoutPage() {
     } catch {
       setPaystackReady(false);
       resetPaystackLoader();
+      toast.dismiss('paystack-open');
       toast.error(
         'The payment window is taking too long to load. Check your connection and tap "Retry Payment".'
       );
@@ -316,6 +317,7 @@ export default function CheckoutPage() {
         metadata: config.metadata,
         onClose: function() {
           console.log('Payment window closed');
+          toast.dismiss('paystack-open');
           toast.warning('Payment cancelled. Click "Retry Payment" to complete your order.');
           setIsProcessing(false);
           setHasPendingPayment(true);
@@ -334,8 +336,11 @@ export default function CheckoutPage() {
 
       console.log('Opening Paystack iframe...');
       handler.openIframe();
+      // Popup is open — clear the "Opening payment window..." spinner now.
+      toast.dismiss('paystack-open');
     } catch (error) {
       console.error('Error initializing Paystack:', error);
+      toast.dismiss('paystack-open');
       toast.error('Failed to open payment window. Please try again.');
       setIsProcessing(false);
       setHasPendingPayment(true);
@@ -756,9 +761,20 @@ export default function CheckoutPage() {
       newErrors.email = 'Invalid email address';
     }
 
-    const phoneRegex = /^(\+234|0)[789]\d{9}$/;
-    if (formData.phone && !phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
-      newErrors.phone = 'Invalid Nigerian phone number';
+    // Accept any common Nigerian format: +2348012345678, 2348012345678,
+    // 08012345678, or a bare 8012345678. Normalise to digits first so we don't
+    // reject a perfectly valid stored number just because of its prefix/spacing.
+    if (formData.phone) {
+      const digits = formData.phone.replace(/\D/g, '');
+      const localTen = digits.startsWith('234')
+        ? digits.slice(3)
+        : digits.startsWith('0')
+        ? digits.slice(1)
+        : digits;
+      // local part must be 10 digits starting 7/8/9 (e.g. 8012345678)
+      if (!/^[789]\d{9}$/.test(localTen)) {
+        newErrors.phone = 'Invalid Nigerian phone number';
+      }
     }
 
     setErrors(newErrors);
@@ -1223,7 +1239,9 @@ export default function CheckoutPage() {
 
             pendingPaystackConfigRef.current = paystackConfig;
             setHasPendingPayment(false);
-            toast.loading('Opening payment window...', { id: 'paystack-open' });
+            // duration is a safety net: a loading toast otherwise lives
+            // forever, so if any path misses the dismiss it still self-clears.
+            toast.loading('Opening payment window...', { id: 'paystack-open', duration: 15000 });
 
             // Await the robust loader rather than guessing with a timer; the
             // toast clears as soon as the popup opens (or an error is shown).
@@ -1911,7 +1929,9 @@ export default function CheckoutPage() {
                     onClick={async () => {
                       if (pendingPaystackConfigRef.current) {
                         setIsProcessing(true);
+                        toast.loading('Opening payment window...', { id: 'paystack-open', duration: 15000 });
                         await initializePaystackPayment(pendingPaystackConfigRef.current);
+                        toast.dismiss('paystack-open');
                       }
                     }}
                   >

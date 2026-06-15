@@ -59,6 +59,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="h-auto overflow-x-clip">
       <head>
+        {/* Warm up connections to the image/video origins so the first
+            product images and hero video handshake without DNS+TLS delay. */}
+        <link rel="preconnect" href="https://gfikrwhtsedhwkxybzm.supabase.co" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://res.cloudinary.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://gfikrwhtsedhwkxybzm.supabase.co" />
+        <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+
         {/* Favicon Links (from RealFaviconGenerator) */}
         <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

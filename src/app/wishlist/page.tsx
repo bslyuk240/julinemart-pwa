@@ -130,6 +130,7 @@ export default function WishlistPage() {
                             src={item.image || '/images/placeholder.svg'}
                             alt={item.name}
                             fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 33vw, 25vw"
                             className="object-cover transition-transform duration-200 hover:scale-105"
                           />
                         </div>

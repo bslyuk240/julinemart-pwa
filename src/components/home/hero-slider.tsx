@@ -180,9 +180,16 @@ export default function HeroSlider() {
   };
 
   const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !videoRef.current.muted;
-      setIsMuted(!isMuted);
+    const video = videoRef.current;
+    if (!video) return;
+    const nextMuted = !isMuted;
+    video.muted = nextMuted;
+    setIsMuted(nextMuted);
+    // Mobile WebViews only allow audio to start from a user gesture — re-invoke
+    // play() here so unmuting actually produces sound (when the video has an
+    // audio track). If the source has no audio track, nothing will play.
+    if (!nextMuted) {
+      video.play().catch(() => {});
     }
   };
 
@@ -217,6 +224,10 @@ export default function HeroSlider() {
                   loop
                   onEnded={nextSlide}
                   playsInline
+                  // Don't front-load the whole mp4 on app open — it saturates
+                  // mobile bandwidth and starves product image loads, leaving
+                  // them blank. Stream progressively instead.
+                  preload="metadata"
                 />
                 {slide.overlayOpacity > 0 && (
                   <div
