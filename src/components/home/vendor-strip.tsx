@@ -46,7 +46,7 @@ export default async function VendorStrip() {
   if (vendors.length === 0) return null;
 
   return (
-    <section className="bg-white border-t border-gray-100 py-6 md:py-8">
+    <section className="bg-gray-50 border-t border-b border-gray-200 py-6 md:py-8">
       <div className="container mx-auto px-4 max-w-6xl">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
