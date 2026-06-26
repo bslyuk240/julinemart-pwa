@@ -2,8 +2,9 @@
 
 import type { SVGProps } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Facebook, Instagram } from 'lucide-react';
+import Lottie from 'lottie-react';
+import googlePlayAnimation from '@/data/google-play-button.json';
 
 function TikTokIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -19,26 +20,18 @@ export default function Footer() {
       <div className="container mx-auto px-3 py-4 md:py-6 grid grid-cols-3 gap-4 md:gap-6">
         <div className="space-y-1.5">
           <h3 className="font-semibold text-white text-sm">Company</h3>
-          <Link href="/page/about" className="block text-gray-200 hover:text-primary-200">
-            About Us
-          </Link>
-          <Link href="/contact" className="block text-gray-200 hover:text-primary-200">
-            Contact Us
-          </Link>
+          <Link href="/page/about" className="block text-gray-200 hover:text-primary-200">About Us</Link>
+          <Link href="/contact" className="block text-gray-200 hover:text-primary-200">Contact Us</Link>
           <Link
             href="https://play.google.com/store/apps/details?id=com.julinemart.app"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 mt-2 bg-white/10 hover:bg-white/20 transition-colors rounded-lg px-3 py-2"
+            className="block w-[155px]"
+            aria-label="Download on Google Play"
           >
-            <Image src="/Playstore-logo.png" alt="Google Play" width={20} height={20} className="object-contain" />
-            <div className="leading-tight">
-              <p className="text-[9px] text-gray-300">GET IT ON</p>
-              <p className="text-xs font-semibold text-white">Google Play</p>
-            </div>
+            <Lottie animationData={googlePlayAnimation} loop initialSegment={[0, 155]} />
           </Link>
-
-          <div className="flex items-center gap-2 pt-2">
+          <div className="flex items-center gap-2 pt-1">
             <Link
               href="https://www.facebook.com/share/1GwmcMzTZH/?mibextid=wwXIfr"
               target="_blank"
