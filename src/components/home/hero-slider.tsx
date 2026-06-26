@@ -37,7 +37,7 @@ const DEFAULT_SLIDES: Slide[] = [
     id: 1,
     type: 'video',
     videoSrc: 'https://res.cloudinary.com/dupgdbwrt/video/upload/v1763955248/copy_E58DF95E-E76A-4B31-B3D0-9D89B0E8F2C0_otgkkq.mp4',
-    videoPoster: 'https://res.cloudinary.com/dupgdbwrt/image/upload/v1782492049/jm-play_lo99uv.png',
+    videoPoster: '/images/placeholder.png',
     primaryButton: { text: 'Shop Now', link: '/products' },
     secondaryButton: { text: 'View deals', link: '/products?tag=deal' },
     useGradient: false,
