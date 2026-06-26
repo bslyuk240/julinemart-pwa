@@ -17,7 +17,7 @@ async function getSettingsFromSupabase(): Promise<Record<string, unknown> | null
     const { data, error } = await supabase
       .from('homepage_content')
       .select('key, content')
-      .in('key', ['hero_slider', 'announcement_bar', 'banner', 'settings']);
+      .in('key', ['hero_slider', 'announcement_bar', 'banner', 'settings', 'hero_ads']);
 
     if (error || !data || data.length === 0) return null;
 
@@ -31,6 +31,11 @@ async function getSettingsFromSupabase(): Promise<Record<string, unknown> | null
 
       if (row.key === 'announcement_bar' || row.key === 'banner') {
         result.banner = row.content;
+        continue;
+      }
+
+      if (row.key === 'hero_ads') {
+        result.hero_ads = row.content;
         continue;
       }
 
