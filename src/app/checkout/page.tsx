@@ -1614,7 +1614,7 @@ export default function CheckoutPage() {
             )}
 
             {/* NEW: Discount Code + Voucher */}
-            {shippingCost !== null && shippingCost > 0 && (
+            {shippingCost !== null && (
               <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <div className="flex items-center gap-3 mb-4">
                   <Tag className="w-6 h-6 text-primary-600" />

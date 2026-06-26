@@ -112,20 +112,6 @@ export default function CartSummary({
         </div>
       </div>
 
-      {/* Promo Code Section */}
-      <div className="mt-6 border-t border-gray-200 pt-6">
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
-          <input
-            type="text"
-            placeholder="Enter promo code"
-            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-          <Button variant="outline" size="sm" className="w-full shrink-0 sm:w-auto">
-            Apply
-          </Button>
-        </div>
-      </div>
-
       {/* Continue Shopping Link */}
       <div className="mt-4 text-center">
         <a
