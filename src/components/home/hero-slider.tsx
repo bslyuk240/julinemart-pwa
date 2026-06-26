@@ -104,7 +104,7 @@ function SlideContent({
           )}
           {isActive && (
             <button
-              onClick={onToggleMute}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleMute(); }}
               className="absolute top-3 right-3 z-30 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full shadow-lg transition-all"
               aria-label={isMuted ? 'Unmute video' : 'Mute video'}
             >
@@ -139,27 +139,6 @@ function SlideContent({
         />
       )}
 
-      <div className="absolute inset-0 flex flex-col justify-between p-4 z-20">
-        <div>
-          <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg inline-block">
-            <p className="text-[10px] font-bold text-primary-700 uppercase tracking-wider">JulineMart</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={slide.primaryButton.link}
-            className="rounded-lg bg-white px-3 py-1.5 text-[10px] font-semibold text-primary-700 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl"
-          >
-            {slide.primaryButton.text}
-          </Link>
-          <Link
-            href={slide.secondaryButton.link}
-            className="rounded-lg bg-white/20 backdrop-blur-md border-2 border-white px-3 py-1.5 text-[10px] font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-white/30"
-          >
-            {slide.secondaryButton.text}
-          </Link>
-        </div>
-      </div>
     </>
   );
 }
@@ -331,9 +310,9 @@ export default function HeroSlider() {
 
   return (
     <>
-      {/* ── MOBILE: full-width single-slide carousel (unchanged) ── */}
+      {/* ── MOBILE: full-width single-slide carousel — 16:9 aspect ratio ── */}
       <div className="md:hidden relative overflow-hidden rounded-xl shadow-lg group">
-        <div className="relative w-full h-[250px] sm:h-[300px]">
+        <Link href={slide?.primaryButton.link || '/products'} className="block relative w-full aspect-video">
           {!hasLoaded || !slide ? skeleton : (
             <SlideContent
               slide={slide}
@@ -344,7 +323,7 @@ export default function HeroSlider() {
               onEnded={nextSlide}
             />
           )}
-        </div>
+        </Link>
 
         {activeSlides.length > 1 && hasLoaded && (
           <>
@@ -380,6 +359,7 @@ export default function HeroSlider() {
           {/* Focal slider — 60% */}
           <div className="w-[60%] flex-shrink-0">
             <div className="relative w-full aspect-video rounded-xl overflow-hidden shadow-lg group">
+              <Link href={slide?.primaryButton.link || '/products'} className="absolute inset-0 z-10" aria-label="View banner offer" />
               {!hasLoaded || !slide ? skeleton : (
                 <SlideContent
                   slide={slide}
