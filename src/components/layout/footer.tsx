@@ -2,6 +2,7 @@
 
 import type { SVGProps } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Facebook, Instagram } from 'lucide-react';
 
 function TikTokIcon(props: SVGProps<SVGSVGElement>) {
@@ -24,7 +25,20 @@ export default function Footer() {
           <Link href="/contact" className="block text-gray-200 hover:text-primary-200">
             Contact Us
           </Link>
-          <div className="flex items-center gap-2 pt-1">
+          <Link
+            href="https://play.google.com/store/apps/details?id=com.julinemart.app"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 mt-2 bg-white/10 hover:bg-white/20 transition-colors rounded-lg px-3 py-2"
+          >
+            <Image src="/Playstore-logo.png" alt="Google Play" width={20} height={20} className="object-contain" />
+            <div className="leading-tight">
+              <p className="text-[9px] text-gray-300">GET IT ON</p>
+              <p className="text-xs font-semibold text-white">Google Play</p>
+            </div>
+          </Link>
+
+          <div className="flex items-center gap-2 pt-2">
             <Link
               href="https://www.facebook.com/share/1GwmcMzTZH/?mibextid=wwXIfr"
               target="_blank"
