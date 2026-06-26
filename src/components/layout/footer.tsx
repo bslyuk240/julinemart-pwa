@@ -86,6 +86,9 @@ export default function Footer() {
 
         <div className="space-y-1.5">
           <h3 className="font-semibold text-white text-sm">Vendors</h3>
+          <Link href="/vendors" className="block text-gray-200 hover:text-primary-200">
+            Our Stores
+          </Link>
           <Link href="/page/become-a-vendor" className="block text-gray-200 hover:text-primary-200">
             Become a Vendor
           </Link>

@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import HeroSlider from '@/components/home/hero-slider';
 import CategoryStrip from '@/components/home/category-strip';
 import HomeSections from '@/components/home/home-sections';
+import VendorStrip from '@/components/home/vendor-strip';
 import { getHomepageSectionsData } from '@/lib/homepage-sections';
 
 export const revalidate = 300; // Re-fetch product sections every 5 minutes
@@ -49,6 +50,10 @@ export default function HomePage() {
         </div>
       }>
         <HomeSectionsFetcher />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <VendorStrip />
       </Suspense>
 
       <div className="h-20 md:h-8" />
