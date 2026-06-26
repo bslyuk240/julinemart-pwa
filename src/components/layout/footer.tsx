@@ -26,7 +26,7 @@ export default function Footer() {
             href="https://play.google.com/store/apps/details?id=com.julinemart.app"
             target="_blank"
             rel="noreferrer"
-            className="block w-[155px]"
+            className="block w-[120px]"
             aria-label="Download on Google Play"
           >
             <Lottie animationData={googlePlayAnimation} loop initialSegment={[0, 155]} />
