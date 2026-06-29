@@ -30,6 +30,7 @@ function buildLimiter(prefix: string, max: number, windowStr: Parameters<typeof 
 
 let authLimiter: Ratelimit | null = null;
 let signupLimiter: Ratelimit | null = null;
+let deviceLimiter: Ratelimit | null = null;
 
 function getAuthLimiter(): Ratelimit | null {
   if (!authLimiter) {
@@ -45,10 +46,21 @@ function getSignupLimiter(): Ratelimit | null {
   return signupLimiter;
 }
 
+// Device registration is a normal authenticated call that fires on page load,
+// refresh, and re-login — and it's shared across users behind the same NAT/IP.
+// It needs a generous abuse ceiling, not the strict signup limit.
+function getDeviceLimiter(): Ratelimit | null {
+  if (!deviceLimiter) {
+    try { deviceLimiter = buildLimiter('rl:device', 60, '1 m'); } catch { return null; }
+  }
+  return deviceLimiter;
+}
+
 // ─── Auth paths ───────────────────────────────────────────────────────────────
 
 const AUTH_PATHS   = ['/api/auth/', '/forgot-password', '/login'];
-const SIGNUP_PATHS = ['/api/audit/signup', '/api/notifications/register-device'];
+const SIGNUP_PATHS = ['/api/audit/signup'];
+const DEVICE_PATHS = ['/api/notifications/register-device'];
 
 function matchesAny(pathname: string, patterns: string[]) {
   return patterns.some((p) => pathname.startsWith(p));
@@ -108,6 +120,23 @@ export async function middleware(request: NextRequest) {
         }
       } catch {
         console.warn('[middleware] Rate limiter unavailable for signup route');
+      }
+    }
+  }
+
+  if (matchesAny(pathname, DEVICE_PATHS)) {
+    const limiter = getDeviceLimiter();
+    if (limiter) {
+      try {
+        const { success } = await limiter.limit(ip);
+        if (!success) {
+          return new NextResponse(
+            JSON.stringify({ error: 'Too many requests. Please slow down.' }),
+            { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '60' } }
+          );
+        }
+      } catch {
+        console.warn('[middleware] Rate limiter unavailable for device route');
       }
     }
   }

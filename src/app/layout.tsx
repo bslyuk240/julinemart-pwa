@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import Script from 'next/script';
 import './globals.css';
 import Header from '@/components/layout/header';
 import { Toaster } from 'sonner';
@@ -16,6 +15,7 @@ import { StatusBarManager } from '@/components/native/status-bar-manager';
 import PushNotificationManager from '@/components/native/push-notification-manager';
 import WebPushManager from '@/components/pwa/web-push-manager';
 import CookieConsentBanner from '@/components/pwa/cookie-consent-banner';
+import GoogleAnalytics from '@/components/pwa/google-analytics';
 import VisualViewportBottomSync from '@/components/layout/visual-viewport-bottom-sync';
 import PaystackPreloader from '@/components/payments/paystack-preloader';
 
@@ -84,33 +84,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Theme Color */}
         <meta name="theme-color" content="#77088a" />
 
-        {/* Google Analytics — Consent Mode v2 */}
-        {/* Read stored consent synchronously so returning users don't hit the wait_for_update race */}
-        <Script id="ga-consent-init" strategy="afterInteractive">
-          {`
-            try { window.__jmConsent = localStorage.getItem('jm_cookie_consent'); } catch(e) {}
-          `}
-        </Script>
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-T0X3ZR08FD"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            var alreadyGranted = window.__jmConsent === 'all';
-            gtag('consent', 'default', {
-              analytics_storage: alreadyGranted ? 'granted' : 'denied',
-              ad_storage: 'denied',
-              wait_for_update: alreadyGranted ? 0 : 500,
-            });
-            gtag('js', new Date());
-            gtag('config', 'G-T0X3ZR08FD', {
-              page_path: window.location.pathname,
-            });
-          `}
-        </Script>
+        {/* Google Analytics is consent-gated — see <GoogleAnalytics /> in body.
+            Nothing loads from Google until the visitor accepts analytics. */}
 
       </head>
       <body className={`${inter.className} min-h-0 overflow-x-clip`}>
@@ -133,6 +108,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <PWAInstallPrompt />
             <NotificationPermissionPrompt />
             <CookieConsentBanner />
+            <GoogleAnalytics />
           </GlobalPullToRefresh>
           <SupportChatWidget />
         </CustomerAuthProvider>
