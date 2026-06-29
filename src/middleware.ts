@@ -1,62 +1,114 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
 
-// In-memory store for rate limiting (per-instance).
-// For multi-instance production deployments, replace with Upstash Redis.
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+// ─── Rate limiter setup ───────────────────────────────────────────────────────
+// Uses Upstash Redis in production — persists across all serverless instances.
+// Falls back to in-memory ephemeral store for local development only.
 
-const RATE_LIMIT_MAX = 5;
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+function buildLimiter(prefix: string, max: number, windowStr: Parameters<typeof Ratelimit.slidingWindow>[1]) {
+  const url   = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-function checkRateLimit(key: string): { success: boolean; remaining: number } {
-  const now = Date.now();
-  const entry = rateLimitStore.get(key);
-
-  if (!entry || now > entry.resetAt) {
-    rateLimitStore.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return { success: true, remaining: RATE_LIMIT_MAX - 1 };
+  if (url && token) {
+    return new Ratelimit({
+      redis: new Redis({ url, token }),
+      limiter: Ratelimit.slidingWindow(max, windowStr),
+      analytics: false,
+      prefix,
+    });
   }
 
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return { success: false, remaining: 0 };
-  }
-
-  entry.count += 1;
-  return { success: true, remaining: RATE_LIMIT_MAX - entry.count };
+  // Local dev fallback — ephemeral, single-instance only
+  return new Ratelimit({
+    redis: Redis.fromEnv(),   // will error if env missing — caught below
+    limiter: Ratelimit.slidingWindow(max, windowStr),
+    prefix,
+  });
 }
 
-const RATE_LIMITED_PATHS = [
-  '/api/auth/',
-  '/api/audit/',
-  '/api/notifications/register-device',
-  '/forgot-password',
-  '/login',
-];
+let authLimiter: Ratelimit | null = null;
+let signupLimiter: Ratelimit | null = null;
 
-export function middleware(request: NextRequest) {
+function getAuthLimiter(): Ratelimit | null {
+  if (!authLimiter) {
+    try { authLimiter = buildLimiter('rl:auth', 5, '15 m'); } catch { return null; }
+  }
+  return authLimiter;
+}
+
+function getSignupLimiter(): Ratelimit | null {
+  if (!signupLimiter) {
+    try { signupLimiter = buildLimiter('rl:signup', 10, '1 h'); } catch { return null; }
+  }
+  return signupLimiter;
+}
+
+// ─── Auth paths ───────────────────────────────────────────────────────────────
+
+const AUTH_PATHS   = ['/api/auth/', '/forgot-password', '/login'];
+const SIGNUP_PATHS = ['/api/audit/signup', '/api/notifications/register-device'];
+
+function matchesAny(pathname: string, patterns: string[]) {
+  return patterns.some((p) => pathname.startsWith(p));
+}
+
+function getIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+    request.headers.get('x-real-ip') ??
+    '127.0.0.1'
+  );
+}
+
+// ─── Middleware ───────────────────────────────────────────────────────────────
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isRateLimited = RATE_LIMITED_PATHS.some(p => pathname.startsWith(p));
+  const ip = getIp(request);
 
-  if (isRateLimited) {
-    const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
-      request.headers.get('x-real-ip') ??
-      '127.0.0.1';
-
-    const key = `${ip}:${pathname}`;
-    const result = checkRateLimit(key);
-
-    if (!result.success) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Too many requests. Please try again in 15 minutes.' }),
-        {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'Retry-After': String(RATE_LIMIT_WINDOW_MS / 1000),
-          },
+  if (matchesAny(pathname, AUTH_PATHS)) {
+    const limiter = getAuthLimiter();
+    if (limiter) {
+      try {
+        const { success, limit, remaining, reset } = await limiter.limit(ip);
+        if (!success) {
+          return new NextResponse(
+            JSON.stringify({ error: 'Too many requests. Please try again in 15 minutes.' }),
+            {
+              status: 429,
+              headers: {
+                'Content-Type': 'application/json',
+                'X-RateLimit-Limit': String(limit),
+                'X-RateLimit-Remaining': String(remaining),
+                'X-RateLimit-Reset': String(reset),
+                'Retry-After': '900',
+              },
+            }
+          );
         }
-      );
+      } catch {
+        // Redis unavailable — fail open, log and continue
+        console.warn('[middleware] Rate limiter unavailable for auth route');
+      }
+    }
+  }
+
+  if (matchesAny(pathname, SIGNUP_PATHS)) {
+    const limiter = getSignupLimiter();
+    if (limiter) {
+      try {
+        const { success } = await limiter.limit(ip);
+        if (!success) {
+          return new NextResponse(
+            JSON.stringify({ error: 'Too many requests. Try again in an hour.' }),
+            { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '3600' } }
+          );
+        }
+      } catch {
+        console.warn('[middleware] Rate limiter unavailable for signup route');
+      }
     }
   }
 
@@ -66,7 +118,7 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/api/auth/:path*',
-    '/api/audit/:path*',
+    '/api/audit/signup',
     '/api/notifications/register-device',
     '/forgot-password',
     '/login',

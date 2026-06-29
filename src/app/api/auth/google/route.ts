@@ -14,13 +14,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'No credential provided' }, { status: 400 });
     }
 
-    // Decode Google JWT (signature already verified by Google's GSI library client-side)
-    const base64Url = credential.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+    // Verify Google ID token server-side using Google's tokeninfo endpoint.
+    // Client-side verification alone cannot be trusted — anyone can forge a JWT payload.
+    const tokenInfoRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
     );
-    const googleUser = JSON.parse(jsonPayload);
+    if (!tokenInfoRes.ok) {
+      return NextResponse.json({ success: false, message: 'Invalid Google credential.' }, { status: 401 });
+    }
+    const googleUser = await tokenInfoRes.json();
+
+    // Confirm the token was issued for this app's client ID
+    const expectedAudiences = [
+      process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+      process.env.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    ].filter(Boolean);
+    if (expectedAudiences.length > 0 && !expectedAudiences.includes(googleUser.aud)) {
+      return NextResponse.json({ success: false, message: 'Token audience mismatch.' }, { status: 401 });
+    }
 
     const { email, given_name: firstName, family_name: lastName, name: fullName, picture: avatarUrl, sub: googleId } = googleUser;
 
