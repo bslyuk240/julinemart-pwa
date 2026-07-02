@@ -197,7 +197,7 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
         />
       )}
 
-      {extraSections.map((s) =>
+      {(extraSections ?? []).map((s) =>
         s.products.length > 0 ? (
           <GenericProductSection key={s.key} title={s.title} products={s.products} />
         ) : null

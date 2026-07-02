@@ -61,6 +61,13 @@ const nextConfig = {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     /** Set to `/julinemart-pwa` when hosting the Next app under that path (SW + `/api`). */
     NEXT_PUBLIC_BASE_PATH: (process.env.NEXT_PUBLIC_BASE_PATH || '').trim(),
+    /**
+     * Sentry environment tag. Netlify sets CONTEXT at build time
+     * (production | deploy-preview | branch-deploy); local `next dev`/`next build`
+     * has no CONTEXT, so fall back to NODE_ENV. Read by sentry.*.config.ts.
+     */
+    NEXT_PUBLIC_SENTRY_ENVIRONMENT:
+      process.env.CONTEXT || (process.env.NODE_ENV === 'production' ? 'production' : 'development'),
   },
 
   experimental: {
