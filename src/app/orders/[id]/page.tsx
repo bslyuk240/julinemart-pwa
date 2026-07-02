@@ -404,7 +404,7 @@ export default function OrderDetailPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-5 md:py-6">
+      <div className="container-custom py-5 md:py-6">
         <PageHeader
           title={`Order #${order.number}`}
           subtitle={`Placed on ${formatDate(order.date_created)}`}

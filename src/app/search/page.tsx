@@ -52,7 +52,7 @@ function SearchContent() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-12">
-      <div className="container mx-auto px-4 py-5 md:py-6">
+      <div className="container-custom py-5 md:py-6">
         <PageHeader
           title="Search results"
           subtitle={query ? `Showing matches for "${query}"` : 'Enter a search term above to see matching products.'}
@@ -100,7 +100,7 @@ function SearchContent() {
 function SearchFallback() {
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-12">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container-custom py-6">
         <div className="bg-white rounded-lg shadow-sm p-10 text-center">
           <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-600">Loading search...</p>

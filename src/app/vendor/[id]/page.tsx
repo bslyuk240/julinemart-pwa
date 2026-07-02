@@ -11,7 +11,8 @@ import { formatPrice } from '@/lib/utils/format-price';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 
 type VendorSortOption = 'date' | 'popularity' | 'price' | 'price-desc';
-const INITIAL_PAGE_SIZE = 12;
+/** API route caps per_page at 100 and caches the underlying JLO fetch for 300s. */
+const INITIAL_PAGE_SIZE = 50;
 
 interface VendorData {
   id: number | string;

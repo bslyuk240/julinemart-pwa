@@ -17,7 +17,7 @@ function TikTokIcon(props: SVGProps<SVGSVGElement>) {
 export default function Footer() {
   return (
     <footer className="bg-[#2a103b] text-gray-100 mt-10 text-sm pb-16 md:pb-6">
-      <div className="container mx-auto px-3 py-4 md:py-6 grid grid-cols-3 gap-4 md:gap-6">
+      <div className="container-custom py-4 md:py-6 grid grid-cols-3 gap-4 md:gap-6">
         <div className="space-y-1.5">
           <h3 className="font-semibold text-white text-sm">Company</h3>
           <Link href="/page/about" className="block text-gray-200 hover:text-primary-200">About Us</Link>
@@ -109,7 +109,7 @@ export default function Footer() {
       </div>
 
       <div className="border-t border-white/10 py-3">
-        <div className="container mx-auto px-3 text-xs text-gray-200 flex flex-wrap items-center justify-center md:justify-between gap-x-4 gap-y-2">
+        <div className="container-custom text-xs text-gray-200 flex flex-wrap items-center justify-center md:justify-between gap-x-4 gap-y-2">
           <span className="whitespace-nowrap">&copy; {new Date().getFullYear()} JulineMart.</span>
           <div className="flex items-center gap-2 whitespace-nowrap">
             <Link href="/page/privacy-policy" className="hover:text-primary-200">Privacy</Link>

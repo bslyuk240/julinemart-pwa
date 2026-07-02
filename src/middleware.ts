@@ -56,11 +56,23 @@ function getDeviceLimiter(): Ratelimit | null {
   return deviceLimiter;
 }
 
+// Public read-only vendor status lookup, client-cached for 5 minutes (see
+// vendor-filters.ts) — normal traffic is at most one call per session, so this
+// ceiling only bites scraping/abuse bursts, not legitimate shared-NAT users.
+let vendorsStatusLimiter: Ratelimit | null = null;
+function getVendorsStatusLimiter(): Ratelimit | null {
+  if (!vendorsStatusLimiter) {
+    try { vendorsStatusLimiter = buildLimiter('rl:vendors-status', 60, '1 m'); } catch { return null; }
+  }
+  return vendorsStatusLimiter;
+}
+
 // ─── Auth paths ───────────────────────────────────────────────────────────────
 
-const AUTH_PATHS   = ['/api/auth/', '/forgot-password', '/login'];
-const SIGNUP_PATHS = ['/api/audit/signup'];
-const DEVICE_PATHS = ['/api/notifications/register-device'];
+const AUTH_PATHS          = ['/api/auth/', '/forgot-password', '/login'];
+const SIGNUP_PATHS        = ['/api/audit/signup'];
+const DEVICE_PATHS        = ['/api/notifications/register-device'];
+const VENDORS_STATUS_PATHS = ['/api/vendors/status'];
 
 function matchesAny(pathname: string, patterns: string[]) {
   return patterns.some((p) => pathname.startsWith(p));
@@ -141,6 +153,23 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  if (matchesAny(pathname, VENDORS_STATUS_PATHS)) {
+    const limiter = getVendorsStatusLimiter();
+    if (limiter) {
+      try {
+        const { success } = await limiter.limit(ip);
+        if (!success) {
+          return new NextResponse(
+            JSON.stringify({ error: 'Too many requests. Please slow down.' }),
+            { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '60' } }
+          );
+        }
+      } catch {
+        console.warn('[middleware] Rate limiter unavailable for vendors-status route');
+      }
+    }
+  }
+
   return NextResponse.next();
 }
 
@@ -149,6 +178,7 @@ export const config = {
     '/api/auth/:path*',
     '/api/audit/signup',
     '/api/notifications/register-device',
+    '/api/vendors/status',
     '/forgot-password',
     '/login',
   ],

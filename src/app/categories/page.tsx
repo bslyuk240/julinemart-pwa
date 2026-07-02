@@ -3,6 +3,7 @@ import { decodeHtmlEntities } from '@/lib/utils/helpers';
 import { getTopLevelCategories } from '@/lib/woocommerce/categories';
 import {
   FALLBACK_CATEGORY_SLUGS,
+  getCategoryDisplayName,
   getCategoryVisual,
   isVisibleCategorySlug,
 } from '@/lib/utils/category-display';
@@ -16,10 +17,7 @@ type CategoryCard = {
 
 const FALLBACK_CATEGORIES: CategoryCard[] = FALLBACK_CATEGORY_SLUGS.map((slug, index) => ({
   id: index + 1,
-  name: slug
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' '),
+  name: getCategoryDisplayName(slug),
   slug,
   count: 0,
 }));
@@ -40,7 +38,7 @@ export default async function CategoriesPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-5 md:py-6">
+      <div className="container-custom py-5 md:py-6">
         <div className="mb-4 md:mb-6">
           <h1 className="mb-1 text-base font-bold text-gray-900 md:text-xl">Shop by Category</h1>
           <p className="text-xs text-gray-600 md:text-sm">
