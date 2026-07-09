@@ -67,12 +67,29 @@ function getVendorsStatusLimiter(): Ratelimit | null {
   return vendorsStatusLimiter;
 }
 
+// Storefront pages that SSR-fetch the JLO catalog (products/categories/search/vendor)
+// with `cache: 'no-store'` on every render — each hit is a real, uncached round trip
+// to Supabase. JLO's own catalog-products/catalog-product functions now rate-limit
+// per IP too, but throttling here stops abusive bursts before they even leave the
+// edge. Ceiling is generous (browsing + shared-NAT traffic is bursty) — this is meant
+// to catch sustained scraping, not real shoppers.
+let catalogPageLimiter: Ratelimit | null = null;
+function getCatalogPageLimiter(): Ratelimit | null {
+  if (!catalogPageLimiter) {
+    try { catalogPageLimiter = buildLimiter('rl:catalog-page', 200, '1 m'); } catch { return null; }
+  }
+  return catalogPageLimiter;
+}
+
 // ─── Auth paths ───────────────────────────────────────────────────────────────
 
 const AUTH_PATHS          = ['/api/auth/', '/forgot-password', '/login'];
 const SIGNUP_PATHS        = ['/api/audit/signup'];
 const DEVICE_PATHS        = ['/api/notifications/register-device'];
 const VENDORS_STATUS_PATHS = ['/api/vendors/status'];
+const CATALOG_PAGE_PATHS  = [
+  '/category/', '/product/', '/products', '/search', '/brand/', '/brands', '/vendor/', '/vendors', '/categories',
+];
 
 function matchesAny(pathname: string, patterns: string[]) {
   return patterns.some((p) => pathname.startsWith(p));
@@ -153,6 +170,23 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  if (pathname === '/' || matchesAny(pathname, CATALOG_PAGE_PATHS)) {
+    const limiter = getCatalogPageLimiter();
+    if (limiter) {
+      try {
+        const { success } = await limiter.limit(ip);
+        if (!success) {
+          return new NextResponse(
+            JSON.stringify({ error: 'Too many requests. Please slow down.' }),
+            { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '60' } }
+          );
+        }
+      } catch {
+        console.warn('[middleware] Rate limiter unavailable for catalog page route');
+      }
+    }
+  }
+
   if (matchesAny(pathname, VENDORS_STATUS_PATHS)) {
     const limiter = getVendorsStatusLimiter();
     if (limiter) {
@@ -181,5 +215,15 @@ export const config = {
     '/api/vendors/status',
     '/forgot-password',
     '/login',
+    '/',
+    '/category/:path*',
+    '/product/:path*',
+    '/products',
+    '/search',
+    '/brand/:path*',
+    '/brands',
+    '/vendor/:path*',
+    '/vendors',
+    '/categories',
   ],
 };
