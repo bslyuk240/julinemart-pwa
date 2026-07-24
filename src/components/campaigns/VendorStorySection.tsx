@@ -5,6 +5,15 @@ import { Play, ArrowRight } from 'lucide-react';
 import type { CampaignVendorOverride } from '@/types/campaigns';
 import { useCampaignTelemetry, type CampaignQrVariantRef } from '@/hooks/useCampaignTelemetry';
 
+/** Storefront vendor pages are `/vendor/[id]`. Normalize bare `/10` / `10` typos. */
+function resolveVendorStoreHref(url?: string): string | undefined {
+  const raw = url?.trim();
+  if (!raw) return undefined;
+  if (/^https?:\/\//i.test(raw) || raw.startsWith('/vendor/')) return raw;
+  const id = raw.replace(/^\//, '');
+  return id ? `/vendor/${encodeURIComponent(id)}` : undefined;
+}
+
 export default function VendorStorySection({
   campaignId,
   vendor,
@@ -16,6 +25,8 @@ export default function VendorStorySection({
 }) {
   const { track } = useCampaignTelemetry(campaignId, qrVariants);
   if (!vendor) return null;
+
+  const storeHref = resolveVendorStoreHref(vendor.storeLinkUrl);
 
   return (
     <section className="grid gap-8 rounded-3xl bg-white p-6 shadow-sm sm:p-8 md:grid-cols-[1.2fr_0.8fr] md:items-center">
@@ -33,9 +44,9 @@ export default function VendorStorySection({
             </div>
           </div>
         )}
-        {vendor.storeLinkUrl && (
+        {storeHref && (
           <a
-            href={vendor.storeLinkUrl}
+            href={storeHref}
             onClick={() => track('cta_click', { cta: 'visit_store' })}
             className="inline-flex items-center gap-1.5 text-sm font-extrabold text-primary-600"
           >
