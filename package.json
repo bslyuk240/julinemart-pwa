@@ -39,7 +39,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-hook-form": "^7.53.2",
-    "sharp": "^0.33.5",
+    "sharp": "^0.35.0",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.5.4",
     "zod": "^3.23.8",
