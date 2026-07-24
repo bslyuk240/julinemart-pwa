@@ -1,16 +1,14 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import Header from '@/components/layout/header';
 import { Toaster } from 'sonner';
 import { CustomerAuthProvider } from '@/context/customer-auth-context';
 import SupportChatWidget from '@/components/support/SupportChatWidget';
 import PWAInstallPrompt from '@/components/pwa/pwa-install-prompt';
 import NotificationPermissionPrompt from '@/components/pwa/notification-permission-prompt';
 import PWAStandaloneTracker from '@/components/pwa/pwa-standalone-tracker';
-import Footer from '@/components/layout/footer';
 import GlobalPullToRefresh from '@/components/layout/global-pull-to-refresh';
-import BottomNav from '@/components/layout/BottomNavClient';
+import ConditionalChrome from '@/components/layout/ConditionalChrome';
 import { StatusBarManager } from '@/components/native/status-bar-manager';
 import PushNotificationManager from '@/components/native/push-notification-manager';
 import WebPushManager from '@/components/pwa/web-push-manager';
@@ -61,9 +59,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* Warm up connections to the image/video origins so the first
             product images and hero video handshake without DNS+TLS delay. */}
-        <link rel="preconnect" href="https://gfikrwhtsedhwkxybzm.supabase.co" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://gfikkrwhsedhwmkxybzm.supabase.co" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://res.cloudinary.com" crossOrigin="anonymous" />
-        <link rel="dns-prefetch" href="https://gfikrwhtsedhwkxybzm.supabase.co" />
+        <link rel="dns-prefetch" href="https://gfikkrwhsedhwmkxybzm.supabase.co" />
         <link rel="dns-prefetch" href="https://res.cloudinary.com" />
 
         {/* Favicon Links (from RealFaviconGenerator) */}
@@ -97,13 +95,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PushNotificationManager />
           <WebPushManager />
           <GlobalPullToRefresh>
-            <Header />
-            {/* pb: nav row (~4rem) + safe-area + visual-viewport/browser-chrome inset on mobile */}
-            <main className="pb-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] md:pb-0">
-              {children}
-            </main>
-            <Footer />
-            <BottomNav />
+            <ConditionalChrome>{children}</ConditionalChrome>
             <Toaster position="top-center" richColors />
             <PWAInstallPrompt />
             <NotificationPermissionPrompt />

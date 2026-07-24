@@ -7,6 +7,8 @@
     "build": "cross-env NODE_OPTIONS=--max-http-header-size=262144 next build",
     "start": "cross-env NODE_OPTIONS=--max-http-header-size=262144 next start",
     "lint": "cross-env NODE_OPTIONS=--max-http-header-size=262144 next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "analyze": "cross-env NODE_OPTIONS=--max-http-header-size=262144 ANALYZE=true next build",
     "cap:sync": "npm run build && npx cap sync android",
     "cap:open": "npx cap open android",
@@ -54,7 +56,9 @@
     "eslint-config-next": "^15.5.10",
     "postcss": "^8",
     "tailwindcss": "^3.4.14",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.10"
   },
   "overrides": {
     "next": {

@@ -81,6 +81,17 @@ function getCatalogPageLimiter(): Ratelimit | null {
   return catalogPageLimiter;
 }
 
+// BE-204 telemetry ingestion — public, unauthenticated, high-frequency by
+// design (one beacon per scroll/click/video event). Limit per Security
+// Checklist §5: 20 requests / 10s per IP.
+let analyticsLimiter: Ratelimit | null = null;
+function getAnalyticsLimiter(): Ratelimit | null {
+  if (!analyticsLimiter) {
+    try { analyticsLimiter = buildLimiter('rl:campaign-analytics', 20, '10 s'); } catch { return null; }
+  }
+  return analyticsLimiter;
+}
+
 // ─── Auth paths ───────────────────────────────────────────────────────────────
 
 const AUTH_PATHS          = ['/api/auth/', '/forgot-password', '/login'];
@@ -90,6 +101,8 @@ const VENDORS_STATUS_PATHS = ['/api/vendors/status'];
 const CATALOG_PAGE_PATHS  = [
   '/category/', '/product/', '/products', '/search', '/brand/', '/brands', '/vendor/', '/vendors', '/categories',
 ];
+const CAMPAIGNS_PATHS      = ['/campaigns/', '/api/campaigns/'];
+const CAMPAIGN_ANALYTICS_PATHS = ['/api/analytics/events'];
 
 function matchesAny(pathname: string, patterns: string[]) {
   return patterns.some((p) => pathname.startsWith(p));
@@ -187,6 +200,35 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Campaigns feature gate — off by default until Phase 7 rollout flips it on.
+  // Route-level 404 rather than a blocking auth check: draft/scheduled campaigns
+  // still need to resolve for admin preview once the feature ships (BE-201).
+  // Also covers the analytics beacon route — no point accepting telemetry
+  // for a feature that's not publicly reachable yet.
+  if (
+    (matchesAny(pathname, CAMPAIGNS_PATHS) || matchesAny(pathname, CAMPAIGN_ANALYTICS_PATHS)) &&
+    process.env.FEATURE_CAMPAIGNS_ENABLED !== 'true'
+  ) {
+    return NextResponse.rewrite(new URL('/404', request.url));
+  }
+
+  if (matchesAny(pathname, CAMPAIGN_ANALYTICS_PATHS)) {
+    const limiter = getAnalyticsLimiter();
+    if (limiter) {
+      try {
+        const { success } = await limiter.limit(ip);
+        if (!success) {
+          return new NextResponse(
+            JSON.stringify({ error: 'Too many requests.' }),
+            { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '10' } }
+          );
+        }
+      } catch {
+        console.warn('[middleware] Rate limiter unavailable for campaign analytics route');
+      }
+    }
+  }
+
   if (matchesAny(pathname, VENDORS_STATUS_PATHS)) {
     const limiter = getVendorsStatusLimiter();
     if (limiter) {
@@ -213,6 +255,9 @@ export const config = {
     '/api/audit/signup',
     '/api/notifications/register-device',
     '/api/vendors/status',
+    '/campaigns/:path*',
+    '/api/campaigns/:path*',
+    '/api/analytics/events',
     '/forgot-password',
     '/login',
     '/',
