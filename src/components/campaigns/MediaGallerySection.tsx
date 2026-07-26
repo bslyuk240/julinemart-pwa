@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Play } from 'lucide-react';
 import type { CampaignMediaItem } from '@/types/campaigns';
 import { useCampaignTelemetry, type CampaignQrVariantRef } from '@/hooks/useCampaignTelemetry';
+import CampaignVideoPlayer from '@/components/campaigns/CampaignVideoPlayer';
 
 export default function MediaGallerySection({
   campaignId,
@@ -31,10 +32,8 @@ export default function MediaGallerySection({
             <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-primary-500 to-primary-800">
               {item.type === 'video' ? (
                 playingIndex === i ? (
-                  <video
-                    src={item.url}
-                    controls
-                    autoPlay
+                  <CampaignVideoPlayer
+                    url={item.url}
                     className="absolute inset-0 h-full w-full object-cover"
                   />
                 ) : (

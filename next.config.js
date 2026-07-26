@@ -14,10 +14,10 @@ const securityHeaders = [
       "connect-src 'self' https://*.supabase.co https://*.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.woocommerce.com https://*.sentry.io wss://*.supabase.co https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://api.paystack.co",
       // youtube-nocookie/vimeo added for campaign vendor-intro videos (SEC-401)
       "frame-src https://accounts.google.com https://checkout.paystack.com https://www.youtube-nocookie.com https://player.vimeo.com",
-      // no media-src existed before campaigns — self-hosted (Supabase Storage) or
-      // YouTube/Vimeo-hosted hero/vendor-intro <video> sources need this explicitly,
+      // no media-src existed before campaigns — self-hosted (Supabase Storage / Cloudinary)
+      // or YouTube/Vimeo-hosted hero/vendor-intro <video> sources need this explicitly,
       // they don't fall under img-src and would otherwise fall back to default-src 'self'.
-      "media-src 'self' blob: https://*.supabase.co https://www.youtube-nocookie.com https://player.vimeo.com",
+      "media-src 'self' blob: https://*.supabase.co https://res.cloudinary.com https://*.cloudinary.com https://www.youtube-nocookie.com https://player.vimeo.com",
       "frame-ancestors 'none'",
       "object-src 'none'",
       "base-uri 'self'",

@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import { Play, ArrowRight } from 'lucide-react';
 import type { CampaignVendorOverride } from '@/types/campaigns';
 import { useCampaignTelemetry, type CampaignQrVariantRef } from '@/hooks/useCampaignTelemetry';
+import CampaignVideoPlayer from '@/components/campaigns/CampaignVideoPlayer';
 
 /** Storefront vendor pages are `/vendor/[id]`. Normalize bare `/10` / `10` typos. */
 function resolveVendorStoreHref(url?: string): string | undefined {
@@ -24,6 +26,7 @@ export default function VendorStorySection({
   qrVariants?: CampaignQrVariantRef[];
 }) {
   const { track } = useCampaignTelemetry(campaignId, qrVariants);
+  const [videoOpen, setVideoOpen] = useState(false);
   if (!vendor) return null;
 
   const storeHref = resolveVendorStoreHref(vendor.storeLinkUrl);
@@ -57,7 +60,11 @@ export default function VendorStorySection({
 
       {vendor.introVideoUrl ? (
         <button
-          onClick={() => track('video_view')}
+          type="button"
+          onClick={() => {
+            setVideoOpen(true);
+            track('video_view');
+          }}
           className="relative flex aspect-video w-full flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-primary-600 to-primary-800 text-white shadow-md"
         >
           {vendor.shopImageUrl && (
@@ -74,6 +81,20 @@ export default function VendorStorySection({
             <Image src={vendor.shopImageUrl} alt={`${vendor.name} shop`} fill className="object-cover" />
           </div>
         )
+      )}
+
+      {videoOpen && vendor.introVideoUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setVideoOpen(false)}
+        >
+          <div
+            className="aspect-video w-full max-w-xl overflow-hidden rounded-xl bg-black"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CampaignVideoPlayer url={vendor.introVideoUrl} className="h-full w-full" />
+          </div>
+        </div>
       )}
     </section>
   );

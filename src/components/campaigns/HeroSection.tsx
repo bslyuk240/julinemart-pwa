@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { ArrowRight, Play, BadgeCheck } from 'lucide-react';
 import type { Campaign } from '@/types/campaigns';
 import { useCampaignTelemetry, type CampaignQrVariantRef } from '@/hooks/useCampaignTelemetry';
+import CampaignVideoPlayer from '@/components/campaigns/CampaignVideoPlayer';
 
 export default function HeroSection({
   campaign,
@@ -61,10 +62,10 @@ export default function HeroSection({
 
         <div className="relative flex items-center justify-center">
           <div className="relative aspect-square w-full max-w-[280px] overflow-hidden rounded-3xl bg-gradient-to-br from-primary-600 to-primary-800 shadow-xl shadow-primary-600/20">
-            {hero.heroImageDesktop && (
+            {(hero.heroImageDesktop || hero.heroImageMobile) && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={hero.heroImageDesktop}
+                src={hero.heroImageDesktop || hero.heroImageMobile}
                 alt={hero.headline}
                 className="h-full w-full object-cover"
               />
@@ -106,13 +107,15 @@ export default function HeroSection({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
           onClick={() => setVideoOpen(false)}
         >
-          <video
-            src={hero.introductoryVideoUrl ?? hero.secondaryCtaVideoUrl}
-            controls
-            autoPlay
-            className="max-h-[80vh] w-full max-w-xl rounded-xl"
+          <div
+            className="aspect-video w-full max-w-xl overflow-hidden rounded-xl bg-black"
             onClick={(e) => e.stopPropagation()}
-          />
+          >
+            <CampaignVideoPlayer
+              url={(hero.introductoryVideoUrl ?? hero.secondaryCtaVideoUrl)!}
+              className="h-full w-full"
+            />
+          </div>
         </div>
       )}
     </section>
