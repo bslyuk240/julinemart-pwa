@@ -6,6 +6,11 @@ import { Play } from 'lucide-react';
 import type { CampaignMediaItem } from '@/types/campaigns';
 import { useCampaignTelemetry, type CampaignQrVariantRef } from '@/hooks/useCampaignTelemetry';
 import CampaignVideoPlayer from '@/components/campaigns/CampaignVideoPlayer';
+import { resolveYoutubeThumbnail } from '@/lib/campaigns/video-playback';
+
+function videoThumbnail(item: CampaignMediaItem): string | null {
+  return item.thumbnailUrl || resolveYoutubeThumbnail(item.url);
+}
 
 export default function MediaGallerySection({
   campaignId,
@@ -33,36 +38,50 @@ export default function MediaGallerySection({
           Clicking opens the uncropped item at its natural aspect ratio instead
           of playing/zooming inside this same cropped box. */}
       <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2">
-        {items.map((item, i) => (
-          <div key={i} className="w-[80vw] flex-none overflow-hidden rounded-2xl bg-gray-50 sm:w-80">
-            <button
-              type="button"
-              onClick={() => {
-                setOpenIndex(i);
-                if (item.type === 'video') track('video_view', { mediaIndex: i });
-              }}
-              className="relative block aspect-video w-full overflow-hidden bg-gradient-to-br from-primary-500 to-primary-800"
-              aria-label={item.type === 'video' ? 'Play video' : 'View image'}
-            >
-              {item.type === 'video' ? (
-                <span className="absolute inset-0 flex items-center justify-center">
-                  <span className="rounded-full bg-secondary-500 p-3.5 text-white">
-                    <Play className="h-5 w-5" />
-                  </span>
-                </span>
-              ) : (
-                <Image
-                  src={item.url}
-                  alt={item.caption || 'Campaign media'}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 640px) 80vw, 320px"
-                />
-              )}
-            </button>
-            {item.caption && <p className="p-3 text-xs text-gray-600">{item.caption}</p>}
-          </div>
-        ))}
+        {items.map((item, i) => {
+          const thumbnail = item.type === 'video' ? videoThumbnail(item) : null;
+          return (
+            <div key={i} className="w-[80vw] flex-none overflow-hidden rounded-2xl bg-gray-50 sm:w-80">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenIndex(i);
+                  if (item.type === 'video') track('video_view', { mediaIndex: i });
+                }}
+                className="relative block aspect-video w-full overflow-hidden bg-gradient-to-br from-primary-500 to-primary-800"
+                aria-label={item.type === 'video' ? 'Play video' : 'View image'}
+              >
+                {item.type === 'video' ? (
+                  <>
+                    {thumbnail && (
+                      <Image
+                        src={thumbnail}
+                        alt={item.caption || 'Video thumbnail'}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 640px) 80vw, 320px"
+                      />
+                    )}
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <span className="rounded-full bg-secondary-500 p-3.5 text-white">
+                        <Play className="h-5 w-5" />
+                      </span>
+                    </span>
+                  </>
+                ) : (
+                  <Image
+                    src={item.url}
+                    alt={item.caption || 'Campaign media'}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 640px) 80vw, 320px"
+                  />
+                )}
+              </button>
+              {item.caption && <p className="p-3 text-xs text-gray-600">{item.caption}</p>}
+            </div>
+          );
+        })}
       </div>
 
       {openItem && (

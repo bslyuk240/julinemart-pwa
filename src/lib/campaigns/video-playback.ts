@@ -8,22 +8,27 @@ export type VideoPlayback =
   | { kind: 'youtube'; embedSrc: string }
   | { kind: 'vimeo'; embedSrc: string };
 
-function youtubeEmbedSrc(url: URL): string | null {
+function extractYoutubeId(url: URL): string | null {
   const host = url.hostname.replace(/^www\./, '');
-  let id: string | null = null;
 
   if (host === 'youtu.be') {
-    id = url.pathname.split('/').filter(Boolean)[0] ?? null;
-  } else if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
+    return url.pathname.split('/').filter(Boolean)[0] ?? null;
+  }
+  if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
     if (url.pathname.startsWith('/embed/')) {
-      id = url.pathname.split('/')[2] ?? null;
-    } else if (url.pathname.startsWith('/shorts/')) {
-      id = url.pathname.split('/')[2] ?? null;
-    } else {
-      id = url.searchParams.get('v');
+      return url.pathname.split('/')[2] ?? null;
     }
+    if (url.pathname.startsWith('/shorts/')) {
+      return url.pathname.split('/')[2] ?? null;
+    }
+    return url.searchParams.get('v');
   }
 
+  return null;
+}
+
+function youtubeEmbedSrc(url: URL): string | null {
+  const id = extractYoutubeId(url);
   if (!id) return null;
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0`;
 }
@@ -39,6 +44,24 @@ function vimeoEmbedSrc(url: URL): string | null {
     return id ? `https://player.vimeo.com/video/${encodeURIComponent(id)}?autoplay=1` : null;
   }
   return null;
+}
+
+// YouTube serves a thumbnail at a predictable, no-auth URL for any public
+// video — free background image for the gallery's play button, no admin
+// input required. Vimeo/direct-file URLs have no equivalent without an extra
+// server-side fetch, so this only covers YouTube; callers fall back to
+// item.thumbnailUrl (admin-provided) for everything else.
+export function resolveYoutubeThumbnail(rawUrl: string): string | null {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+
+  try {
+    const url = new URL(trimmed);
+    const id = extractYoutubeId(url);
+    return id ? `https://img.youtube.com/vi/${encodeURIComponent(id)}/hqdefault.jpg` : null;
+  } catch {
+    return null;
+  }
 }
 
 export function resolveVideoPlayback(rawUrl: string): VideoPlayback | null {
