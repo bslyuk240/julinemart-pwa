@@ -17,53 +17,77 @@ export default function MediaGallerySection({
   qrVariants?: CampaignQrVariantRef[];
 }) {
   const { track } = useCampaignTelemetry(campaignId, qrVariants);
-  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   if (!items?.length) return null;
+
+  const openItem = openIndex != null ? items[openIndex] : null;
 
   return (
     <section className="rounded-3xl bg-white p-6 shadow-sm sm:p-8">
       <p className="mb-1 text-xs font-extrabold uppercase tracking-wide text-primary-600">From our customers</p>
       <h2 className="mb-5 text-xl font-extrabold text-gray-900">Behind the scenes &amp; customer stories</h2>
 
+      {/* Tiles are fixed at aspect-video (YouTube's own 16:9) regardless of the
+          source media's real dimensions — cropped to fill via object-cover.
+          Clicking opens the uncropped item at its natural aspect ratio instead
+          of playing/zooming inside this same cropped box. */}
       <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2">
         {items.map((item, i) => (
-          <div key={i} className="w-[70vw] flex-none overflow-hidden rounded-2xl bg-gray-50 sm:w-64">
-            <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-primary-500 to-primary-800">
+          <div key={i} className="w-[80vw] flex-none overflow-hidden rounded-2xl bg-gray-50 sm:w-80">
+            <button
+              type="button"
+              onClick={() => {
+                setOpenIndex(i);
+                if (item.type === 'video') track('video_view', { mediaIndex: i });
+              }}
+              className="relative block aspect-video w-full overflow-hidden bg-gradient-to-br from-primary-500 to-primary-800"
+              aria-label={item.type === 'video' ? 'Play video' : 'View image'}
+            >
               {item.type === 'video' ? (
-                playingIndex === i ? (
-                  <CampaignVideoPlayer
-                    url={item.url}
-                    className="absolute inset-0 h-full w-full object-cover"
-                  />
-                ) : (
-                  <button
-                    onClick={() => {
-                      setPlayingIndex(i);
-                      track('video_view', { mediaIndex: i });
-                    }}
-                    className="absolute inset-0 flex items-center justify-center"
-                    aria-label="Play video"
-                  >
-                    <span className="rounded-full bg-secondary-500 p-3.5 text-white">
-                      <Play className="h-5 w-5" />
-                    </span>
-                  </button>
-                )
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="rounded-full bg-secondary-500 p-3.5 text-white">
+                    <Play className="h-5 w-5" />
+                  </span>
+                </span>
               ) : (
                 <Image
                   src={item.url}
                   alt={item.caption || 'Campaign media'}
                   fill
                   className="object-cover"
-                  sizes="(max-width: 640px) 70vw, 256px"
+                  sizes="(max-width: 640px) 80vw, 320px"
                 />
               )}
-            </div>
+            </button>
             {item.caption && <p className="p-3 text-xs text-gray-600">{item.caption}</p>}
           </div>
         ))}
       </div>
+
+      {openItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setOpenIndex(null)}
+        >
+          {openItem.type === 'video' ? (
+            <div
+              className="aspect-video w-full max-w-xl overflow-hidden rounded-xl bg-black"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <CampaignVideoPlayer url={openItem.url} className="h-full w-full" />
+            </div>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={openItem.url}
+              alt={openItem.caption || 'Campaign media'}
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[85vh] w-auto max-w-full rounded-xl object-contain"
+            />
+          )}
+        </div>
+      )}
     </section>
   );
 }
