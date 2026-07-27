@@ -86,7 +86,7 @@ async function fetchProductsFromSupabase(rules: CampaignProductSelectionRules): 
   let query = supabase
     .from('products')
     .select(
-      '*, images:product_images(src, alt, position, is_thumbnail), category_map:product_category_map(categories(id, woo_term_id, name, slug))'
+      '*, images:product_images(src, alt, position, is_thumbnail), category_map:product_category_map(categories(id, woo_term_id, name, slug)), vendor:vendors!products_vendor_id_fkey(id, store_name, woocommerce_vendor_id)'
     )
     .eq('status', 'published');
 
