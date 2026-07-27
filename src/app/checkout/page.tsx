@@ -32,6 +32,10 @@ import { useCartStore } from '@/store/cart-store';
 import { jloItemIdsFromCartLine } from '@/lib/jlo/line-identity';
 import { ensurePaystackReady, resetPaystackLoader } from '@/lib/paystack';
 import { logActivity } from '@/lib/logActivity';
+import {
+  clearPendingCampaignVoucher,
+  readPendingCampaignVoucher,
+} from '@/components/campaigns/OfferSection';
 
 interface ShippingOption {
   id: string;
@@ -117,6 +121,14 @@ export default function CheckoutPage() {
   const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
   const [voucherError, setVoucherError] = useState('');
   const [voucherDiscount, setVoucherDiscount] = useState(0);
+
+  // Prefill campaign voucher saved from "Save offer & shop" on a landing page.
+  useEffect(() => {
+    const pending = readPendingCampaignVoucher();
+    if (!pending) return;
+    setPromoKind('voucher');
+    setVoucherCode(pending);
+  }, []);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -920,6 +932,7 @@ export default function CheckoutPage() {
       setVoucherDiscount(voucherValue);
       setVoucherError('');
       setVoucherCode('');
+      clearPendingCampaignVoucher();
       removeCoupon({ showToast: false });
       
       toast.success(`Voucher applied (−${formatPrice(voucherValue)})`);

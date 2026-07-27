@@ -1,9 +1,37 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import type { CampaignOfferConfig } from '@/types/campaigns';
-import { useCartStore } from '@/store/cart-store';
 import { useCampaignTelemetry, type CampaignQrVariantRef } from '@/hooks/useCampaignTelemetry';
+
+/** Checkout reads this to prefill the campaign voucher field. */
+export const PENDING_CAMPAIGN_VOUCHER_KEY = 'julinemart_pending_campaign_voucher';
+
+export function savePendingCampaignVoucher(code: string) {
+  try {
+    sessionStorage.setItem(PENDING_CAMPAIGN_VOUCHER_KEY, code.trim().toUpperCase());
+  } catch {
+    // private mode / blocked storage — copy still works
+  }
+}
+
+export function readPendingCampaignVoucher(): string | null {
+  try {
+    const value = sessionStorage.getItem(PENDING_CAMPAIGN_VOUCHER_KEY);
+    return value?.trim() ? value.trim().toUpperCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingCampaignVoucher() {
+  try {
+    sessionStorage.removeItem(PENDING_CAMPAIGN_VOUCHER_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 export default function OfferSection({
   campaignId,
@@ -14,20 +42,10 @@ export default function OfferSection({
   offer?: CampaignOfferConfig;
   qrVariants?: CampaignQrVariantRef[];
 }) {
-  const applyCoupon = useCartStore((s) => s.applyCoupon);
   const { track } = useCampaignTelemetry(campaignId, qrVariants);
   const [copied, setCopied] = useState(false);
 
   if (!offer?.couponCode) return null;
-
-  async function handleApply() {
-    try {
-      await applyCoupon(offer!.couponCode!);
-      track('cta_click', { cta: 'apply_offer' });
-    } catch {
-      // useCartStore.applyCoupon already surfaces its own toast on failure.
-    }
-  }
 
   async function handleCopy() {
     try {
@@ -35,8 +53,29 @@ export default function OfferSection({
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      // Clipboard API unavailable — user can still read the code and type it.
+      // Clipboard API unavailable — user can still read the code.
     }
+  }
+
+  async function handleApplyAndShop() {
+    const code = offer!.couponCode!.trim().toUpperCase();
+    savePendingCampaignVoucher(code);
+    track('cta_click', { cta: 'apply_offer' });
+
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // copy optional
+    }
+
+    const products = document.getElementById('campaign-products');
+    if (products) {
+      products.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    toast.success(`${code} saved — add products, then it prefills at checkout`);
   }
 
   return (
@@ -59,6 +98,7 @@ export default function OfferSection({
         </div>
 
         <button
+          type="button"
           onClick={handleCopy}
           className="flex h-32 w-32 flex-none flex-col items-center justify-center gap-1 rounded-full bg-gradient-to-br from-secondary-500 to-secondary-700 shadow-lg shadow-secondary-500/40 transition hover:scale-105"
         >
@@ -70,11 +110,15 @@ export default function OfferSection({
       </div>
 
       <button
-        onClick={handleApply}
+        type="button"
+        onClick={handleApplyAndShop}
         className="mt-6 min-h-[48px] w-full rounded-full bg-white px-6 text-sm font-extrabold text-primary-700 sm:w-auto sm:px-8"
       >
-        Apply offer &amp; shop
+        Save offer &amp; shop
       </button>
+      <p className="mt-2 text-center text-xs text-primary-100 sm:text-left">
+        Saves the code for checkout, then scrolls to products.
+      </p>
     </section>
   );
 }
