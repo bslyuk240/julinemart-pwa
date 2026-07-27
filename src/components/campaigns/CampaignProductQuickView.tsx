@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ExternalLink, X } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Product, ProductVariation } from '@/types/product';
 import { getProductVariations } from '@/lib/woocommerce/products';
 import { useCartStore } from '@/store/cart-store';
@@ -20,6 +21,23 @@ import { buildCampaignProductHref } from '@/lib/campaigns/view-more';
 function formatNaira(value: number) {
   if (!Number.isFinite(value) || value <= 0) return '';
   return `₦${value.toLocaleString('en-NG')}`;
+}
+
+function formatPriceLabel(product: Product, selectedPrice: number, variations: ProductVariation[]) {
+  if (selectedPrice > 0) return formatNaira(selectedPrice);
+
+  const prices = variations
+    .map((v) => parseMoney(v.sale_price, v.price, v.regular_price))
+    .filter((n) => n > 0);
+  if (prices.length === 1) return formatNaira(prices[0]);
+  if (prices.length > 1) {
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    return min === max ? formatNaira(min) : `${formatNaira(min)} – ${formatNaira(max)}`;
+  }
+
+  const fallback = parseMoney(product.sale_price, product.price, product.min_price);
+  return fallback > 0 ? formatNaira(fallback) : 'Select options';
 }
 
 export default function CampaignProductQuickView({
@@ -42,6 +60,7 @@ export default function CampaignProductQuickView({
   const addItem = useCartStore((s) => s.addItem);
   const [variations, setVariations] = useState<ProductVariation[]>([]);
   const [loadingVariations, setLoadingVariations] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [selectedVariation, setSelectedVariation] = useState<ProductVariation | null>(null);
   const [added, setAdded] = useState(false);
@@ -53,6 +72,7 @@ export default function CampaignProductQuickView({
     setSelectedVariation(null);
     setSelectedAttributes({});
     setVariations([]);
+    setLoadError(false);
 
     if (product.type !== 'variable') return;
 
@@ -65,19 +85,48 @@ export default function CampaignProductQuickView({
           : null;
         const data = inline ?? (await getProductVariations(product.id));
         if (cancelled) return;
+
+        if (!data.length) {
+          setVariations([]);
+          setLoadError(true);
+          return;
+        }
+
         setVariations(data);
 
+        // Prefill defaults, otherwise auto-select when each attribute has one option.
+        const inferred = inferVariationAttributes(data);
+        const defaults: Record<string, string> = {};
+
         if (product.default_attributes?.length) {
-          const defaults: Record<string, string> = {};
           product.default_attributes.forEach((attr: { name?: string; option?: string }) => {
             const k = normalizeVariationKey(String(attr.name ?? ''));
             const v = (attr.option ?? '').trim();
             if (k && v) defaults[k] = v;
           });
-          setSelectedAttributes(defaults);
         }
+
+        inferred.forEach((attr) => {
+          const key = normalizeVariationKey(attr.name ?? '');
+          if (!key || defaults[key]) return;
+          if (attr.options.length === 1) defaults[key] = attr.options[0].trim();
+        });
+
+        // Single variation → select all of its attributes.
+        if (data.length === 1) {
+          data[0].attributes.forEach((attr) => {
+            const key = normalizeVariationKey(attr.name ?? '');
+            const option = (attr.option ?? '').trim();
+            if (key && option) defaults[key] = option;
+          });
+        }
+
+        setSelectedAttributes(defaults);
       } catch {
-        if (!cancelled) setVariations([]);
+        if (!cancelled) {
+          setVariations([]);
+          setLoadError(true);
+        }
       } finally {
         if (!cancelled) setLoadingVariations(false);
       }
@@ -122,9 +171,8 @@ export default function CampaignProductQuickView({
       if (Number.isFinite(sale) && sale > 0) return sale;
       const fromVariation = parseMoney(selectedVariation.price, selectedVariation.regular_price);
       if (fromVariation > 0) return fromVariation;
-      return parseMoney(product.sale_price, product.price, product.min_price);
     }
-    return parseMoney(product.sale_price, product.price, product.min_price);
+    return 0;
   }, [product, selectedVariation]);
 
   const imageSrc =
@@ -135,14 +183,24 @@ export default function CampaignProductQuickView({
     : '#';
 
   const isVariable = product?.type === 'variable';
-  const needsOptions = Boolean(isVariable && variationAttributes.length > 0);
+  const needsVariation = Boolean(isVariable);
+  const canAdd =
+    Boolean(product) &&
+    !loadingVariations &&
+    (!needsVariation || (Boolean(selectedVariation) && selectedPrice > 0)) &&
+    selectedVariation?.stock_status !== 'outofstock' &&
+    !(needsVariation && loadError);
+
   const outOfStock =
     selectedVariation?.stock_status === 'outofstock' ||
-    (!selectedVariation && product?.stock_status === 'outofstock');
+    (!selectedVariation && !isVariable && product?.stock_status === 'outofstock');
 
   function handleAdd() {
     if (!product) return;
-    if (needsOptions && !selectedVariation) return;
+    if (needsVariation && (!selectedVariation || selectedPrice <= 0)) {
+      toast.error('Please choose your options first');
+      return;
+    }
 
     const variationPayload = selectedVariation
       ? {
@@ -153,7 +211,7 @@ export default function CampaignProductQuickView({
             return acc;
           }, {}),
           price: selectedPrice,
-          regularPrice: parseMoney(selectedVariation.regular_price, selectedVariation.price),
+          regularPrice: parseMoney(selectedVariation.regular_price, selectedVariation.price) || selectedPrice,
           salePrice: selectedVariation.sale_price
             ? parseFloat(selectedVariation.sale_price)
             : undefined,
@@ -173,19 +231,19 @@ export default function CampaignProductQuickView({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={product.name}
     >
       <div
-        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white shadow-xl sm:rounded-3xl"
+        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-xl sm:rounded-3xl sm:pb-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
           <p className="text-xs font-extrabold uppercase tracking-wide text-primary-600">
-            Quick pick
+            Choose options
           </p>
           <button
             type="button"
@@ -213,7 +271,7 @@ export default function CampaignProductQuickView({
           <div>
             <h3 className="text-lg font-extrabold text-gray-900">{product.name}</h3>
             <p className="mt-1 font-mono text-base font-extrabold text-gray-900">
-              {formatNaira(selectedPrice) || 'Select options'}
+              {formatPriceLabel(product, selectedPrice, variations)}
             </p>
             {product.short_description && (
               <p className="mt-2 line-clamp-3 text-sm text-gray-600">
@@ -226,6 +284,11 @@ export default function CampaignProductQuickView({
             <div className="space-y-4 border-t border-gray-100 pt-4">
               {loadingVariations && (
                 <p className="text-sm text-gray-500">Loading options…</p>
+              )}
+              {loadError && !loadingVariations && (
+                <p className="text-sm text-red-600">
+                  Options couldn&apos;t be loaded. Open full details to choose a variation.
+                </p>
               )}
               {variationAttributes.map((attr) => {
                 const key = normalizeVariationKey(attr.name ?? '');
@@ -301,21 +364,21 @@ export default function CampaignProductQuickView({
           <div className="space-y-3 border-t border-gray-100 pt-4">
             <button
               type="button"
-              disabled={
-                outOfStock ||
-                loadingVariations ||
-                (needsOptions && !selectedVariation)
-              }
+              disabled={!canAdd || outOfStock}
               onClick={handleAdd}
               className="flex min-h-[48px] w-full items-center justify-center rounded-full bg-secondary-500 px-4 text-sm font-extrabold text-white shadow-lg shadow-secondary-500/25 transition hover:bg-secondary-600 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
             >
               {outOfStock
                 ? 'Out of stock'
-                : needsOptions && !selectedVariation
-                  ? 'Select options to add'
-                  : added
-                    ? 'Added ✓ — pick another'
-                    : 'Add to cart'}
+                : loadingVariations
+                  ? 'Loading options…'
+                  : needsVariation && selectedPrice <= 0
+                    ? 'Select options to add'
+                    : added
+                      ? 'Added ✓ — pick another'
+                      : selectedPrice > 0
+                        ? `Add to cart · ${formatNaira(selectedPrice)}`
+                        : 'Add to cart'}
             </button>
 
             <Link
@@ -325,9 +388,6 @@ export default function CampaignProductQuickView({
               View full details
               <ExternalLink className="h-3.5 w-3.5" />
             </Link>
-            <p className="text-center text-xs text-gray-500">
-              Full details keeps a Return to campaign bar so you can come back easily.
-            </p>
           </div>
         </div>
       </div>

@@ -69,8 +69,21 @@ export default function ProductsSection({
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         {products.map((product) => {
           const inCart = isInCart(product.id);
-          const onSale = product.on_sale && product.sale_price;
           const isVariable = product.type === 'variable';
+          const displayPrice =
+            parseFloat(String(product.sale_price || product.price || product.min_price || '')) || 0;
+          const regularPrice = parseFloat(String(product.regular_price || '')) || 0;
+          const onSale =
+            Boolean(product.on_sale && product.sale_price) &&
+            regularPrice > displayPrice &&
+            displayPrice > 0;
+          const priceLabel = displayPrice > 0
+            ? isVariable && product.max_price && product.min_price && product.max_price !== product.min_price
+              ? `From ${formatNaira(displayPrice)}`
+              : formatNaira(displayPrice)
+            : isVariable
+              ? 'See options'
+              : '';
 
           return (
             <article
@@ -106,10 +119,10 @@ export default function ProductsSection({
                   {product.average_rating || '0'} <span>({product.rating_count})</span>
                 </p>
                 <p className="mb-2 font-mono text-sm font-extrabold text-gray-900">
-                  {formatNaira(onSale ? product.sale_price : product.price)}
+                  {priceLabel}
                   {onSale && (
                     <span className="ml-2 text-xs font-normal text-gray-400 line-through">
-                      {formatNaira(product.regular_price)}
+                      {formatNaira(regularPrice)}
                     </span>
                   )}
                 </p>
@@ -124,7 +137,7 @@ export default function ProductsSection({
                 ) : (
                   <button
                     type="button"
-                    disabled={product.stock_status === 'outofstock'}
+                    disabled={product.stock_status === 'outofstock' || displayPrice <= 0}
                     onClick={() => {
                       addItem(product);
                       track('add_to_cart', { productId: product.id });
