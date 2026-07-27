@@ -2,6 +2,7 @@ import type { Campaign, CampaignBenefit, CampaignMediaItem } from '@/types/campa
 import type { Product } from '@/types/product';
 import type { CampaignReview } from '@/lib/campaigns/reviews';
 import type { CampaignQrVariantRef } from '@/hooks/useCampaignTelemetry';
+import { resolveCampaignViewMore } from '@/lib/campaigns/view-more';
 import HeroSection from '@/components/campaigns/HeroSection';
 import BenefitsSection from '@/components/campaigns/BenefitsSection';
 import VendorStorySection from '@/components/campaigns/VendorStorySection';
@@ -25,6 +26,8 @@ export default function SectionRenderer({
   reviews: CampaignReview[];
   qrVariants: CampaignQrVariantRef[];
 }) {
+  const viewMore = resolveCampaignViewMore(campaign, products);
+
   return (
     <>
       {campaign.sectionLayout.map((section) => {
@@ -56,6 +59,7 @@ export default function SectionRenderer({
                 campaignTitle={campaign.publicTitle}
                 offerText={campaign.offerConfig?.displayText}
                 products={products}
+                viewMore={viewMore}
                 qrVariants={qrVariants}
               />
             );

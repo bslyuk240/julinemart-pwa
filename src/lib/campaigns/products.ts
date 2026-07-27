@@ -94,17 +94,21 @@ async function fetchProductsFromSupabase(rules: CampaignProductSelectionRules): 
     const numericIds = (rules.manualProductIds ?? []).map(Number).filter((n) => !Number.isNaN(n));
     if (!numericIds.length) return [];
     query = query.in('woo_product_id', numericIds);
-  } else {
-    if (rules.categoryIds?.length) {
-      const productIds = await productIdsForCategory(String(rules.categoryIds[0]));
-      if (!productIds.length) return [];
-      query = query.in('id', productIds);
-    }
-    if (rules.vendorId != null) {
-      const vendorUuid = await resolveVendorUuid(rules.vendorId);
-      if (!vendorUuid) return [];
-      query = query.eq('vendor_id', vendorUuid);
-    }
+  } else if (rules.categoryIds?.length) {
+    const productIds = await productIdsForCategory(String(rules.categoryIds[0]));
+    if (!productIds.length) return [];
+    query = query.in('id', productIds);
+  }
+
+  // Vendor scope applies to automatic, rules-based, and manual — never mix sellers
+  // on a vendor-targeted campaign.
+  if (rules.vendorId != null) {
+    const vendorUuid = await resolveVendorUuid(rules.vendorId);
+    if (!vendorUuid) return [];
+    query = query.eq('vendor_id', vendorUuid);
+  }
+
+  if (rules.source !== 'manual') {
     if (rules.inStockOnly) {
       query = query.eq('stock_status', 'instock');
     }
@@ -140,8 +144,36 @@ export interface ResolvedCampaignProducts {
   source: CampaignProductSelectionRules['source'];
 }
 
+/** Fill missing vendor/category scope from the campaign target itself. */
+export function resolveEffectiveProductRules(campaign: Campaign): CampaignProductSelectionRules {
+  const rules: CampaignProductSelectionRules = { ...campaign.productSelectionRules };
+
+  if (rules.vendorId == null) {
+    const fromOverride = campaign.vendorOverride?.vendorId;
+    if (fromOverride != null) {
+      rules.vendorId = fromOverride;
+    } else if (campaign.targetType === 'vendor' && campaign.targetId) {
+      rules.vendorId = campaign.targetId;
+    }
+  }
+
+  if (!rules.categoryIds?.length && campaign.targetType === 'category' && campaign.targetId) {
+    rules.categoryIds = [campaign.targetId];
+  }
+
+  // Vendor / category targets should never resolve as an unscoped "automatic" dump.
+  if (
+    rules.source === 'automatic' &&
+    (rules.vendorId != null || (rules.categoryIds && rules.categoryIds.length > 0))
+  ) {
+    rules.source = 'rules_based';
+  }
+
+  return rules;
+}
+
 export async function resolveCampaignProducts(campaign: Campaign): Promise<ResolvedCampaignProducts> {
-  const rules = campaign.productSelectionRules;
+  const rules = resolveEffectiveProductRules(campaign);
   const cacheKey = `${campaign.id}:${JSON.stringify(rules)}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {

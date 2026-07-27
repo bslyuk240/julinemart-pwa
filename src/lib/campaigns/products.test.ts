@@ -52,7 +52,7 @@ vi.mock('@/lib/supabase-server', () => ({
   getSupabaseServerClient: () => ({ from: supabaseFromMock }),
 }));
 
-import { resolveCampaignProducts } from './products';
+import { resolveCampaignProducts, resolveEffectiveProductRules } from './products';
 
 function makeRow(overrides: Record<string, unknown> = {}) {
   const wooId = (overrides.woo_product_id as number) ?? 1;
@@ -190,5 +190,39 @@ describe('resolveCampaignProducts', () => {
     const campaign = makeCampaign('discounted', { source: 'automatic', discountedOnly: true, maxProducts: 12 });
     const result = await resolveCampaignProducts(campaign);
     expect(result.products.map((p) => p.id)).toEqual([1]);
+  });
+
+  it('inherits vendorId from campaign target when product rules omit it', async () => {
+    state.vendor = { id: 'vendor-uuid-1' };
+    state.products = [makeRow({ woo_product_id: 9, vendor_id: 'vendor-uuid-1' })];
+    const campaign = {
+      ...makeCampaign('vendor-inherit', { source: 'automatic', maxProducts: 12 }),
+      targetType: 'vendor' as const,
+      targetId: 'vendor-uuid-1',
+    };
+    const result = await resolveCampaignProducts(campaign);
+    expect(builders.products[0].eq).toHaveBeenCalledWith('vendor_id', 'vendor-uuid-1');
+    expect(result.products.map((p) => p.id)).toEqual([9]);
+  });
+});
+
+describe('resolveEffectiveProductRules', () => {
+  it('copies vendor target into vendorId', () => {
+    const rules = resolveEffectiveProductRules({
+      ...makeCampaign('v', { source: 'automatic' }),
+      targetType: 'vendor',
+      targetId: 'abc-vendor',
+    });
+    expect(rules.vendorId).toBe('abc-vendor');
+    expect(rules.source).toBe('rules_based');
+  });
+
+  it('copies category target into categoryIds', () => {
+    const rules = resolveEffectiveProductRules({
+      ...makeCampaign('c', { source: 'automatic' }),
+      targetType: 'category',
+      targetId: 'cat-1',
+    });
+    expect(rules.categoryIds).toEqual(['cat-1']);
   });
 });
