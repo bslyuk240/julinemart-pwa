@@ -5,6 +5,7 @@ import { resolveCampaignProducts } from '@/lib/campaigns/products';
 import { resolveCampaignReviews } from '@/lib/campaigns/reviews';
 import CampaignTopNav from '@/components/campaigns/TopNav';
 import PromoBanner from '@/components/campaigns/PromoBanner';
+import CampaignCountdown from '@/components/campaigns/CampaignCountdown';
 import SectionRenderer from '@/components/campaigns/SectionRenderer';
 import CampaignFooter from '@/components/campaigns/CampaignFooter';
 import StickyOfferBar from '@/components/campaigns/StickyOfferBar';
@@ -76,10 +77,11 @@ export default async function CampaignLandingPage({ params }: CampaignPageProps)
       <PageViewBeacon campaignId={campaign.id} qrVariants={qrVariants} />
       <PromoBanner offerConfig={campaign.offerConfig} />
       <div className="mx-auto flex max-w-6xl flex-col gap-5 p-4 pb-28 sm:p-6 sm:pb-8">
+        {campaign.endDate && <CampaignCountdown endDate={campaign.endDate} />}
         <SectionRenderer campaign={campaign} products={products} reviews={reviews} qrVariants={qrVariants} />
         <CampaignFooter />
       </div>
-      <StickyOfferBar offer={campaign.offerConfig} />
+      <StickyOfferBar offer={campaign.offerConfig} endDate={campaign.endDate} />
     </>
   );
 }

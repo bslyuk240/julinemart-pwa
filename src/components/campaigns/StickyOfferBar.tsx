@@ -3,11 +3,18 @@
 import { useState } from 'react';
 import { X, ArrowRight } from 'lucide-react';
 import type { CampaignOfferConfig } from '@/types/campaigns';
+import CampaignCountdown from '@/components/campaigns/CampaignCountdown';
 
 // StickyOfferFloatingBar (UI Change Plan / New Components) — mobile only.
 // isDismissed collapses to a small reopenable pill; copied gives tap-to-copy
 // feedback. Matches the props/states named in the PRD's component spec.
-export default function StickyOfferBar({ offer }: { offer?: CampaignOfferConfig }) {
+export default function StickyOfferBar({
+  offer,
+  endDate,
+}: {
+  offer?: CampaignOfferConfig;
+  endDate?: string;
+}) {
   const [isDismissed, setIsDismissed] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -37,6 +44,7 @@ export default function StickyOfferBar({ offer }: { offer?: CampaignOfferConfig 
           <div className="min-w-0">
             <span className="font-mono text-sm font-extrabold text-primary-600">{offer.couponCode}</span>
             <p className="truncate text-[11px] text-gray-500">{offer.displayText}</p>
+            <CampaignCountdown endDate={endDate} variant="compact" />
           </div>
           <div className="flex flex-none items-center gap-2">
             <button
