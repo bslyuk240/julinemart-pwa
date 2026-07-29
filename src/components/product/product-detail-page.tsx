@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Star, ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, Minus, Plus, Store, BadgeCheck } from 'lucide-react';
+import { Star, ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, Minus, Plus, Store, BadgeCheck, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProductGallery from '@/components/product/product-gallery';
 import ProductCarousel from '@/components/product/product-carousel';
@@ -111,6 +111,14 @@ interface ProductDetailPageProps {
 
 export default function ProductDetailPage({ initialProduct }: ProductDetailPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // UI Change Plan, "Changes to Existing Screens": campaign-referred visits
+  // (from a "Choose Options" link on a variable product) get a context bar
+  // back to the campaign. Absent for every normal visit — zero effect on the
+  // other ~everyone who lands here without these params.
+  const fromCampaignSlug = searchParams.get('from_campaign');
+  const fromCampaignTitle = searchParams.get('from_campaign_title');
+  const fromCampaignOffer = searchParams.get('from_campaign_offer');
   const product = initialProduct;
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [quantity, setQuantity] = useState(1);
@@ -646,6 +654,18 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
   return (
     <main className="min-h-screen bg-white pb-24 md:pb-8 overflow-x-hidden">
+      {fromCampaignSlug && (
+        <Link
+          href={`/campaigns/${fromCampaignSlug}`}
+          className="flex items-center gap-2 bg-primary-50 px-4 py-2.5 text-sm font-semibold text-primary-700"
+        >
+          <ArrowLeft className="h-4 w-4 flex-none" />
+          <span className="truncate">
+            Return to {fromCampaignTitle || 'the campaign'}
+            {fromCampaignOffer ? ` to secure: ${fromCampaignOffer}` : ''}
+          </span>
+        </Link>
+      )}
       <div className="container-custom py-4 md:py-6 overflow-x-hidden">
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-600 mb-4">

@@ -32,6 +32,10 @@ import { useCartStore } from '@/store/cart-store';
 import { jloItemIdsFromCartLine } from '@/lib/jlo/line-identity';
 import { ensurePaystackReady, resetPaystackLoader } from '@/lib/paystack';
 import { logActivity } from '@/lib/logActivity';
+import {
+  clearPendingCampaignVoucher,
+  readPendingCampaignVoucher,
+} from '@/components/campaigns/OfferSection';
 
 interface ShippingOption {
   id: string;
@@ -104,6 +108,8 @@ export default function CheckoutPage() {
   const [useDifferentAddress, setUseDifferentAddress] = useState(false);
   const [saveNewAddress, setSaveNewAddress] = useState(false);
 
+  // Promo code UI — one field for campaign voucher or influencer code
+  const [promoKind, setPromoKind] = useState<'voucher' | 'influencer'>('voucher');
   // NEW: Influencer coupon state
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
@@ -115,6 +121,14 @@ export default function CheckoutPage() {
   const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
   const [voucherError, setVoucherError] = useState('');
   const [voucherDiscount, setVoucherDiscount] = useState(0);
+
+  // Prefill campaign voucher saved from "Save offer & shop" on a landing page.
+  useEffect(() => {
+    const pending = readPendingCampaignVoucher();
+    if (!pending) return;
+    setPromoKind('voucher');
+    setVoucherCode(pending);
+  }, []);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -918,16 +932,11 @@ export default function CheckoutPage() {
       setVoucherDiscount(voucherValue);
       setVoucherError('');
       setVoucherCode('');
+      clearPendingCampaignVoucher();
       removeCoupon({ showToast: false });
       
-      // ✅ Better success message
-      const matchingItems = result.data?.matching_items_count || items.length;
-      const totalItems = result.data?.total_items_count || items.length;
-      toast.success(
-        matchingItems === totalItems
-          ? `Voucher applied! ${formatPrice(voucherValue)} discount`
-          : `Voucher applied to ${matchingItems} of ${totalItems} items! ${formatPrice(voucherValue)} discount`
-      );
+      toast.success(`Voucher applied (−${formatPrice(voucherValue)})`);
+
     } catch (error: any) {
       console.error('Voucher validation error:', error);
       setVoucherError(
@@ -1613,139 +1622,89 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* NEW: Discount Code + Voucher */}
+            {/* Promo code — single voucher / influencer entry */}
             {shippingCost !== null && (
               <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <Tag className="w-6 h-6 text-primary-600" />
-                  <h2 className="text-sm md:text-base font-semibold text-gray-900">Discounts</h2>
+                <div className="mb-4 flex items-center gap-3">
+                  <Tag className="h-6 w-6 text-primary-600" />
+                  <h2 className="text-sm font-semibold text-gray-900 md:text-base">Have a promo code?</h2>
                 </div>
 
-                <div className="space-y-5">
-                  <div className="space-y-3">
-                    {appliedVoucher ? (
-                      <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-green-900">
-                              {appliedVoucher.code} Applied
-                            </p>
-                            <p className="text-sm text-green-700 mt-1">
-                              {appliedVoucher.message}
-                            </p>
-                            {voucherDiscount > 0 && (
-                              <p className="text-xs text-gray-600 mt-1">
-                                Product discount: -{formatPrice(voucherDiscount)}
-                                {appliedVoucher?.matching_items_count < appliedVoucher?.total_items_count && 
-                                  ` (applied to ${appliedVoucher.matching_items_count} of ${appliedVoucher.total_items_count} items)`
-                                }
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={removeVoucher}
-                            className="text-red-600 hover:text-red-700 text-sm font-medium"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                          <div className="min-w-0 w-full sm:flex-1">
-                            <Input
-                              placeholder="Enter campaign voucher"
-                              value={voucherCode}
-                              onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                              disabled={isApplyingVoucher}
-                              fullWidth
-                            />
-                          </div>
-                          <Button
-                            onClick={applyVoucher}
-                            disabled={
-                              !voucherCode.trim() ||
-                              isApplyingVoucher ||
-                              shippingCost === null
-                            }
-                            isLoading={isApplyingVoucher}
-                            variant="secondary"
-                            size="sm"
-                            className="w-full shrink-0 whitespace-nowrap sm:w-auto"
-                            type="button"
-                          >
-                            Apply
-                          </Button>
-                        </div>
-                        {voucherError && (
-                          <p className="text-sm text-red-600">{voucherError}</p>
-                        )}
-                          <p className="text-xs text-gray-500">
-                            Campaign vouchers discount products and are validated after shipping is calculated.
-                          </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="border-t pt-4 space-y-3">
-                    {appliedCoupon ? (
-                      <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-green-900">
-                              {appliedCoupon.code} Applied
-                            </p>
-                            <p className="text-sm text-green-700 mt-1">
-                              {appliedCoupon.message}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => removeCoupon()}
-                            type="button"
-                            className="text-red-600 hover:text-red-700 text-sm font-medium"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                          <div className="min-w-0 w-full sm:flex-1">
-                            <Input
-                              placeholder="Enter influencer code"
-                              value={couponCode}
-                              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                              disabled={isApplyingCoupon || Boolean(appliedVoucher)}
-                              fullWidth
-                            />
-                          </div>
-                          <Button
-                            onClick={applyCoupon}
-                            disabled={!couponCode || isApplyingCoupon || Boolean(appliedVoucher)}
-                            isLoading={isApplyingCoupon}
-                            variant="secondary"
-                            size="sm"
-                            className="w-full shrink-0 whitespace-nowrap sm:w-auto"
-                            type="button"
-                          >
-                            Apply
-                          </Button>
-                        </div>
-                        {couponError && (
-                          <p className="text-sm text-red-600">{couponError}</p>
-                        )}
-                      </div>
-                    )}
-                    <p className="text-xs text-gray-500">
-                      {appliedVoucher
-                        ? 'Remove the campaign voucher to use an influencer code.'
-                        : 'Influencer codes discount shipping.'}
+                {appliedVoucher || appliedCoupon ? (
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
+                    <p className="min-w-0 truncate text-sm font-semibold text-green-900">
+                      {(appliedVoucher?.code || appliedCoupon?.code)} applied
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (appliedVoucher) removeVoucher();
+                        else removeCoupon();
+                      }}
+                      className="shrink-0 text-sm font-medium text-red-600 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-3">
+                    <select
+                      value={promoKind}
+                      onChange={(e) => {
+                        const next = e.target.value as 'voucher' | 'influencer';
+                        setPromoKind(next);
+                        setVoucherError('');
+                        setCouponError('');
+                      }}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                    >
+                      <option value="voucher">Campaign voucher</option>
+                      <option value="influencer">Influencer code</option>
+                    </select>
+
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                      <div className="min-w-0 w-full sm:flex-1">
+                        <Input
+                          placeholder={
+                            promoKind === 'voucher'
+                              ? 'Enter voucher code'
+                              : 'Enter influencer code'
+                          }
+                          value={promoKind === 'voucher' ? voucherCode : couponCode}
+                          onChange={(e) => {
+                            const value = e.target.value.toUpperCase();
+                            if (promoKind === 'voucher') setVoucherCode(value);
+                            else setCouponCode(value);
+                          }}
+                          disabled={isApplyingVoucher || isApplyingCoupon}
+                          fullWidth
+                        />
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (promoKind === 'voucher') applyVoucher();
+                          else applyCoupon();
+                        }}
+                        disabled={
+                          (promoKind === 'voucher'
+                            ? !voucherCode.trim() || isApplyingVoucher
+                            : !couponCode.trim() || isApplyingCoupon) || shippingCost === null
+                        }
+                        isLoading={promoKind === 'voucher' ? isApplyingVoucher : isApplyingCoupon}
+                        variant="secondary"
+                        size="sm"
+                        className="w-full shrink-0 whitespace-nowrap sm:w-auto"
+                        type="button"
+                      >
+                        Apply
+                      </Button>
+                    </div>
+
+                    {(voucherError || couponError) && (
+                      <p className="text-sm text-red-600">{voucherError || couponError}</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
