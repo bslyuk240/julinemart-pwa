@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -13,6 +13,10 @@ import {
   ShoppingBag,
   CreditCard,
   Bell,
+  ChevronRight,
+  Clock,
+  RefreshCw,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
@@ -73,23 +77,17 @@ export default function AccountPage() {
   const [recentOrders, setRecentOrders] = useState<AccountOrder[]>([]);
   const [orderStats, setOrderStats] = useState<OrderStats>(emptyOrderStats);
   const [ordersLoading, setOrdersLoading] = useState(true);
-  const [showDeferredPanels, setShowDeferredPanels] = useState(false);
+  const loggingOutRef = useRef(false);
 
   useEffect(() => {
     if (!isLoading) {
-      if (!isAuthenticated) router.push('/login');
-      else if (user?.email) loadOrders();
+      if (!isAuthenticated) {
+        // Skip the login redirect during an explicit logout so we land on '/'
+        if (!loggingOutRef.current) router.push('/login');
+      } else if (user?.email) loadOrders();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, isAuthenticated, user]);
-
-  useEffect(() => {
-    if (isLoading || !customer) return;
-
-    setShowDeferredPanels(false);
-    const timer = window.setTimeout(() => setShowDeferredPanels(true), 120);
-    return () => window.clearTimeout(timer);
-  }, [isLoading, customer?.id]);
 
   const loadOrders = async () => {
     if (!user?.email) return;
@@ -109,13 +107,14 @@ export default function AccountPage() {
   };
 
   const handleLogout = async () => {
+    loggingOutRef.current = true;
     await logout();
     toast.success('Logged out successfully');
     router.push('/');
   };
 
   const formatPrice = (amount: number | string) =>
-    `NGN ${Number(amount).toLocaleString()}`;
+    `₦${Number(amount).toLocaleString()}`;
 
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString('en-US', {
@@ -129,29 +128,29 @@ export default function AccountPage() {
   if (!customer) {
     return (
       <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-        <div className="container mx-auto px-4 py-6">
-          <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-lg shadow-lg p-6 md:p-8 mb-6 text-white">
+        <div className="mx-auto max-w-lg px-4 py-5">
+          <div className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg p-5 mb-5 text-white">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white/20 flex items-center justify-center">
-                <User className="w-8 h-8 md:w-10 md:h-10" />
+              <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                <User className="w-8 h-8" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-2xl md:text-3xl font-bold">Loading your account...</h1>
-                <p className="text-primary-100 mt-1 truncate">
+                <h1 className="text-base font-bold leading-tight">Loading your account…</h1>
+                <p className="text-primary-100 text-sm mt-0.5 truncate">
                   {user?.email || 'Checking your profile'}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-            <h2 className="text-lg font-semibold text-gray-900">Account profile is still loading</h2>
+          <div className="bg-white rounded-2xl shadow-sm p-6 text-center">
+            <h2 className="text-base font-semibold text-gray-900">Account profile is still loading</h2>
             <p className="text-sm text-gray-600 mt-2">
               If this takes too long on your device, retry the profile fetch or sign in again.
             </p>
-            <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button variant="primary" onClick={refreshCustomer}>Retry</Button>
-              <Button variant="outline" onClick={handleLogout}>Logout</Button>
+            <div className="mt-4 flex flex-col gap-2">
+              <Button variant="primary" size="sm" onClick={refreshCustomer} fullWidth>Retry</Button>
+              <Button variant="outline" size="sm" onClick={handleLogout} fullWidth>Logout</Button>
             </div>
           </div>
         </div>
@@ -214,203 +213,158 @@ export default function AccountPage() {
       description: 'Account preferences',
       href: '/account/settings',
       color: 'text-gray-600',
-      bgColor: 'bg-gray-50',
+      bgColor: 'bg-gray-100',
     },
+  ];
+
+  const statItems = [
+    { label: 'Total Orders', value: orderStats.total, icon: ShoppingBag, color: 'text-primary-600', bgColor: 'bg-primary-50' },
+    { label: 'Pending', value: orderStats.pending, icon: Clock, color: 'text-orange-500', bgColor: 'bg-orange-50' },
+    { label: 'Processing', value: orderStats.processing, icon: RefreshCw, color: 'text-blue-600', bgColor: 'bg-blue-50' },
+    { label: 'Completed', value: orderStats.completed, icon: CheckCircle2, color: 'text-green-600', bgColor: 'bg-green-50' },
   ];
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6">
-        <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-lg shadow-lg p-6 md:p-8 mb-6 text-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {customer.avatar_url ? (
-                <img
-                  src={customer.avatar_url}
-                  alt="Avatar"
-                  className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover ring-2 ring-white/30"
-                />
-              ) : (
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white/20 flex items-center justify-center">
-                  <User className="w-8 h-8 md:w-10 md:h-10" />
-                </div>
-              )}
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold">
-                  Welcome back, {customer.first_name || 'there'}!
-                </h1>
-                <p className="text-primary-100 mt-1">{customer.email}</p>
+      <div className="container-custom py-5 md:py-8 space-y-5 md:space-y-6">
+        {/* Welcome card */}
+        <section className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg p-5 md:p-7 text-white">
+          <div className="flex items-center gap-4 md:gap-5">
+            {customer.avatar_url ? (
+              <img
+                src={customer.avatar_url}
+                alt="Avatar"
+                className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover ring-2 ring-white/40 flex-shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center flex-shrink-0">
+                <User className="w-8 h-8 md:w-10 md:h-10" />
               </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base md:text-xl font-bold leading-tight">
+                Welcome back, {customer.first_name || 'there'}!
+              </h1>
+              <p className="text-primary-100 text-sm md:text-base mt-0.5 truncate">{customer.email}</p>
             </div>
-            <Button
-              variant="outline"
+            <button
               onClick={handleLogout}
-              className="flex bg-white/10 border-white/20 text-white hover:bg-white/20"
+              aria-label="Logout"
+              className="flex-shrink-0 w-11 h-11 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors active:scale-95"
             >
-              <LogOut className="w-4 h-4 md:mr-2" />
-              <span className="hidden md:inline">Logout</span>
-            </Button>
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
-        </div>
+        </section>
 
-        <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Account shortcuts</h2>
-              <p className="text-sm text-gray-600">One place for each account function.</p>
-            </div>
-            <Link href="/orders" className="text-sm font-medium text-primary-600 hover:text-primary-700">
-              View all
-            </Link>
+        {/* Account shortcuts */}
+        <section className="bg-white rounded-2xl shadow-sm p-4">
+          <div className="mb-3">
+            <h2 className="text-sm md:text-base font-bold text-gray-900">Account shortcuts</h2>
+            <p className="text-xs text-gray-500 mt-0.5">One place for each account function.</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {accountMenuItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="rounded-xl border border-gray-200 p-4 hover:border-primary-300 hover:bg-primary-50/50 transition-colors group"
+                className="flex items-center gap-2.5 rounded-xl border border-gray-200 p-3 hover:border-primary-300 active:bg-gray-50 transition-colors"
               >
-                <div className={`w-10 h-10 rounded-lg ${item.bgColor} flex items-center justify-center mb-3`}>
+                <div className={`w-10 h-10 rounded-xl ${item.bgColor} flex items-center justify-center flex-shrink-0`}>
                   <item.icon className={`w-5 h-5 ${item.color}`} />
                 </div>
-                <p className="font-medium text-gray-900 group-hover:text-primary-600">{item.title}</p>
-                <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-gray-900 text-xs md:text-sm leading-tight">{item.title}</p>
+                  <p className="hidden md:block text-xs text-gray-500 mt-0.5 leading-snug truncate">{item.description}</p>
+                </div>
+                <ChevronRight className="hidden md:block w-4 h-4 text-gray-300 flex-shrink-0" />
               </Link>
             ))}
           </div>
-        </div>
+        </section>
 
-        {showDeferredPanels ? (
-          <div className="grid lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { label: 'Total Orders', value: orderStats.total, color: 'text-gray-900' },
-                  { label: 'Pending', value: orderStats.pending, color: 'text-yellow-600' },
-                  { label: 'Processing', value: orderStats.processing, color: 'text-blue-600' },
-                  { label: 'Completed', value: orderStats.completed, color: 'text-green-600' },
-                ].map((s) => (
-                  <div key={s.label} className="bg-white rounded-lg shadow-sm p-4 min-h-[92px]">
-                    <p className="text-sm text-gray-600 mb-1">{s.label}</p>
-                    {ordersLoading ? (
-                      <div className="h-8 w-16 rounded bg-gray-100 animate-pulse" />
-                    ) : (
-                      <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                    )}
-                  </div>
-                ))}
+        {/* Stats */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {statItems.map((s) => (
+            <div key={s.label} className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3">
+              <div className={`w-11 h-11 rounded-xl ${s.bgColor} flex items-center justify-center flex-shrink-0`}>
+                <s.icon className={`w-5 h-5 ${s.color}`} />
               </div>
-
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-900">Recent Orders</h2>
-                  <Link href="/orders" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-                    View All
-                  </Link>
-                </div>
+              <div className="min-w-0">
+                <p className="text-xs text-gray-500 leading-tight">{s.label}</p>
                 {ordersLoading ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gray-100 rounded animate-pulse" />
-                          <div className="space-y-2">
-                            <div className="h-4 w-40 bg-gray-100 rounded animate-pulse" />
-                            <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
-                          </div>
-                        </div>
-                        <div className="space-y-2 text-right">
-                          <div className="h-4 w-20 bg-gray-100 rounded animate-pulse" />
-                          <div className="h-3 w-16 bg-gray-100 rounded animate-pulse" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : recentOrders.length === 0 ? (
-                  <div className="text-center py-8">
-                    <ShoppingBag className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-600 mb-4">No orders yet</p>
-                    <Link href="/">
-                      <Button variant="primary" size="sm">Start Shopping</Button>
-                    </Link>
-                  </div>
+                  <div className="h-7 w-10 rounded bg-gray-100 animate-pulse mt-1" />
                 ) : (
-                  <div className="space-y-3">
-                    {recentOrders.map((order) => (
-                      <Link
-                        key={order.id}
-                        href={`/orders/${order.id}`}
-                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-primary-100 rounded flex items-center justify-center">
-                            <Package className="w-6 h-6 text-primary-600" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">Order #{order.order_number}</p>
-                            <p className="text-sm text-gray-600">{formatDate(order.created_at)}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-900">{formatPrice(order.total_amount)}</p>
-                          <p className="text-sm text-gray-600 capitalize">{order.overall_status}</p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
+                  <p className={`text-lg md:text-xl font-bold ${s.color}`}>{s.value}</p>
                 )}
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="grid lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="bg-white rounded-lg shadow-sm p-4 min-h-[92px]">
-                    <div className="h-4 w-24 bg-gray-100 rounded animate-pulse mb-3" />
-                    <div className="h-8 w-16 bg-gray-100 rounded animate-pulse" />
-                  </div>
-                ))}
-              </div>
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <div className="h-6 w-40 bg-gray-100 rounded animate-pulse mb-4" />
-                <div className="space-y-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gray-100 rounded animate-pulse" />
-                        <div className="space-y-2">
-                          <div className="h-4 w-40 bg-gray-100 rounded animate-pulse" />
-                          <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
-                        </div>
-                      </div>
-                      <div className="space-y-2 text-right">
-                        <div className="h-4 w-20 bg-gray-100 rounded animate-pulse" />
-                        <div className="h-3 w-16 bg-gray-100 rounded animate-pulse" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+          ))}
+        </section>
 
-        {!showDeferredPanels && (
-          <div className="mt-6 bg-white rounded-lg shadow-sm p-6">
-            <div className="h-6 w-48 bg-gray-100 rounded animate-pulse mb-4" />
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className="rounded-xl border border-gray-200 p-4 min-h-[116px]">
-                  <div className="w-10 h-10 rounded-lg bg-gray-100 animate-pulse mb-3" />
-                  <div className="h-4 w-24 bg-gray-100 rounded animate-pulse mb-2" />
-                  <div className="h-3 w-20 bg-gray-100 rounded animate-pulse" />
+        {/* Recent Orders */}
+        <section className="bg-white rounded-2xl shadow-sm p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm md:text-base font-bold text-gray-900">Recent Orders</h2>
+            <Link href="/orders" className="text-xs md:text-sm font-semibold text-primary-600 flex items-center gap-0.5">
+              View All <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {ordersLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-3 border border-gray-200 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 bg-gray-100 rounded-xl animate-pulse" />
+                    <div className="space-y-2">
+                      <div className="h-3.5 w-32 bg-gray-100 rounded animate-pulse" />
+                      <div className="h-3 w-20 bg-gray-100 rounded animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-right">
+                    <div className="h-3.5 w-16 bg-gray-100 rounded animate-pulse" />
+                    <div className="h-3 w-12 bg-gray-100 rounded animate-pulse" />
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : recentOrders.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                <ShoppingBag className="w-7 h-7 text-gray-400" />
+              </div>
+              <p className="text-gray-500 text-xs md:text-sm mb-4">No orders yet</p>
+              <Link href="/">
+                <Button variant="primary" size="sm">Start Shopping</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentOrders.map((order) => (
+                <Link
+                  key={order.id}
+                  href={`/orders/${order.id}`}
+                  className="flex items-center justify-between p-3 border border-gray-200 rounded-xl hover:border-primary-300 active:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Package className="w-5 h-5 text-primary-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 text-xs md:text-sm truncate">Order #{order.order_number}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{formatDate(order.created_at)}</p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-2">
+                    <p className="font-semibold text-gray-900 text-xs md:text-sm">{formatPrice(order.total_amount)}</p>
+                    <p className="text-xs text-gray-500 capitalize mt-0.5">{order.overall_status}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

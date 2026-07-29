@@ -3,6 +3,7 @@ import { decodeHtmlEntities } from '@/lib/utils/helpers';
 import { getTopLevelCategories } from '@/lib/woocommerce/categories';
 import {
   FALLBACK_CATEGORY_SLUGS,
+  getCategoryDisplayName,
   getCategoryVisual,
   isVisibleCategorySlug,
 } from '@/lib/utils/category-display';
@@ -15,10 +16,7 @@ type StripCategory = {
 
 const FALLBACK_CATEGORIES: StripCategory[] = FALLBACK_CATEGORY_SLUGS.map((slug, index) => ({
   id: index + 1,
-  name: slug
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' '),
+  name: getCategoryDisplayName(slug),
   slug,
 }));
 

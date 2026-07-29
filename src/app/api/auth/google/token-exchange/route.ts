@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -6,9 +7,8 @@ export async function POST(request: NextRequest) {
   try {
     const { code, redirectUri } = await request.json();
 
-    console.log('📥 Token exchange request received');
-    console.log('Code present:', !!code);
-    console.log('RedirectUri:', redirectUri);
+    logger.info('Token exchange request received');
+    logger.info('Code present:', !!code);
 
     if (!code || !redirectUri) {
       return NextResponse.json(
@@ -17,28 +17,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use Android Web OAuth client credentials
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_ANDROID_CLIENT_SECRET;
 
-    console.log('Has clientId:', !!clientId);
-    console.log('Has clientSecret:', !!clientSecret);
-    console.log('ClientId length:', clientId?.length);
-
     if (!clientId || !clientSecret) {
-      console.error('❌ Missing Google OAuth credentials', {
-        hasClientId: !!clientId,
-        hasClientSecret: !!clientSecret,
-      });
+      logger.error('Missing Google OAuth credentials');
       return NextResponse.json(
-        { error: 'Server configuration error', details: { hasClientId: !!clientId, hasClientSecret: !!clientSecret } },
+        { error: 'Server configuration error' },
         { status: 500 }
       );
     }
 
-    console.log('🔄 Exchanging authorization code for tokens...');
+    logger.info('Exchanging authorization code for tokens...');
 
-    // Exchange code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
@@ -55,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json();
-      console.error('Token exchange failed:', errorData);
+      logger.error('Token exchange failed', new Error(errorData.error_description ?? 'unknown'));
       return NextResponse.json(
         { error: errorData.error_description || 'Token exchange failed' },
         { status: tokenResponse.status }
@@ -63,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     const tokens = await tokenResponse.json();
-    console.log('✅ Tokens received successfully');
+    logger.info('Tokens received successfully');
 
     return NextResponse.json({
       success: true,
@@ -71,7 +62,7 @@ export async function POST(request: NextRequest) {
       access_token: tokens.access_token,
     });
   } catch (error) {
-    console.error('Token exchange error:', error);
+    logger.error('Token exchange error', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

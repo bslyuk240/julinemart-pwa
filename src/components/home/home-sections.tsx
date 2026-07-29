@@ -9,6 +9,7 @@ import SponsoredProducts from '@/components/home/sponsored-products';
 import LaunchingDeals from '@/components/home/launching-deals';
 import CategoryProductsSection from '@/components/home/category-products-section';
 import type { HomepageSectionsData } from '@/lib/homepage-sections';
+import GenericProductSection from '@/components/home/generic-product-section';
 
 interface HomeSectionsProps {
   initialSections: HomepageSectionsData;
@@ -23,6 +24,7 @@ const EMPTY_SECTIONS: HomepageSectionsData = {
   launchingProducts: [],
   electronicsProducts: [],
   fashionProducts: [],
+  extraSections: [],
 };
 
 const CACHE_KEY = 'homepage_sections_v1';
@@ -49,7 +51,8 @@ function writeCache(data: HomepageSectionsData) {
 }
 
 function hasData(sections: HomepageSectionsData) {
-  return Object.values(sections).some((arr) => arr.length > 0);
+  const { extraSections, ...fixed } = sections;
+  return Object.values(fixed).some((arr) => arr.length > 0) || extraSections.length > 0;
 }
 
 // Skeleton for a single horizontal product section
@@ -140,6 +143,7 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
     launchingProducts,
     electronicsProducts,
     fashionProducts,
+    extraSections,
   } = sections;
 
   // Still waiting for first-ever fetch and nothing in cache
@@ -191,6 +195,12 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
           accentClassName="bg-gradient-to-br from-rose-600 to-pink-500"
           linkClassName="text-rose-600 hover:text-rose-700"
         />
+      )}
+
+      {(extraSections ?? []).map((s) =>
+        s.products.length > 0 ? (
+          <GenericProductSection key={s.key} title={s.title} products={s.products} />
+        ) : null
       )}
 
       {!hasData(sections) && (

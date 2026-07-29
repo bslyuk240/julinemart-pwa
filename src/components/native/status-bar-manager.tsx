@@ -16,6 +16,13 @@ export function StatusBarManager() {
         const { Capacitor, SystemBars, SystemBarsStyle } = await import('@capacitor/core');
 
         if (Capacitor.isNativePlatform()) {
+          // Purple theme-color tints the Android status bar dark; use white so icons stay visible.
+          document.documentElement.style.backgroundColor = '#ffffff';
+          const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+          if (themeColorMeta) {
+            themeColorMeta.setAttribute('content', '#ffffff');
+          }
+
           await SystemBars.setStyle({ style: SystemBarsStyle.Light });
           await SystemBars.show();
         }

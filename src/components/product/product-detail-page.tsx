@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Star, ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, Minus, Plus, Store, BadgeCheck } from 'lucide-react';
+import { Star, ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, Minus, Plus, Store, BadgeCheck, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProductGallery from '@/components/product/product-gallery';
 import ProductCarousel from '@/components/product/product-carousel';
@@ -23,6 +23,7 @@ import {
   trackAddToWishlist,
   trackShareProduct,
 } from '@/lib/gtag';
+import { useCustomerAuth } from '@/context/customer-auth-context';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -110,6 +111,14 @@ interface ProductDetailPageProps {
 
 export default function ProductDetailPage({ initialProduct }: ProductDetailPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // UI Change Plan, "Changes to Existing Screens": campaign-referred visits
+  // (from a "Choose Options" link on a variable product) get a context bar
+  // back to the campaign. Absent for every normal visit — zero effect on the
+  // other ~everyone who lands here without these params.
+  const fromCampaignSlug = searchParams.get('from_campaign');
+  const fromCampaignTitle = searchParams.get('from_campaign_title');
+  const fromCampaignOffer = searchParams.get('from_campaign_offer');
   const product = initialProduct;
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [quantity, setQuantity] = useState(1);
@@ -128,6 +137,22 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     rating: 0,
     review: '',
   });
+
+  const { user, customer } = useCustomerAuth();
+
+  // Prefill review form for authenticated users
+  useEffect(() => {
+    if (user) {
+      const name = customer
+        ? [customer.first_name, customer.last_name].filter(Boolean).join(' ')
+        : (user.user_metadata?.full_name ?? user.user_metadata?.name ?? '');
+      setReviewForm((prev) => ({
+        ...prev,
+        reviewer: prev.reviewer || name,
+        reviewerEmail: prev.reviewerEmail || (user.email ?? ''),
+      }));
+    }
+  }, [user, customer]);
 
   const addToCart = useCartStore((state) => state.addItem);
   const { toggleWishlist, isInWishlist } = useWishlist();
@@ -366,12 +391,12 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       if (newReview) {
         setReviews((prev) => [newReview, ...prev]);
         toast.success('Review submitted!');
-        setReviewForm({
-          reviewer: '',
-          reviewerEmail: '',
+        setReviewForm((prev) => ({
+          reviewer: prev.reviewer,
+          reviewerEmail: prev.reviewerEmail,
           rating: 0,
           review: '',
-        });
+        }));
       } else {
         toast.error('Unable to submit review right now.');
       }
@@ -629,6 +654,18 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
   return (
     <main className="min-h-screen bg-white pb-24 md:pb-8 overflow-x-hidden">
+      {fromCampaignSlug && (
+        <Link
+          href={`/campaigns/${fromCampaignSlug}`}
+          className="flex items-center gap-2 bg-primary-50 px-4 py-2.5 text-sm font-semibold text-primary-700"
+        >
+          <ArrowLeft className="h-4 w-4 flex-none" />
+          <span className="truncate">
+            Return to {fromCampaignTitle || 'the campaign'}
+            {fromCampaignOffer ? ` to secure: ${fromCampaignOffer}` : ''}
+          </span>
+        </Link>
+      )}
       <div className="container-custom py-4 md:py-6 overflow-x-hidden">
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-600 mb-4">
@@ -700,7 +737,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                 </div>
               )}
 
-              <h1 className="text-lg md:text-2xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2">
+              <h1 className="text-base md:text-xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2">
                 {decodedProductName}
               </h1>
               
@@ -727,7 +764,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
               {/* Price */}
               <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className="text-xl md:text-2xl font-bold text-primary-600">
+                <span className="text-lg md:text-xl font-bold text-primary-600">
                   {formatPrice(selectedPrice.toString())}
                 </span>
                 {discountPercentage > 0 && (
@@ -916,7 +953,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                 <Button
                   onClick={handleAddToCart}
                   variant="primary"
-                  size="md"
+                  size="sm"
                   fullWidth
                   disabled={
                     effectiveStockStatus === 'outofstock' ||
@@ -933,7 +970,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                 <Button 
                   onClick={handleWishlist}
                   variant={inWishlist ? "primary" : "outline"}
-                  size="md"
+                  size="sm"
                 >
                   <Heart className={`w-4 h-4 md:w-5 md:h-5 ${inWishlist ? 'fill-current' : ''}`} />
                 </Button>
@@ -943,7 +980,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                   <Button 
                     onClick={() => setShowShareMenu(!showShareMenu)}
                     variant="outline" 
-                    size="md"
+                    size="sm"
                   >
                     <Share2 className="w-4 h-4 md:w-5 md:h-5" />
                   </Button>
@@ -1019,7 +1056,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
               <Button 
                 onClick={handleBuyNow}
                 variant="secondary" 
-                size="md" 
+                size="sm" 
                 fullWidth
                 disabled={
                   effectiveStockStatus === 'outofstock' ||
@@ -1177,7 +1214,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                             type="text"
                             value={reviewForm.reviewer}
                             onChange={(e) => setReviewForm((prev) => ({ ...prev, reviewer: e.target.value }))}
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+                            className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 ${user ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-gray-300'}`}
                             placeholder="Your name"
                           />
                         </div>
@@ -1187,7 +1224,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                             type="email"
                             value={reviewForm.reviewerEmail}
                             onChange={(e) => setReviewForm((prev) => ({ ...prev, reviewerEmail: e.target.value }))}
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+                            className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 ${user ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-gray-300'}`}
                             placeholder="you@example.com"
                           />
                         </div>
@@ -1207,7 +1244,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                       <Button
                         type="submit"
                         variant="primary"
-                        size="md"
+                        size="sm"
                         fullWidth
                         disabled={submittingReview}
                       >
@@ -1224,7 +1261,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
         {/* Related Products */}
         {relatedProducts.length > 0 && (
           <section className="border-t pt-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Related Products</h2>
+            <h2 className="text-sm md:text-base font-bold text-gray-900 mb-4 md:mb-6">Related Products</h2>
             <ProductCarousel products={relatedProducts} />
           </section>
         )}

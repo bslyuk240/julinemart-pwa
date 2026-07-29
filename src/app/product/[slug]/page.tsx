@@ -4,6 +4,8 @@ import ProductDetailPage from '@/components/product/product-detail-page';
 import { getProductBySlug } from '@/lib/woocommerce/products';
 import { decodeHtmlEntities } from '@/lib/utils/helpers';
 
+export const revalidate = 300; // Cache product pages for 5 minutes
+
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://julinemart.com';
 const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || 'JulineMart';
 const LOGO_URL = process.env.NEXT_PUBLIC_LOGO_URL || `${SITE_URL}/favicon.ico`;

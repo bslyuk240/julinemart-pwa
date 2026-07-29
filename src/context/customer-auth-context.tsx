@@ -29,12 +29,20 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
   const [isLoading, setIsLoading] = useState(true);
 
   const loadProfile = async (u: User) => {
-    const { data } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('id', u.id)
-      .single();
-    setCustomer(data ?? null);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', u.id)
+        .single();
+      if (!error) {
+        setCustomer(data ?? null);
+        return;
+      }
+      // Wait 1s before the retry on first failure
+      if (attempt === 0) await new Promise<void>((r) => setTimeout(r, 1000));
+    }
+    // Both attempts failed — user is still authenticated, profile just unavailable
   };
 
   useEffect(() => {

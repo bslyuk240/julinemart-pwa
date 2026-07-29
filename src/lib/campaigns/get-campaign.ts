@@ -1,0 +1,137 @@
+import { getSupabaseServerClient } from '@/lib/supabase-server';
+import type { Campaign, CampaignSection, CampaignSectionType } from '@/types/campaigns';
+
+interface CampaignRow {
+  id: string;
+  slug: string;
+  internal_name: string;
+  public_title: string;
+  campaign_objective: string | null;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+  target_type: string;
+  target_id: string | null;
+  template_id: string | null;
+  section_layout: unknown;
+  hero_config: Record<string, unknown> | null;
+  vendor_override: Record<string, unknown> | null;
+  product_selection_rules: Record<string, unknown> | null;
+  review_rules: Record<string, unknown> | null;
+  offer_config: Record<string, unknown> | null;
+  meta_seo: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SectionRow {
+  id: string;
+  campaign_id: string;
+  section_type: string;
+  order_index: number;
+  is_visible: boolean;
+  config: Record<string, unknown>;
+  created_at: string;
+}
+
+function mapSection(row: SectionRow): CampaignSection {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    sectionType: row.section_type as CampaignSectionType,
+    orderIndex: row.order_index,
+    isVisible: row.is_visible,
+    config: row.config ?? {},
+    createdAt: row.created_at,
+  };
+}
+
+function mapCampaign(row: CampaignRow, sections: SectionRow[]): Campaign {
+  return {
+    id: row.id,
+    slug: row.slug,
+    internalName: row.internal_name,
+    publicTitle: row.public_title,
+    campaignObjective: row.campaign_objective ?? undefined,
+    status: row.status as Campaign['status'],
+    startDate: row.start_date ?? undefined,
+    endDate: row.end_date ?? undefined,
+    targetType: row.target_type as Campaign['targetType'],
+    targetId: row.target_id ?? undefined,
+    templateId: row.template_id ?? undefined,
+
+    sectionLayout: sections.map(mapSection),
+    heroConfig: (row.hero_config as unknown as Campaign['heroConfig']) ?? {
+      headline: '',
+      subtitle: '',
+      ctaLabel: 'Shop Now',
+    },
+    vendorOverride: (row.vendor_override as unknown as Campaign['vendorOverride']) ?? undefined,
+    productSelectionRules: (row.product_selection_rules as unknown as Campaign['productSelectionRules']) ?? {
+      source: 'automatic',
+    },
+    reviewRules: (row.review_rules as unknown as Campaign['reviewRules']) ?? { scope: 'mixed' },
+    offerConfig: (row.offer_config as unknown as Campaign['offerConfig']) ?? undefined,
+    metaSeo: (row.meta_seo as unknown as Campaign['metaSeo']) ?? undefined,
+
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+// Active-window check done in app code (not just in the RLS policy) so the
+// service-role client — which bypasses RLS — still respects it consistently
+// for the public GET route. Admin/preview routes should query with
+// requireActive: false instead of relying on this helper's default.
+function isWithinActiveWindow(row: CampaignRow): boolean {
+  if (row.status !== 'active') return false;
+  const now = Date.now();
+  if (row.start_date && new Date(row.start_date).getTime() > now) return false;
+  if (row.end_date && new Date(row.end_date).getTime() < now) return false;
+  return true;
+}
+
+export async function getCampaignBySlug(
+  slug: string,
+  options: { requireActive?: boolean } = {}
+): Promise<Campaign | null> {
+  const requireActive = options.requireActive ?? true;
+  const supabase = getSupabaseServerClient();
+
+  const { data: campaignRow, error: campaignError } = await supabase
+    .from('campaigns')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle<CampaignRow>();
+
+  if (campaignError || !campaignRow) return null;
+  if (requireActive && !isWithinActiveWindow(campaignRow)) return null;
+
+  const { data: sectionRows, error: sectionsError } = await supabase
+    .from('campaign_sections')
+    .select('*')
+    .eq('campaign_id', campaignRow.id)
+    .eq('is_visible', true)
+    .order('order_index', { ascending: true });
+
+  if (sectionsError) return null;
+
+  return mapCampaign(campaignRow, (sectionRows as SectionRow[]) ?? []);
+}
+
+// Feeds the client telemetry hook's tracking_slug -> qr_id resolution
+// (?qr_source= carries the slug, never the uuid, so this lookup has to
+// happen somewhere — doing it server-side here avoids a second client-side
+// Supabase client just for this one lookup).
+export async function getCampaignQrVariantRefs(
+  campaignId: string
+): Promise<{ id: string; trackingSlug: string }[]> {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from('campaign_qr_variants')
+    .select('id, tracking_slug')
+    .eq('campaign_id', campaignId);
+
+  if (error || !data) return [];
+  return data.map((row: { id: string; tracking_slug: string }) => ({ id: row.id, trackingSlug: row.tracking_slug }));
+}

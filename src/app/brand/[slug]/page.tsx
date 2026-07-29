@@ -38,7 +38,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container-custom py-6">
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-600 mb-6">
           <Link href="/" className="hover:text-primary-600">Home</Link>

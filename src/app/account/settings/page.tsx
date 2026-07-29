@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, User, Save, Mail, Phone, MapPin, Trash2, Lock } from 'lucide-react';
+import { User, Save, Mail, Phone, MapPin, Trash2, Lock } from 'lucide-react';
+import AccountPageHeader from '@/components/account/account-page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -101,27 +102,27 @@ export default function AccountSettingsPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <Link href="/account" className="flex items-center gap-2 text-gray-600 hover:text-primary-600 mb-6">
-          <ArrowLeft className="w-5 h-5" /><span>Back to Account</span>
-        </Link>
+      <div className="container mx-auto px-4 py-5 md:py-6 max-w-4xl">
+        <AccountPageHeader
+          title="Profile Settings"
+          subtitle="Manage your account details and preferences"
+        />
 
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 md:px-8 py-8 text-white">
-            <div className="flex items-center gap-4">
+          <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-4 md:px-6 py-4 md:py-6 text-white">
+            <div className="flex items-center gap-3">
               {customer.avatar_url ? (
                 <img src={customer.avatar_url} alt="Avatar"
-                  className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover ring-2 ring-white/30" />
+                  className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover ring-2 ring-white/30 flex-shrink-0" />
               ) : (
-                <div className="w-16 h-16 md:w-20 md:h-20 bg-white/20 rounded-full flex items-center justify-center">
-                  <User className="w-8 h-8 md:w-10 md:h-10" />
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <User className="w-6 h-6 md:w-8 md:h-8" />
                 </div>
               )}
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold">Profile Settings</h1>
-                <p className="text-white/90 mt-1">{customer.first_name} {customer.last_name}</p>
-                <p className="text-white/70 text-xs mt-1">
+              <div className="min-w-0">
+                <p className="text-base md:text-lg font-bold leading-tight truncate">{customer.first_name} {customer.last_name}</p>
+                <p className="text-white/70 text-xs mt-0.5">
                   Member since {new Date(customer.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </p>
               </div>
@@ -129,26 +130,26 @@ export default function AccountSettingsPage() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 px-6 md:px-8 py-6 bg-gray-50 border-b">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 px-4 md:px-6 py-4 bg-gray-50 border-b">
             <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{daysActive}</p>
+              <p className="text-lg md:text-xl font-bold text-gray-900">{daysActive}</p>
               <p className="text-xs text-gray-600">Days Active</p>
             </div>
             <div className="text-center">
-              <p className="text-lg font-bold text-gray-900 truncate">{user?.email?.split('@')[0]}</p>
+              <p className="text-base md:text-lg font-bold text-gray-900 truncate">{user?.email?.split('@')[0]}</p>
               <p className="text-xs text-gray-600">Username</p>
             </div>
             <div className="text-center">
-              <p className="text-lg font-bold text-gray-900">{user?.email_confirmed_at ? '✓' : '○'}</p>
+              <p className="text-base md:text-lg font-bold text-gray-900">{user?.email_confirmed_at ? '✓' : '○'}</p>
               <p className="text-xs text-gray-600">Email Verified</p>
             </div>
           </div>
 
-          <div className="p-6 md:p-8">
+          <div className="p-4 md:p-8">
             <div className="max-w-2xl mx-auto space-y-8">
               {/* Personal Info */}
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-1">Personal Information</h2>
+                <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-1">Personal Information</h2>
                 <p className="text-sm text-gray-600 mb-5">Update your personal details</p>
                 <div className="space-y-5">
                   <div>
@@ -190,24 +191,24 @@ export default function AccountSettingsPage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-3 mt-6 pt-6 border-t">
-                  <Button onClick={handleProfileUpdate} disabled={loading || !hasChanges} variant="primary" className="flex items-center gap-2">
-                    <Save className="w-4 h-4" />{loading ? 'Saving...' : 'Save Changes'}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-5 pt-5 border-t">
+                  <Button onClick={handleProfileUpdate} disabled={loading || !hasChanges} variant="primary" size="sm" className="flex items-center gap-1.5 sm:flex-1">
+                    <Save className="w-3.5 h-3.5" />{loading ? 'Saving...' : 'Save Changes'}
                   </Button>
                   {hasChanges && (
                     <Button onClick={() => setProfileData({ firstName: customer.first_name || '', lastName: customer.last_name || '', phone: customer.phone || '' })}
-                      disabled={loading} variant="outline">Cancel</Button>
+                      disabled={loading} variant="outline" size="sm" className="sm:flex-1">Cancel</Button>
                   )}
                 </div>
               </div>
 
               {/* Password */}
               <div className="border-t pt-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-1">Password</h2>
+                <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-1">Password</h2>
                 <p className="text-sm text-gray-600 mb-5">Change your account password</p>
                 {!changingPassword ? (
-                  <Button onClick={() => setChangingPassword(true)} variant="outline" className="flex items-center gap-2">
-                    <Lock className="w-4 h-4" /> Change Password
+                  <Button onClick={() => setChangingPassword(true)} variant="outline" size="sm" className="flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5" /> Change Password
                   </Button>
                 ) : (
                   <div className="space-y-4">
@@ -217,12 +218,12 @@ export default function AccountSettingsPage() {
                     <Input label="Confirm New Password" type="password" value={passwordData.confirm}
                       onChange={e => setPasswordData(p => ({ ...p, confirm: e.target.value }))}
                       placeholder="Re-enter new password" fullWidth />
-                    <div className="flex gap-3">
-                      <Button onClick={handlePasswordChange} disabled={loading} variant="primary">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                      <Button onClick={handlePasswordChange} disabled={loading} variant="primary" size="sm" className="sm:flex-1">
                         {loading ? 'Updating...' : 'Update Password'}
                       </Button>
                       <Button onClick={() => { setChangingPassword(false); setPasswordData({ current: '', newPass: '', confirm: '' }); }}
-                        disabled={loading} variant="outline">Cancel</Button>
+                        disabled={loading} variant="outline" size="sm" className="sm:flex-1">Cancel</Button>
                     </div>
                   </div>
                 )}
