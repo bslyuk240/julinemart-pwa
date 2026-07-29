@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Loader2, Package, ArrowLeft } from 'lucide-react';
+import { Loader2, Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import AccountPageHeader from '@/components/account/account-page-header';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { JloReturn, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
 import { formatPrice } from '@/lib/utils/format-price';
@@ -107,27 +109,19 @@ export default function ReturnsPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24">
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <div className="flex items-center gap-3 mb-6">
-          <Link href="/account" className="text-gray-600 hover:text-primary-600">
-            <ArrowLeft className="w-6 h-6" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">My Returns</h1>
-            <p className="text-gray-600 text-sm">Track the status of your return requests</p>
-          </div>
-        </div>
+      <div className="container mx-auto px-4 py-5 md:py-6 max-w-4xl">
+        <AccountPageHeader
+          title="My Returns"
+          subtitle="Track the status of your return requests"
+        />
 
         {returns.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-            <Package className="w-14 h-14 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-800 font-semibold mb-1">No returns yet</p>
-            <p className="text-gray-600 text-sm mb-4">You can request a return from an eligible order&apos;s detail page.</p>
-            <Link
-              href="/orders"
-              className="inline-block px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
-            >
-              View Orders
+          <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8 text-center">
+            <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-800 font-semibold text-sm md:text-base mb-1">No returns yet</p>
+            <p className="text-gray-600 text-xs md:text-sm mb-4">You can request a return from an eligible order&apos;s detail page.</p>
+            <Link href="/orders">
+              <Button variant="primary" size="sm">View Orders</Button>
             </Link>
           </div>
         ) : (
@@ -157,11 +151,11 @@ export default function ReturnsPage() {
               const fezTrackingUrl = tracking ? buildFezTrackingUrl(tracking) : null;
 
               return (
-                <div key={returnRequestId} className="bg-white rounded-xl shadow-sm p-4 md:p-5 border border-gray-100">
+                <div key={returnRequestId} className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm text-gray-600">Order #{item.order_number || item.order_id}</p>
-                      <p className="text-base font-semibold text-gray-900">Return {String(returnRequestId).slice(0, 8)}</p>
+                      <p className="text-sm md:text-base font-semibold text-gray-900">Return {String(returnRequestId).slice(0, 8)}</p>
                       {item.created_at ? (
                         <p className="text-xs text-gray-500">Requested {new Date(item.created_at).toLocaleString()}</p>
                       ) : null}

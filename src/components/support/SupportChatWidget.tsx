@@ -354,11 +354,20 @@ export default function SupportChatWidget() {
 
     try {
       const key = getSessionKey();
-      await fetch('/api/support/message', {
+      const res = await fetch('/api/support/message', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: session.id, customer_session_key: key, content: text }),
       });
+      // If the AI triggered agent escalation, update local session state immediately
+      // so the "Connecting you to an agent…" banner appears without needing a DB poll.
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.escalate) {
+          setSession(prev => prev ? { ...prev, mode: 'human', status: 'open' } : prev);
+          setAiTyping(false);
+        }
+      }
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       if (channelReadyRef.current) {
         channelRef.current?.send({ type: 'broadcast', event: 'stop_typing', payload: { role: 'customer' } });

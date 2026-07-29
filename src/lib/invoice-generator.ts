@@ -126,7 +126,7 @@ const loadImageAsBase64 = async (url: string): Promise<string> => {
   }
 };
 
-export const generateInvoicePDF = async (data: InvoiceData) => {
+const buildInvoiceDoc = async (data: InvoiceData): Promise<jsPDF> => {
   const { order } = data;
   const doc = new jsPDF();
   
@@ -418,6 +418,53 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   doc.setFont('helvetica', 'normal');
   doc.text('Need help? Contact: support@julinemart.com', 105, pageHeight - 3, { align: 'center' });
 
-  // Save the PDF
-  doc.save(`Invoice-${order.number}.pdf`);
+  return doc;
+};
+
+/**
+ * Generates the invoice PDF and returns it as a base64 string (no download).
+ * Used to email the PDF via the server.
+ */
+export const generateInvoicePDFBase64 = async (data: InvoiceData): Promise<string> => {
+  const doc = await buildInvoiceDoc(data);
+  return doc.output('datauristring').split(',')[1]; // strip the data URI prefix
+};
+
+export const generateInvoicePDF = async (data: InvoiceData) => {
+  const doc = await buildInvoiceDoc(data);
+  const { order } = data;
+  const fileName = `Invoice-${order.number}.pdf`;
+  const blob = doc.output('blob');
+
+  const nav =
+    typeof navigator !== 'undefined' ? (navigator as Navigator & { canShare?: (d: any) => boolean }) : undefined;
+
+  // 1. Native share with file (mobile)
+  if (nav?.canShare) {
+    try {
+      const file = new File([blob], fileName, { type: 'application/pdf' });
+      if (nav.canShare({ files: [file] })) {
+        await nav.share({ files: [file], title: fileName });
+        return;
+      }
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') return;
+    }
+  }
+
+  // 2. Open blob in a new tab (works in most WebViews)
+  try {
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    if (win) {
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    }
+    URL.revokeObjectURL(url);
+  } catch {
+    // fall through to anchor download
+  }
+
+  // 3. Classic anchor download (desktop)
+  doc.save(fileName);
 };

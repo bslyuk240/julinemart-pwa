@@ -11,7 +11,6 @@ import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import GoogleSignInButton from '@/components/auth/google-sign-in-button';
 import { trackSignupSuccess } from '@/lib/gtag';
-import { logActivity } from '@/lib/logActivity';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -36,21 +35,35 @@ export default function SignupPage() {
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
+  const validationMessages = {
+    firstNameRequired: 'First name is required',
+    lastNameRequired: 'Last name is required',
+    emailRequired: 'Email is required',
+    emailInvalid: 'Invalid email address',
+    phoneInvalid: 'Invalid Nigerian phone number',
+    credentialRequired: 'Password is required',
+    credentialTooShort: 'Password must be at least 8 characters',
+    credentialWeak: 'Password must contain uppercase, lowercase, and number',
+    confirmRequired: 'Please confirm your password',
+    confirmMismatch: 'Passwords do not match',
+    termsRequired: 'You must agree to the terms and conditions',
+  } as const;
+
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!formData.firstName.trim()) errs.firstName = 'First name is required';
-    if (!formData.lastName.trim()) errs.lastName = 'Last name is required';
-    if (!formData.email.trim()) errs.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errs.email = 'Invalid email address';
+    if (!formData.firstName.trim()) errs.firstName = validationMessages.firstNameRequired;
+    if (!formData.lastName.trim()) errs.lastName = validationMessages.lastNameRequired;
+    if (!formData.email.trim()) errs.email = validationMessages.emailRequired;
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errs.email = validationMessages.emailInvalid;
     if (formData.phone && !/^(\+234|0)[789]\d{9}$/.test(formData.phone.replace(/\s/g, '')))
-      errs.phone = 'Invalid Nigerian phone number';
-    if (!formData.password) errs.password = 'Password is required';
-    else if (formData.password.length < 8) errs.password = 'Password must be at least 8 characters';
+      errs.phone = validationMessages.phoneInvalid;
+    if (!formData.password) errs.password = validationMessages.credentialRequired;
+    else if (formData.password.length < 8) errs.password = validationMessages.credentialTooShort;
     else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password))
-      errs.password = 'Password must contain uppercase, lowercase, and number';
-    if (!formData.confirmPassword) errs.confirmPassword = 'Please confirm your password';
-    else if (formData.password !== formData.confirmPassword) errs.confirmPassword = 'Passwords do not match';
-    if (!formData.agreeToTerms) errs.agreeToTerms = 'You must agree to the terms and conditions';
+      errs.password = validationMessages.credentialWeak;
+    if (!formData.confirmPassword) errs.confirmPassword = validationMessages.confirmRequired;
+    else if (formData.password !== formData.confirmPassword) errs.confirmPassword = validationMessages.confirmMismatch;
+    if (!formData.agreeToTerms) errs.agreeToTerms = validationMessages.termsRequired;
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -89,9 +102,26 @@ export default function SignupPage() {
         await supabase.from('customers').update({ phone: formData.phone }).eq('id', user.id);
       }
 
+      // Enrich the SIGNUP audit log with IP + name (DB trigger creates the row;
+      // this enriches it server-side so IP is captured from the request context).
+      if (user) {
+        fetch('/api/audit/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.id,
+            email: user.email,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            phone: formData.phone || null,
+            provider: 'email',
+          }),
+        }).catch(() => { /* non-critical */ });
+      }
+
       toast.success('Account created! Welcome to JulineMart!');
       trackSignupSuccess({ method: 'email' });
-      logActivity({ action: 'SIGNUP', resource_type: 'customers', details: { method: 'email' } });
+      // SIGNUP is logged server-side via the handle_new_customer DB trigger.
       router.push('/account');
     } catch (err: any) {
       console.error('Registration error:', err);

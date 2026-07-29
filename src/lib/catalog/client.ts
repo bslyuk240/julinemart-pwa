@@ -430,6 +430,31 @@ export async function catalogGetProduct(slug: string): Promise<Product | null> {
   return toWcProduct(resp.data);
 }
 
+export interface CatalogCategory {
+  id: number;
+  name: string;
+  slug: string;
+  parent: number;
+}
+
+/**
+ * Fetch categories from the Supabase/JLO catalog (catalog-meta?type=categories).
+ * Returns null on any error so callers can fall back to WooCommerce.
+ */
+export async function catalogGetCategories(): Promise<CatalogCategory[] | null> {
+  const resp = await jloFetch<JloListResponse>(
+    `/.netlify/functions/catalog-meta?type=categories`
+  );
+  if (!resp?.success || !Array.isArray(resp.data) || resp.data.length === 0) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (resp.data as any[]).map((row) => ({
+    id: Number(row.id),
+    name: String(row.name ?? ''),
+    slug: String(row.slug ?? ''),
+    parent: Number(row.parent_id ?? 0) || 0,
+  }));
+}
+
 export async function catalogGetVariations(
   productId: number
 ): Promise<ProductVariation[] | null> {

@@ -19,6 +19,7 @@ export async function GET() {
         launchingProducts: [],
         electronicsProducts: [],
         fashionProducts: [],
+        extraSections: [],
       },
       { status: 500 }
     );

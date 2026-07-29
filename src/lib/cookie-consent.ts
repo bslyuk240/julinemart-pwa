@@ -4,6 +4,9 @@ export type ConsentChoice = 'all' | 'essential';
 
 const CONSENT_KEY = 'jm_cookie_consent';
 
+/** Fired on `window` whenever the stored consent choice changes. */
+export const CONSENT_CHANGE_EVENT = 'jm-consent-change';
+
 /** Returns the stored consent choice, or null if the user hasn't decided yet. */
 export function getStoredConsent(): ConsentChoice | null {
   const val = safeStorage.getItem(CONSENT_KEY);
@@ -11,9 +14,12 @@ export function getStoredConsent(): ConsentChoice | null {
   return null;
 }
 
-/** Persists the user's choice. */
+/** Persists the user's choice and notifies listeners (e.g. the GA loader). */
 export function storeConsent(choice: ConsentChoice): void {
   safeStorage.setItem(CONSENT_KEY, choice);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(CONSENT_CHANGE_EVENT, { detail: choice }));
+  }
 }
 
 /**

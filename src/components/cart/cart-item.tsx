@@ -37,7 +37,7 @@ export default function CartItem({ item, onUpdateQuantity, onRemove }: CartItemP
   const itemTotal = item.price * item.quantity;
 
   return (
-    <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-100 bg-white p-3 shadow-sm md:p-4">
+    <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-gray-100 bg-white p-3 shadow-sm md:p-4">
       <div className="flex min-w-0 gap-3 md:gap-4">
         {/* Product Image */}
         <Link href={`/product/${item.slug}`} className="shrink-0">
