@@ -1,12 +1,84 @@
 /* global importScripts, firebase, self, clients */
 
-importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
+importScripts(
+  `https://www.gstatic.com/firebasejs/12.9.0/firebase-app-compat.js`
+);
+importScripts(
+  `https://www.gstatic.com/firebasejs/12.9.0/firebase-messaging-compat.js`
+);
 
 const JULINEMART_ICON = '/icon-192.png';
 const JULINEMART_BADGE = '/favicon-96x96.png';
+
+/** Path prefix for subpath installs (registration scope minus trailing slash). */
+function scopePathPrefix() {
+  try {
+    if (self.registration?.scope) {
+      const p = new URL(self.registration.scope).pathname.replace(/\/$/, '');
+      return p ? p : '';
+    }
+  } catch (_) {
+    /* noop */
+  }
+  return '';
+}
+
+function scopedAbsUrl(pathOrUrl) {
+  if (
+    typeof pathOrUrl !== 'string' ||
+    pathOrUrl.startsWith('http://') ||
+    pathOrUrl.startsWith('https://')
+  ) {
+    return pathOrUrl;
+  }
+  const prefix = scopePathPrefix();
+  if (!prefix) return pathOrUrl;
+  const p = pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`;
+  return `${prefix}${p}`.replace(/\/+/g, '/');
+}
+
+/** Absolute URLs avoid Android PWAs rejecting invalid relative icon URLs (breaks showNotification). */
+function absoluteNotifyAssetUrl(relPath) {
+  const localized = scopedAbsUrl(relPath);
+  if (
+    typeof localized !== 'string' ||
+    localized.startsWith('http://') ||
+    localized.startsWith('https://')
+  ) {
+    return localized;
+  }
+  return new URL(
+    localized.startsWith('/') ? localized : `/${localized}`,
+    self.location.origin
+  ).href;
+}
+
+/** Prefix app paths when the SW is scoped under a subpath (e.g. /julinemart-pwa). */
+function withScope(relPath) {
+  const prefix = scopePathPrefix();
+  if (!relPath || relPath === '/') {
+    const root = prefix ? `${prefix}/` : '/';
+    return root.replace(/\/+/g, '/');
+  }
+  const normalized = relPath.startsWith('/') ? relPath : `/${relPath}`;
+  if (!prefix) return normalized;
+  if (normalized === prefix || normalized.startsWith(`${prefix}/`)) {
+    return normalized;
+  }
+  return `${prefix}${normalized}`.replace(/\/+/g, '/');
+}
+
+function firebaseConfigFetchUrl() {
+  const prefix = scopePathPrefix();
+  const path = prefix
+    ? `${prefix}/api/notifications/firebase-config`
+    : `/api/notifications/firebase-config`;
+  return new URL(path, self.location.origin).href;
+}
 const DEFAULT_CLICK_PATH = '/';
 let initPromise = null;
+let lastShownSignature = null;
+let lastShownAt = 0;
 
 function toStringMap(input) {
   const result = {};
@@ -54,7 +126,8 @@ function resolveTargetPath(data) {
 
 function buildNotification(payload) {
   const payloadData = toStringMap(payload && payload.data ? payload.data : {});
-  const targetPath = resolveTargetPath(payloadData) || DEFAULT_CLICK_PATH;
+  const rawTarget = resolveTargetPath(payloadData) || DEFAULT_CLICK_PATH;
+  const targetPath = withScope(rawTarget);
 
   const title =
     (payload && payload.notification && payload.notification.title) ||
@@ -70,10 +143,11 @@ function buildNotification(payload) {
     title,
     options: {
       body,
-      icon: JULINEMART_ICON,
-      badge: JULINEMART_BADGE,
-      tag: payloadData.type || 'julinemart-notification',
-      renotify: true,
+      icon: absoluteNotifyAssetUrl(JULINEMART_ICON),
+      badge: absoluteNotifyAssetUrl(JULINEMART_BADGE),
+      // Distinct tag helps Android avoid renotify edge cases; renotify can break some Chrome builds.
+      tag: `${payloadData.type || 'jm'}-${Date.now().toString(36)}`,
+      renotify: false,
       data: {
         ...payloadData,
         targetPath,
@@ -82,16 +156,40 @@ function buildNotification(payload) {
   };
 }
 
+function isDuplicateNotification(title, options) {
+  const signature = `${String(title || '')}|${String(options?.body || '')}|${String(
+    options?.data?.targetPath || ''
+  )}`;
+  const now = Date.now();
+  const duplicate = signature === lastShownSignature && now - lastShownAt < 2500;
+  if (!duplicate) {
+    lastShownSignature = signature;
+    lastShownAt = now;
+  }
+  return duplicate;
+}
+
+function showBuiltNotification(built) {
+  const { title: nTitle, options } = built;
+  if (isDuplicateNotification(nTitle, options)) {
+    return Promise.resolve();
+  }
+  return self.registration.showNotification(nTitle, options).catch((showErr) => {
+    console.error('[jm-sw] showNotification failed, retrying minimal:', showErr);
+    return self.registration.showNotification(String(nTitle || 'JulineMart'), {
+      body: String(options.body || 'You have a new update.'),
+      data: options.data || {},
+    });
+  });
+}
+
 async function initFirebaseMessaging() {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    const response = await fetch(
-      `${self.location.origin}/api/notifications/firebase-config`,
-      {
-        cache: 'no-store',
-      }
-    );
+    const response = await fetch(firebaseConfigFetchUrl(), {
+      cache: 'no-store',
+    });
 
     if (!response.ok) {
       throw new Error(`firebase-config fetch failed (HTTP ${response.status})`);
@@ -108,34 +206,83 @@ async function initFirebaseMessaging() {
 
     const messaging = firebase.messaging();
     messaging.onBackgroundMessage((messagePayload) => {
-      // Avoid duplicate notifications when FCM/browser already displays
-      // a notification payload automatically.
-      const hasManagedNotification = Boolean(
-        messagePayload &&
-          messagePayload.notification &&
-          (messagePayload.notification.title || messagePayload.notification.body)
-      );
-      if (hasManagedNotification) {
-        return;
+      try {
+        const built = buildNotification(messagePayload);
+        // Returning the promise keeps the SW alive until Chrome records the notification.
+        return showBuiltNotification(built);
+      } catch (err) {
+        console.error('[jm-sw] background message handler error:', err, messagePayload);
+        return self.registration.showNotification('JulineMart', {
+          body: 'You have a new update.',
+        });
       }
-
-      const { title, options } = buildNotification(messagePayload);
-      self.registration.showNotification(title, options);
     });
-  })().catch((error) => {
-    console.error('firebase-messaging-sw init error:', error);
-  });
+  })();
+
+  try {
+    await initPromise;
+  } catch (error) {
+    initPromise = null;
+    throw error;
+  }
 
   return initPromise;
 }
 
-void initFirebaseMessaging();
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    (async () => {
+      await initFirebaseMessaging().catch((e) =>
+        console.error('[jm-sw] init during install:', e)
+      );
+      await self.skipWaiting();
+    })()
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      await initFirebaseMessaging().catch((e) =>
+        console.error('[jm-sw] init during activate:', e)
+      );
+      await self.clients.claim();
+    })()
+  );
+});
+
+void initFirebaseMessaging().catch((e) => console.error('[jm-sw] eager init:', e));
+
+// Fallback: handle raw Push API payloads directly.
+// This covers Android/Chrome cases where Firebase's onBackgroundMessage isn't invoked.
+self.addEventListener('push', (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const rawText = event.data ? event.data.text() : '';
+        let payload = {};
+        if (rawText) {
+          try {
+            payload = JSON.parse(rawText);
+          } catch {
+            payload = { data: { message: rawText } };
+          }
+        }
+        const built = buildNotification(payload);
+        await showBuiltNotification(built);
+      } catch (error) {
+        console.error('[jm-sw] push fallback handler failed:', error);
+      }
+    })()
+  );
+});
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const data = toStringMap(event.notification.data || {});
-  const targetPath = resolveTargetPath(data) || DEFAULT_CLICK_PATH;
+  const rawTarget = resolveTargetPath(data) || DEFAULT_CLICK_PATH;
+  const targetPath = withScope(rawTarget);
   const destination = new URL(targetPath, self.location.origin).href;
 
   event.waitUntil(

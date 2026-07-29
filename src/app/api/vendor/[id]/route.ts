@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
+// force-dynamic so Next.js does NOT collapse page=1, page=2, etc into one
+// cached response. The internal JLO fetch already has next:{revalidate:300}
+// which caches the expensive Supabase call per unique URL (including ?page=N).
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 /**
  * GET /api/vendor/[id]
@@ -10,7 +13,7 @@ export const revalidate = 0;
  * Netlify function (which has its own Supabase service-role access).
  *
  * Runs server-side so JLO CORS restrictions don't apply.
- * [id] = WooCommerce numeric vendor ID.
+ * [id] = WooCommerce numeric vendor user id, or JLO `jlo-{uuid}` (vendors.woocommerce_vendor_id).
  */
 
 const JLO_BASE = (
@@ -26,10 +29,9 @@ export async function GET(
   const url = new URL(_req.url);
   const page = Math.max(Number(url.searchParams.get('page') || 1), 1);
   const perPage = Math.min(Math.max(Number(url.searchParams.get('per_page') || 24), 1), 100);
-  const { id } = await params;
-  const wcVendorId = parseInt(id, 10);
-
-  if (isNaN(wcVendorId)) {
+  const { id: rawParam } = await params;
+  const WooKey = decodeURIComponent(String(rawParam ?? '')).trim();
+  if (!WooKey) {
     return NextResponse.json({ error: 'Invalid vendor ID' }, { status: 400 });
   }
 
@@ -42,11 +44,11 @@ export async function GET(
 
   try {
     // Filter server-side to published only so pagination never buries them
-    const url =
+    const catalogProductsUrl =
       `${JLO_BASE}/.netlify/functions/catalog-products` +
-      `?woo_vendor_id=${wcVendorId}&page=${page}&per_page=${perPage}&status=published`;
+      `?woo_vendor_id=${encodeURIComponent(WooKey)}&page=${page}&per_page=${perPage}&status=published`;
 
-    const res = await fetch(url, {
+    const res = await fetch(catalogProductsUrl, {
       headers: { 'Content-Type': 'application/json' },
       // cache the first page a bit longer; vendor pages are browsed frequently
       next: { revalidate: 300 },
@@ -78,18 +80,40 @@ export async function GET(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const firstRow = body.data[0] as any;
     const vendorRow = firstRow?.vendor ?? null;
+
+    // Fetch vendor rating from product_reviews using the vendor's UUID
+    let vendorRating: { avg: string; count: number } | null = null;
+    const vendorUuid: string | null = vendorRow?.id ?? null;
+    if (vendorUuid) {
+      try {
+        const supabase = getSupabaseServerClient();
+        const { data: ratingData } = await supabase
+          .from('product_reviews')
+          .select('rating')
+          .eq('vendor_id', vendorUuid)
+          .eq('status', 'approved');
+        if (ratingData && ratingData.length > 0) {
+          const avg = ratingData.reduce((s, r) => s + Number(r.rating), 0) / ratingData.length;
+          vendorRating = { avg: avg.toFixed(1), count: ratingData.length };
+        }
+      } catch {
+        // non-fatal — vendor page just shows "No ratings"
+      }
+    }
+
     const vendor = vendorRow
       ? {
-          id:               wcVendorId,
-          store_name:       vendorRow.store_name ?? `Vendor ${wcVendorId}`,
-          store_logo:       vendorRow.logo_url   ?? null,
-          banner:           vendorRow.banner_url  ?? null,
+          id: WooKey,
+          store_name: vendorRow.store_name ?? `Vendor ${WooKey}`,
+          store_logo: vendorRow.logo_url ?? null,
+          banner: vendorRow.banner_url ?? null,
           shop_description: vendorRow.description ?? null,
-          email:            vendorRow.email        ?? null,
-          phone:            vendorRow.phone        ?? null,
-          is_active:        true,
-          store_slug:       vendorRow.store_slug  ?? '',
-          store_url:        `/vendor/${wcVendorId}`,
+          email: vendorRow.email ?? null,
+          phone: vendorRow.phone ?? null,
+          is_active: true,
+          store_slug: vendorRow.store_slug ?? '',
+          store_url: `/vendor/${WooKey}`,
+          rating: vendorRating ?? undefined,
         }
       : null;
 
@@ -122,11 +146,11 @@ export async function GET(
         images,
         categories:    Array.isArray(p.categories) ? p.categories : [],
         tags:          Array.isArray(p.tags)        ? p.tags        : [],
-        average_rating: '0',
-        rating_count:  0,
+        average_rating: String(p.average_rating ?? '0'),
+        rating_count:  Number(p.rating_count ?? 0),
         date_created:  p.created_at ?? '',
         store: vendor
-          ? { id: wcVendorId, name: vendor.store_name, shop_name: vendor.store_name, url: `/vendor/${wcVendorId}`, address: {} }
+          ? { id: WooKey, name: vendor.store_name, shop_name: vendor.store_name, url: `/vendor/${WooKey}`, address: {} }
           : undefined,
       };
     });

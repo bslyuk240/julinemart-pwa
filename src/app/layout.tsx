@@ -1,18 +1,21 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import Script from 'next/script';
 import './globals.css';
-import Header from '@/components/layout/header';
 import { Toaster } from 'sonner';
 import { CustomerAuthProvider } from '@/context/customer-auth-context';
-import WhatsAppFloat from '@/components/layout/whatsapp-float';
+import SupportChatWidget from '@/components/support/SupportChatWidget';
 import PWAInstallPrompt from '@/components/pwa/pwa-install-prompt';
-import Footer from '@/components/layout/footer';
+import NotificationPermissionPrompt from '@/components/pwa/notification-permission-prompt';
+import PWAStandaloneTracker from '@/components/pwa/pwa-standalone-tracker';
 import GlobalPullToRefresh from '@/components/layout/global-pull-to-refresh';
-import BottomNav from '@/components/layout/BottomNavClient';
+import ConditionalChrome from '@/components/layout/ConditionalChrome';
 import { StatusBarManager } from '@/components/native/status-bar-manager';
 import PushNotificationManager from '@/components/native/push-notification-manager';
 import WebPushManager from '@/components/pwa/web-push-manager';
+import CookieConsentBanner from '@/components/pwa/cookie-consent-banner';
+import GoogleAnalytics from '@/components/pwa/google-analytics';
+import VisualViewportBottomSync from '@/components/layout/visual-viewport-bottom-sync';
+import PaystackPreloader from '@/components/payments/paystack-preloader';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -46,12 +49,21 @@ export const viewport = {
   userScalable: true,
   themeColor: '#77088a',
   viewportFit: 'cover',
+  // Chrome/Android: resize layout with browser UI so fixed bottom bars stay aligned with visible viewport.
+  interactiveWidget: 'resizes-content',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="h-auto overflow-x-clip">
       <head>
+        {/* Warm up connections to the image/video origins so the first
+            product images and hero video handshake without DNS+TLS delay. */}
+        <link rel="preconnect" href="https://gfikkrwhsedhwmkxybzm.supabase.co" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://res.cloudinary.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://gfikkrwhsedhwmkxybzm.supabase.co" />
+        <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+
         {/* Favicon Links (from RealFaviconGenerator) */}
         <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -70,37 +82,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Theme Color */}
         <meta name="theme-color" content="#77088a" />
 
-        {/* Google Analytics */}
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-T0X3ZR08FD"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-T0X3ZR08FD', {
-              page_path: window.location.pathname,
-            });
-          `}
-        </Script>
+        {/* Google Analytics is consent-gated — see <GoogleAnalytics /> in body.
+            Nothing loads from Google until the visitor accepts analytics. */}
+
       </head>
-      <body className={`${inter.className} overflow-x-hidden`}>
+      <body className={`${inter.className} min-h-0 overflow-x-clip`}>
+        <VisualViewportBottomSync />
+        <PaystackPreloader />
         <StatusBarManager />
+        <PWAStandaloneTracker />
         <CustomerAuthProvider>
           <PushNotificationManager />
           <WebPushManager />
           <GlobalPullToRefresh>
-            <Header />
-            {children}
-            <Footer />
-            <BottomNav />
+            <ConditionalChrome>{children}</ConditionalChrome>
             <Toaster position="top-center" richColors />
             <PWAInstallPrompt />
+            <NotificationPermissionPrompt />
+            <CookieConsentBanner />
+            <GoogleAnalytics />
           </GlobalPullToRefresh>
+          <SupportChatWidget />
         </CustomerAuthProvider>
-        <WhatsAppFloat />
       </body>
     </html>
   );

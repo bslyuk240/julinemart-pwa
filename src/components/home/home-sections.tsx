@@ -9,6 +9,7 @@ import SponsoredProducts from '@/components/home/sponsored-products';
 import LaunchingDeals from '@/components/home/launching-deals';
 import CategoryProductsSection from '@/components/home/category-products-section';
 import type { HomepageSectionsData } from '@/lib/homepage-sections';
+import GenericProductSection from '@/components/home/generic-product-section';
 
 interface HomeSectionsProps {
   initialSections: HomepageSectionsData;
@@ -23,58 +24,115 @@ const EMPTY_SECTIONS: HomepageSectionsData = {
   launchingProducts: [],
   electronicsProducts: [],
   fashionProducts: [],
+  extraSections: [],
 };
 
-function hasAnyMissingSections(sections: HomepageSectionsData) {
-  return Object.values(sections).some((products) => products.length === 0);
+const CACHE_KEY = 'homepage_sections_v1';
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function readCache(): HomepageSectionsData | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw) as { data: HomepageSectionsData; ts: number };
+    if (Date.now() - ts > CACHE_TTL_MS) return null; // expired
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(data: HomepageSectionsData) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+  } catch {
+    // storage full or disabled — silently ignore
+  }
+}
+
+function hasData(sections: HomepageSectionsData) {
+  const { extraSections, ...fixed } = sections;
+  return Object.values(fixed).some((arr) => arr.length > 0) || extraSections.length > 0;
+}
+
+// Skeleton for a single horizontal product section
+function SectionSkeleton() {
+  return (
+    <section className="py-3 md:py-8 bg-white">
+      <div className="container-custom">
+        <div className="flex items-center justify-between mb-3 md:mb-4">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gray-200 animate-pulse" />
+            <div>
+              <div className="h-3 w-20 bg-gray-200 rounded animate-pulse mb-1" />
+              <div className="h-5 w-32 bg-gray-200 rounded animate-pulse" />
+            </div>
+          </div>
+          <div className="h-4 w-14 bg-gray-200 rounded animate-pulse" />
+        </div>
+        <div className="flex gap-3 md:gap-4 overflow-hidden">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex-shrink-0 w-36 md:w-44 rounded-xl bg-gray-100 animate-pulse"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              <div className="aspect-square rounded-t-xl bg-gray-200" />
+              <div className="p-2 space-y-2">
+                <div className="h-3 bg-gray-200 rounded w-full" />
+                <div className="h-3 bg-gray-200 rounded w-3/4" />
+                <div className="h-4 bg-gray-200 rounded w-1/2 mt-1" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export default function HomeSections({ initialSections }: HomeSectionsProps) {
-  const [sections, setSections] = useState<HomepageSectionsData>(
-    initialSections || EMPTY_SECTIONS
-  );
-  useEffect(() => {
-    if (!hasAnyMissingSections(initialSections)) {
-      return;
-    }
+  // Hydration-safe: SSR and first client render must agree. Reading localStorage
+  // inside useState() breaks that (server = skeletons, client = cached products → #418).
+  const initialFromServer = initialSections ?? EMPTY_SECTIONS;
+  const serverHasData = hasData(initialFromServer);
 
+  const [sections, setSections] = useState<HomepageSectionsData>(() =>
+    serverHasData ? initialFromServer : EMPTY_SECTIONS,
+  );
+
+  const [loading, setLoading] = useState(() => !serverHasData);
+
+  useEffect(() => {
     let cancelled = false;
 
-    const refreshSections = async () => {
+    if (!serverHasData) {
+      const cached = readCache();
+      if (cached && hasData(cached)) {
+        setSections(cached);
+        setLoading(false);
+      }
+    }
+
+    const refresh = async () => {
       try {
-        const response = await fetch('/api/homepage-sections', {
-          cache: 'no-store',
-        });
-
-        if (!response.ok) {
-          return;
+        const res = await fetch('/api/homepage-sections');
+        if (!res.ok) return;
+        const data = (await res.json()) as HomepageSectionsData;
+        if (!cancelled && hasData(data)) {
+          writeCache(data);
+          setSections(data);
         }
-
-        const data = (await response.json()) as HomepageSectionsData;
-
-        if (!cancelled) {
-          // Merge: keep existing data for any section the API returned empty
-          setSections((prev) => {
-            const merged: HomepageSectionsData = { ...prev };
-            (Object.keys(data) as (keyof HomepageSectionsData)[]).forEach((key) => {
-              if (data[key].length > 0) {
-                merged[key] = data[key];
-              }
-            });
-            return merged;
-          });
-        }
-      } catch (error) {
-        console.error('Failed to refresh homepage sections:', error);
+      } catch {
+        // network error — keep whatever we have
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
 
-    refreshSections();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    refresh();
+    return () => { cancelled = true; };
+  }, [serverHasData]);
 
   const {
     flashSaleProducts,
@@ -85,7 +143,19 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
     launchingProducts,
     electronicsProducts,
     fashionProducts,
+    extraSections,
   } = sections;
+
+  // Still waiting for first-ever fetch and nothing in cache
+  if (loading) {
+    return (
+      <>
+        <SectionSkeleton />
+        <SectionSkeleton />
+        <SectionSkeleton />
+      </>
+    );
+  }
 
   return (
     <>
@@ -127,33 +197,32 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
         />
       )}
 
-      {flashSaleProducts.length === 0 &&
-        dealProducts.length === 0 &&
-        trendingProducts.length === 0 &&
-        topSellerProducts.length === 0 &&
-        sponsoredProducts.length === 0 &&
-        launchingProducts.length === 0 &&
-        electronicsProducts.length === 0 &&
-        fashionProducts.length === 0 && (
-          <div className="container-custom py-12 text-center">
-            <p className="mb-4 text-gray-600">
-              No featured products yet. Add tags to your products to display them here.
+      {(extraSections ?? []).map((s) =>
+        s.products.length > 0 ? (
+          <GenericProductSection key={s.key} title={s.title} products={s.products} />
+        ) : null
+      )}
+
+      {!hasData(sections) && (
+        <div className="container-custom py-12 text-center">
+          <p className="mb-4 text-gray-600">
+            No featured products yet. Add tags to your products to display them here.
+          </p>
+          <div className="mx-auto max-w-2xl rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <p className="mb-2 text-sm font-medium text-blue-800">
+              How to add products to homepage sections:
             </p>
-            <div className="mx-auto max-w-2xl rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <p className="mb-2 text-sm font-medium text-blue-800">
-                How to add products to homepage sections:
-              </p>
-              <ul className="space-y-1 text-left text-sm text-blue-700">
-                <li>&bull; Tag products with &quot;flash-sale&quot; for Flash Sales section</li>
-                <li>&bull; Tag products with &quot;deal&quot; for Deals section</li>
-                <li>&bull; Tag products with &quot;best-seller&quot; for Trending section</li>
-                <li>&bull; Tag products with &quot;top-seller&quot; for Top Sellers section</li>
-                <li>&bull; Tag products with &quot;sponsored&quot; for Sponsored Products section</li>
-                <li>&bull; Tag products with &quot;launching-deal&quot; for Launching Deals section</li>
-              </ul>
-            </div>
+            <ul className="space-y-1 text-left text-sm text-blue-700">
+              <li>&bull; Tag products with &quot;flash-sale&quot; for Flash Sales section</li>
+              <li>&bull; Tag products with &quot;deal&quot; for Deals section</li>
+              <li>&bull; Tag products with &quot;best-seller&quot; for Trending section</li>
+              <li>&bull; Tag products with &quot;top-seller&quot; for Top Sellers section</li>
+              <li>&bull; Tag products with &quot;sponsored&quot; for Sponsored Products section</li>
+              <li>&bull; Tag products with &quot;launching-deal&quot; for Launching Deals section</li>
+            </ul>
           </div>
-        )}
+        </div>
+      )}
     </>
   );
 }

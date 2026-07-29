@@ -168,9 +168,22 @@ const VENDOR_PRODUCTS_CHUNK = 100;
  * so vendor pages show the correct products even when WooCommerce list doesn't include store data.
  * Falls back to fetching pages and filtering by product.store.id if backend has no product_ids.
  */
-export async function getVendorProducts(vendorId: number, productIds?: number[]): Promise<Product[]> {
+export async function getVendorProducts(
+  vendorId: number | string,
+  productIds?: number[]
+): Promise<Product[]> {
   try {
-    const ids = productIds ?? (await getVendorProductCount(vendorId))?.product_ids;
+    const numericVendorId =
+      typeof vendorId === 'number'
+        ? vendorId
+        : /^[0-9]+$/.test(String(vendorId))
+          ? Number(vendorId)
+          : null;
+    const ids =
+      productIds ??
+      (numericVendorId != null
+        ? (await getVendorProductCount(numericVendorId))?.product_ids
+        : undefined);
     if (ids?.length) {
       const chunks: number[][] = [];
       for (let i = 0; i < ids.length; i += VENDOR_PRODUCTS_CHUNK) {
@@ -190,7 +203,7 @@ export async function getVendorProducts(vendorId: number, productIds?: number[])
     const collected: Product[] = [];
     for (let page = 1; page <= maxPages; page++) {
       const batch = await getProducts({ per_page: perPage, page });
-      const forVendor = batch.filter((p) => p.store?.id === vendorId);
+      const forVendor = batch.filter((p) => String(p.store?.id) === String(vendorId));
       collected.push(...forVendor);
       if (batch.length < perPage) break;
     }

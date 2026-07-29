@@ -11,6 +11,7 @@
  */
 
 import type { Product, ProductAttribute, ProductVariation, ProductsQueryParams } from '@/types/product';
+import { resolveProductStoreFromCatalogRow } from '@/lib/catalog/product-store';
 
 function getJloCatalogBase(): string | null {
   const url =
@@ -136,23 +137,30 @@ const inferVariationAttributesFromProduct = (
   });
 };
 
+const strTrim = (v: unknown): string => {
+  if (v == null) return '';
+  const s = String(v).trim();
+  return s;
+};
+
+const minPriceFromVariations = (variations: ProductVariation[] | undefined): string => {
+  if (!variations?.length) return '';
+  const nums: number[] = [];
+  for (const v of variations) {
+    const raw = v.sale_price || v.price || v.regular_price;
+    const n = parseFloat(String(raw ?? ''));
+    if (Number.isFinite(n) && n > 0) nums.push(n);
+  }
+  if (!nums.length) return '';
+  return String(Math.min(...nums));
+};
+
 // ---------------------------------------------------------------------------
 // Row → WC Product mapper
 // ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toWcProduct(row: any): Product {
-  // Derive price: prefer sale_price, else regular_price, else sourcing_meta NGN snapshot
-  const snapshotNgn = row.sourcing_meta?.final_price_snapshot_ngn
-    ?? row.sourcing_meta?.landed_cost_snapshot_ngn
-    ?? null;
-  const regularPrice = row.regular_price
-    ? String(row.regular_price)
-    : snapshotNgn ? String(snapshotNgn) : '';
-  const salePrice = row.sale_price ? String(row.sale_price) : '';
-  const price = salePrice || regularPrice;
-  const onSale = Boolean(salePrice && salePrice !== regularPrice);
-
   // Map "published" → "publish" to match WC status enum
   const rawStatus = row.status ?? 'publish';
   const status = rawStatus === 'published' ? 'publish' : rawStatus;
@@ -221,11 +229,28 @@ export function toWcProduct(row: any): Product {
         .filter((id: number) => Number.isFinite(id))
     : [];
 
+  // Price: parent row is often empty for variable CJ products; vendor list uses
+  // regular_price ?? min_price — mirror that (min from row, else inline vars).
+  const snapshotNgn = row.sourcing_meta?.final_price_snapshot_ngn
+    ?? row.sourcing_meta?.landed_cost_snapshot_ngn
+    ?? null;
+  const minFromRow = strTrim(row.min_price);
+  const minFromVars = minPriceFromVariations(inlineVariations);
+  const minPriceMeta = minFromRow || minFromVars;
+  const maxPriceMeta = strTrim(row.max_price);
+  const baseRegular = strTrim(row.regular_price) || minPriceMeta || (snapshotNgn != null && snapshotNgn !== '' ? String(snapshotNgn) : '');
+  const salePrice = strTrim(row.sale_price);
+  const price = salePrice || baseRegular;
+  const regularPrice = baseRegular;
+  const onSale = Boolean(salePrice && baseRegular && salePrice !== baseRegular);
+
   return {
     supabaseId: row.id ?? undefined,
     _variations: inlineVariations,
-    // Use woo_product_id as the numeric WC id; fall back to wc_id or 0
-    id: Number(row.woo_product_id ?? row.wc_id ?? row.id ?? 0),
+    // Prefer WC product ID; fall back to a stable hash of the Supabase UUID so
+    // products not yet synced to WooCommerce still get a positive numeric id and
+    // pass the p.id > 0 guard used in related-products filtering.
+    id: Number(row.woo_product_id ?? row.wc_id ?? 0) || stableNumericId(String(row.id ?? '')),
     name: row.name ?? '',
     slug: row.slug ?? '',
     permalink: row.permalink ?? '',
@@ -288,21 +313,10 @@ export function toWcProduct(row: any): Product {
     variations: variationIds,
     grouped_products: Array.isArray(row.grouped_products) ? row.grouped_products : [],
     menu_order: Number(row.menu_order ?? 0),
+    min_price: minPriceMeta || undefined,
+    max_price: maxPriceMeta || undefined,
     meta_data: Array.isArray(row.meta_data) ? row.meta_data : [],
-    store: (() => {
-      if (row.store) return row.store;
-      // Supabase data has a nested vendor object: { id, store_name, store_slug, woocommerce_vendor_id }
-      const vendor = row.vendor;
-      const vendorId = Number(vendor?.woocommerce_vendor_id ?? row.woocommerce_vendor_id ?? row.wc_vendor_id ?? 0);
-      if (!vendorId) return undefined;
-      return {
-        id: vendorId,
-        name: vendor?.store_name ?? `Vendor ${vendorId}`,
-        shop_name: vendor?.store_name ?? `Vendor ${vendorId}`,
-        url: `/vendor/${vendorId}`,
-        address: {},
-      };
-    })(),
+    store: resolveProductStoreFromCatalogRow(row),
   };
 }
 
@@ -414,6 +428,31 @@ export async function catalogGetProduct(slug: string): Promise<Product | null> {
   );
   if (!resp?.success || !resp.data) return null;
   return toWcProduct(resp.data);
+}
+
+export interface CatalogCategory {
+  id: number;
+  name: string;
+  slug: string;
+  parent: number;
+}
+
+/**
+ * Fetch categories from the Supabase/JLO catalog (catalog-meta?type=categories).
+ * Returns null on any error so callers can fall back to WooCommerce.
+ */
+export async function catalogGetCategories(): Promise<CatalogCategory[] | null> {
+  const resp = await jloFetch<JloListResponse>(
+    `/.netlify/functions/catalog-meta?type=categories`
+  );
+  if (!resp?.success || !Array.isArray(resp.data) || resp.data.length === 0) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (resp.data as any[]).map((row) => ({
+    id: Number(row.id),
+    name: String(row.name ?? ''),
+    slug: String(row.slug ?? ''),
+    parent: Number(row.parent_id ?? 0) || 0,
+  }));
 }
 
 export async function catalogGetVariations(

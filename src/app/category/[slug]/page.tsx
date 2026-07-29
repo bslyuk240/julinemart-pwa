@@ -5,11 +5,14 @@ import { useParams } from 'next/navigation';
 import ProductGrid from '@/components/product/product-grid';
 import { Filter, ChevronDown, X } from 'lucide-react';
 import { Product } from '@/types/product';
+import { getCategoryDisplayName } from '@/lib/utils/category-display';
 
 type CategorySortOption = 'date' | 'popularity' | 'rating' | 'price' | 'price-desc';
 
 /** JLO catalog-products caps per_page at 100; request that and paginate by category server-side. */
 const CATALOG_PER_PAGE = 100;
+/** How many already-fetched products to reveal per render batch (images lazy-load, so no extra network cost). */
+const VISIBLE_PAGE_SIZE = 50;
 
 export default function CategoryPage() {
   const params = useParams();
@@ -20,14 +23,12 @@ export default function CategoryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [sortBy, setSortBy] = useState<CategorySortOption>('date');
   const [showFilters, setShowFilters] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(24);
+  const [visibleCount, setVisibleCount] = useState(VISIBLE_PAGE_SIZE);
   const [apiPage, setApiPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
 
-  const categoryName = slug
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
+  const categoryName = getCategoryDisplayName(slug);
 
   const computeSortParams = (sort: CategorySortOption) => {
     if (sort === 'price-desc') {
@@ -68,10 +69,11 @@ export default function CategoryPage() {
       try {
         setLoading(true);
         setApiPage(1);
-        const { products: fetched, totalPages: pages } = await fetchFromApi(buildUrl(sortBy, 1), ac.signal);
+        const { products: fetched, total: count, totalPages: pages } = await fetchFromApi(buildUrl(sortBy, 1), ac.signal);
         setProducts(fetched);
+        setTotal(count);
         setTotalPages(Math.max(1, pages));
-        setVisibleCount(24);
+        setVisibleCount(VISIBLE_PAGE_SIZE);
       } catch (error) {
         if ((error as Error).name === 'AbortError') return;
         console.error('Error fetching category products:', error);
@@ -91,7 +93,7 @@ export default function CategoryPage() {
 
   const loadMore = async () => {
     if (visibleCount < products.length) {
-      setVisibleCount((current) => Math.min(current + 24, products.length));
+      setVisibleCount((current) => Math.min(current + VISIBLE_PAGE_SIZE, products.length));
       return;
     }
     if (apiPage >= totalPages || loadingMore) return;
@@ -102,7 +104,7 @@ export default function CategoryPage() {
       setProducts((prev) => [...prev, ...more]);
       setApiPage(nextPage);
       setTotalPages(Math.max(totalPages, pages));
-      setVisibleCount((current) => current + Math.min(24, more.length));
+      setVisibleCount((current) => current + Math.min(VISIBLE_PAGE_SIZE, more.length));
     } catch (error) {
       console.error('Error loading more category products:', error);
     } finally {
@@ -139,13 +141,13 @@ export default function CategoryPage() {
         </nav>
 
         <div className="mb-6">
-          <h1 className="mb-1 text-2xl font-bold text-gray-900 md:text-3xl">{categoryName}</h1>
-          <p className="text-sm text-gray-600 md:text-base">
-            {products.length > 0 ? `${products.length} products found` : 'Browse products in this category'}
+          <h1 className="mb-1 text-base font-bold text-gray-900 md:text-xl">{categoryName}</h1>
+          <p className="text-xs text-gray-600 md:text-sm">
+            {total > 0 ? `${total} products found` : 'Browse products in this category'}
           </p>
         </div>
 
-        <div className="mb-6 flex items-center justify-between rounded-lg bg-white p-4 shadow-sm">
+        <div className="mb-6 flex items-center justify-between rounded-2xl bg-white p-3 md:p-4 shadow-sm">
           <div className="flex items-center gap-4">
             <button
               type="button"

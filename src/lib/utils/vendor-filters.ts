@@ -14,68 +14,81 @@ type VendorStatus = {
 };
 
 const VENDOR_STATUS_TIMEOUT_MS = 8000;
+/** Matches the 300s revalidate convention used elsewhere for JLO/catalog fetches. */
+const VENDOR_STATUS_TTL_MS = 5 * 60 * 1000;
 
-let serverVendorsCache: Promise<VendorStatus[]> | null = null;
-let clientVendorsCache: Promise<VendorStatus[]> | null = null;
+type VendorCacheEntry = { promise: Promise<VendorStatus[]>; expiresAt: number };
+
+let serverVendorsCache: VendorCacheEntry | null = null;
+let clientVendorsCache: VendorCacheEntry | null = null;
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
 /**
+ * Vendors are keyed by legacy numeric WooCommerce vendor id; JLO-onboarded vendors use
+ * `woocommerce_vendor_id = "jlo-{uuid}"` and are treated as always-active (see caller).
+ * Mirrors the numeric-only matching in parseCatalogVendorRouteKey (product-store.ts).
+ */
+function toLegacyVendorId(value: unknown): number | null {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed || !/^[0-9]+$/.test(trimmed)) return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
  * Get all vendors status - SERVER SIDE VERSION
- * Calls WordPress directly (not through API route)
+ * Supabase is the source of truth (WooCommerce vendor plugin was retired).
  */
 async function getAllVendorsStatusServer(): Promise<VendorStatus[]> {
-  if (!serverVendorsCache) {
-    serverVendorsCache = (async () => {
+  if (!serverVendorsCache || serverVendorsCache.expiresAt <= Date.now()) {
+    const promise = (async () => {
       try {
-        const baseUrl =
-          process.env.WC_BASE_URL?.replace('/wc/v3', '') ||
-          process.env.NEXT_PUBLIC_WC_BASE_URL?.replace('/wc/v3', '') ||
-          '';
+        const { getSupabaseServerClient } = await import('@/lib/supabase-server');
+        const supabase = getSupabaseServerClient();
 
-        if (!baseUrl) {
-          console.error('No base URL configured');
+        const { data, error } = await supabase
+          .from('vendors')
+          .select('woocommerce_vendor_id, store_name, is_active')
+          .not('woocommerce_vendor_id', 'is', null)
+          .limit(500);
+
+        if (error) {
+          console.error('[SERVER] Error fetching vendors:', error.message);
+          serverVendorsCache = null;
           return [];
         }
 
-        const url = `${baseUrl}/julinemart/v1/vendors-status`;
-        console.log(`[SERVER] Fetching vendors from: ${url}`);
+        const vendors: VendorStatus[] = (data ?? [])
+          .map((row) => {
+            const id = toLegacyVendorId(row.woocommerce_vendor_id);
+            if (id == null) return null;
+            const isActive = Boolean(row.is_active);
+            return {
+              id,
+              store_name: row.store_name ?? '',
+              enabled: isActive,
+              is_store_vacation: false,
+              is_active: isActive,
+            };
+          })
+          .filter((v): v is VendorStatus => v != null);
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), VENDOR_STATUS_TIMEOUT_MS);
-
-        try {
-          const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            next: { revalidate: 60 },
-            signal: controller.signal,
-          });
-
-          if (!response.ok) {
-            console.error(`[SERVER] Vendor API error: ${response.status}`);
-            return [];
-          }
-
-          const data = (await response.json()) as VendorStatus[];
-          console.log(`[SERVER] Fetched ${data.length} vendors`);
-          return data;
-        } finally {
-          clearTimeout(timeout);
-        }
+        console.log(`[SERVER] Fetched ${vendors.length} vendors`);
+        return vendors;
       } catch (error: unknown) {
         serverVendorsCache = null;
         console.error('[SERVER] Error fetching vendors:', getErrorMessage(error));
         return [];
       }
     })();
+
+    serverVendorsCache = { promise, expiresAt: Date.now() + VENDOR_STATUS_TTL_MS };
   }
 
-  return serverVendorsCache;
+  return serverVendorsCache.promise;
 }
 
 /**
@@ -83,8 +96,8 @@ async function getAllVendorsStatusServer(): Promise<VendorStatus[]> {
  * Calls Next.js API route
  */
 async function getAllVendorsStatusClient(): Promise<VendorStatus[]> {
-  if (!clientVendorsCache) {
-    clientVendorsCache = (async () => {
+  if (!clientVendorsCache || clientVendorsCache.expiresAt <= Date.now()) {
+    const promise = (async () => {
       try {
         const url = '/api/vendors/status';
         console.log(`[CLIENT] Fetching vendors from: ${url}`);
@@ -103,6 +116,7 @@ async function getAllVendorsStatusClient(): Promise<VendorStatus[]> {
 
           if (!response.ok) {
             console.error(`[CLIENT] Vendor API error: ${response.status}`);
+            clientVendorsCache = null;
             return [];
           }
 
@@ -118,9 +132,11 @@ async function getAllVendorsStatusClient(): Promise<VendorStatus[]> {
         return [];
       }
     })();
+
+    clientVendorsCache = { promise, expiresAt: Date.now() + VENDOR_STATUS_TTL_MS };
   }
 
-  return clientVendorsCache;
+  return clientVendorsCache.promise;
 }
 
 /**
@@ -171,6 +187,11 @@ export async function filterActiveVendorProducts(products: Product[]): Promise<P
 
       if (!vendorId) {
         console.warn(`Product ${product.id} has no vendor - keeping it`);
+        return true;
+      }
+
+      // JLO onboarding uses non-numeric vendor keys (e.g. `jlo-{uuid}`) not present in Woo vendors-status.
+      if (typeof vendorId === 'string') {
         return true;
       }
 

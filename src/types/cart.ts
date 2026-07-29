@@ -26,7 +26,7 @@ export interface CartItem {
     stockQuantity: number | null;
     stockStatus: 'instock' | 'outofstock' | 'onbackorder';
   };
-  vendorId?: number;
+  vendorId?: number | string;
   vendorName?: string;
   hubId?: string | null;
   hubName?: string | null;  // ✅ ADD THIS LINE

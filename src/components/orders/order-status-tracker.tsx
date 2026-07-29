@@ -147,6 +147,25 @@ export default function OrderStatusTracker({
     },
   ];
 
+  // Handle pending (awaiting payment) orders — order created but not yet paid
+  if (normalizedStatus === 'pending' && !datePaid) {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+        <h2 className="text-base md:text-xl font-semibold text-gray-900 mb-3 md:mb-4">Order Status</h2>
+        <div className="flex items-start gap-3 p-3 md:p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <Clock className="w-5 h-5 md:w-6 md:h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-amber-900 text-sm md:text-base">Awaiting Payment</p>
+            <p className="text-xs md:text-sm text-amber-700 mt-0.5">
+              Your order has been created but payment hasn&apos;t been completed yet. Complete your
+              payment below to confirm this order.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Handle cancelled/failed orders
   if (normalizedStatus === 'cancelled' || normalizedStatus === 'failed') {
     return (

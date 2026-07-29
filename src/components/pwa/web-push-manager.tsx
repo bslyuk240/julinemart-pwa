@@ -13,10 +13,27 @@ import {
   WEB_PUSH_ENABLE_EVENT,
   type WebPushEnableResult,
 } from '@/lib/web-push-events';
+import { PUBLIC_BASE_PATH, withPublicBasePath } from '@/lib/constants';
+import { safeStorage } from '@/lib/safe-storage';
 
 const PENDING_TOKEN_STORAGE_KEY = 'jm_pending_fcm_token';
 const LAST_TOKEN_STORAGE_KEY = 'jm_last_fcm_token';
 const DEV_CACHE_RESET_KEY = 'jm_dev_cache_reset_done';
+
+function firebaseMessagingServiceWorkerRegistration(): {
+  scriptUrl: string;
+  registrationOptions?: RegistrationOptions;
+} {
+  if (!PUBLIC_BASE_PATH || PUBLIC_BASE_PATH === '/') {
+    return { scriptUrl: '/firebase-messaging-sw.js' };
+  }
+  const base = PUBLIC_BASE_PATH.startsWith('/') ? PUBLIC_BASE_PATH : `/${PUBLIC_BASE_PATH}`;
+  const scriptUrl = `${base}/firebase-messaging-sw.js`.replace(/\/+/g, '/');
+  return {
+    scriptUrl,
+    registrationOptions: { scope: `${base}/`.replace(/\/+/g, '/') },
+  };
+}
 
 function toStringMap(input?: Record<string, unknown>) {
   const result: Record<string, string> = {};
@@ -110,7 +127,7 @@ export default function WebPushManager() {
     const registerTokenForCustomer = async (tokenValue: string) => {
       const activeCustomerId = customerId ?? customer?.id;
       if (!activeCustomerId) {
-        localStorage.setItem(PENDING_TOKEN_STORAGE_KEY, tokenValue);
+        safeStorage.setItem(PENDING_TOKEN_STORAGE_KEY, tokenValue);
         return {
           success: false,
           message: 'Push token is pending until customer sign-in completes.',
@@ -123,7 +140,7 @@ export default function WebPushManager() {
       }
 
       try {
-        const response = await fetch('/api/notifications/register-device', {
+        const response = await fetch(withPublicBasePath('/api/notifications/register-device'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -139,12 +156,12 @@ export default function WebPushManager() {
           throw new Error(reason);
         }
 
-        localStorage.removeItem(PENDING_TOKEN_STORAGE_KEY);
-        localStorage.setItem(LAST_TOKEN_STORAGE_KEY, tokenValue);
+        safeStorage.removeItem(PENDING_TOKEN_STORAGE_KEY);
+        safeStorage.setItem(LAST_TOKEN_STORAGE_KEY, tokenValue);
         registrationCacheRef.current = registrationKey;
         return { success: true } satisfies WebPushEnableResult;
       } catch (error: unknown) {
-        localStorage.setItem(PENDING_TOKEN_STORAGE_KEY, tokenValue);
+        safeStorage.setItem(PENDING_TOKEN_STORAGE_KEY, tokenValue);
         const reason =
           error instanceof Error ? error.message : 'Failed to register token on backend';
         return { success: false, message: reason } satisfies WebPushEnableResult;
@@ -158,18 +175,14 @@ export default function WebPushManager() {
 
       inFlightSetupRef.current = (async () => {
         try {
-          const { Capacitor } = await import('@capacitor/core');
-          if (Capacitor.isNativePlatform()) {
+          // Guard before importing @capacitor/core — its initialization code
+          // crashes in Facebook's iOS in-app browser (window.webkit.messageHandlers undefined).
+          // window.Capacitor is only injected by the real native Capacitor bridge.
+          const isCapacitorNative = !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+          if (isCapacitorNative) {
             return {
               success: false,
               message: 'Native platform detected; web push setup skipped.',
-            } satisfies WebPushEnableResult;
-          }
-
-          if (!isAuthenticated || !(customerId ?? customer?.id)) {
-            return {
-              success: false,
-              message: 'Sign in required before enabling browser notifications.',
             } satisfies WebPushEnableResult;
           }
 
@@ -200,9 +213,12 @@ export default function WebPushManager() {
             } satisfies WebPushEnableResult;
           }
 
-          const swRegistration = await navigator.serviceWorker.register(
-            '/firebase-messaging-sw.js'
-          );
+          const { scriptUrl, registrationOptions } =
+            firebaseMessagingServiceWorkerRegistration();
+          const swRegistration =
+            registrationOptions !== undefined
+              ? await navigator.serviceWorker.register(scriptUrl, registrationOptions)
+              : await navigator.serviceWorker.register(scriptUrl);
 
           let permission = Notification.permission;
           if (permission === 'default' && interactivePermissionRequest) {
@@ -241,6 +257,17 @@ export default function WebPushManager() {
             return {
               success: false,
               message: 'Could not obtain a browser push token.',
+            } satisfies WebPushEnableResult;
+          }
+
+          // Auth check is intentionally after getToken: if the user isn't signed in
+          // yet, we still fetch the token and park it in localStorage as pending so
+          // that rebindLocalTokenIfAvailable() can register it once they log in.
+          if (!isAuthenticated || !(customerId ?? customer?.id)) {
+            safeStorage.setItem(PENDING_TOKEN_STORAGE_KEY, token);
+            return {
+              success: false,
+              message: 'Sign in required before enabling browser notifications.',
             } satisfies WebPushEnableResult;
           }
 
@@ -285,17 +312,22 @@ export default function WebPushManager() {
     };
 
     const rebindLocalTokenIfAvailable = async () => {
-      const activeCustomerId = customerId ?? customer?.id;
-      if (!activeCustomerId) return;
+      try {
+        const activeCustomerId = customerId ?? customer?.id;
+        if (!activeCustomerId) return;
 
-      const pendingToken = localStorage.getItem(PENDING_TOKEN_STORAGE_KEY);
-      if (pendingToken) {
-        await registerTokenForCustomer(pendingToken);
-      }
+        const pendingToken = safeStorage.getItem(PENDING_TOKEN_STORAGE_KEY);
+        if (pendingToken) {
+          await registerTokenForCustomer(pendingToken);
+        }
 
-      const lastKnownToken = localStorage.getItem(LAST_TOKEN_STORAGE_KEY);
-      if (lastKnownToken) {
-        await registerTokenForCustomer(lastKnownToken);
+        const lastKnownToken = safeStorage.getItem(LAST_TOKEN_STORAGE_KEY);
+        if (lastKnownToken) {
+          await registerTokenForCustomer(lastKnownToken);
+        }
+      } catch {
+        // localStorage may throw SecurityError when storage is blocked
+        // (e.g. Android Chrome with cookies/storage restricted). Non-critical.
       }
     };
 

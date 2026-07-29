@@ -40,13 +40,25 @@ export function resolveSupabaseUrlFromEnv() {
 }
 
 export function getSupabaseServerClient() {
+  if (typeof window !== 'undefined') {
+    throw new Error('getSupabaseServerClient must only be called from server-side code.');
+  }
+
   const supabaseUrl = resolveSupabaseUrlFromEnv();
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseKey = serviceRoleKey || anonKey;
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error(
-      'Supabase environment variables are not configured. Set NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) and NEXT_PUBLIC_SUPABASE_ANON_KEY (or SUPABASE_SERVICE_ROLE_KEY).'
+      'Supabase environment variables are not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+    );
+  }
+
+  if (!serviceRoleKey) {
+    console.warn(
+      '[supabase-server] SUPABASE_SERVICE_ROLE_KEY is not set — falling back to anon key. ' +
+      'Routes requiring elevated DB access will be restricted by RLS.'
     );
   }
 

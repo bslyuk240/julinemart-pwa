@@ -10,6 +10,7 @@ import { useCart } from '@/hooks/use-cart';
 import { useWishlist } from '@/hooks/use-wishlist';
 import { toast } from 'sonner';
 import { decodeHtmlEntities } from '@/lib/utils/helpers';
+import { parseMoney } from '@/lib/utils/parse-money';
 
 interface ProductCardProps {
   product: Product;
@@ -34,9 +35,17 @@ export default function ProductCard({
   const inWishlist = isInWishlist(product.id);
   const isVariable = product.type === 'variable';
 
-  // Price handling
-  const price = parseFloat(product.price || '0');
-  const regularPrice = parseFloat(product.regular_price || product.price || '0');
+  // Price handling (variable CJ parents may only have min_price or meaningful variation rows)
+  const price = parseMoney(
+    product.sale_price,
+    product.price,
+    product.min_price
+  );
+  const regularPrice = parseMoney(
+    product.regular_price,
+    product.price,
+    product.min_price
+  );
   const outOfStock = product.stock_status === 'outofstock';
   
   // Rating handling
@@ -56,7 +65,7 @@ export default function ProductCard({
 
     // Variable products require variation selection — go to product page
     if (isVariable) {
-      router.push(`/product/${product.slug}`);
+      if (product.slug) router.push(`/product/${product.slug}`);
       return;
     }
 

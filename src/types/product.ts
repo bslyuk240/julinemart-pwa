@@ -69,11 +69,16 @@ export interface Product {
   grouped_products: number[];
   menu_order: number;
 
+  /** Variable products: min/max from catalog (same idea as WC price_range). */
+  min_price?: string;
+  max_price?: string;
+
   /** 👇 This is where hub_id is located */
   meta_data: MetaData[];
 
+  /** `id` is numeric for WooCommerce/WCFM vendors, or a string (e.g. `jlo-{uuid}` from JLO vendor onboarding). */
   store?: {
-    id: number;
+    id: number | string;
     name: string;
     shop_name: string;
     url: string;

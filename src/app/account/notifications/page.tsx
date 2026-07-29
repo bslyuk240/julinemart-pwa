@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
   Bell,
   RefreshCcw,
   Smartphone,
@@ -17,6 +16,7 @@ import { toast } from 'sonner';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 
 import PageLoading from '@/components/ui/page-loading';
+import AccountPageHeader from '@/components/account/account-page-header';
 import {
   WEB_PUSH_ENABLE_EVENT,
   type WebPushEnableResult,
@@ -379,13 +379,13 @@ export default function AccountNotificationsPage() {
   if (!isAuthenticated || !customer) {
     return (
       <main className="min-h-screen bg-gray-50 pb-24 md:pb-8 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-sm p-6 text-center max-w-md">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Sign in required</h1>
-          <p className="text-gray-600 mb-4">
+        <div className="bg-white rounded-2xl shadow-sm p-5 text-center max-w-md">
+          <h1 className="text-base md:text-xl font-bold text-gray-900 mb-2">Sign in required</h1>
+          <p className="text-sm text-gray-600 mb-4">
             Please log in to manage notification preferences.
           </p>
           <Link href="/login?redirect=/account/notifications">
-            <Button variant="primary">Go to Login</Button>
+            <Button variant="primary" size="sm">Go to Login</Button>
           </Link>
         </div>
       </main>
@@ -394,51 +394,34 @@ export default function AccountNotificationsPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <div className="flex items-center justify-between mb-6">
-          <Link
-            href="/account"
-            className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Back to Account</span>
-          </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadRegistrationStatus}
-            isLoading={loadingStatus}
-          >
-            <RefreshCcw className="w-4 h-4 mr-2" />
-            Refresh Status
-          </Button>
-        </div>
+      <div className="container mx-auto px-4 py-5 md:py-6 max-w-4xl">
+        <AccountPageHeader
+          title="Notifications"
+          subtitle="Manage device registration and notification preferences."
+          action={(
+            <button
+              type="button"
+              onClick={loadRegistrationStatus}
+              disabled={loadingStatus}
+              aria-label="Refresh status"
+              className="flex-shrink-0 w-9 h-9 rounded-xl border border-gray-200 bg-white flex items-center justify-center hover:bg-gray-50 transition-colors active:scale-95 disabled:opacity-50"
+            >
+              <RefreshCcw className={`w-4 h-4 text-gray-600 ${loadingStatus ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+        />
 
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
-          <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 md:px-8 py-8 text-white">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 md:w-20 md:h-20 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                <Bell className="w-8 h-8 md:w-10 md:h-10" />
-              </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold">Notifications</h1>
-                <p className="text-white/90 mt-1 text-sm md:text-base">
-                  Manage device registration and notification preferences.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6 md:p-8 space-y-6">
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="border border-gray-200 rounded-lg p-4">
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-4 md:mb-6">
+          <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+            <div className="grid md:grid-cols-3 gap-3 md:gap-4">
+              <div className="border border-gray-200 rounded-xl p-3 md:p-4">
                 <p className="text-sm text-gray-600 mb-1">Registered Devices</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-lg md:text-xl font-bold text-gray-900">
                   {registeredTokens.length}
                 </p>
               </div>
 
-              <div className="border border-gray-200 rounded-lg p-4">
+              <div className="border border-gray-200 rounded-xl p-3 md:p-4">
                 <p className="text-sm text-gray-600 mb-1">This Device</p>
                 <div className="flex items-center gap-2">
                   {thisDeviceRegistered ? (
@@ -455,7 +438,7 @@ export default function AccountNotificationsPage() {
                 </div>
               </div>
 
-              <div className="border border-gray-200 rounded-lg p-4">
+              <div className="border border-gray-200 rounded-xl p-3 md:p-4">
                 <p className="text-sm text-gray-600 mb-1">Last Backend Update</p>
                 <p className="font-semibold text-gray-900">
                   {updatedAt
@@ -484,41 +467,44 @@ export default function AccountNotificationsPage() {
               </div>
             )}
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
               {isNativePlatform ? (
                 <Button
                   variant="primary"
+                  size="sm"
                   onClick={handleRegisterThisDevice}
                   isLoading={registeringDevice}
                 >
-                  <Smartphone className="w-4 h-4 mr-2" />
+                  <Smartphone className="w-3.5 h-3.5 mr-1.5" />
                   Register This Device
                 </Button>
               ) : (
                 <Button
                   variant="primary"
+                  size="sm"
                   onClick={handleEnableBrowserNotifications}
                   isLoading={registeringDevice}
                 >
-                  <Bell className="w-4 h-4 mr-2" />
-                  Enable Browser Notifications
+                  <Bell className="w-3.5 h-3.5 mr-1.5" />
+                  Enable Notifications
                 </Button>
               )}
               <Button
                 variant="outline"
+                size="sm"
                 onClick={handleDisableThisDevice}
                 disabled={!currentDeviceToken}
                 isLoading={removingDevice}
               >
-                <Trash2 className="w-4 h-4 mr-2" />
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
                 Disable on This Device
               </Button>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 md:p-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+        <div className="bg-white rounded-2xl shadow-sm p-4 md:p-8">
+          <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-2">
             Preference Controls
           </h2>
           <p className="text-sm text-gray-600 mb-6">

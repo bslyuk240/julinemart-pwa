@@ -70,6 +70,12 @@ type Audience = NonNullable<SendPayload['audience']>;
 
 type DeviceTokenRow = {
   fcm_token?: string | null;
+  platform?: string | null;
+};
+
+type PushTargetDevice = {
+  token: string;
+  platform: 'web' | 'android';
 };
 
 const GOOGLE_TOKEN_AUDIENCE = 'https://oauth2.googleapis.com/token';
@@ -160,8 +166,39 @@ function parseSegmentPlatform(value: unknown) {
   return SUPPORTED_SEGMENT_PLATFORMS.has(value) ? value : null;
 }
 
-function dedupeTokens(tokens: string[]) {
-  return [...new Set(tokens.map((token) => token.trim()).filter(Boolean))];
+function normalizePushPlatform(value: unknown): PushTargetDevice['platform'] {
+  if (value === 'android') return 'android';
+  // Default web: storefront + browser PWAs. Native/Android app tokens MUST send explicit "android".
+  return 'web';
+}
+
+function dedupeTargets(rows: DeviceTokenRow[]): PushTargetDevice[] {
+  // Prefer web when a token appears with mixed platform rows.
+  // Browser tokens historically got saved as "android" in some flows;
+  // sending web tokens as android can trigger generic Chrome background updates.
+  const byToken = new Map<string, PushTargetDevice['platform']>();
+
+  for (const row of rows) {
+    const token = typeof row?.fcm_token === 'string' ? row.fcm_token.trim() : '';
+    if (!token) continue;
+
+    const nextPlatform = normalizePushPlatform(row?.platform);
+    const existing = byToken.get(token);
+
+    if (!existing) {
+      byToken.set(token, nextPlatform);
+      continue;
+    }
+
+    if (existing !== 'web' && nextPlatform === 'web') {
+      byToken.set(token, 'web');
+    }
+  }
+
+  return Array.from(byToken.entries()).map(([token, platform]) => ({
+    token,
+    platform,
+  }));
 }
 
 function isAdminRequest(request: NextRequest) {
@@ -390,6 +427,114 @@ function resolveWebLinkPath(data?: Record<string, string>) {
   return '/';
 }
 
+function minimalFcmDataFallback(
+  title: string,
+  message: string,
+  type: string | undefined
+): Record<string, string> {
+  const t = String(type || 'general');
+  return {
+    type: t,
+    title: String(title),
+    body: String(message),
+    message: String(message),
+  };
+}
+
+function buildFcmV1MessageBody(args: {
+  token: string;
+  platform: PushTargetDevice['platform'];
+  title: string;
+  body: string;
+  data: Record<string, string>;
+  webLinkUrl: string;
+  webpushIcon: string;
+  webpushBadge: string;
+}): Record<string, unknown> {
+  const { token, platform, title, body, data, webLinkUrl, webpushIcon, webpushBadge } =
+    args;
+
+  if (platform === 'web') {
+    // Data-only for web: combined `notification` payloads often make Android Chrome
+    // show a generic "updated in the background" instead of our SW's showNotification().
+    return {
+      token,
+      data,
+      webpush: {
+        headers: {
+          Urgency: 'high',
+          TTL: '2419200',
+        },
+        // Some Chromium builds deliver data more reliably when mirrored on webpush.
+        data: { ...data },
+        fcm_options: {
+          link: webLinkUrl,
+        },
+      },
+    };
+  }
+
+  return {
+    token,
+    notification: {
+      title,
+      body,
+    },
+    data,
+    android: {
+      priority: 'HIGH',
+      notification: {
+        sound: 'default',
+        color: '#77088a',
+      },
+    },
+    webpush: {
+      headers: {
+        Urgency: 'high',
+        TTL: '2419200',
+      },
+      notification: {
+        title,
+        body,
+        icon: webpushIcon,
+        badge: webpushBadge,
+      },
+      fcm_options: {
+        link: webLinkUrl,
+      },
+    },
+  };
+}
+
+function buildLegacyFcmPayload(args: {
+  token: string;
+  platform: PushTargetDevice['platform'];
+  title: string;
+  body: string;
+  data: Record<string, string>;
+}): Record<string, unknown> {
+  const { token, platform, title, body, data } = args;
+
+  if (platform === 'web') {
+    return {
+      to: token,
+      priority: 'high',
+      data,
+    };
+  }
+
+  return {
+    to: token,
+    priority: 'high',
+    notification: {
+      title,
+      body,
+      sound: 'default',
+    },
+    data,
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as SendPayload;
@@ -472,156 +617,145 @@ export async function POST(request: NextRequest) {
     console.log(`Title: ${title}`);
     console.log(`Type: ${type || 'general'}`);
 
-    let targetTokens: string[] = [];
+    const supabaseForTokens = getSupabaseClient();
+
+    let targetDevices: PushTargetDevice[] = [];
 
     if (audience === 'single') {
-      const tokensResponse = await fetch(
-        `${request.nextUrl.origin}/api/notifications/register-device?customerId=${customerId}`,
-        { method: 'GET' }
-      );
-      const tokensData = (await tokensResponse.json()) as {
-        success?: boolean;
-        message?: string;
-        tokens?: string[];
-      };
-
-      if (!tokensResponse.ok || !tokensData.success) {
+      if (!supabaseForTokens) {
         return NextResponse.json(
           {
             success: false,
             audience,
             message:
-              tokensData.message ||
-              `Failed to load device tokens (HTTP ${tokensResponse.status})`,
-          },
-          { status: 502 }
-        );
-      }
-
-      targetTokens = tokensData.tokens || [];
-    } else {
-      const supabase = getSupabaseClient();
-      if (!supabase) {
-        return NextResponse.json(
-          {
-            success: false,
-            audience,
-            message: 'Supabase environment variables are not configured',
+              'Supabase environment variables are not configured. Cannot load device tokens for single sends.',
           },
           { status: 500 }
         );
       }
 
-      if (audience === 'all_customers') {
-        const { data: tokenRows, error } = await supabase
-          .from('device_tokens')
-          .select('fcm_token');
+      const { data: tokenRows, error } = await supabaseForTokens
+        .from('device_tokens')
+        .select('fcm_token, platform')
+        .eq('customer_id', String(customerId))
+        .order('updated_at', { ascending: false });
 
-        if (error) {
-          throw new Error(`Database error: ${error.message}`);
-        }
+      if (error) {
+        throw new Error(`Database error: ${error.message}`);
+      }
 
-        targetTokens = (tokenRows || [])
-          .map((row: DeviceTokenRow) => row.fcm_token || '')
-          .filter(Boolean);
-      } else if (audience === 'segment') {
-        if (!segment?.platform) {
+      targetDevices = dedupeTargets(tokenRows || []);
+    } else if (!supabaseForTokens) {
+      return NextResponse.json(
+        {
+          success: false,
+          audience,
+          message: 'Supabase environment variables are not configured',
+        },
+        { status: 500 }
+      );
+    }
+
+    if (audience === 'all_customers') {
+      const { data: tokenRows, error } = await supabaseForTokens!
+        .from('device_tokens')
+        .select('fcm_token, platform')
+        .eq('user_type', 'customer');
+
+      if (error) {
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      targetDevices = dedupeTargets(tokenRows || []);
+    } else if (audience === 'segment') {
+      if (!segment?.platform) {
+        return NextResponse.json(
+          {
+            success: false,
+            audience,
+            message:
+              'segment.platform is required for audience=segment in this MVP',
+          },
+          { status: 400 }
+        );
+      }
+
+      const segmentPlatform = parseSegmentPlatform(segment.platform);
+      if (!segmentPlatform) {
+        return NextResponse.json(
+          {
+            success: false,
+            audience,
+            message: 'Invalid segment.platform. Supported values: android, web',
+          },
+          { status: 400 }
+        );
+      }
+
+      const { data: tokenRows, error } = await supabaseForTokens!
+        .from('device_tokens')
+        .select('fcm_token, platform')
+        .eq('platform', segmentPlatform);
+
+      if (error) {
+        if (isMissingColumnError(error, 'platform')) {
           return NextResponse.json(
             {
               success: false,
               audience,
               message:
-                'segment.platform is required for audience=segment in this MVP',
+                "device_tokens.platform column is required for audience=segment. Add a 'platform' column to use platform-based segments.",
             },
             { status: 400 }
           );
         }
+        throw new Error(`Database error: ${error.message}`);
+      }
 
-        const segmentPlatform = parseSegmentPlatform(segment.platform);
-        if (!segmentPlatform) {
+      targetDevices = dedupeTargets(tokenRows || []);
+    } else if (audience === 'all_vendors' || audience === 'all_staff') {
+      const targetUserType = audience === 'all_vendors' ? 'vendor' : 'staff';
+      const { data: tokenRows, error } = await supabaseForTokens!
+        .from('device_tokens')
+        .select('fcm_token, platform')
+        .eq('user_type', targetUserType);
+
+      if (error) {
+        if (isMissingColumnError(error, 'user_type')) {
           return NextResponse.json(
             {
               success: false,
               audience,
-              message: 'Invalid segment.platform. Supported values: android, web',
+              message:
+                "device_tokens.user_type column is required for vendor/staff audiences. Add a 'user_type' column to use all_vendors/all_staff.",
             },
             { status: 400 }
           );
         }
-
-        const { data: tokenRows, error } = await supabase
-          .from('device_tokens')
-          .select('fcm_token')
-          .eq('platform', segmentPlatform);
-
-        if (error) {
-          if (isMissingColumnError(error, 'platform')) {
-            return NextResponse.json(
-              {
-                success: false,
-                audience,
-                message:
-                  "device_tokens.platform column is required for audience=segment. Add a 'platform' column to use platform-based segments.",
-              },
-              { status: 400 }
-            );
-          }
-          throw new Error(`Database error: ${error.message}`);
-        }
-
-        targetTokens = (tokenRows || [])
-          .map((row: DeviceTokenRow) => row.fcm_token || '')
-          .filter(Boolean);
-      } else if (audience === 'all_vendors' || audience === 'all_staff') {
-        const targetUserType = audience === 'all_vendors' ? 'vendor' : 'staff';
-        const { data: tokenRows, error } = await supabase
-          .from('device_tokens')
-          .select('fcm_token')
-          .eq('user_type', targetUserType);
-
-        if (error) {
-          if (isMissingColumnError(error, 'user_type')) {
-            return NextResponse.json(
-              {
-                success: false,
-                audience,
-                message:
-                  "device_tokens.user_type column is required for vendor/staff audiences. Add a 'user_type' column to use all_vendors/all_staff.",
-              },
-              { status: 400 }
-            );
-          }
-          throw new Error(`Database error: ${error.message}`);
-        }
-
-        targetTokens = (tokenRows || [])
-          .map((row: DeviceTokenRow) => row.fcm_token || '')
-          .filter(Boolean);
+        throw new Error(`Database error: ${error.message}`);
       }
+
+      targetDevices = dedupeTargets(tokenRows || []);
     }
 
-    const dedupedTokens = dedupeTokens(targetTokens);
-    const matchedTokensCount = dedupedTokens.length;
+    const matchedTokensCount = targetDevices.length;
 
     if (matchedTokensCount === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          audience,
-          message:
-            audience === 'single'
-              ? 'No devices registered for this customer'
-              : 'No devices matched the selected audience',
-          matchedTokensCount: 0,
-          sent: 0,
-          failed: 0,
-          totalDevices: 0,
-          invalidTokenCount: 0,
-          cleanedUpInvalidTokens: 0,
-          errors: [],
-        },
-        { status: 404 }
-      );
+      return NextResponse.json({
+        success: false,
+        audience,
+        message:
+          audience === 'single'
+            ? 'No devices registered for this customer'
+            : 'No devices matched the selected audience',
+        matchedTokensCount: 0,
+        sent: 0,
+        failed: 0,
+        totalDevices: 0,
+        invalidTokenCount: 0,
+        cleanedUpInvalidTokens: 0,
+        errors: [],
+      });
     }
 
     const useFcmV1 = hasServiceAccountConfig();
@@ -641,45 +775,49 @@ export async function POST(request: NextRequest) {
     const normalizedData = normalizeDataPayload({
       type: type || 'general',
       ...(data || {}),
+      // Redundant copies for SW parsing: web clients often only receive robust `data` keys,
+      // and `onBackgroundMessage` must still show meaningful copy.
+      title: String(title),
+      body: String(message),
+      message: String(message),
     });
-    const webLinkPath = resolveWebLinkPath(normalizedData);
-    const webLinkUrl = new URL(webLinkPath, request.nextUrl.origin).toString();
+    const fcmDataPayload: Record<string, string> =
+      normalizedData ??
+      minimalFcmDataFallback(String(title), String(message), String(type || 'general'));
+    const webLinkPath = resolveWebLinkPath(normalizedData ?? fcmDataPayload);
+    // Use the configured storefront origin so notification clicks always open
+    // the customer PWA, not the server's own hostname (which may differ).
+    const storefrontOrigin =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      request.nextUrl.origin;
+    const webLinkUrl = new URL(webLinkPath, storefrontOrigin).toString();
+
+    const pathPrefix = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/+$/, '');
+    const webpushIcon = pathPrefix
+      ? `${pathPrefix}/icon-192.png`.replace(/\/+/g, '/')
+      : '/icon-192.png';
+    const webpushBadge = pathPrefix
+      ? `${pathPrefix}/favicon-96x96.png`.replace(/\/+/g, '/')
+      : '/favicon-96x96.png';
 
     const results: TokenSendResult[] = await Promise.all(
-      dedupedTokens.map(async (token) => {
+      targetDevices.map(async ({ token, platform }) => {
         try {
           if (useFcmV1 && serviceAccount && accessToken) {
+            const messageBody = buildFcmV1MessageBody({
+              token,
+              platform,
+              title,
+              body: message,
+              data: fcmDataPayload,
+              webLinkUrl,
+              webpushIcon,
+              webpushBadge,
+            });
+
             const fcmPayload = {
-              message: {
-                token,
-                notification: {
-                  title,
-                  body: message,
-                },
-                data: normalizedData,
-                android: {
-                  priority: 'HIGH',
-                  notification: {
-                    sound: 'default',
-                    color: '#77088a',
-                  },
-                },
-                webpush: {
-                  headers: {
-                    Urgency: 'high',
-                    TTL: '2419200',
-                  },
-                  notification: {
-                    title,
-                    body: message,
-                    icon: '/icon-192.png',
-                    badge: '/favicon-96x96.png',
-                  },
-                  fcm_options: {
-                    link: webLinkUrl,
-                  },
-                },
-              },
+              message: messageBody,
             };
 
             const response = await fetch(
@@ -728,16 +866,13 @@ export async function POST(request: NextRequest) {
             } satisfies TokenSendSuccess;
           }
 
-          const legacyPayload = {
-            to: token,
-            priority: 'high',
-            notification: {
-              title,
-              body: message,
-              sound: 'default',
-            },
-            data: normalizedData,
-          };
+          const legacyPayload = buildLegacyFcmPayload({
+            token,
+            platform,
+            title,
+            body: message,
+            data: fcmDataPayload,
+          });
 
           const response = await fetch('https://fcm.googleapis.com/fcm/send', {
             method: 'POST',

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { jloItemIdsFromOrderLineItem } from '@/lib/jlo/line-identity';
 
 const JLO_BASE = (
   process.env.JLO_API_BASE_URL ||
@@ -8,6 +9,7 @@ const JLO_BASE = (
 
 const SUB_STATUS_RANK: Record<string, number> = {
   pending: 1,
+  vendor_dispatched: 2,
   assigned: 2,
   pickup_scheduled: 2,
   in_transit: 3,
@@ -16,8 +18,18 @@ const SUB_STATUS_RANK: Record<string, number> = {
 };
 
 function deriveOrderStatus(o: any): string {
+  const dbStatus: string = o.overall_status || 'pending';
+
+  // Unpaid / not-yet-confirmed orders stay 'pending'. Sub-orders are created at
+  // checkout (before payment) with status 'pending', so we must NOT let that
+  // derive a 'pending' order forward to 'processing'. verify-payment is what
+  // moves overall_status to 'processing' once payment is confirmed.
+  if (dbStatus === 'pending') return 'pending';
+
+  // Terminal states pass through untouched
+  if (dbStatus === 'cancelled' || dbStatus === 'refunded') return dbStatus;
+
   const subOrders: any[] = o.sub_orders || [];
-  const dbStatus: string = o.overall_status || 'processing';
   if (!subOrders.length) return dbStatus;
 
   const ranks = subOrders
@@ -65,6 +77,7 @@ function adaptOrder(o: any) {
     currency: 'NGN',
     payment_method: o.payment_method || '',
     payment_method_title: o.payment_method || 'Paystack',
+    payment_status: o.payment_status || 'pending',
     transaction_id: o.payment_reference || '',
     billing: {
       first_name: firstName, last_name: lastName,
@@ -120,27 +133,42 @@ export async function POST(request: Request) {
       billing.state ||
       '';
 
-    const shippingFee =
+    const influencerCouponCode = getMeta('_influencer_coupon_code') || undefined;
+
+    const getShippingLineMeta = (key: string) => {
+      const lineMeta: any[] = shippingLines[0]?.meta_data || [];
+      return lineMeta.find((m: any) => m.key === key)?.value ?? null;
+    };
+
+    // Checkout sends discounted total in shipping_lines[0].total when an influencer
+    // code applies; JLO create-order expects base shipping and re-applies the discount.
+    let shippingFee =
       shippingLines.length > 0 ? parseFloat(shippingLines[0].total || '0') : 0;
+    if (influencerCouponCode) {
+      const originalRaw = getShippingLineMeta('_original_shipping_cost');
+      if (originalRaw != null && String(originalRaw).trim() !== '') {
+        const original = parseFloat(String(originalRaw));
+        if (Number.isFinite(original) && original >= 0) {
+          shippingFee = original;
+        }
+      }
+    }
 
-    const voucherCode = getMeta('_campaign_voucher_code') || undefined;
+    const rawCampaignVoucher = getMeta('_campaign_voucher_code');
+    const voucherCode =
+      rawCampaignVoucher != null && String(rawCampaignVoucher).trim() !== ''
+        ? String(rawCampaignVoucher).trim().toUpperCase()
+        : undefined;
 
-    // Map line items — prefer Supabase UUIDs stored in meta_data
+    // Map line items — same identity rules as voucherHelpers (src/lib/jlo/line-identity.ts)
     const items = lineItems
       .map((item: any) => {
-        const itemMeta: any[] = item.meta_data || [];
-        const getMi = (key: string) =>
-          itemMeta.find((m: any) => m.key === key)?.value ?? null;
-        const productId =
-          getMi('_supabase_product_id') || String(item.product_id || '');
-        const variationId =
-          getMi('_supabase_variation_id') ||
-          (item.variation_id ? String(item.variation_id) : undefined);
-        return { product_id: productId, variation_id: variationId, quantity: item.quantity };
+        const { product_id, variation_id } = jloItemIdsFromOrderLineItem(item);
+        return { product_id, variation_id, quantity: item.quantity };
       })
       .filter((i: any) => i.product_id);
 
-    const jloPayload = {
+    const jloPayload: Record<string, unknown> = {
       customer_name: `${billing.first_name || ''} ${billing.last_name || ''}`.trim(),
       customer_email: billing.email || '',
       customer_phone: billing.phone || '',
@@ -152,10 +180,17 @@ export async function POST(request: Request) {
       delivery_landmark: getMeta('_delivery_landmark') || undefined,
       items,
       shipping_fee: shippingFee,
-      voucher_code: voucherCode,
+      influencer_coupon_code: influencerCouponCode,
       special_instructions: customerNote || undefined,
       order_notes: customerNote || undefined,
     };
+    if (voucherCode) {
+      jloPayload.voucher_code = voucherCode;
+      const campaignVoucherId = getMeta('_campaign_voucher_id');
+      if (campaignVoucherId != null && String(campaignVoucherId).trim() !== '') {
+        jloPayload.campaign_voucher_id = String(campaignVoucherId).trim();
+      }
+    }
 
     const jloRes = await fetch(`${JLO_BASE}/api/create-order`, {
       method: 'POST',

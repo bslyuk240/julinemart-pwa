@@ -11,10 +11,11 @@ import { formatPrice } from '@/lib/utils/format-price';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 
 type VendorSortOption = 'date' | 'popularity' | 'price' | 'price-desc';
-const INITIAL_PAGE_SIZE = 12;
+/** API route caps per_page at 100 and caches the underlying JLO fetch for 300s. */
+const INITIAL_PAGE_SIZE = 50;
 
 interface VendorData {
-  id: number;
+  id: number | string;
   store_name: string;
   store_logo?: string | null;
   banner?: string | null;
@@ -67,7 +68,9 @@ export default function VendorStorePage() {
     const { silent = false, page = 1, perPage = INITIAL_PAGE_SIZE, append = false } = opts;
     if (!silent) setLoading(true);
     try {
-      const res  = await fetch(`/api/vendor/${vendorId}?page=${page}&per_page=${perPage}`, { cache: 'no-store' });
+      const res  = await fetch(
+        `/api/vendor/${encodeURIComponent(vendorId)}?page=${page}&per_page=${perPage}`
+      );
       const data = await res.json() as {
         vendor: VendorData;
         products: Product[];
@@ -81,8 +84,12 @@ export default function VendorStorePage() {
       if (data.vendor) setVendor(data.vendor);
       if (data.products) {
         setProducts(prev => {
-          const next = append ? [...prev, ...data.products] : data.products;
-          return sortProducts(next, sortBy);
+          if (!append) return sortProducts(data.products, sortBy);
+          // Deduplicate by supabase_id then woo id — prevents duplicates when
+          // catalog pagination is unstable (products with identical created_at).
+          const seen = new Set(prev.map(p => p.slug || String(p.id)));
+          const fresh = data.products.filter(p => !seen.has(p.slug || String(p.id)));
+          return sortProducts([...prev, ...fresh], sortBy);
         });
         setTotal(data.total ?? data.products.length);
         setCurrentPage(data.page ?? page);
@@ -151,7 +158,7 @@ export default function VendorStorePage() {
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+      <main className="min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8">
         <div className="container-custom min-w-0 py-6">
           <div className="text-center py-20">
             <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4" />
@@ -183,7 +190,7 @@ export default function VendorStorePage() {
   // ── Vacation mode ────────────────────────────────────────────────────────────
   if (vendor && vendor.is_store_vacation === true) {
     return (
-      <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+      <main className="min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8">
         <div className="container-custom min-w-0 py-6">
           <div className="text-center py-20">
             <Store className="w-16 h-16 mx-auto text-yellow-500 mb-4" />
@@ -217,7 +224,7 @@ export default function VendorStorePage() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+    <main className="min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8">
       <div className="container-custom min-w-0 py-6">
 
         {/* Pull-to-refresh indicator */}

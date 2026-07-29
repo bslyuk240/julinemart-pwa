@@ -52,7 +52,7 @@ export async function upsertAddress(
       .eq('type', address.type);
   }
 
-  const payload: any = { customer_id: customerId, ...address };
+  const payload: any = { customer_id: customerId, ...address, updated_at: new Date().toISOString() };
   if (id) payload.id = id;
 
   const { data, error } = await supabase
@@ -134,14 +134,50 @@ export async function updateNotificationPrefs(
 
 // ── Orders (from JLO Supabase, same DB) ──────────────────────────────────────
 
+const SUB_STATUS_RANK: Record<string, number> = {
+  pending: 1,
+  vendor_dispatched: 2,
+  assigned: 2,
+  pickup_scheduled: 2,
+  in_transit: 3,
+  out_for_delivery: 4,
+  delivered: 5,
+};
+
+function deriveDisplayStatus(subOrders: { status: string }[], dbStatus: string): string {
+  // Unpaid / not-yet-confirmed orders stay 'pending'. Sub-orders are created at
+  // checkout (before payment) with status 'pending', so we must NOT let that
+  // derive a 'pending' order forward to 'processing'.
+  if (dbStatus === 'pending') return 'pending';
+  if (dbStatus === 'cancelled' || dbStatus === 'refunded') return dbStatus;
+  if (!subOrders.length) return dbStatus;
+  const ranks = subOrders.map((so) => SUB_STATUS_RANK[so.status] ?? 1);
+  if (ranks.every((r) => r === 5)) return 'delivered';
+  const minRank = Math.min(...ranks);
+  const rankToDisplay: Record<number, string> = {
+    1: 'processing',
+    2: 'ready-to-ship',
+    3: 'shipped',
+    4: 'out-for-delivery',
+    5: 'delivered',
+  };
+  return rankToDisplay[minRank] ?? dbStatus;
+}
+
 export async function getCustomerOrders(email: string, limit = 10) {
   const { data } = await supabase
     .from('orders')
-    .select('id, order_number, overall_status, total_amount, created_at')
+    .select('id, order_number, overall_status, total_amount, created_at, sub_orders ( status )')
     .eq('customer_email', email)
     .order('created_at', { ascending: false })
     .limit(limit);
-  return data || [];
+  return (data || []).map((o: any) => ({
+    id: o.id,
+    order_number: o.order_number,
+    overall_status: deriveDisplayStatus(o.sub_orders || [], o.overall_status),
+    total_amount: o.total_amount,
+    created_at: o.created_at,
+  }));
 }
 
 async function countCustomerOrders(email: string, modifier?: (query: any) => any) {

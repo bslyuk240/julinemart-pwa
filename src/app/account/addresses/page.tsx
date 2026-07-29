@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, MapPin, Plus, Edit2, Trash2, Home, Briefcase, Check } from 'lucide-react';
+import { MapPin, Plus, Edit2, Trash2, Home, Briefcase, Check } from 'lucide-react';
+import AccountPageHeader from '@/components/account/account-page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -117,27 +117,26 @@ export default function AddressesPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <Link href="/account" className="flex items-center gap-2 text-gray-600 hover:text-primary-600 mb-6">
-          <ArrowLeft className="w-5 h-5" /><span>Back to Account</span>
-        </Link>
-
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">My Addresses</h1>
-            <p className="text-sm text-gray-600 mt-1">Manage your shipping and billing addresses</p>
-          </div>
-          {!showForm && (
-            <Button onClick={openNew} variant="primary" className="flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Add Address
-            </Button>
-          )}
-        </div>
+      <div className="container mx-auto px-4 py-5 md:py-6 max-w-4xl">
+        <AccountPageHeader
+          title="My Addresses"
+          subtitle="Manage your shipping and billing addresses"
+          action={!showForm ? (
+            <button
+              type="button"
+              onClick={openNew}
+              aria-label="Add address"
+              className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center hover:bg-primary-700 transition-colors active:scale-95"
+            >
+              <Plus className="w-4 h-4 text-white" />
+            </button>
+          ) : undefined}
+        />
 
         {/* Form */}
         {showForm && (
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-5">{editingId ? 'Edit Address' : 'New Address'}</h2>
+          <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 mb-4 md:mb-6">
+            <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-4">{editingId ? 'Edit Address' : 'New Address'}</h2>
             <div className="space-y-4">
               {/* Type + Label */}
               <div className="grid grid-cols-2 gap-4">
@@ -183,30 +182,30 @@ export default function AddressesPage() {
                 <span className="text-sm text-gray-700">Set as default {formData.type} address</span>
               </label>
             </div>
-            <div className="flex gap-3 mt-6 pt-6 border-t">
-              <Button onClick={handleSave} disabled={loading} variant="primary">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-5 pt-5 border-t">
+              <Button onClick={handleSave} disabled={loading} variant="primary" size="sm" className="sm:flex-1">
                 {loading ? 'Saving...' : editingId ? 'Update Address' : 'Save Address'}
               </Button>
-              <Button onClick={() => setShowForm(false)} disabled={loading} variant="outline">Cancel</Button>
+              <Button onClick={() => setShowForm(false)} disabled={loading} variant="outline" size="sm" className="sm:flex-1">Cancel</Button>
             </div>
           </div>
         )}
 
         {/* List */}
         {addresses.length === 0 && !showForm ? (
-          <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-            <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No addresses saved</h3>
-            <p className="text-gray-600 mb-5">Add an address for faster checkout</p>
-            <Button onClick={openNew} variant="primary"><Plus className="w-4 h-4 mr-2" />Add Address</Button>
+          <div className="bg-white rounded-2xl shadow-sm p-6 md:p-10 text-center">
+            <MapPin className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+            <h3 className="text-sm md:text-base font-medium text-gray-900 mb-1">No addresses saved</h3>
+            <p className="text-xs md:text-sm text-gray-600 mb-4">Add an address for faster checkout</p>
+            <Button onClick={openNew} variant="primary" size="sm"><Plus className="w-3.5 h-3.5 mr-1.5" />Add Address</Button>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-3 md:gap-4">
             {addresses.map(a => (
-              <div key={a.id} className={`bg-white rounded-xl shadow-sm p-5 border-2 ${a.is_default ? 'border-primary-500' : 'border-transparent'}`}>
-                <div className="flex items-start justify-between mb-3">
+              <div key={a.id} className={`bg-white rounded-2xl shadow-sm p-4 border-2 ${a.is_default ? 'border-primary-500' : 'border-transparent'}`}>
+                <div className="flex items-start justify-between mb-2.5">
                   <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-lg bg-primary-50 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-xl bg-primary-50 flex items-center justify-center">
                       {a.label === 'Office' ? <Briefcase className="w-5 h-5 text-primary-600" /> : <Home className="w-5 h-5 text-primary-600" />}
                     </div>
                     <div>
@@ -227,12 +226,22 @@ export default function AddressesPage() {
                   {a.phone && <p className="text-gray-500">{a.phone}</p>}
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={() => openEdit(a)} variant="outline" size="sm" className="flex items-center gap-1 flex-1">
-                    <Edit2 className="w-3.5 h-3.5" /> Edit
-                  </Button>
-                  <Button onClick={() => handleDelete(a.id)} variant="outline" size="sm" className="flex items-center gap-1 text-red-600 hover:bg-red-50 flex-1">
-                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => openEdit(a)}
+                    aria-label="Edit address"
+                    className="flex-1 h-9 rounded-xl border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors active:scale-95"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-gray-600" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(a.id)}
+                    aria-label="Delete address"
+                    className="flex-1 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-red-600 hover:bg-red-50 transition-colors active:scale-95"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             ))}

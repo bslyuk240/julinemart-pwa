@@ -65,15 +65,16 @@ export default function MobileMenu({ isOpen, onClose, showOnDesktop = false }: M
 
   return (
     <>
-      {/* Overlay */}
-      <div
-        className={clsx(
-          'fixed inset-0 bg-black/50 z-50 transition-opacity duration-300',
-          showOnDesktop ? '' : 'md:hidden',
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        )}
-        onClick={onClose}
-      />
+      {/* Overlay: only in DOM when open so a full-viewport `fixed` layer never blocks wheel/scroll on desktop */}
+      {isOpen && (
+        <div
+          className={clsx(
+            'fixed inset-0 z-50 bg-black/50 transition-opacity duration-300',
+            showOnDesktop ? '' : 'md:hidden',
+          )}
+          onClick={onClose}
+        />
+      )}
 
       {/* Menu Drawer */}
         <div

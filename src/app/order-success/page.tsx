@@ -11,6 +11,8 @@ function OrderSuccessContent() {
   const searchParams = useSearchParams();
   // New flow passes ?ref=1042 (order_number); legacy flow may pass ?order=<uuid>
   const ref = searchParams.get('ref') || searchParams.get('order');
+  // ORDER_PLACED is logged authoritatively server-side in JLO create-order
+  // (captures guests too), so no client-side logging here.
 
   // Determine display label — if it's a plain number show #1042, else show as-is
   const isNumeric = ref && /^\d+$/.test(ref);
@@ -18,7 +20,7 @@ function OrderSuccessContent() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6 md:py-16">
+      <div className="container-custom py-5 md:py-12">
         <div className="max-w-2xl mx-auto">
 
           {/* Success Icon + Heading */}
@@ -26,10 +28,10 @@ function OrderSuccessContent() {
             <div className="inline-flex items-center justify-center w-24 h-24 bg-green-100 rounded-full mb-6">
               <CheckCircle className="w-14 h-14 text-green-600" />
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+            <h1 className="text-base md:text-xl font-bold text-gray-900 mb-3">
               Order Placed!
             </h1>
-            <p className="text-gray-600 text-lg">
+            <p className="text-gray-600 text-xs md:text-sm">
               Thank you for shopping with JulineMart. Your order has been received.
             </p>
           </div>
@@ -71,17 +73,17 @@ function OrderSuccessContent() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <Link href="/" className="flex-1">
-              <Button variant="outline" size="lg" className="w-full">
+              <Button variant="outline" size="sm" className="w-full">
                 Continue Shopping
               </Button>
             </Link>
             <Link href="/orders" className="flex-1">
-              <Button variant="primary" size="lg" className="w-full">
-                <Package className="w-5 h-5 mr-2" />
+              <Button variant="primary" size="sm" className="w-full">
+                <Package className="w-3.5 h-3.5 mr-1.5" />
                 View My Orders
-                <ArrowRight className="w-4 h-4 ml-2" />
+                <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
               </Button>
             </Link>
           </div>
