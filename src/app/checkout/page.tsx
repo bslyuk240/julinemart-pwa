@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CreditCard, Truck, Package, MapPin, Tag } from 'lucide-react';
+import { CreditCard, Truck, Package, MapPin, Tag } from 'lucide-react';
+import PageHeader from '@/components/layout/page-header';
 import { useCart } from '@/hooks/use-cart';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,12 @@ import type { CustomerAddress, SavedCard } from '@/types/customer';
 import { trackBeginCheckout, trackPurchase } from '@/lib/gtag';
 import { useCartStore } from '@/store/cart-store';
 import { jloItemIdsFromCartLine } from '@/lib/jlo/line-identity';
+import { ensurePaystackReady, resetPaystackLoader } from '@/lib/paystack';
+import { logActivity } from '@/lib/logActivity';
+import {
+  clearPendingCampaignVoucher,
+  readPendingCampaignVoucher,
+} from '@/components/campaigns/OfferSection';
 
 interface ShippingOption {
   id: string;
@@ -74,6 +81,9 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [isCartHydrated, setIsCartHydrated] = useState(false);
   const currentOrderRef = useRef<any>(null);
+  const pendingPaystackConfigRef = useRef<any>(null);
+  const [hasPendingPayment, setHasPendingPayment] = useState(false);
+  const [paystackReady, setPaystackReady] = useState(false);
   const hasTrackedBeginCheckoutRef = useRef(false);
   
   // Saved card state
@@ -98,6 +108,8 @@ export default function CheckoutPage() {
   const [useDifferentAddress, setUseDifferentAddress] = useState(false);
   const [saveNewAddress, setSaveNewAddress] = useState(false);
 
+  // Promo code UI — one field for campaign voucher or influencer code
+  const [promoKind, setPromoKind] = useState<'voucher' | 'influencer'>('voucher');
   // NEW: Influencer coupon state
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
@@ -109,6 +121,14 @@ export default function CheckoutPage() {
   const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
   const [voucherError, setVoucherError] = useState('');
   const [voucherDiscount, setVoucherDiscount] = useState(0);
+
+  // Prefill campaign voucher saved from "Save offer & shop" on a landing page.
+  useEffect(() => {
+    const pending = readPendingCampaignVoucher();
+    if (!pending) return;
+    setPromoKind('voucher');
+    setVoucherCode(pending);
+  }, []);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -205,14 +225,21 @@ export default function CheckoutPage() {
     [discountedShipping, toAnalyticsItems, total]
   );
 
-  // Load Paystack script
+  // Preload Paystack as soon as checkout mounts so the popup is ready well
+  // before the user taps Place Order. Readiness gates nothing hard — the open
+  // path awaits ensurePaystackReady() — but it lets us surface load failures.
   useEffect(() => {
-    if (typeof window !== 'undefined' && !window.PaystackPop) {
-      const script = document.createElement('script');
-      script.src = 'https://js.paystack.co/v1/inline.js';
-      script.async = true;
-      document.body.appendChild(script);
-    }
+    let cancelled = false;
+    ensurePaystackReady()
+      .then(() => {
+        if (!cancelled) setPaystackReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setPaystackReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -246,32 +273,74 @@ export default function CheckoutPage() {
     hasTrackedBeginCheckoutRef.current = true;
   }, [discountedSubtotal, items.length, toAnalyticsItems]);
 
-  // Initialize Paystack payment with inline callbacks
-  const initializePaystackPayment = (config: any) => {
-    console.log('Initializing Paystack with config:', { 
-      ref: config.reference, 
-      email: config.email, 
-      amount: config.amount 
+  // Initialize Paystack payment with inline callbacks.
+  // Awaits the robust loader (no fixed setTimeout guess) so the popup opens as
+  // soon as the gateway is genuinely ready, with an honest message + retry path
+  // if it never loads. Gateway problems are logged to JLO activity logs.
+  const initializePaystackPayment = async (config: any) => {
+    console.log('Initializing Paystack with config:', {
+      ref: config.reference,
+      email: config.email,
+      amount: config.amount,
     });
 
-    if (typeof window === 'undefined' || !window.PaystackPop) {
-      toast.error('Payment system not loaded. Please refresh the page.');
+    const orderResourceId = config?.metadata?.order_id;
+
+    // Wait for the gateway to be ready instead of guessing with a timer.
+    try {
+      await ensurePaystackReady();
+      setPaystackReady(true);
+    } catch {
+      setPaystackReady(false);
+      resetPaystackLoader();
+      toast.dismiss('paystack-open');
+      toast.error(
+        'The payment window is taking too long to load. Check your connection and tap "Retry Payment".'
+      );
       setIsProcessing(false);
+      setHasPendingPayment(true);
+      logActivity({
+        action: 'PAYMENT_GATEWAY_LOAD_FAILED',
+        resource_type: 'orders',
+        resource_id: orderResourceId,
+        details: { reference: config.reference, reason: 'inline.js failed to load before timeout' },
+      });
       return;
     }
 
+    // Always open Paystack with a FRESH transaction reference. Reusing the ref
+    // from an abandoned/cancelled attempt makes Paystack treat it as a duplicate
+    // and the iframe hangs on an endless loading spinner. The JLO order is still
+    // located via currentOrderRef (the stable payment_reference) at verify time,
+    // so a fresh Paystack ref is safe. config.reference is the stable base.
+    const freshRef = `${config.reference}-R${Date.now().toString(36).toUpperCase()}`;
+
     try {
+      logActivity({
+        action: 'PAYMENT_INITIATED',
+        resource_type: 'orders',
+        resource_id: orderResourceId,
+        details: { reference: freshRef, amount: config.amount },
+      });
+
       const handler = window.PaystackPop.setup({
         key: config.publicKey,
         email: config.email,
         amount: config.amount,
-        ref: config.reference,
+        ref: freshRef,
         metadata: config.metadata,
         onClose: function() {
           console.log('Payment window closed');
-          toast.warning('Payment cancelled. Your order is still pending payment.');
+          toast.dismiss('paystack-open');
+          toast.warning('Payment cancelled. Click "Retry Payment" to complete your order.');
           setIsProcessing(false);
-          currentOrderRef.current = null;
+          setHasPendingPayment(true);
+          logActivity({
+            action: 'PAYMENT_CANCELLED',
+            resource_type: 'orders',
+            resource_id: orderResourceId,
+            details: { reference: freshRef, stage: 'popup_closed' },
+          });
         },
         callback: function(response: any) {
           console.log('Payment callback received:', response);
@@ -281,10 +350,20 @@ export default function CheckoutPage() {
 
       console.log('Opening Paystack iframe...');
       handler.openIframe();
+      // Popup is open — clear the "Opening payment window..." spinner now.
+      toast.dismiss('paystack-open');
     } catch (error) {
       console.error('Error initializing Paystack:', error);
+      toast.dismiss('paystack-open');
       toast.error('Failed to open payment window. Please try again.');
       setIsProcessing(false);
+      setHasPendingPayment(true);
+      logActivity({
+        action: 'PAYMENT_GATEWAY_OPEN_FAILED',
+        resource_type: 'orders',
+        resource_id: orderResourceId,
+        details: { reference: freshRef, error: String((error as Error)?.message || error) },
+      });
     }
   };
 
@@ -341,6 +420,8 @@ export default function CheckoutPage() {
       trackPurchaseForOrder(redirectOrderId);
       clearCart();
       currentOrderRef.current = null;
+      pendingPaystackConfigRef.current = null;
+      setHasPendingPayment(false);
 
       const orderNum = verifyData.order?.order_number;
       router.push(`/order-success?ref=${orderNum || redirectOrderId}`);
@@ -694,9 +775,20 @@ export default function CheckoutPage() {
       newErrors.email = 'Invalid email address';
     }
 
-    const phoneRegex = /^(\+234|0)[789]\d{9}$/;
-    if (formData.phone && !phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
-      newErrors.phone = 'Invalid Nigerian phone number';
+    // Accept any common Nigerian format: +2348012345678, 2348012345678,
+    // 08012345678, or a bare 8012345678. Normalise to digits first so we don't
+    // reject a perfectly valid stored number just because of its prefix/spacing.
+    if (formData.phone) {
+      const digits = formData.phone.replace(/\D/g, '');
+      const localTen = digits.startsWith('234')
+        ? digits.slice(3)
+        : digits.startsWith('0')
+        ? digits.slice(1)
+        : digits;
+      // local part must be 10 digits starting 7/8/9 (e.g. 8012345678)
+      if (!/^[789]\d{9}$/.test(localTen)) {
+        newErrors.phone = 'Invalid Nigerian phone number';
+      }
     }
 
     setErrors(newErrors);
@@ -840,16 +932,11 @@ export default function CheckoutPage() {
       setVoucherDiscount(voucherValue);
       setVoucherError('');
       setVoucherCode('');
+      clearPendingCampaignVoucher();
       removeCoupon({ showToast: false });
       
-      // ✅ Better success message
-      const matchingItems = result.data?.matching_items_count || items.length;
-      const totalItems = result.data?.total_items_count || items.length;
-      toast.success(
-        matchingItems === totalItems
-          ? `Voucher applied! ${formatPrice(voucherValue)} discount`
-          : `Voucher applied to ${matchingItems} of ${totalItems} items! ${formatPrice(voucherValue)} discount`
-      );
+      toast.success(`Voucher applied (−${formatPrice(voucherValue)})`);
+
     } catch (error: any) {
       console.error('Voucher validation error:', error);
       setVoucherError(
@@ -1116,7 +1203,8 @@ export default function CheckoutPage() {
 
       if (order && order.id) {
         console.log('✅ Order created:', order.id);
-        
+        // ORDER_PLACED is logged server-side in JLO create-order (captures guests too).
+
         const selectedGateway = paymentGateways.find(g => g.id === selectedPayment);
         const requiresPayment = selectedGateway?.id !== 'cod' && 
                                selectedGateway?.id !== 'bacs' && 
@@ -1158,11 +1246,16 @@ export default function CheckoutPage() {
               },
             };
 
-            toast.success('Opening payment window...');
-            
-            setTimeout(() => {
-              initializePaystackPayment(paystackConfig);
-            }, 500);
+            pendingPaystackConfigRef.current = paystackConfig;
+            setHasPendingPayment(false);
+            // duration is a safety net: a loading toast otherwise lives
+            // forever, so if any path misses the dismiss it still self-clears.
+            toast.loading('Opening payment window...', { id: 'paystack-open', duration: 15000 });
+
+            // Await the robust loader rather than guessing with a timer; the
+            // toast clears as soon as the popup opens (or an error is shown).
+            await initializePaystackPayment(paystackConfig);
+            toast.dismiss('paystack-open');
           }
         } else {
           await persistCheckoutProfileIfNeeded();
@@ -1191,8 +1284,8 @@ export default function CheckoutPage() {
       <main className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">Your cart is empty</h2>
-          <Link href="/" className="text-primary-600 hover:text-primary-700 font-medium">
+          <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-4">Your cart is empty</h2>
+          <Link href="/" className="text-xs md:text-sm text-primary-600 hover:text-primary-700 font-medium">
             Continue Shopping
           </Link>
         </div>
@@ -1230,14 +1323,13 @@ export default function CheckoutPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom min-w-0 py-4 md:py-6">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Link href="/cart" className="text-gray-600 hover:text-primary-600">
-            <ArrowLeft className="w-6 h-6" />
-          </Link>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Checkout</h1>
-        </div>
+      <div className="container-custom min-w-0 py-5 md:py-6">
+        <PageHeader
+          title="Checkout"
+          subtitle="Review your details and place your order"
+          backHref="/cart"
+          backLabel="Back to cart"
+        />
 
         {loading && (
           <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -1249,10 +1341,10 @@ export default function CheckoutPage() {
           {/* Checkout Form */}
           <div className="min-w-0 space-y-6 lg:col-span-2">
             {/* Customer Information */}
-            <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+            <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
               <div className="flex items-center gap-3 mb-4">
-                <MapPin className="w-6 h-6 text-primary-600" />
-                <h2 className="text-xl font-semibold text-gray-900">Contact Information</h2>
+                <MapPin className="w-5 h-5 text-primary-600" />
+                <h2 className="text-sm md:text-base font-semibold text-gray-900">Contact Information</h2>
               </div>
               
               <div className="space-y-4">
@@ -1299,10 +1391,10 @@ export default function CheckoutPage() {
             </div>
 
             {/* Delivery Information */}
-            <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+            <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
               <div className="flex items-center gap-3 mb-4">
                 <Truck className="w-6 h-6 text-primary-600" />
-                <h2 className="text-xl font-semibold text-gray-900">Delivery Address</h2>
+                <h2 className="text-sm md:text-base font-semibold text-gray-900">Delivery Address</h2>
               </div>
               
               {hasSavedShipping && (
@@ -1468,10 +1560,10 @@ export default function CheckoutPage() {
 
             {/* Shipping Method */}
             {(loading || shippingOptions.length > 0) && (
-              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+              <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <div className="flex items-center gap-3 mb-4">
                   <Truck className="w-6 h-6 text-primary-600" />
-                  <h2 className="text-xl font-semibold text-gray-900">Shipping Method</h2>
+                  <h2 className="text-sm md:text-base font-semibold text-gray-900">Shipping Method</h2>
                 </div>
 
                 {shippingOptions.length > 0 ? (
@@ -1530,148 +1622,98 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* NEW: Discount Code + Voucher */}
-            {shippingCost !== null && shippingCost > 0 && (
-              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Tag className="w-6 h-6 text-primary-600" />
-                  <h2 className="text-xl font-semibold text-gray-900">Discounts</h2>
+            {/* Promo code — single voucher / influencer entry */}
+            {shippingCost !== null && (
+              <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <div className="mb-4 flex items-center gap-3">
+                  <Tag className="h-6 w-6 text-primary-600" />
+                  <h2 className="text-sm font-semibold text-gray-900 md:text-base">Have a promo code?</h2>
                 </div>
 
-                <div className="space-y-5">
-                  <div className="space-y-3">
-                    {appliedVoucher ? (
-                      <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-green-900">
-                              {appliedVoucher.code} Applied
-                            </p>
-                            <p className="text-sm text-green-700 mt-1">
-                              {appliedVoucher.message}
-                            </p>
-                            {voucherDiscount > 0 && (
-                              <p className="text-xs text-gray-600 mt-1">
-                                Product discount: -{formatPrice(voucherDiscount)}
-                                {appliedVoucher?.matching_items_count < appliedVoucher?.total_items_count && 
-                                  ` (applied to ${appliedVoucher.matching_items_count} of ${appliedVoucher.total_items_count} items)`
-                                }
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={removeVoucher}
-                            className="text-red-600 hover:text-red-700 text-sm font-medium"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                          <div className="min-w-0 w-full sm:flex-1">
-                            <Input
-                              placeholder="Enter campaign voucher"
-                              value={voucherCode}
-                              onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                              disabled={isApplyingVoucher}
-                              fullWidth
-                            />
-                          </div>
-                          <Button
-                            onClick={applyVoucher}
-                            disabled={
-                              !voucherCode.trim() ||
-                              isApplyingVoucher ||
-                              shippingCost === null
-                            }
-                            isLoading={isApplyingVoucher}
-                            variant="secondary"
-                            size="md"
-                            className="w-full shrink-0 whitespace-nowrap sm:w-auto"
-                            type="button"
-                          >
-                            Apply
-                          </Button>
-                        </div>
-                        {voucherError && (
-                          <p className="text-sm text-red-600">{voucherError}</p>
-                        )}
-                          <p className="text-xs text-gray-500">
-                            Campaign vouchers discount products and are validated after shipping is calculated.
-                          </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="border-t pt-4 space-y-3">
-                    {appliedCoupon ? (
-                      <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-green-900">
-                              {appliedCoupon.code} Applied
-                            </p>
-                            <p className="text-sm text-green-700 mt-1">
-                              {appliedCoupon.message}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => removeCoupon()}
-                            type="button"
-                            className="text-red-600 hover:text-red-700 text-sm font-medium"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                          <div className="min-w-0 w-full sm:flex-1">
-                            <Input
-                              placeholder="Enter influencer code"
-                              value={couponCode}
-                              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                              disabled={isApplyingCoupon || Boolean(appliedVoucher)}
-                              fullWidth
-                            />
-                          </div>
-                          <Button
-                            onClick={applyCoupon}
-                            disabled={!couponCode || isApplyingCoupon || Boolean(appliedVoucher)}
-                            isLoading={isApplyingCoupon}
-                            variant="secondary"
-                            size="md"
-                            className="w-full shrink-0 whitespace-nowrap sm:w-auto"
-                            type="button"
-                          >
-                            Apply
-                          </Button>
-                        </div>
-                        {couponError && (
-                          <p className="text-sm text-red-600">{couponError}</p>
-                        )}
-                      </div>
-                    )}
-                    <p className="text-xs text-gray-500">
-                      {appliedVoucher
-                        ? 'Remove the campaign voucher to use an influencer code.'
-                        : 'Influencer codes discount shipping.'}
+                {appliedVoucher || appliedCoupon ? (
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
+                    <p className="min-w-0 truncate text-sm font-semibold text-green-900">
+                      {(appliedVoucher?.code || appliedCoupon?.code)} applied
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (appliedVoucher) removeVoucher();
+                        else removeCoupon();
+                      }}
+                      className="shrink-0 text-sm font-medium text-red-600 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-3">
+                    <select
+                      value={promoKind}
+                      onChange={(e) => {
+                        const next = e.target.value as 'voucher' | 'influencer';
+                        setPromoKind(next);
+                        setVoucherError('');
+                        setCouponError('');
+                      }}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                    >
+                      <option value="voucher">Campaign voucher</option>
+                      <option value="influencer">Influencer code</option>
+                    </select>
+
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                      <div className="min-w-0 w-full sm:flex-1">
+                        <Input
+                          placeholder={
+                            promoKind === 'voucher'
+                              ? 'Enter voucher code'
+                              : 'Enter influencer code'
+                          }
+                          value={promoKind === 'voucher' ? voucherCode : couponCode}
+                          onChange={(e) => {
+                            const value = e.target.value.toUpperCase();
+                            if (promoKind === 'voucher') setVoucherCode(value);
+                            else setCouponCode(value);
+                          }}
+                          disabled={isApplyingVoucher || isApplyingCoupon}
+                          fullWidth
+                        />
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (promoKind === 'voucher') applyVoucher();
+                          else applyCoupon();
+                        }}
+                        disabled={
+                          (promoKind === 'voucher'
+                            ? !voucherCode.trim() || isApplyingVoucher
+                            : !couponCode.trim() || isApplyingCoupon) || shippingCost === null
+                        }
+                        isLoading={promoKind === 'voucher' ? isApplyingVoucher : isApplyingCoupon}
+                        variant="secondary"
+                        size="sm"
+                        className="w-full shrink-0 whitespace-nowrap sm:w-auto"
+                        type="button"
+                      >
+                        Apply
+                      </Button>
+                    </div>
+
+                    {(voucherError || couponError) && (
+                      <p className="text-sm text-red-600">{voucherError || couponError}</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
             {/* Payment Method */}
             {(loading || paymentGateways.length > 0) && (
-              <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
+              <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <div className="flex items-center gap-3 mb-4">
                   <CreditCard className="w-6 h-6 text-primary-600" />
-                  <h2 className="text-xl font-semibold text-gray-900">Payment Method</h2>
+                  <h2 className="text-sm md:text-base font-semibold text-gray-900">Payment Method</h2>
                 </div>
 
                 {paymentGateways.length === 0 ? (
@@ -1761,8 +1803,8 @@ export default function CheckoutPage() {
 
           {/* Order Summary */}
           <div className="min-w-0 lg:col-span-1">
-            <div className="sticky top-4 rounded-lg bg-white p-4 shadow-sm sm:p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Summary</h2>
+            <div className="sticky top-4 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+              <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-4">Order Summary</h2>
               
               <div className="mb-4 max-h-64 space-y-3 overflow-y-auto overflow-x-hidden border-b pb-4">
                 {items.map((item: any) => (
@@ -1833,23 +1875,76 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                isLoading={isProcessing}
-                onClick={handlePlaceOrder}
-                disabled={
-                  !isCheckoutReady ||
-                  (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null)
-                }
-              >
-                {isProcessing
-                  ? 'Processing...'
-                  : loading
-                    ? 'Loading checkout options...'
-                    : 'Place Order'}
-              </Button>
+              {hasPendingPayment ? (
+                <div className="space-y-2">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-center text-xs text-amber-800">
+                    Your order was created but payment was not completed.
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    fullWidth
+                    isLoading={isProcessing}
+                    onClick={async () => {
+                      if (pendingPaystackConfigRef.current) {
+                        setIsProcessing(true);
+                        toast.loading('Opening payment window...', { id: 'paystack-open', duration: 15000 });
+                        await initializePaystackPayment(pendingPaystackConfigRef.current);
+                        toast.dismiss('paystack-open');
+                      }
+                    }}
+                  >
+                    {isProcessing ? 'Processing...' : 'Retry Payment'}
+                  </Button>
+                  <button
+                    type="button"
+                    className="w-full text-center text-xs text-gray-500 underline hover:text-gray-700"
+                    onClick={async () => {
+                      const orderId = currentOrderRef.current;
+                      if (orderId) {
+                        try {
+                          await fetch(`/api/orders/${orderId}/cancel`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ reason: 'Customer cancelled before completing payment' }),
+                          });
+                        } catch {
+                          // best-effort — don't block the user if cancel call fails
+                        }
+                      }
+                      currentOrderRef.current = null;
+                      pendingPaystackConfigRef.current = null;
+                      setHasPendingPayment(false);
+                    }}
+                  >
+                    Cancel and place a new order instead
+                  </button>
+                </div>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  fullWidth
+                  isLoading={isProcessing}
+                  onClick={handlePlaceOrder}
+                  disabled={
+                    !isCheckoutReady ||
+                    (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null)
+                  }
+                >
+                  {isProcessing
+                    ? 'Processing...'
+                    : loading
+                      ? 'Loading checkout options...'
+                      : 'Place Order'}
+                </Button>
+              )}
+
+              {!paystackReady && !loading && !hasPendingPayment && (
+                <p className="mt-2 text-center text-xs text-gray-400">
+                  Preparing secure payment…
+                </p>
+              )}
 
               <p className="text-xs text-gray-500 text-center mt-4">
                 By placing your order, you agree to our{' '}

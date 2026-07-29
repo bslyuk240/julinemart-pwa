@@ -183,12 +183,6 @@ export default function TrackReturnPage() {
           )}
         </div>
 
-        <div className="text-center text-sm text-gray-600">
-          Need to add or fix the tracking number?{' '}
-          <Link href={`/returns/${returnId}/add-tracking`} className="text-primary-600 underline font-semibold">
-            Add tracking number
-          </Link>
-        </div>
       </div>
     </main>
   );

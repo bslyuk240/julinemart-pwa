@@ -1,32 +1,40 @@
-import { wcApi, handleApiError } from './client';
+import { catalogGetCategories } from '@/lib/catalog/client';
 import { Category, CategoryQueryParams } from '@/types/category';
 
 /**
- * Get all categories with optional filters
+ * Category data now comes exclusively from the Supabase/JLO catalog
+ * (catalog-meta?type=categories). WooCommerce has been retired — on a catalog
+ * miss we return empty so callers fall back to their own static defaults
+ * (e.g. CategoryStrip's FALLBACK_CATEGORIES). No WooCommerce calls are made.
+ */
+
+/**
+ * Get all categories with optional filters.
  */
 export async function getCategories(
   params: CategoryQueryParams = {}
 ): Promise<Category[]> {
-  try {
-    const response = await wcApi.get('products/categories', params);
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    return [];
+  // Server-side only — catalogGetCategories returns null in the browser.
+  const catalog = await catalogGetCategories();
+  if (!catalog || catalog.length === 0) return [];
+
+  let rows = catalog;
+  if (params.parent !== undefined) {
+    rows = rows.filter((c) => c.parent === Number(params.parent));
   }
+  if (params.per_page !== undefined) {
+    rows = rows.slice(0, Number(params.per_page));
+  }
+  return rows as unknown as Category[];
 }
 
 /**
  * Get a single category by ID
  */
 export async function getCategory(id: number): Promise<Category | null> {
-  try {
-    const response = await wcApi.get(`products/categories/${id}`);
-    return response.data;
-  } catch (error) {
-    handleApiError(error);
-    return null;
-  }
+  const catalog = await catalogGetCategories();
+  const match = catalog?.find((c) => c.id === Number(id));
+  return (match as unknown as Category) ?? null;
 }
 
 /**
@@ -35,13 +43,9 @@ export async function getCategory(id: number): Promise<Category | null> {
 export async function getCategoryBySlug(
   slug: string
 ): Promise<Category | null> {
-  try {
-    const response = await wcApi.get('products/categories', { slug });
-    return response.data[0] || null;
-  } catch (error) {
-    handleApiError(error);
-    return null;
-  }
+  const catalog = await catalogGetCategories();
+  const match = catalog?.find((c) => c.slug === slug);
+  return (match as unknown as Category) ?? null;
 }
 
 /**

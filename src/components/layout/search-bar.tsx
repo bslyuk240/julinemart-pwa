@@ -82,14 +82,14 @@ export default function SearchBar() {
           onFocus={() => setIsFocused(true)}
           onBlur={() => setTimeout(() => setIsFocused(false), 150)}
           placeholder="Search for products, brands and categories..."
-          className="w-full pl-10 pr-20 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-transparent transition-colors"
+          className="w-full pl-10 pr-12 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-transparent transition-colors"
         />
 
         {query ? (
           <button
             type="button"
             onClick={handleClear}
-            className="absolute right-20 p-1 hover:bg-gray-100 rounded-full transition-colors"
+            className="absolute right-11 p-1 hover:bg-gray-100 rounded-full transition-colors"
             aria-label="Clear search"
           >
             <X className="w-4 h-4 text-gray-500" />
@@ -98,9 +98,10 @@ export default function SearchBar() {
 
         <button
           type="submit"
-          className="absolute right-2 bg-secondary-500 hover:bg-secondary-600 text-white px-4 py-2 rounded-md transition-colors font-medium"
+          aria-label="Search"
+          className="absolute right-2 w-8 h-8 bg-secondary-500 hover:bg-secondary-600 rounded-lg flex items-center justify-center transition-colors active:scale-95"
         >
-          Search
+          <Search className="w-4 h-4 text-white" />
         </button>
       </div>
 

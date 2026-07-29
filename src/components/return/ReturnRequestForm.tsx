@@ -49,7 +49,7 @@ const FEZ_HUBS: FezHub[] = [
   { name: 'Uyo Hub', address: 'Belderick House, 15 Mbaba Afia Street, Off Aka Road (Near IBB/Aka Road Junction), Uyo', city: 'Uyo', state: 'Akwa Ibom', contact: '+234 813 632 6573' },
 ];
 
-type Resolution = 'refund' | 'replacement';
+type Resolution = 'refund';
 const JLO_RETURNS_URL = 'https://jlo.julinemart.com/api/returns-create';
 const DEFAULT_HUB_ID = '51a0aad5-c866-4ac5-83ef-22ab41ccd063';
 
@@ -538,27 +538,6 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
         </div>
 
         <form className="bg-white rounded-xl shadow-sm p-6 space-y-5" onSubmit={handleSubmit}>
-          <div>
-            <h2 className="font-semibold text-gray-900 mb-3">Preferred resolution</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {(['refund', 'replacement'] as Resolution[]).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setPreferredResolution(option)}
-                  className={`border rounded-lg p-3 text-left transition ${
-                    preferredResolution === option ? 'border-primary-600 bg-primary-50' : 'border-gray-200 bg-white'
-                  }`}
-                >
-                  <p className="font-semibold text-gray-900 capitalize">{option}</p>
-                  <p className="text-xs text-gray-600">
-                    {option === 'refund' ? 'Refund after inspection' : 'Replacement if stock is available'}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div>
             <h2 className="font-semibold text-gray-900 mb-3">Return method</h2>
             <div className="grid grid-cols-1 gap-3">

@@ -83,6 +83,7 @@ export default function Header() {
           console.log('Banner API failed, using default banner');
         }
       } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return;
         console.error('Error fetching banner:', error);
       } finally {
         setBannerLoading(false);
@@ -205,14 +206,15 @@ export default function Header() {
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setTimeout(() => setIsFocused(false), 150)}
                   placeholder="Search for products, brands and categories..."
-                  className="w-full px-4 py-2.5 pl-10 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-primary-500 transition-colors"
+                  className="w-full py-2.5 pl-10 pr-12 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-primary-500 transition-colors"
                 />
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <button
                   type="submit"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-secondary-500 hover:bg-secondary-600 text-white px-5 md:px-6 py-1.5 rounded-md transition-colors"
+                  aria-label="Search"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 bg-secondary-500 hover:bg-secondary-600 rounded-lg flex items-center justify-center transition-colors active:scale-95"
                 >
-                  Search
+                  <Search className="w-4 h-4 text-white" />
                 </button>
               </div>
             </form>

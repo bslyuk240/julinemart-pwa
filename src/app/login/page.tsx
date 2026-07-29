@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
 import GoogleSignInButton from '@/components/auth/google-sign-in-button';
 import { trackLoginSuccess } from '@/lib/gtag';
+import { logActivity } from '@/lib/logActivity';
 
 function LoginContent() {
   const router = useRouter();
@@ -29,11 +30,17 @@ function LoginContent() {
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
+  const validationMessages = {
+    emailRequired: 'Email is required',
+    emailInvalid: 'Invalid email address',
+    credentialRequired: 'Password is required',
+  } as const;
+
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!formData.email.trim()) errs.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errs.email = 'Invalid email address';
-    if (!formData.password) errs.password = 'Password is required';
+    if (!formData.email.trim()) errs.email = validationMessages.emailRequired;
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errs.email = validationMessages.emailInvalid;
+    if (!formData.password) errs.password = validationMessages.credentialRequired;
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -59,6 +66,7 @@ function LoginContent() {
 
       toast.success('Welcome back!');
       trackLoginSuccess({ method: 'email' });
+      logActivity({ action: 'LOGIN', details: { method: 'email' } });
       router.push(redirect);
     } catch (err: any) {
       toast.error('Login failed. Please try again.');

@@ -190,16 +190,7 @@
   }
 }
 
-/* Add padding to main content for bottom nav */
-main {
-  padding-bottom: calc(64px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
-}
-
-@media (min-width: 768px) {
-  main {
-    padding-bottom: 2rem;
-  }
-}
+/* Main bottom padding: mobile uses Tailwind on <main> in layout.tsx (nav clearance). */
 
 /* Prevent scroll bounce on iOS but keep normal scrolling */
 body {

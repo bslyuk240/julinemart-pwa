@@ -4,23 +4,24 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Download, Share } from 'lucide-react';
 import Image from 'next/image';
 import { trackPwaInstallAccepted, trackPwaInstallPromptShown } from '@/lib/gtag';
+import { safeStorage } from '@/lib/safe-storage';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+const DISMISSED_KEY   = 'pwa-install-dismissed';
+const VISIT_COUNT_KEY = 'jm_visit_count';
+const DISMISS_COOLDOWN_DAYS = 14; // don't re-show for 2 weeks after dismiss
+
 function getOrCreateAnonymousId(): string {
-  try {
-    const key = 'jm_anon_id';
-    const existing = localStorage.getItem(key);
-    if (existing) return existing;
-    const id = crypto.randomUUID();
-    localStorage.setItem(key, id);
-    return id;
-  } catch {
-    return 'unknown';
-  }
+  const key = 'jm_anon_id';
+  const existing = safeStorage.getItem(key);
+  if (existing) return existing;
+  const id = crypto.randomUUID();
+  safeStorage.setItem(key, id);
+  return id;
 }
 
 async function logPwaEvent(params: {
@@ -45,11 +46,20 @@ async function logPwaEvent(params: {
   }
 }
 
+function incrementAndGetVisitCount(): number {
+  const raw = safeStorage.getItem(VISIT_COUNT_KEY);
+  const prev = raw ? parseInt(raw, 10) : 0;
+  const next = prev + 1;
+  safeStorage.setItem(VISIT_COUNT_KEY, String(next));
+  return next;
+}
+
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [isReturningVisitor, setIsReturningVisitor] = useState(false);
   const hasTrackedPromptShownRef = useRef(false);
 
   useEffect(() => {
@@ -58,27 +68,40 @@ export default function PWAInstallPrompt() {
       (window.navigator as any).standalone === true;
 
     setIsStandalone(isInStandalone);
+    if (isInStandalone) return; // already installed — never show
 
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     setIsIOS(iOS);
 
-    const dismissed = localStorage.getItem('pwa-install-dismissed');
-    const dismissedTime = dismissed ? parseInt(dismissed) : 0;
+    // Check dismiss cooldown
+    const dismissed = safeStorage.getItem(DISMISSED_KEY);
+    const dismissedTime = dismissed ? parseInt(dismissed, 10) : 0;
     const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
+    if (daysSinceDismissed < DISMISS_COOLDOWN_DAYS) return;
 
-    if (!isInStandalone && daysSinceDismissed > 7) {
-      if (iOS) {
-        setTimeout(() => setShowPrompt(true), 3000);
-      } else {
-        const handler = (e: Event) => {
-          e.preventDefault();
-          setDeferredPrompt(e as BeforeInstallPromptEvent);
-          setTimeout(() => setShowPrompt(true), 3000);
-        };
+    const visitCount = incrementAndGetVisitCount();
+    const returning = visitCount > 1;
+    setIsReturningVisitor(returning);
 
-        window.addEventListener('beforeinstallprompt', handler);
-        return () => window.removeEventListener('beforeinstallprompt', handler);
-      }
+    if (iOS) {
+      // iOS: only show on 2nd+ visit — user already knows the site
+      if (visitCount < 2) return;
+      const t = setTimeout(() => setShowPrompt(true), 15 * 1000);
+      return () => clearTimeout(t);
+    } else {
+      // Android: wait for the browser install prompt, then wait 15 seconds
+      const handler = (e: Event) => {
+        e.preventDefault();
+        setDeferredPrompt(e as BeforeInstallPromptEvent);
+        const t = setTimeout(() => setShowPrompt(true), 15 * 1000);
+        // store timeout id for cleanup — we do it via returned cleanup
+        (handler as any)._timeout = t;
+      };
+      window.addEventListener('beforeinstallprompt', handler);
+      return () => {
+        window.removeEventListener('beforeinstallprompt', handler);
+        if ((handler as any)._timeout) clearTimeout((handler as any)._timeout);
+      };
     }
   }, []);
 
@@ -96,7 +119,6 @@ export default function PWAInstallPrompt() {
       hasTrackedPromptShownRef.current = false;
       return;
     }
-
     if (isStandalone || hasTrackedPromptShownRef.current) return;
 
     const platform = isIOS ? 'ios' : 'android_desktop';
@@ -126,15 +148,22 @@ export default function PWAInstallPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+    safeStorage.setItem(DISMISSED_KEY, Date.now().toString());
     if (isIOS) {
       logPwaEvent({ event_name: 'pwa_ios_guide_dismissed', platform: 'ios' });
     }
   };
 
-  if (isStandalone || !showPrompt) {
-    return null;
-  }
+  if (isStandalone || !showPrompt) return null;
+
+  // Message varies based on whether this is a returning visitor
+  const headline = isReturningVisitor
+    ? 'Welcome back to JulineMart!'
+    : 'Install JulineMart';
+
+  const subtitle = isReturningVisitor
+    ? 'Save it to your home screen for instant access — no browser needed'
+    : 'Get the full app experience with faster loading and offline access';
 
   return (
     <>
@@ -142,7 +171,7 @@ export default function PWAInstallPrompt() {
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 animate-in fade-in duration-300" />
 
       {/* Install Prompt */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 md:bottom-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md md:rounded-t-2xl">
+      <div className="fixed bottom-[var(--jm-vv-bottom-inset,0px)] left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 md:bottom-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md md:rounded-t-2xl">
         <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl p-6 relative">
           {/* Close Button */}
           <button
@@ -167,34 +196,30 @@ export default function PWAInstallPrompt() {
           </div>
 
           {/* Title */}
-          <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">
-            Install JulineMart
-          </h2>
-          <p className="text-center text-gray-600 mb-6">
-            Get the full app experience with faster loading and offline access
-          </p>
+          <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">{headline}</h2>
+          <p className="text-center text-gray-600 mb-6">{subtitle}</p>
 
           {/* iOS Instructions */}
           {isIOS ? (
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm font-semibold text-blue-900 mb-3">
-                  📱 Install on iPhone/iPad:
+                  📱 Add to your iPhone/iPad home screen:
                 </p>
                 <ol className="text-sm text-blue-800 space-y-2">
                   <li className="flex items-start gap-2">
                     <span className="font-bold">1.</span>
                     <span>
-                      Tap the <Share className="w-4 h-4 inline mx-1" /> Share button at the bottom
+                      Tap the <Share className="w-4 h-4 inline mx-1" /> Share button at the bottom of Safari
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="font-bold">2.</span>
-                    <span>Scroll down and tap "Add to Home Screen"</span>
+                    <span>Scroll down and tap <strong>"Add to Home Screen"</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="font-bold">3.</span>
-                    <span>Tap "Add" in the top right corner</span>
+                    <span>Tap <strong>"Add"</strong> in the top right corner</span>
                   </li>
                 </ol>
               </div>
@@ -210,9 +235,7 @@ export default function PWAInstallPrompt() {
             // Android/Desktop Install Button
             <div className="space-y-3">
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <p className="text-sm text-green-800">
-                  ✨ <strong>Benefits:</strong>
-                </p>
+                <p className="text-sm text-green-800">✨ <strong>Why install?</strong></p>
                 <ul className="text-sm text-green-700 mt-2 space-y-1">
                   <li>• Faster loading times</li>
                   <li>• Works offline</li>

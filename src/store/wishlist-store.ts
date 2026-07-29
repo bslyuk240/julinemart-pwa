@@ -42,7 +42,12 @@ export const useWishlistStore = create<WishlistState>()(
           name: product.name,
           slug: product.slug,
           price: product.price,
-          image: product.images[0]?.src || '/images/placeholder.svg',
+          // Accept both shapes: full product (images[]) from product cards, and
+          // the flat { image } object passed from the product detail page.
+          image:
+            product.images?.[0]?.src ||
+            (product as any).image ||
+            '/images/placeholder.svg',
           addedAt: new Date().toISOString(),
         };
         

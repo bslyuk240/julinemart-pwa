@@ -14,13 +14,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'No credential provided' }, { status: 400 });
     }
 
-    // Decode Google JWT (signature already verified by Google's GSI library client-side)
-    const base64Url = credential.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+    // Verify Google ID token server-side using Google's tokeninfo endpoint.
+    // Client-side verification alone cannot be trusted — anyone can forge a JWT payload.
+    const tokenInfoRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
     );
-    const googleUser = JSON.parse(jsonPayload);
+    if (!tokenInfoRes.ok) {
+      return NextResponse.json({ success: false, message: 'Invalid Google credential.' }, { status: 401 });
+    }
+    const googleUser = await tokenInfoRes.json();
+
+    // Confirm the token was issued for this app's client ID
+    const expectedAudiences = [
+      process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+      process.env.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    ].filter(Boolean);
+    if (expectedAudiences.length > 0 && !expectedAudiences.includes(googleUser.aud)) {
+      return NextResponse.json({ success: false, message: 'Token audience mismatch.' }, { status: 401 });
+    }
 
     const { email, given_name: firstName, family_name: lastName, name: fullName, picture: avatarUrl, sub: googleId } = googleUser;
 
@@ -31,38 +42,9 @@ export async function POST(request: NextRequest) {
     const userFirstName = firstName || (fullName ? fullName.split(' ')[0] : '');
     const userLastName = lastName || (fullName ? fullName.split(' ').slice(1).join(' ') : '');
 
-    // Try to find existing user by email
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === email);
-
-    if (existingUser) {
-      // Update avatar if Google provides one
-      if (avatarUrl && !existingUser.user_metadata?.avatar_url) {
-        await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
-          user_metadata: { ...existingUser.user_metadata, avatar_url: avatarUrl },
-        });
-        await supabaseAdmin.from('customers').update({ avatar_url: avatarUrl }).eq('id', existingUser.id);
-      }
-
-      // Sign in via magic link token exchange — return a session
-      const { data: sessionData, error: sessionErr } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'magiclink',
-        email,
-      });
-      if (sessionErr || !sessionData) {
-        return NextResponse.json({ success: false, message: 'Failed to generate session' }, { status: 500 });
-      }
-
-      return NextResponse.json({
-        success: true,
-        action: 'login',
-        // Front-end will exchange this token via supabase.auth.verifyOtp
-        token_hash: sessionData.properties?.hashed_token,
-        email,
-      });
-    }
-
-    // New user — create in Supabase Auth
+    // Attempt to create the user. If the email already exists (regardless of
+    // how many users are in the DB, listUsers pagination is unreliable), we
+    // treat it as an existing-user sign-in instead.
     const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
       email_confirm: true,
@@ -74,25 +56,62 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (createErr || !newUser.user) {
-      return NextResponse.json({ success: false, message: createErr?.message || 'Failed to create account' }, { status: 500 });
+    // Determine the user we're working with (new or existing)
+    type AuthUser = { id: string; email?: string; user_metadata?: Record<string, unknown> };
+    let resolvedUser: AuthUser | null = newUser?.user ?? null;
+    let isNewUser = !!resolvedUser;
+
+    if (createErr) {
+      const isAlreadyExists =
+        createErr.message?.toLowerCase().includes('already') ||
+        createErr.message?.toLowerCase().includes('registered') ||
+        createErr.message?.toLowerCase().includes('exists');
+
+      if (!isAlreadyExists) {
+        return NextResponse.json({ success: false, message: createErr.message || 'Failed to create account' }, { status: 500 });
+      }
+
+      // User exists — find them via paginated listUsers
+      // We scan up to 5 pages (500 users) to locate the account
+      let found: AuthUser | undefined;
+      for (let page = 1; page <= 5 && !found; page++) {
+        const { data: pageData } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 100 });
+        found = pageData?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      }
+      if (!found) {
+        return NextResponse.json({ success: false, message: 'Failed to locate account' }, { status: 500 });
+      }
+      resolvedUser = found;
+      isNewUser = false;
     }
 
-    // customer row created by DB trigger — generate session token
+    if (!resolvedUser) {
+      return NextResponse.json({ success: false, message: 'Failed to create account' }, { status: 500 });
+    }
+
+    // Update avatar for existing users who don't have one yet
+    if (!isNewUser && avatarUrl && !resolvedUser.user_metadata?.avatar_url) {
+      await supabaseAdmin.auth.admin.updateUserById(resolvedUser.id, {
+        user_metadata: { ...resolvedUser.user_metadata, avatar_url: avatarUrl },
+      });
+      await supabaseAdmin.from('customers').update({ avatar_url: avatarUrl }).eq('id', resolvedUser.id);
+    }
+
+    // Generate a magic-link token to establish a real Supabase session client-side
     const { data: sessionData, error: sessionErr } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email,
     });
     if (sessionErr || !sessionData) {
-      return NextResponse.json({ success: false, message: 'Account created but session failed' }, { status: 500 });
+      return NextResponse.json({ success: false, message: isNewUser ? 'Account created but session failed' : 'Failed to generate session' }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
-      action: 'signup',
+      action: isNewUser ? 'signup' : 'login',
       token_hash: sessionData.properties?.hashed_token,
       email,
-      first_name: userFirstName,
+      ...(isNewUser && { first_name: userFirstName }),
     });
   } catch (error: any) {
     console.error('Google auth error:', error);

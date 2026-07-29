@@ -18,8 +18,18 @@ const SUB_STATUS_RANK: Record<string, number> = {
 };
 
 function deriveOrderStatus(o: any): string {
+  const dbStatus: string = o.overall_status || 'pending';
+
+  // Unpaid / not-yet-confirmed orders stay 'pending'. Sub-orders are created at
+  // checkout (before payment) with status 'pending', so we must NOT let that
+  // derive a 'pending' order forward to 'processing'. verify-payment is what
+  // moves overall_status to 'processing' once payment is confirmed.
+  if (dbStatus === 'pending') return 'pending';
+
+  // Terminal states pass through untouched
+  if (dbStatus === 'cancelled' || dbStatus === 'refunded') return dbStatus;
+
   const subOrders: any[] = o.sub_orders || [];
-  const dbStatus: string = o.overall_status || 'processing';
   if (!subOrders.length) return dbStatus;
 
   const ranks = subOrders
@@ -67,6 +77,7 @@ function adaptOrder(o: any) {
     currency: 'NGN',
     payment_method: o.payment_method || '',
     payment_method_title: o.payment_method || 'Paystack',
+    payment_status: o.payment_status || 'pending',
     transaction_id: o.payment_reference || '',
     billing: {
       first_name: firstName, last_name: lastName,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { logger } from '@/lib/logger';
 
 export default function GoogleCallbackPage() {
   const router = useRouter();
@@ -17,30 +18,25 @@ export default function GoogleCallbackPage() {
     // Get search params from window.location in browser
     const urlParams = new URLSearchParams(window.location.search);
     
-    // If no parameters, just show waiting state (for direct URL access)
-    if (!urlParams.toString()) {
-      console.log('⏳ Waiting for OAuth redirect...');
-      return;
-    }
+    if (!urlParams.toString()) return;
     
     const handleCallback = async () => {
       const code = urlParams.get('code');
       const error = urlParams.get('error');
 
       if (error) {
-        console.error('OAuth error:', error);
-        // Redirect back to home with error toast
+        logger.error('OAuth error', new Error(String(error)));
         router.push(`/?auth_error=${encodeURIComponent(error)}`);
         return;
       }
 
       if (!code) {
-        console.error('No authorization code received');
+        logger.error('No authorization code received');
         router.push('/?auth_error=no_code');
         return;
       }
 
-      console.log('✅ Authorization code received in callback');
+      logger.info('Authorization code received in callback');
 
       // Ensure we're in the browser
       if (typeof window === 'undefined') {
@@ -54,7 +50,7 @@ export default function GoogleCallbackPage() {
       // If in external browser (Chrome Custom Tabs), redirect back to app with custom scheme
       if (!isCapacitor) {
         const appUri = `julinemart://oauth?code=${encodeURIComponent(code)}&state=google`;
-        console.log('📲 Redirecting to app via julinemart://...');
+        logger.info('Redirecting to app via custom scheme');
         window.location.replace(appUri);
         setTimeout(() => {
           const a = document.createElement('a');
@@ -87,7 +83,7 @@ export default function GoogleCallbackPage() {
         try {
           const redirectUri = `${window.location.origin}/auth/google/callback`;
 
-          console.log('🔄 Exchanging code for tokens via backend...');
+          logger.info('Exchanging code for tokens via backend');
 
           const tokenResponse = await fetch('/api/auth/google/token-exchange', {
             method: 'POST',
@@ -106,7 +102,7 @@ export default function GoogleCallbackPage() {
           }
 
           const data = await tokenResponse.json();
-          console.log('✅ Tokens received, signing in...');
+          logger.info('Tokens received, signing in');
 
           // Sign in with NextAuth using the ID token
           const signInResponse = await fetch('/api/auth/callback/credentials', {
@@ -125,7 +121,7 @@ export default function GoogleCallbackPage() {
             throw new Error('Sign in failed');
           }
         } catch (error) {
-          console.error('Token exchange error:', error);
+          logger.error('Token exchange error', error instanceof Error ? error : new Error(String(error)));
           router.push(
             `/?auth_error=${encodeURIComponent(
               error instanceof Error ? error.message : 'Token exchange failed'

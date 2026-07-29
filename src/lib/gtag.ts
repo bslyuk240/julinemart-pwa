@@ -1,3 +1,5 @@
+import { getStoredConsent } from './cookie-consent';
+
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
@@ -19,6 +21,9 @@ export interface EcommerceItem {
 export function gaEvent(eventName: string, params: Record<string, unknown> = {}) {
   if (typeof window === 'undefined') return;
   if (typeof window.gtag !== 'function') return;
+  // Respect cookie consent — GA4 Consent Mode also blocks this server-side,
+  // but we guard here too so no event call is made at all when denied.
+  if (getStoredConsent() !== 'all') return;
 
   window.gtag('event', eventName, params);
 }

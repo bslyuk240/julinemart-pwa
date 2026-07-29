@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
+// force-dynamic so Next.js does NOT collapse page=1, page=2, etc into one
+// cached response. The internal JLO fetch already has next:{revalidate:300}
+// which caches the expensive Supabase call per unique URL (including ?page=N).
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 /**
  * GET /api/vendor/[id]
@@ -77,6 +80,27 @@ export async function GET(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const firstRow = body.data[0] as any;
     const vendorRow = firstRow?.vendor ?? null;
+
+    // Fetch vendor rating from product_reviews using the vendor's UUID
+    let vendorRating: { avg: string; count: number } | null = null;
+    const vendorUuid: string | null = vendorRow?.id ?? null;
+    if (vendorUuid) {
+      try {
+        const supabase = getSupabaseServerClient();
+        const { data: ratingData } = await supabase
+          .from('product_reviews')
+          .select('rating')
+          .eq('vendor_id', vendorUuid)
+          .eq('status', 'approved');
+        if (ratingData && ratingData.length > 0) {
+          const avg = ratingData.reduce((s, r) => s + Number(r.rating), 0) / ratingData.length;
+          vendorRating = { avg: avg.toFixed(1), count: ratingData.length };
+        }
+      } catch {
+        // non-fatal — vendor page just shows "No ratings"
+      }
+    }
+
     const vendor = vendorRow
       ? {
           id: WooKey,
@@ -89,6 +113,7 @@ export async function GET(
           is_active: true,
           store_slug: vendorRow.store_slug ?? '',
           store_url: `/vendor/${WooKey}`,
+          rating: vendorRating ?? undefined,
         }
       : null;
 
@@ -121,8 +146,8 @@ export async function GET(
         images,
         categories:    Array.isArray(p.categories) ? p.categories : [],
         tags:          Array.isArray(p.tags)        ? p.tags        : [],
-        average_rating: '0',
-        rating_count:  0,
+        average_rating: String(p.average_rating ?? '0'),
+        rating_count:  Number(p.rating_count ?? 0),
         date_created:  p.created_at ?? '',
         store: vendor
           ? { id: WooKey, name: vendor.store_name, shop_name: vendor.store_name, url: `/vendor/${WooKey}`, address: {} }
