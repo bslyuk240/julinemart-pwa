@@ -1,8 +1,45 @@
 // @ts-check
 const { withSentryConfig } = require('@sentry/nextjs');
 
+const securityHeaders = [
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net https://www.googletagmanager.com https://js.paystack.co",
+      "worker-src 'self' blob:",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https: http:",
+      "connect-src 'self' https://*.supabase.co https://*.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.woocommerce.com https://*.sentry.io wss://*.supabase.co https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://api.paystack.co",
+      // youtube-nocookie/vimeo added for campaign vendor-intro videos (SEC-401)
+      "frame-src https://accounts.google.com https://checkout.paystack.com https://www.youtube-nocookie.com https://player.vimeo.com",
+      // no media-src existed before campaigns — self-hosted (Supabase Storage / Cloudinary)
+      // or YouTube/Vimeo-hosted hero/vendor-intro <video> sources need this explicitly,
+      // they don't fall under img-src and would otherwise fall back to default-src 'self'.
+      "media-src 'self' blob: https://*.supabase.co https://res.cloudinary.com https://*.cloudinary.com https://www.youtube-nocookie.com https://player.vimeo.com",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+    ].join('; '),
+  },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
+  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: securityHeaders,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {
@@ -29,6 +66,13 @@ const nextConfig = {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     /** Set to `/julinemart-pwa` when hosting the Next app under that path (SW + `/api`). */
     NEXT_PUBLIC_BASE_PATH: (process.env.NEXT_PUBLIC_BASE_PATH || '').trim(),
+    /**
+     * Sentry environment tag. Netlify sets CONTEXT at build time
+     * (production | deploy-preview | branch-deploy); local `next dev`/`next build`
+     * has no CONTEXT, so fall back to NODE_ENV. Read by sentry.*.config.ts.
+     */
+    NEXT_PUBLIC_SENTRY_ENVIRONMENT:
+      process.env.CONTEXT || (process.env.NODE_ENV === 'production' ? 'production' : 'development'),
   },
 
   experimental: {

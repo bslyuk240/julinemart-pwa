@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CreditCard, Plus, Trash2, Check, Shield, AlertCircle, Lock } from 'lucide-react';
+import { CreditCard, Plus, Trash2, Check, Shield, Lock } from 'lucide-react';
+import AccountPageHeader from '@/components/account/account-page-header';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useCustomerAuth } from '@/context/customer-auth-context';
@@ -144,23 +144,25 @@ export default function PaymentMethodsPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <Link href="/account" className="flex items-center gap-2 text-gray-600 hover:text-primary-600 mb-6">
-          <ArrowLeft className="w-5 h-5" /><span>Back to Account</span>
-        </Link>
-
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Payment Methods</h1>
-            <p className="text-sm text-gray-600 mt-1">Manage your saved payment cards</p>
-          </div>
-          <Button onClick={handleAddCard} disabled={loading} variant="primary" className="flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Add Card
-          </Button>
-        </div>
+      <div className="container mx-auto px-4 py-5 md:py-6 max-w-4xl">
+        <AccountPageHeader
+          title="Payment Methods"
+          subtitle="Manage your saved payment cards"
+          action={(
+            <button
+              type="button"
+              onClick={handleAddCard}
+              disabled={loading}
+              aria-label="Add payment method"
+              className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center hover:bg-primary-700 transition-colors active:scale-95 disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4 text-white" />
+            </button>
+          )}
+        />
 
         {/* Security notice */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 md:p-4 mb-4 md:mb-6 flex items-start gap-3">
           <Shield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-800">
             <p className="font-medium">Secure Card Storage</p>
@@ -169,26 +171,26 @@ export default function PaymentMethodsPage() {
         </div>
 
         {savedCards.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-            <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No payment methods saved</h3>
-            <p className="text-gray-600 mb-5">Add a card for faster checkout</p>
-            <Button onClick={handleAddCard} disabled={loading} variant="primary">
-              <Plus className="w-4 h-4 mr-2" /> Add Payment Method
+          <div className="bg-white rounded-2xl shadow-sm p-6 md:p-10 text-center">
+            <CreditCard className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+            <h3 className="text-sm md:text-base font-medium text-gray-900 mb-1">No payment methods saved</h3>
+            <p className="text-xs md:text-sm text-gray-600 mb-4">Add a card for faster checkout</p>
+            <Button onClick={handleAddCard} disabled={loading} variant="primary" size="sm">
+              <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Payment Method
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {savedCards.map(card => (
               <div key={card.id}
-                className={`bg-white rounded-xl shadow-sm p-5 border-2 ${card.is_default ? 'border-primary-500' : 'border-transparent'}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <CreditCard className={`w-6 h-6 ${cardBrandColor[card.card_type?.toLowerCase() || ''] || 'text-gray-600'}`} />
+                className={`bg-white rounded-2xl shadow-sm p-4 border-2 ${card.is_default ? 'border-primary-500' : 'border-transparent'}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <CreditCard className={`w-5 h-5 ${cardBrandColor[card.card_type?.toLowerCase() || ''] || 'text-gray-600'}`} />
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-900 capitalize">
+                      <p className="font-semibold text-gray-900 capitalize text-sm md:text-base">
                         {card.card_type || 'Card'} •••• {card.last4}
                       </p>
                       <p className="text-sm text-gray-600">
@@ -204,13 +206,26 @@ export default function PaymentMethodsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {!card.is_default && (
-                      <Button onClick={() => handleSetDefault(card.id)} disabled={loading}
-                        variant="outline" size="sm">Set Default</Button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetDefault(card.id)}
+                        disabled={loading}
+                        aria-label="Set as default card"
+                        className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors active:scale-95 disabled:opacity-50"
+                        title="Set default"
+                      >
+                        <Check className="w-3.5 h-3.5 text-primary-600" />
+                      </button>
                     )}
-                    <Button onClick={() => handleDelete(card.id)} disabled={loading}
-                      variant="outline" size="sm" className="text-red-600 hover:bg-red-50">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(card.id)}
+                      disabled={loading}
+                      aria-label="Remove payment method"
+                      className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-red-600 hover:bg-red-50 transition-colors active:scale-95 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               </div>

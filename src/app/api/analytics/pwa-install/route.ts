@@ -42,12 +42,12 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('pwa_install_events insert error:', error.message);
-      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+      return NextResponse.json({ success: false }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('pwa-install analytics error:', err);
-    return NextResponse.json({ success: false, message: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ success: false }, { status: 500 });
   }
 }

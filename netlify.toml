@@ -1,3 +1,7 @@
+[build.environment]
+  # Android native files are not used by the Next.js build; omit from secrets scanning.
+  SECRETS_SCAN_OMIT_PATHS = "android/**"
+
 [[headers]]
   for = "/.well-known/assetlinks.json"
   [headers.values]

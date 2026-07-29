@@ -3,11 +3,9 @@ import {
   BookOpen,
   Car,
   Dumbbell,
-  Droplets,
   Home as HomeIcon,
   Laptop,
   LucideIcon,
-  Package,
   Shirt,
   ShoppingCart,
   Sparkles,
@@ -58,20 +56,11 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
   },
   {
     slug: 'home-living',
-    name: 'Home Living',
+    name: 'Home and Living',
     visual: {
       icon: HomeIcon,
       color: 'bg-green-500',
       image: 'https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400',
-    },
-  },
-  {
-    slug: 'home-items',
-    name: 'Home Items',
-    visual: {
-      icon: Package,
-      color: 'bg-emerald-500',
-      image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400',
     },
   },
   {
@@ -90,15 +79,6 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
       icon: Sparkles,
       color: 'bg-purple-500',
       image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400',
-    },
-  },
-  {
-    slug: 'sanitary-products',
-    name: 'Sanitary Products',
-    visual: {
-      icon: Droplets,
-      color: 'bg-cyan-500',
-      image: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=400',
     },
   },
   {
@@ -122,15 +102,6 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
   {
     slug: 'sports-fitness',
     name: 'Sports Fitness',
-    visual: {
-      icon: Dumbbell,
-      color: 'bg-teal-500',
-      image: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=400',
-    },
-  },
-  {
-    slug: 'fitness-equipment',
-    name: 'Fitness Equipment',
     visual: {
       icon: Dumbbell,
       color: 'bg-teal-500',
@@ -195,6 +166,22 @@ export function getCategoryVisual(slug: string, name?: string): CategoryVisual {
   }
 
   return FALLBACK_VISUAL;
+}
+
+const CATEGORY_NAMES = new Map<string, string>();
+for (const definition of CATEGORY_DEFINITIONS) {
+  CATEGORY_NAMES.set(slugify(definition.slug), definition.name);
+}
+
+/** Known display name for a category slug, falling back to a humanized version of the slug. */
+export function getCategoryDisplayName(slug: string): string {
+  const known = CATEGORY_NAMES.get(slugify(decodeHtmlEntities(slug)));
+  if (known) return known;
+
+  return slug
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 export const FALLBACK_CATEGORY_SLUGS = CATEGORY_DEFINITIONS.map((definition) => definition.slug);
