@@ -43,46 +43,55 @@ export default function CampaignOffersPopup({ campaigns }: CampaignOffersPopupPr
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[70] overflow-y-auto overscroll-contain bg-black/50 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="campaign-offers-title"
+      onClick={dismiss}
     >
-      <div
-        className="w-full max-w-md animate-in slide-in-from-bottom rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:slide-in-from-bottom-0 sm:zoom-in-95"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 id="campaign-offers-title" className="text-lg font-extrabold text-gray-900">
-                Campaign offers
-              </h2>
-              <p className="text-sm text-gray-500">Limited deals — tap to explore</p>
+      <div className="flex min-h-full items-center justify-center p-4 pb-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px)+1rem)] sm:pb-4">
+        <div
+          className="flex w-full max-w-md max-h-[min(85dvh,calc(100dvh-4rem-env(safe-area-inset-bottom,0px)-var(--jm-vv-bottom-inset,0px)-2rem))] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-in zoom-in-95"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="shrink-0 border-b border-gray-100 p-5 pb-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 id="campaign-offers-title" className="text-lg font-extrabold text-gray-900">
+                    Campaign offers
+                  </h2>
+                  <p className="text-sm text-gray-500">Limited deals — tap to explore</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={dismiss}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={dismiss}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3">
+            <CampaignOffersList campaigns={campaigns} />
+          </div>
+
+          <div className="shrink-0 border-t border-gray-100 p-5 pt-3">
+            <button
+              type="button"
+              onClick={dismiss}
+              className="w-full rounded-xl py-3 text-sm font-semibold text-gray-500 hover:bg-gray-50"
+            >
+              Maybe later
+            </button>
+          </div>
         </div>
-
-        <CampaignOffersList campaigns={campaigns} />
-
-        <button
-          type="button"
-          onClick={dismiss}
-          className="mt-4 w-full rounded-xl py-3 text-sm font-semibold text-gray-500 hover:bg-gray-50"
-        >
-          Maybe later
-        </button>
       </div>
     </div>
   );
