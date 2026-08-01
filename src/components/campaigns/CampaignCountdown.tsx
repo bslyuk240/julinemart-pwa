@@ -41,9 +41,13 @@ function Unit({ value, label }: { value: string; label: string }) {
 export default function CampaignCountdown({
   endDate,
   variant = 'banner',
+  inline = false,
+  className = '',
 }: {
   endDate?: string;
-  variant?: 'banner' | 'compact';
+  variant?: 'banner' | 'compact' | 'micro';
+  inline?: boolean;
+  className?: string;
 }) {
   const [now, setNow] = useState<number | null>(null);
 
@@ -59,7 +63,17 @@ export default function CampaignCountdown({
   const left = getTimeLeft(endDate, now);
   if (!left) {
     if (variant === 'compact') {
-      return <span className="text-[11px] font-bold text-red-600">Ended</span>;
+      const Tag = inline ? 'span' : 'p';
+      return (
+        <Tag className={`text-[11px] font-bold text-red-600 ${className}`.trim()}>Ended</Tag>
+      );
+    }
+    if (variant === 'micro') {
+      return (
+        <span className={`block truncate text-[8px] font-extrabold leading-none text-red-300 ${className}`.trim()}>
+          Ended
+        </span>
+      );
     }
     return (
       <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-700">
@@ -70,14 +84,35 @@ export default function CampaignCountdown({
 
   const urgent = left.totalMs < 24 * 60 * 60 * 1000;
 
-  if (variant === 'compact') {
+  if (variant === 'micro') {
+    const text =
+      left.days > 0
+        ? `${left.days}d ${left.hours}h`
+        : left.hours > 0
+          ? `${left.hours}h ${pad(left.minutes)}m`
+          : `${left.minutes}:${pad(left.seconds)}`;
     return (
-      <p className={`text-[11px] font-bold tabular-nums ${urgent ? 'text-secondary-600' : 'text-gray-500'}`}>
-        {left.days > 0
-          ? `${left.days}d ${pad(left.hours)}h ${pad(left.minutes)}m`
-          : `${pad(left.hours)}:${pad(left.minutes)}:${pad(left.seconds)}`}{' '}
-        left
-      </p>
+      <span
+        className={`block truncate text-[8px] font-extrabold leading-none tabular-nums ${
+          urgent ? 'text-secondary-300' : 'text-white'
+        } ${className}`.trim()}
+      >
+        {text}
+      </span>
+    );
+  }
+
+  if (variant === 'compact') {
+    const text = left.days > 0
+      ? `${left.days}d ${pad(left.hours)}h ${pad(left.minutes)}m left`
+      : `${pad(left.hours)}:${pad(left.minutes)}:${pad(left.seconds)} left`;
+    const Tag = inline ? 'span' : 'p';
+    return (
+      <Tag
+        className={`text-[11px] font-bold tabular-nums ${urgent ? 'text-secondary-600' : 'text-gray-500'} ${className}`.trim()}
+      >
+        {text}
+      </Tag>
     );
   }
 

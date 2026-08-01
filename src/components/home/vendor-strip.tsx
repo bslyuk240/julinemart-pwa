@@ -61,35 +61,39 @@ export default async function VendorStrip() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9 gap-2 md:gap-3">
-          {vendors.map((v) => {
-            const routeKey = v.woocommerce_vendor_id || `jlo-${v.id}`;
-            const color = colorFor(v.store_name || '');
-            const abbr = initials(v.store_name || '?');
+        <div className="overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div className="flex flex-nowrap gap-3 pb-1 md:gap-4">
+            {vendors.map((v) => {
+              const routeKey = v.woocommerce_vendor_id || `jlo-${v.id}`;
+              const color = colorFor(v.store_name || '');
+              const abbr = initials(v.store_name || '?');
 
-            return (
-              <Link
-                key={v.id}
-                href={`/vendor/${encodeURIComponent(routeKey)}`}
-                className="flex flex-col items-center gap-1.5 group text-center"
-              >
-                {v.logo_url ? (
-                  <img
-                    src={v.logo_url}
-                    alt={v.store_name || ''}
-                    className="w-10 h-10 md:w-11 md:h-11 rounded-full object-cover border border-gray-100 group-hover:border-primary-300 transition-colors"
-                  />
-                ) : (
-                  <div className={`w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center text-xs font-semibold ${color.bg} ${color.text} group-hover:ring-2 group-hover:ring-primary-200 transition-all`}>
-                    {abbr}
-                  </div>
-                )}
-                <span className="text-xs text-gray-600 group-hover:text-primary-600 transition-colors leading-tight line-clamp-2 w-full px-0.5">
-                  {v.store_name}
-                </span>
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  key={v.id}
+                  href={`/vendor/${encodeURIComponent(routeKey)}`}
+                  className="group flex w-[72px] shrink-0 flex-col items-center gap-1.5 text-center md:w-20"
+                >
+                  {v.logo_url ? (
+                    <img
+                      src={v.logo_url}
+                      alt={v.store_name || ''}
+                      className="h-10 w-10 rounded-full border border-gray-100 object-cover transition-colors group-hover:border-primary-300 md:h-11 md:w-11"
+                    />
+                  ) : (
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold transition-all group-hover:ring-2 group-hover:ring-primary-200 md:h-11 md:w-11 ${color.bg} ${color.text}`}
+                    >
+                      {abbr}
+                    </div>
+                  )}
+                  <span className="line-clamp-2 w-full px-0.5 text-xs leading-tight text-gray-600 transition-colors group-hover:text-primary-600">
+                    {v.store_name}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>

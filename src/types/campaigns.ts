@@ -153,6 +153,17 @@ export interface CampaignManualExclusion {
   createdAt: string;
 }
 
+/** Lightweight shape for homepage promos, offer popup, and share cards. */
+export interface CampaignSummary {
+  id: string;
+  slug: string;
+  publicTitle: string;
+  offerLabel?: string;
+  heroImage?: string;
+  badgeText?: string;
+  endDate?: string;
+}
+
 export interface Campaign {
   id: string;
   slug: string;

@@ -3,9 +3,15 @@ import HeroSlider from '@/components/home/hero-slider';
 import CategoryStrip from '@/components/home/category-strip';
 import HomeSections from '@/components/home/home-sections';
 import VendorStrip from '@/components/home/vendor-strip';
+import ReviewsCarousel from '@/components/home/reviews-carousel';
+import CampaignOffersStrip from '@/components/campaigns/CampaignOffersStrip';
+import CampaignOffersPopup from '@/components/campaigns/CampaignOffersPopup';
 import { getHomepageSectionsData } from '@/lib/homepage-sections';
+import { getActiveCampaignSummaries } from '@/lib/campaigns/get-campaign';
 
 export const revalidate = 300; // Re-fetch product sections every 5 minutes
+
+const CAMPAIGNS_ENABLED = process.env.FEATURE_CAMPAIGNS_ENABLED === 'true';
 
 // HomeSectionsFetcher runs server-side so the full page (hero + sections)
 // is pre-rendered with real product data. No client skeleton flash on first load.
@@ -14,12 +20,18 @@ async function HomeSectionsFetcher() {
   return <HomeSections initialSections={sections} />;
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const activeCampaigns = CAMPAIGNS_ENABLED ? await getActiveCampaignSummaries() : [];
+
   return (
     <main className="min-h-screen overflow-x-hidden bg-gray-50">
       <section className="container-custom py-3 md:py-6">
         <HeroSlider />
       </section>
+
+      <CampaignOffersStrip campaigns={activeCampaigns} />
+
+      {activeCampaigns.length > 0 && <CampaignOffersPopup campaigns={activeCampaigns} />}
 
       <CategoryStrip />
 
@@ -56,7 +68,11 @@ export default function HomePage() {
         <VendorStrip />
       </Suspense>
 
-      <div className="h-20 md:h-8" />
+      <Suspense fallback={null}>
+        <ReviewsCarousel />
+      </Suspense>
+
+      <div className="h-4 md:h-2" />
     </main>
   );
 }

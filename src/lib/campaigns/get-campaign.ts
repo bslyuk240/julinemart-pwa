@@ -1,5 +1,5 @@
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import type { Campaign, CampaignSection, CampaignSectionType } from '@/types/campaigns';
+import type { Campaign, CampaignSection, CampaignSectionType, CampaignOfferConfig, CampaignSummary } from '@/types/campaigns';
 
 interface CampaignRow {
   id: string;
@@ -123,6 +123,58 @@ export async function getCampaignBySlug(
 // (?qr_source= carries the slug, never the uuid, so this lookup has to
 // happen somewhere — doing it server-side here avoids a second client-side
 // Supabase client just for this one lookup).
+function buildOfferLabel(offer?: CampaignOfferConfig): string | undefined {
+  if (!offer) return undefined;
+  if (offer.displayText) return offer.displayText;
+  if (offer.discountType === 'percentage' && offer.discountValue) {
+    return `${offer.discountValue}% off`;
+  }
+  if (offer.discountType === 'fixed_amount' && offer.discountValue) {
+    return `₦${offer.discountValue.toLocaleString()} off`;
+  }
+  if (offer.freeDelivery) return 'Free delivery';
+  if (offer.couponCode) return `Use code ${offer.couponCode}`;
+  return undefined;
+}
+
+function mapCampaignSummary(row: CampaignRow): CampaignSummary | null {
+  if (!isWithinActiveWindow(row)) return null;
+
+  const heroConfig = (row.hero_config as unknown as Campaign['heroConfig']) ?? {
+    headline: '',
+    subtitle: '',
+    ctaLabel: 'Shop Now',
+  };
+  const offerConfig = (row.offer_config ?? undefined) as CampaignOfferConfig | undefined;
+
+  return {
+    id: row.id,
+    slug: row.slug,
+    publicTitle: row.public_title,
+    offerLabel: buildOfferLabel(offerConfig),
+    heroImage: heroConfig.heroImageMobile ?? heroConfig.heroImageDesktop,
+    badgeText: heroConfig.badgeText,
+    endDate: row.end_date ?? undefined,
+  };
+}
+
+/** Active campaigns for homepage promos — no sections/products payload. */
+export async function getActiveCampaignSummaries(): Promise<CampaignSummary[]> {
+  const supabase = getSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from('campaigns')
+    .select('id, slug, public_title, status, start_date, end_date, hero_config, offer_config')
+    .eq('status', 'active')
+    .order('updated_at', { ascending: false });
+
+  if (error || !data) return [];
+
+  return (data as CampaignRow[])
+    .map(mapCampaignSummary)
+    .filter((item): item is CampaignSummary => item !== null);
+}
+
 export async function getCampaignQrVariantRefs(
   campaignId: string
 ): Promise<{ id: string; trackingSlug: string }[]> {

@@ -73,7 +73,11 @@ export default async function CampaignLandingPage({ params }: CampaignPageProps)
 
   return (
     <>
-      <CampaignTopNav campaignName={campaign.publicTitle} />
+      <CampaignTopNav
+        campaignName={campaign.publicTitle}
+        campaignSlug={campaign.slug}
+        shareDescription={campaign.metaSeo?.description ?? campaign.heroConfig.subtitle}
+      />
       <PageViewBeacon campaignId={campaign.id} qrVariants={qrVariants} />
       <PromoBanner offerConfig={campaign.offerConfig} />
       <div className="mx-auto flex max-w-6xl flex-col gap-5 p-4 pb-28 sm:p-6 sm:pb-8">
