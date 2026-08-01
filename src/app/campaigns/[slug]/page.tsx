@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { getCampaignShareImageUrl } from '@/lib/campaigns/share-image';
 import { getCampaignBySlug, getCampaignQrVariantRefs } from '@/lib/campaigns/get-campaign';
 import { resolveCampaignProducts } from '@/lib/campaigns/products';
 import { resolveCampaignReviews } from '@/lib/campaigns/reviews';
@@ -35,14 +36,22 @@ export async function generateMetadata({ params }: CampaignPageProps): Promise<M
     return { title: `${SITE_NAME} | Campaign` };
   }
 
+  const shareImageUrl = getCampaignShareImageUrl(campaign.heroConfig, SITE_URL);
+
   return {
     title: `${campaign.publicTitle} | ${SITE_NAME}`,
     description: campaign.metaSeo?.description ?? campaign.heroConfig.subtitle,
     openGraph: {
       title: campaign.metaSeo?.title ?? campaign.publicTitle,
       description: campaign.metaSeo?.description ?? campaign.heroConfig.subtitle,
-      images: campaign.metaSeo?.ogImage ? [campaign.metaSeo.ogImage] : undefined,
+      images: [{ url: shareImageUrl, alt: campaign.publicTitle }],
       url: `${SITE_URL}/campaigns/${slug}`,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: campaign.metaSeo?.title ?? campaign.publicTitle,
+      description: campaign.metaSeo?.description ?? campaign.heroConfig.subtitle,
+      images: [shareImageUrl],
     },
   };
 }
@@ -71,12 +80,15 @@ export default async function CampaignLandingPage({ params }: CampaignPageProps)
     getCampaignQrVariantRefs(campaign.id),
   ]);
 
+  const shareImageUrl = getCampaignShareImageUrl(campaign.heroConfig, SITE_URL);
+
   return (
     <>
       <CampaignTopNav
         campaignName={campaign.publicTitle}
         campaignSlug={campaign.slug}
         shareDescription={campaign.metaSeo?.description ?? campaign.heroConfig.subtitle}
+        shareImageUrl={shareImageUrl}
       />
       <PageViewBeacon campaignId={campaign.id} qrVariants={qrVariants} />
       <PromoBanner offerConfig={campaign.offerConfig} />

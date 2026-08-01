@@ -9,6 +9,8 @@ interface CampaignShareButtonProps {
   title: string;
   description?: string;
   slug: string;
+  /** Preview image for native share (mobile hero banner or logo fallback). */
+  imageUrl?: string;
   /** Compact icon-only for nav bars; full shows label on sm+ */
   variant?: 'icon' | 'button';
   className?: string;
@@ -20,6 +22,7 @@ export default function CampaignShareButton({
   title,
   description,
   slug,
+  imageUrl,
   variant = 'icon',
   className = '',
 }: CampaignShareButtonProps) {
@@ -32,7 +35,7 @@ export default function CampaignShareButton({
   };
 
   const handleNativeShare = async () => {
-    const result = await nativeShare({ title, text: shareText, url: shareUrl });
+    const result = await nativeShare({ title, text: shareText, url: shareUrl, imageUrl });
     if (result === 'shared') toast.success('Shared!');
     else if (result === 'unavailable') {
       const copied = await copyToClipboard(shareUrl);

@@ -12,10 +12,12 @@ export default function CampaignTopNav({
   campaignName,
   campaignSlug,
   shareDescription,
+  shareImageUrl,
 }: {
   campaignName: string;
   campaignSlug: string;
   shareDescription?: string;
+  shareImageUrl?: string;
 }) {
   const itemCount = useCartStore((s) => s.itemCount);
 
@@ -36,6 +38,7 @@ export default function CampaignTopNav({
           title={campaignName}
           description={shareDescription}
           slug={campaignSlug}
+          imageUrl={shareImageUrl}
         />
         <Link
           href="/cart"
