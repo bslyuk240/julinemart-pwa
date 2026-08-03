@@ -4,19 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { Bell, Package, Truck, Tag, X } from 'lucide-react';
 import { WEB_PUSH_ENABLE_EVENT } from '@/lib/web-push-events';
 import { safeStorage } from '@/lib/safe-storage';
+import { getOrCreateAnonymousId } from '@/lib/analytics/anonymous-id';
 
 const PROMPT_SEEN_KEY = 'jm_notif_prompt_seen';
 const PROMPT_SNOOZED_KEY = 'jm_notif_prompt_snoozed';
 const SNOOZE_DAYS = 7; // re-show after 1 week, not 3 days
-
-function getOrCreateAnonymousId(): string {
-  const key = 'jm_anon_id';
-  const existing = safeStorage.getItem(key);
-  if (existing) return existing;
-  const id = crypto.randomUUID();
-  safeStorage.setItem(key, id);
-  return id;
-}
 
 async function logNotifEvent(eventName: string, platform: string) {
   try {

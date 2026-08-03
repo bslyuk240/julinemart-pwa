@@ -24,6 +24,7 @@ import {
   trackShareProduct,
 } from '@/lib/gtag';
 import { useCustomerAuth } from '@/context/customer-auth-context';
+import { trackJourneyEvent } from '@/lib/analytics/track-event';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -223,6 +224,13 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       price: parseMoney(product.price),
       itemBrand: (product as any).brands?.[0] ?? undefined,
       itemCategory: product.categories?.[0]?.name ?? undefined,
+    });
+    trackJourneyEvent({
+      eventType: 'product_viewed',
+      customerId: user?.id ?? null,
+      customerEmail: user?.email ?? null,
+      productId: product.supabaseId ?? null,
+      sourcePage: window.location.pathname,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id]);

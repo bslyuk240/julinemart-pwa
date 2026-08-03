@@ -5,6 +5,7 @@ import { X, Download, Share } from 'lucide-react';
 import Image from 'next/image';
 import { trackPwaInstallAccepted, trackPwaInstallPromptShown } from '@/lib/gtag';
 import { safeStorage } from '@/lib/safe-storage';
+import { getOrCreateAnonymousId } from '@/lib/analytics/anonymous-id';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -14,15 +15,6 @@ interface BeforeInstallPromptEvent extends Event {
 const DISMISSED_KEY   = 'pwa-install-dismissed';
 const VISIT_COUNT_KEY = 'jm_visit_count';
 const DISMISS_COOLDOWN_DAYS = 14; // don't re-show for 2 weeks after dismiss
-
-function getOrCreateAnonymousId(): string {
-  const key = 'jm_anon_id';
-  const existing = safeStorage.getItem(key);
-  if (existing) return existing;
-  const id = crypto.randomUUID();
-  safeStorage.setItem(key, id);
-  return id;
-}
 
 async function logPwaEvent(params: {
   event_name: string;

@@ -1,19 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-
-function getOrCreateAnonymousId(): string {
-  try {
-    const key = 'jm_anon_id';
-    const existing = localStorage.getItem(key);
-    if (existing) return existing;
-    const id = crypto.randomUUID();
-    localStorage.setItem(key, id);
-    return id;
-  } catch {
-    return 'unknown';
-  }
-}
+import { getOrCreateAnonymousId } from '@/lib/analytics/anonymous-id';
 
 // Tracks when a user opens JulineMart from the installed PWA icon (standalone mode).
 // Fires once per session to avoid duplicate events.
