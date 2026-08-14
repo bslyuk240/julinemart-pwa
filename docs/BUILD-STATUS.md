@@ -5,6 +5,25 @@
 
 Last updated: **14 August 2026**
 
+## JulineMart Gifts — Phase G3 IN PROGRESS
+
+### G2 — COMPLETE
+- Gift ops dashboard, message card, customer timeline
+
+### G3 shipped (code)
+- [x] Migration `20260814130000_gift_g3_builder.sql`
+- [x] `gift_builder_sessions`, `gift_builder_items`, `gift_packaging_types`
+- [x] `gift-builder` API + `create-gift-order` Mode B
+- [x] PWA `/gifts/build` wizard with running total
+
+### G3 exit gate
+- [x] Migration applied to Supabase
+- [ ] Running total updates on add/remove
+- [ ] Non-pool items rejected
+- [ ] E2E custom box purchase at Warri
+
+---
+
 ## JulineMart Gifts — Phase G2 IN PROGRESS
 
 ### G1 — COMPLETE

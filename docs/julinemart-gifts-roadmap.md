@@ -117,7 +117,20 @@ Settlement: `order_items` still hold component lines for vendor/supplier cost tr
 
 Each phase has an **exit gate**. Do not start N+1 until gate passes.
 
-### Phase G2 — Gift fulfilment & ops (IN PROGRESS)
+### Phase G3 — Build your own box (IN PROGRESS)
+
+| Deliverable | Status |
+|-------------|--------|
+| Builder schema + packaging tiers | Migration applied |
+| `gift-builder` session API | Done |
+| `create-gift-order` Mode B | Done |
+| PWA `/gifts/build` | Done |
+
+**Exit gate:** see BUILD-STATUS.md
+
+---
+
+### Phase G2 — Gift fulfilment & ops (COMPLETE)
 
 | Deliverable | Status |
 |-------------|--------|

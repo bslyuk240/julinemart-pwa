@@ -35,6 +35,16 @@ export default async function GiftsLandingPage() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            <Link
+              href="/gifts/build"
+              className="group bg-gradient-to-br from-primary-600 to-rose-600 rounded-2xl border overflow-hidden shadow-sm hover:shadow-md transition-shadow text-white sm:col-span-2 lg:col-span-1"
+            >
+              <div className="p-6 h-full flex flex-col justify-center min-h-[180px]">
+                <Gift className="w-10 h-10 mb-3 opacity-90" />
+                <h2 className="font-bold text-lg mb-1">Build your own box</h2>
+                <p className="text-sm text-primary-100">Pick from our Warri pool · running total as you go</p>
+              </div>
+            </Link>
             {boxes.map((box) => (
               <Link
                 key={box.id}

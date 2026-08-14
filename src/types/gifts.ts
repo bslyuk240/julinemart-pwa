@@ -27,7 +27,8 @@ export type GiftBox = {
 };
 
 export type GiftCheckoutPayload = {
-  gift_box_slug: string;
+  gift_box_slug?: string;
+  builder_session_token?: string;
   gfc_code?: string;
   customer_name: string;
   customer_email: string;
@@ -43,4 +44,42 @@ export type GiftCheckoutPayload = {
   sender_visible?: boolean;
   occasion?: string;
   shipping_fee?: number;
+};
+
+export type GiftPackagingOption = {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  price: number;
+  max_items: number;
+};
+
+export type GiftBuilderItem = {
+  id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  name?: string;
+  gift_category?: string | null;
+  image?: string | null;
+};
+
+export type GiftBuilderState = {
+  session_token: string;
+  items: GiftBuilderItem[];
+  packaging: GiftPackagingOption | null;
+  packaging_options: GiftPackagingOption[];
+  totals: {
+    items_subtotal: number;
+    packaging_fee: number;
+    grand_total: number;
+    item_count: number;
+  };
+  session: {
+    recipient_type?: string | null;
+    occasion?: string | null;
+    budget_max?: number | null;
+  };
 };
