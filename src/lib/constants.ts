@@ -57,6 +57,9 @@ export const PRODUCT_TAGS = {
   FEATURED: 'featured',
   BEST_SELLER: 'best-seller',
   OFFICIAL_STORE: 'official-store',
+  HANDMADE: 'handmade',
+  MADE_IN_NIGERIA: 'made-in-nigeria',
+  CUSTOMISABLE: 'customisable',
 };
 
 // Order Status

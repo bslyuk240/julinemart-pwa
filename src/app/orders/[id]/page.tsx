@@ -10,6 +10,8 @@ import { useCustomerAuth } from '@/context/customer-auth-context';
 import PageLoading from '@/components/ui/page-loading';
 import { toast } from 'sonner';
 import OrderStatusTracker from '@/components/orders/order-status-tracker';
+import CustomOrderTimeline from '@/components/orders/CustomOrderTimeline';
+import BuyAgainButton from '@/components/orders/BuyAgainButton';
 import { JloReturn, formatJloRefundStatus, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
 import type { Order as WooOrder } from '@/types/order';
 import { ensurePaystackReady, resetPaystackLoader } from '@/lib/paystack';
@@ -402,6 +404,12 @@ export default function OrderDetailPage() {
   const canCompletePayment = paymentPending && Boolean(order.transaction_id);
   const showReturns = returnEligible || Boolean(activeReturn);
 
+  const orderMeta = (key: string) =>
+    order.meta_data?.find((m) => m.key === key)?.value ?? null;
+  const fulfillmentMethod = orderMeta('_fulfillment_method');
+  const reservationStatus = orderMeta('_reservation_status');
+  const reservedUntil = orderMeta('_reserved_until');
+
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
       <div className="container-custom py-5 md:py-6">
@@ -421,6 +429,23 @@ export default function OrderDetailPage() {
             </button>
           )}
         />
+
+        {fulfillmentMethod === 'reservation' && (
+          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-sm font-semibold text-emerald-900">Reserve & collect</p>
+            <p className="mt-1 text-xs text-emerald-800">
+              Status: <strong>{String(reservationStatus || 'reserved')}</strong>
+              {reservedUntil && (
+                <> · hold until {new Date(String(reservedUntil)).toLocaleString()}</>
+              )}
+            </p>
+            {reservationStatus === 'ready' && (
+              <p className="mt-2 text-sm font-medium text-emerald-900">
+                Your order is ready — visit the store to collect.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Complete Payment banner — shown when order is created but unpaid */}
         {paymentPending && (
@@ -465,6 +490,19 @@ export default function OrderDetailPage() {
               dateCompleted={order.date_completed}
               metaData={order.meta_data}
             />
+
+            {customerEmail && (
+              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+                <h2 className="text-base md:text-xl font-semibold text-gray-900 mb-3 md:mb-4">
+                  Custom order progress
+                </h2>
+                <CustomOrderTimeline
+                  orderId={orderId}
+                  customerEmail={customerEmail}
+                  supabaseOrderId={order._supabase_id}
+                />
+              </div>
+            )}
 
             {/* Order Items */}
             <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
@@ -597,6 +635,17 @@ export default function OrderDetailPage() {
 
             {/* Actions */}
             <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 space-y-2.5">
+              <BuyAgainButton
+                lineItems={order.line_items.map((item) => ({
+                  product_id: item.product_id,
+                  variation_id: item.variation_id,
+                  product_name: item.name,
+                  quantity: item.quantity,
+                }))}
+                fullWidth
+                size="md"
+              />
+
               {canCompletePayment && (
                 <Button
                   variant="primary"

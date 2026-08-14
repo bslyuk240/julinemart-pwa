@@ -10,6 +10,14 @@ import ProductCarousel from '@/components/product/product-carousel';
 import { Badge } from '@/components/ui/badge';
 import { getProductVariations, getProductReviews, createProductReview } from '@/lib/woocommerce/products';
 import ProductFeatures from '@/components/product/product-features';
+import JulineMartProtectBadge from '@/components/trust/JulineMartProtectBadge';
+import ProductWarrantyBadge from '@/components/product/ProductWarrantyBadge';
+import SellerTrustBadge from '@/components/trust/SellerTrustBadge';
+import CollectionAvailabilityBanner from '@/components/local/CollectionAvailabilityBanner';
+import ReserveCollectButton from '@/components/local/ReserveCollectButton';
+import CustomiseProductPanel from '@/components/product/CustomiseProductPanel';
+import { isCustomisableProduct } from '@/lib/custom-order';
+import type { VendorTrustResponse } from '@/lib/trust/get-vendor-trust';
 import { useCartStore } from '@/store/cart-store';
 import { useWishlist } from '@/hooks/use-wishlist';
 import { Product, ProductAttribute, ProductVariation, ProductReview } from '@/types/product';
@@ -138,6 +146,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     rating: 0,
     review: '',
   });
+  const [vendorTrust, setVendorTrust] = useState<VendorTrustResponse | null>(null);
 
   const { user, customer } = useCustomerAuth();
 
@@ -154,6 +163,24 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       }));
     }
   }, [user, customer]);
+
+  useEffect(() => {
+    const vendorId = product?.store?.id;
+    if (!vendorId) {
+      setVendorTrust(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/vendor/${encodeURIComponent(String(vendorId))}/trust`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setVendorTrust(data?.trust ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setVendorTrust(null);
+      });
+    return () => { cancelled = true; };
+  }, [product?.store?.id]);
 
   const addToCart = useCartStore((state) => state.addItem);
   const { toggleWishlist, isInWishlist } = useWishlist();
@@ -957,6 +984,24 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
             {/* Add to Cart Section */}
             <div className="space-y-3 md:space-y-4 border-t pt-4 md:pt-6">
+              <JulineMartProtectBadge className="mb-1" />
+              <ProductWarrantyBadge
+                warrantyType={product.warranty_type}
+                warrantyMonths={product.warranty_months}
+              />
+
+              {isCustomisableProduct(product.customisationSchema) && (
+                <CustomiseProductPanel
+                  product={product}
+                  schema={product.customisationSchema}
+                  selectedVariation={selectedVariation}
+                  basePrice={selectedPrice}
+                  requiresSelection={
+                    product.type === 'variable' && variationAttributes.length > 0
+                  }
+                />
+              )}
+
               <div className="flex gap-3 md:gap-4 flex-wrap md:flex-nowrap">
                 <Button
                   onClick={handleAddToCart}
@@ -1076,7 +1121,23 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
               >
                 Buy Now
               </Button>
+
+              {vendorTrust?.physical_store?.supports_pickup && (
+                <ReserveCollectButton
+                  fullWidth
+                  disabled={
+                    effectiveStockStatus === 'outofstock' ||
+                    (product.type === 'variable' &&
+                      variationAttributes.length > 0 &&
+                      !selectedVariation)
+                  }
+                />
+              )}
             </div>
+
+            {vendorTrust?.physical_store?.supports_pickup && (
+              <CollectionAvailabilityBanner trust={vendorTrust} className="mt-4" />
+            )}
 
             {/* Features */}
             <ProductFeatures className="border-t pt-6" />
@@ -1097,6 +1158,14 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                       >
                         {product.store.shop_name || product.store.name || (product.store.url ? product.store.url.split('/').pop()?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Vendor Store')}
                       </a>
+                      {vendorTrust && (
+                        <SellerTrustBadge
+                          level={vendorTrust.level}
+                          verifications={vendorTrust.verifications}
+                          compact
+                          className="mb-2"
+                        />
+                      )}
                       <a 
                         href={`/vendor/${product.store.id}`}
                         className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700 font-medium"

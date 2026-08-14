@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProductGrid from '@/components/product/product-grid';
 import PageHeader from '@/components/layout/page-header';
+import AreaFilterBar, { type AreaFilters } from '@/components/local/AreaFilterBar';
 import { Product } from '@/types/product';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 import { trackSearchUsed } from '@/lib/gtag';
@@ -15,6 +16,12 @@ function SearchContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [filters, setFilters] = useState<AreaFilters>({
+    state: '',
+    city: '',
+    area: '',
+    pickupOnly: false,
+  });
 
   useEffect(() => {
     if (!query) {
@@ -30,6 +37,10 @@ function SearchContent() {
 
       try {
         const qs = new URLSearchParams({ search: query, per_page: '24' });
+        if (filters.state) qs.set('near_state', filters.state);
+        if (filters.city) qs.set('near_city', filters.city);
+        if (filters.area) qs.set('near_area', filters.area);
+        if (filters.pickupOnly) qs.set('pickup_available', 'true');
         const res = await fetch(`/api/products?${qs.toString()}`);
         if (!res.ok) throw new Error(`Search API error: ${res.status}`);
         const { products: data } = await res.json();
@@ -48,7 +59,7 @@ function SearchContent() {
 
     fetchResults();
     return () => { isCancelled = true; };
-  }, [query]);
+  }, [query, filters]);
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-12">
@@ -59,6 +70,15 @@ function SearchContent() {
           backHref="/"
           backLabel="Back to home"
         />
+
+        {query && (
+          <AreaFilterBar
+            value={filters}
+            onChange={setFilters}
+            showPickupToggle
+            className="mb-4"
+          />
+        )}
 
         {loading && (
           <div className="bg-white rounded-2xl shadow-sm p-8 text-center">

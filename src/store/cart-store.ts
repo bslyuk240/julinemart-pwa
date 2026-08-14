@@ -9,6 +9,8 @@ import { trackAddToCart } from '@/lib/gtag';
 import { parseProductWeightKg } from '@/lib/shipping/cart-weight';
 import { parseMoney } from '@/lib/utils/parse-money';
 import { parseCatalogVendorRouteKey } from '@/lib/catalog/product-store';
+import type { CartCustomisation } from '@/types/custom-order';
+import { customisationCartKey } from '@/lib/custom-order';
 
 export interface CartItem extends TypedCartItem {
   weight?: number;
@@ -38,7 +40,8 @@ interface CartState {
       sku?: string;
       stockQuantity: number | null;
       stockStatus: 'instock' | 'outofstock' | 'onbackorder';
-    }
+    },
+    customisation?: CartCustomisation
   ) => void;
   removeItem: (itemId: number) => void;
   updateQuantity: (itemId: number, quantity: number) => void;
@@ -122,14 +125,17 @@ export const useCartStore = create<CartState>()(
           sku?: string;
           stockQuantity: number | null;
           stockStatus: 'instock' | 'outofstock' | 'onbackorder';
-        }
+        },
+        customisation?: CartCustomisation
       ) => {
         const { items } = get();
+        const custKey = customisationCartKey(customisation);
 
         const existingItem = items.find(
           (item) =>
             item.productId === product.id &&
-            (variation ? item.variation?.id === variation.id : !item.variation)
+            (variation ? item.variation?.id === variation.id : !item.variation) &&
+            customisationCartKey(item.customisation) === custKey
         );
 
         if (existingItem) {
@@ -226,10 +232,12 @@ const hubName = hubNameMeta ? String(hubNameMeta.value) : null;
 
         const vendorInfo = getVendorInfo();
 
-        const displayPrice =
+        const basePrice =
           variation?.salePrice ??
           variation?.price ??
           parseMoney(product.sale_price, product.price, product.min_price);
+
+        const displayPrice = basePrice + (customisation?.price_adjustment ?? 0);
 
         const displayRegularPrice =
           variation?.regularPrice ??
@@ -259,6 +267,7 @@ const hubName = hubNameMeta ? String(hubNameMeta.value) : null;
   hubId: hubId,          // ✅ Now extracts correctly
   hubName: hubName,      
   weight: numericWeight,
+  customisation,
   variation: variation
     ? {
         id: variation.id,

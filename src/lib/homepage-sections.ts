@@ -1,6 +1,7 @@
 import { getProducts } from '@/lib/woocommerce/products';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { PRODUCT_TAGS } from '@/lib/constants';
 import type { Product } from '@/types/product';
 
 const HOMEPAGE_FETCH_TIMEOUT_MS = 12000;
@@ -18,6 +19,7 @@ export interface HomepageSectionsData {
   topSellerProducts: Product[];
   sponsoredProducts: Product[];
   launchingProducts: Product[];
+  localMakersProducts: Product[];
   electronicsProducts: Product[];
   fashionProducts: Product[];
   extraSections: ExtraSection[];
@@ -127,6 +129,33 @@ async function getHomepageTagProducts(tag: string, label: string): Promise<Produ
   );
 }
 
+function dedupeProducts(products: Product[]): Product[] {
+  const seen = new Set<string>();
+  return products.filter((product) => {
+    const key = product.slug || String(product.id);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function getLocalMakersProducts(): Promise<Product[]> {
+  return withTimeout(
+    (async () => {
+      const [handmade, madeInNigeria, customisable] = await Promise.all([
+        getProducts({ tag: PRODUCT_TAGS.HANDMADE, per_page: 12 }),
+        getProducts({ tag: PRODUCT_TAGS.MADE_IN_NIGERIA, per_page: 12 }),
+        getProducts({ tag: PRODUCT_TAGS.CUSTOMISABLE, per_page: 8 }),
+      ]);
+      const merged = dedupeProducts([...handmade, ...madeInNigeria, ...customisable]);
+      const filtered = await filterActiveVendorProducts(merged);
+      return shuffle(filtered).slice(0, 12);
+    })(),
+    'Local makers fetch',
+    []
+  );
+}
+
 // JLO catalog-products filters by category slug server-side (max 100 per page).
 async function getCategoryProducts(categorySlug: string, limit: number = 18): Promise<Product[]> {
   const rawProducts = await getProducts({
@@ -157,6 +186,7 @@ export async function getHomepageSectionsData(): Promise<HomepageSectionsData> {
     topSellerProducts,
     sponsoredProducts,
     launchingProducts,
+    localMakersProducts,
     electronicsProducts,
     fashionProducts,
     ...extraResults
@@ -167,6 +197,7 @@ export async function getHomepageSectionsData(): Promise<HomepageSectionsData> {
     getHomepageTagProducts(tag('top_sellers', 'top-seller'), 'Top sellers fetch'),
     getHomepageTagProducts(tag('sponsored', 'sponsored'), 'Sponsored fetch'),
     getHomepageTagProducts(tag('launching_deals', 'launching-deal'), 'Launching deals fetch'),
+    getLocalMakersProducts(),
     withTimeout(getCategoryProducts(cat('electronics', 'electronics'), limit('electronics', 18)), 'Electronics products fetch', []),
     withTimeout(getCategoryProducts(cat('fashion', 'fashion-accessories'), limit('fashion', 18)), 'Fashion products fetch', []),
     // Extra sections added from admin — each fetches by tag_slug or category_slug
@@ -202,6 +233,7 @@ export async function getHomepageSectionsData(): Promise<HomepageSectionsData> {
     topSellerProducts,
     sponsoredProducts,
     launchingProducts,
+    localMakersProducts,
     electronicsProducts,
     fashionProducts,
     extraSections,

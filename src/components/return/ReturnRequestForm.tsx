@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { ArrowLeft, Package, AlertCircle, Loader2, MapPin, Image, Info } from 'lucide-react';
 import { Order } from '@/types/order';
@@ -13,12 +13,15 @@ interface ReturnRequestFormProps {
   orderId: number;
 }
 
-const RETURN_REASONS = [
-  { value: 'wrong_item', label: 'Wrong item' },
-  { value: 'damaged', label: 'Item damaged' },
-  { value: 'not_as_described', label: 'Not as described' },
-  { value: 'other', label: 'Other (add details)' },
-];
+const COMPLAINT_TYPES = [
+  { value: 'not_received', label: 'Product not received' },
+  { value: 'wrong_product', label: 'Wrong product' },
+  { value: 'damaged', label: 'Damaged product' },
+  { value: 'not_as_described', label: 'Product significantly different from description' },
+  { value: 'missing_items', label: 'Missing items' },
+  { value: 'suspected_counterfeit', label: 'Suspected counterfeit' },
+  { value: 'other', label: 'Other' },
+] as const;
 
 type FezHub = {
   name: string;
@@ -79,13 +82,14 @@ function extractHubId(order: Order | null) {
 
 export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [order, setOrder] = useState<Order | null>(null);
   const [returns, setReturns] = useState<JloReturn[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Record<number, number>>({});
   const [preferredResolution, setPreferredResolution] = useState<Resolution>('refund');
-  const [reasonCode, setReasonCode] = useState('');
+  const [complaintType, setComplaintType] = useState('');
   const [reasonNote, setReasonNote] = useState('');
   const [imageUrls, setImageUrls] = useState('');
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
@@ -119,6 +123,16 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     fetchOrder();
   }, [orderId]);
 
+  useEffect(() => {
+    const fromQuery = searchParams.get('complaint_type');
+    if (fromQuery && COMPLAINT_TYPES.some((c) => c.value === fromQuery)) {
+      setComplaintType(fromQuery);
+    }
+    if (searchParams.get('reason') === 'warranty') {
+      setReasonNote((prev) => prev || 'Warranty claim — product fault within warranty period.');
+    }
+  }, [searchParams]);
+
   const fetchOrder = async () => {
     try {
       setLoading(true);
@@ -146,9 +160,15 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     e.preventDefault();
     if (!order) return;
 
-    if (!reasonCode) return toast.error('Select a reason for your return');
-    if (reasonCode === 'other' && !reasonNote.trim()) return toast.error('Add details for your return');
+    if (!complaintType) return toast.error('Select the type of problem');
+    if (complaintType === 'other' && !reasonNote.trim()) return toast.error('Add details about the problem');
     if (!hubId) return toast.error('Hub not found for this order.');
+
+    const mappedReasonCode =
+      complaintType === 'wrong_product' ? 'wrong_item'
+        : complaintType === 'damaged' ? 'damaged'
+          : complaintType === 'not_as_described' ? 'not_as_described'
+            : 'other';
 
     try {
       setSubmitting(true);
@@ -166,7 +186,8 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           order_id: order.id,
           refund_amount: selectedAmount,
           preferred_resolution: preferredResolution,
-          reason_code: reasonCode,
+          complaint_type: complaintType,
+          reason_code: mappedReasonCode,
           reason_note: reasonNote,
           images,
           method,
@@ -579,28 +600,35 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           </div>
 
           <div>
-            <h2 className="font-semibold text-gray-900 mb-3">Reason for return</h2>
+            <h2 className="font-semibold text-gray-900 mb-3">Report a problem</h2>
             <div className="space-y-2">
-              <select
-                value={reasonCode}
-                onChange={(e) => setReasonCode(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                required
-              >
-                <option value="">Select a reason</option>
-                {RETURN_REASONS.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
+              {COMPLAINT_TYPES.map((item) => (
+                <label
+                  key={item.value}
+                  className={`flex items-center gap-3 rounded-xl border px-3 py-3 cursor-pointer transition ${
+                    complaintType === item.value
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 bg-white active:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="complaint_type"
+                    value={item.value}
+                    checked={complaintType === item.value}
+                    onChange={() => setComplaintType(item.value)}
+                    className="h-4 w-4 text-primary-600"
+                  />
+                  <span className="text-sm text-gray-900">{item.label}</span>
+                </label>
+              ))}
               <textarea
                 value={reasonNote}
                 onChange={(e) => setReasonNote(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
                 rows={3}
-                placeholder="Add more details (helps us process faster)"
-                required={reasonCode === 'other'}
+                placeholder="Add more details or upload photos below"
+                required={complaintType === 'other'}
               />
             </div>
           </div>

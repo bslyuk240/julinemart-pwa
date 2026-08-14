@@ -84,6 +84,10 @@ export interface Product {
     url: string;
     address: any;
   };
+
+  warranty_type?: 'none' | 'manufacturer' | 'seller' | 'extended' | null;
+  warranty_months?: number | null;
+  customisationSchema?: import('./custom-order').ProductCustomisationSchema | null;
 }
 
 export interface ProductReview {
@@ -144,6 +148,7 @@ export interface ProductImage {
   src: string;
   name: string;
   alt: string;
+  photo_source?: 'manufacturer' | 'seller_actual';
 }
 
 export interface ProductAttribute {
@@ -190,4 +195,8 @@ export interface ProductsQueryParams {
   max_price?: string;
   stock_status?: 'instock' | 'outofstock' | 'onbackorder';
   woo_vendor_id?: number | string;
+  near_state?: string;
+  near_city?: string;
+  near_area?: string;
+  pickup_available?: boolean;
 }

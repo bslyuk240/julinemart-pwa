@@ -196,6 +196,8 @@ export function toWcProduct(row: any): Product {
         src: img.src ?? '',
         name: img.name ?? '',
         alt: img.alt ?? '',
+        photo_source:
+          img.photo_source === 'seller_actual' ? 'seller_actual' : 'manufacturer',
       }))
     : [];
 
@@ -317,6 +319,10 @@ export function toWcProduct(row: any): Product {
     max_price: maxPriceMeta || undefined,
     meta_data: Array.isArray(row.meta_data) ? row.meta_data : [],
     store: resolveProductStoreFromCatalogRow(row),
+    warranty_type: row.warranty_type ?? null,
+    warranty_months: row.warranty_months != null ? Number(row.warranty_months) : null,
+    customisationSchema:
+      row.customisation_schema?.fields?.length > 0 ? row.customisation_schema : null,
   };
 }
 
@@ -386,6 +392,10 @@ function buildProductsQS(params: ProductsQueryParams): string {
   if (params.orderby) qs.set('orderby', params.orderby);
   if (params.order) qs.set('order', params.order);
   if (params.woo_vendor_id) qs.set('woo_vendor_id', String(params.woo_vendor_id));
+  if (params.near_state) qs.set('near_state', params.near_state);
+  if (params.near_city) qs.set('near_city', params.near_city);
+  if (params.near_area) qs.set('near_area', params.near_area);
+  if (params.pickup_available) qs.set('pickup_available', 'true');
   return qs.toString();
 }
 

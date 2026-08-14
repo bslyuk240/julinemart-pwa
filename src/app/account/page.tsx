@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   User,
+  Shield,
   Package,
   MapPin,
   Heart,
@@ -17,6 +18,7 @@ import {
   Clock,
   RefreshCw,
   CheckCircle2,
+  Store,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
@@ -176,12 +178,28 @@ export default function AccountPage() {
       bgColor: 'bg-purple-50',
     },
     {
+      icon: Shield,
+      title: 'My Purchases',
+      description: 'Receipts & warranty',
+      href: '/account/purchases',
+      color: 'text-teal-600',
+      bgColor: 'bg-teal-50',
+    },
+    {
       icon: MapPin,
       title: 'Addresses',
       description: 'Manage shipping & billing',
       href: '/account/addresses',
       color: 'text-green-600',
       bgColor: 'bg-green-50',
+    },
+    {
+      icon: Store,
+      title: 'Following',
+      description: 'Stores you follow',
+      href: '/account/following',
+      color: 'text-pink-600',
+      bgColor: 'bg-pink-50',
     },
     {
       icon: Heart,

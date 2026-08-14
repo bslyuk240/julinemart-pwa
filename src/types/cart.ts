@@ -1,4 +1,5 @@
 import { Product } from './product';
+import type { CartCustomisation } from './custom-order';
 
 export interface CartItem {
   id: number;
@@ -31,6 +32,7 @@ export interface CartItem {
   hubId?: string | null;
   hubName?: string | null;  // ✅ ADD THIS LINE
   weight?: number;
+  customisation?: CartCustomisation;
 }
 export interface Cart {
   items: CartItem[];

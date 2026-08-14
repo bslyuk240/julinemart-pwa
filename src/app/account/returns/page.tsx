@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import AccountPageHeader from '@/components/account/account-page-header';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { JloReturn, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
+import RefundTimeline from '@/components/return/RefundTimeline';
 import { formatPrice } from '@/lib/utils/format-price';
 import { toast } from 'sonner';
 
@@ -185,6 +186,20 @@ export default function ReturnsPage() {
                       {statusDisplay.label}
                     </span>
                   </div>
+
+                  {item.refund_status && item.refund_status !== 'none' && (
+                    <RefundTimeline
+                      className="mt-3"
+                      refund={{
+                        refund_status: item.refund_status,
+                        refund_amount: item.refund_amount,
+                        refund_currency: item.refund_currency,
+                        refund_method: item.refund_method,
+                        refund_initiated_at: item.refund_initiated_at,
+                        refund_expected_by: item.refund_expected_by,
+                      }}
+                    />
+                  )}
                 </div>
               );
             })}

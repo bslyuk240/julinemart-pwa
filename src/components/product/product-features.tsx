@@ -67,9 +67,9 @@ export default function ProductFeatures({ className = '' }: ProductFeaturesProps
       </div>
       
       <div className="text-center">
-        <Shield className="w-5 h-5 md:w-7 md:h-7 text-primary-600 mx-auto mb-1" />
-        <p className="text-xs md:text-sm font-medium text-gray-900">Secure Payment</p>
-        <p className="text-[11px] md:text-xs text-gray-500">100% protected</p>
+        <Shield className="w-5 h-5 md:w-7 md:h-7 text-emerald-600 mx-auto mb-1" />
+        <p className="text-xs md:text-sm font-medium text-gray-900">JulineMart Protect</p>
+        <p className="text-[11px] md:text-xs text-gray-500">Purchase protection</p>
       </div>
       
       <div className="text-center">

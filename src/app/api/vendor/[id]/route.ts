@@ -112,6 +112,7 @@ export async function GET(
           phone: vendorRow.phone ?? null,
           is_active: true,
           store_slug: vendorRow.store_slug ?? '',
+          intro_video_url: vendorRow.intro_video_url ?? null,
           store_url: `/vendor/${WooKey}`,
           rating: vendorRating ?? undefined,
         }

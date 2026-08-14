@@ -9,6 +9,10 @@ import { Product } from '@/types/product';
 import { getStorePolicies, StorePolicies } from '@/lib/woocommerce/policies';
 import { formatPrice } from '@/lib/utils/format-price';
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
+import { SellerTrustPanel } from '@/components/trust/SellerTrustBadge';
+import { VendorStoreInlineActions, VendorStoreQrPanel } from '@/components/vendor/VendorStoreHeroActions';
+import VendorMeetSection from '@/components/vendor/VendorMeetSection';
+import type { VendorTrustResponse } from '@/lib/trust/get-vendor-trust';
 
 type VendorSortOption = 'date' | 'popularity' | 'price' | 'price-desc';
 /** API route caps per_page at 100 and caches the underlying JLO fetch for 300s. */
@@ -24,6 +28,7 @@ interface VendorData {
   phone?: string | null;
   is_active?: boolean;
   store_slug?: string;
+  intro_video_url?: string | null;
   store_url?: string;
   rating?: { avg?: string; rating?: string; count?: number };
   enabled?: boolean;
@@ -62,6 +67,7 @@ export default function VendorStorePage() {
   const [totalPages,   setTotalPages]   = useState(0);
   const [policies,     setPolicies]     = useState<StorePolicies | null>(null);
   const [policyLoading, setPolicyLoading] = useState(true);
+  const [trust,        setTrust]        = useState<VendorTrustResponse | null>(null);
 
   // ── Fetch vendor + products from Supabase-backed API ────────────────────────
   const fetchVendor = useCallback(async (opts: { silent?: boolean; page?: number; perPage?: number; append?: boolean } = {}) => {
@@ -82,6 +88,19 @@ export default function VendorStorePage() {
       };
 
       if (data.vendor) setVendor(data.vendor);
+
+      try {
+        const trustRes = await fetch(`/api/vendor/${encodeURIComponent(vendorId)}/trust`);
+        if (trustRes.ok) {
+          const trustData = await trustRes.json();
+          setTrust(trustData.trust ?? null);
+        } else {
+          setTrust(null);
+        }
+      } catch {
+        setTrust(null);
+      }
+
       if (data.products) {
         setProducts(prev => {
           if (!append) return sortProducts(data.products, sortBy);
@@ -213,6 +232,23 @@ export default function VendorStorePage() {
   const vendorBanner = vendor?.banner     || null;
   const ratingAvg    = vendor?.rating?.avg || vendor?.rating?.rating || null;
   const ratingValue  = ratingAvg ? Math.min(5, Math.max(0, Number(ratingAvg))) : 0;
+  const reviewCount  = vendor?.rating?.count ?? 0;
+
+  const mobileStats = [
+    { val: total ?? products.length, label: 'Products', color: 'text-primary-600' },
+    ...(ratingAvg
+      ? [{ val: ratingAvg, label: 'Rating', color: 'text-yellow-600' }]
+      : []),
+    ...(reviewCount > 0
+      ? [{ val: reviewCount, label: 'Reviews', color: 'text-blue-600' }]
+      : []),
+  ];
+
+  const desktopStats = [
+    { val: total ?? products.length, label: 'Products' },
+    ...(ratingAvg ? [{ val: ratingAvg, label: 'Rating' }] : []),
+    ...(reviewCount > 0 ? [{ val: reviewCount, label: 'Reviews' }] : []),
+  ];
 
   const freeShippingThreshold = policies?.shippingPolicy?.freeShippingThreshold ?? 0;
   const shippingDescription   = policies?.shippingPolicy?.description;
@@ -253,34 +289,59 @@ export default function VendorStorePage() {
           </div>
         )}
 
+        {trust && (
+          <div className="mb-6">
+            <SellerTrustPanel
+              level={trust.level}
+              verifications={trust.verifications}
+              successfulOrders={trust.metrics?.successful_orders}
+              fulfilmentRate={trust.metrics?.fulfilment_rate}
+              physicalStore={trust.physical_store}
+            />
+          </div>
+        )}
+
+        {(vendor?.intro_video_url || (vendor?.shop_description && vendor.shop_description.length > 120)) && (
+          <VendorMeetSection
+            vendorName={vendorName}
+            story={vendor?.shop_description}
+            logoUrl={vendorAvatar}
+            introVideoUrl={vendor?.intro_video_url}
+          />
+        )}
+
         {/* Vendor Header Card */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-8">
           {/* Mobile */}
           <div className="md:hidden">
-            <div className="p-4 pb-3 border-b border-gray-100">
-              <div className="flex items-center gap-3 mb-3">
+            <div className="p-4 border-b border-gray-100">
+              <div className="flex items-start gap-3">
                 <div className={`w-14 h-14 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-gray-100 flex-shrink-0 ${vendorAvatar ? 'bg-white' : 'bg-gradient-to-br from-primary-500 to-primary-700'}`}>
                   {vendorAvatar
                     ? <img src={vendorAvatar} alt={vendorName} className="w-full h-full object-cover" />
                     : <Store className="w-8 h-8 text-white" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h1 className="font-bold text-gray-900 mb-1 truncate" style={{ fontSize: 16 }}>{vendorName}</h1>
+                  <div className="mb-1 flex items-center gap-2">
+                    <h1 className="min-w-0 flex-1 truncate text-base font-bold text-gray-900">{vendorName}</h1>
+                    <VendorStoreInlineActions vendorId={vendorId} vendorName={vendorName} />
+                  </div>
                   <div className="flex items-center gap-1.5">
                     {Array.from({ length: 5 }).map((_, i) => (
                       <Star key={i} className={`w-3 h-3 ${ratingValue > i ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-200 text-gray-200'}`} />
                     ))}
-                    <span className="text-gray-500" style={{ fontSize: 11 }}>{ratingAvg ?? 'No ratings'}</span>
+                    <span className="text-gray-500 text-xs">{ratingAvg ?? 'No ratings'}</span>
                   </div>
+                  <VendorStoreQrPanel
+                    vendorId={vendorId}
+                    vendorName={vendorName}
+                    className="mt-2"
+                  />
                 </div>
               </div>
             </div>
             <div className="px-4 py-3 bg-gray-50 flex items-center justify-between text-center">
-              {[
-                { val: total ?? products.length, label: 'Products', color: 'text-primary-600' },
-                { val: '95%',  label: 'Positive',  color: 'text-green-600' },
-                { val: '24h',  label: 'Response',  color: 'text-blue-600' },
-              ].map((s, i, arr) => (
+              {mobileStats.map((s, i, arr) => (
                 <Fragment key={`${s.label}-${i}`}>
                   <div className="flex-1">
                     <div className={`font-bold ${s.color}`} style={{ fontSize: 18 }}>{s.val}</div>
@@ -293,37 +354,38 @@ export default function VendorStorePage() {
           </div>
 
           {/* Desktop */}
-          <div className="hidden md:flex md:gap-6 p-6">
-            <div className="flex-shrink-0">
-              <div className={`w-32 h-32 rounded-full flex items-center justify-center overflow-hidden ${vendorAvatar ? 'bg-white shadow-sm border-2 border-gray-200' : 'bg-gradient-to-br from-primary-500 to-primary-700'}`}>
-                {vendorAvatar
-                  ? <img src={vendorAvatar} alt={vendorName} className="w-full h-full object-cover" />
-                  : <Store className="w-16 h-16 text-white" />}
+          <div className="hidden md:block p-6">
+            <div className="flex gap-6">
+              <div className="flex-shrink-0">
+                <div className={`w-32 h-32 rounded-full flex items-center justify-center overflow-hidden ${vendorAvatar ? 'bg-white shadow-sm border-2 border-gray-200' : 'bg-gradient-to-br from-primary-500 to-primary-700'}`}>
+                  {vendorAvatar
+                    ? <img src={vendorAvatar} alt={vendorName} className="w-full h-full object-cover" />
+                    : <Store className="w-16 h-16 text-white" />}
+                </div>
               </div>
-            </div>
-            <div className="flex-1">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{vendorName}</h1>
-              <div className="flex items-center gap-2 mb-4">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className={`w-5 h-5 ${ratingValue > i ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
-                ))}
-                <span className="text-sm text-gray-600">{ratingAvg ? `(${ratingAvg} rating)` : '(No ratings yet)'}</span>
-              </div>
-              {vendor?.shop_description && (
-                <p className="text-sm text-gray-600 mb-4">{vendor.shop_description}</p>
-              )}
-              <div className="flex flex-wrap gap-4 pt-4 border-t">
-                {[
-                  { val: total ?? products.length, label: 'Products' },
-                  { val: ratingAvg ?? 'N/A',        label: 'Rating' },
-                  { val: '95%',                     label: 'Positive' },
-                  { val: '24h',                     label: 'Response' },
-                ].map((s, i) => (
-                  <div key={`${s.label}-${i}`} className="text-center">
-                    <p className="text-2xl font-bold text-primary-600">{s.val}</p>
-                    <p className="text-xs text-gray-600">{s.label}</p>
-                  </div>
-                ))}
+              <div className="flex-1 min-w-0">
+                <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <h1 className="min-w-0 text-3xl font-bold text-gray-900">{vendorName}</h1>
+                  <VendorStoreInlineActions vendorId={vendorId} vendorName={vendorName} />
+                </div>
+                <div className="flex items-center gap-2 mb-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} className={`w-5 h-5 ${ratingValue > i ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
+                  ))}
+                  <span className="text-sm text-gray-600">{ratingAvg ? `(${ratingAvg} rating)` : '(No ratings yet)'}</span>
+                </div>
+                {vendor?.shop_description && (
+                  <p className="text-sm text-gray-600 max-w-2xl mb-3">{vendor.shop_description}</p>
+                )}
+                <VendorStoreQrPanel vendorId={vendorId} vendorName={vendorName} className="mb-1" />
+                <div className="flex flex-wrap gap-4 pt-4 mt-4 border-t">
+                  {desktopStats.map((s, i) => (
+                    <div key={`${s.label}-${i}`} className="text-center min-w-[4rem]">
+                      <p className="text-2xl font-bold text-primary-600">{s.val}</p>
+                      <p className="text-xs text-gray-600">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -392,7 +454,10 @@ export default function VendorStorePage() {
             </div>
             <div className="bg-white rounded-lg p-6">
               <h3 className="font-semibold text-gray-900 mb-3">Customer Service</h3>
-              <p className="text-sm text-gray-600">Responds within 24 hours. Available Monday–Saturday, 9am–6pm.</p>
+              <p className="text-sm text-gray-600">
+                Contact the seller through your order page after purchase. JulineMart support is
+                available if you need help with an order issue.
+              </p>
             </div>
           </div>
         )}

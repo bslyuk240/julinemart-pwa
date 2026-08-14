@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Truck, Package, MapPin, Tag } from 'lucide-react';
+import { CreditCard, Truck, Package, MapPin, Tag, Store } from 'lucide-react';
 import PageHeader from '@/components/layout/page-header';
 import { useCart } from '@/hooks/use-cart';
 import { useCustomerAuth } from '@/context/customer-auth-context';
@@ -19,6 +19,7 @@ import {
 // Orders are created via server API to avoid client-side CORS
 import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
+import JulineMartProtectBadge from '@/components/trust/JulineMartProtectBadge';
 import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
 import { getShippingFee } from '@/lib/shipping/jloShipping';
 import {
@@ -36,6 +37,10 @@ import {
   clearPendingCampaignVoucher,
   readPendingCampaignVoucher,
 } from '@/components/campaigns/OfferSection';
+import {
+  clearCheckoutFulfillmentPref,
+  readCheckoutFulfillmentPref,
+} from '@/lib/local/geolocation';
 
 interface ShippingOption {
   id: string;
@@ -45,6 +50,8 @@ interface ShippingOption {
   zoneId: number;
   methodId: string;
 }
+
+type FulfillmentMethod = 'delivery' | 'store_pickup' | 'reservation';
 
 
 const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
@@ -105,6 +112,13 @@ export default function CheckoutPage() {
   // JLO shipping calculation state
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
   const [shippingError, setShippingError] = useState<string | null>(null);
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod>('delivery');
+  const [storePickupStore, setStorePickupStore] = useState<{
+    area?: string;
+    city?: string;
+    state?: string;
+    storeName?: string;
+  } | null>(null);
   const [useDifferentAddress, setUseDifferentAddress] = useState(false);
   const [saveNewAddress, setSaveNewAddress] = useState(false);
 
@@ -129,6 +143,77 @@ export default function CheckoutPage() {
     setPromoKind('voucher');
     setVoucherCode(pending);
   }, []);
+
+  const singleVendorId = useMemo(() => {
+    const vendorIds = new Set(
+      items
+        .map((item: { vendorId?: string | number | null }) =>
+          item.vendorId != null && item.vendorId !== '' ? String(item.vendorId) : null
+        )
+        .filter(Boolean) as string[]
+    );
+    return vendorIds.size === 1 ? Array.from(vendorIds)[0] : null;
+  }, [items]);
+
+  const storePickupEligible = Boolean(
+    singleVendorId && storePickupStore?.city && storePickupStore?.state
+  );
+
+  useEffect(() => {
+    if (!singleVendorId) {
+      setStorePickupStore(null);
+      setFulfillmentMethod((prev) =>
+        prev === 'store_pickup' || prev === 'reservation' ? 'delivery' : prev
+      );
+      return;
+    }
+
+    let cancelled = false;
+    fetch(`/api/vendor/${encodeURIComponent(singleVendorId)}/trust`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        const store = data?.trust?.physical_store;
+        if (store?.supports_pickup) {
+          setStorePickupStore({
+            area: store.area,
+            city: store.city,
+            state: store.state,
+            storeName: data?.trust?.store_name,
+          });
+        } else {
+          setStorePickupStore(null);
+          setFulfillmentMethod((prev) =>
+        prev === 'store_pickup' || prev === 'reservation' ? 'delivery' : prev
+      );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setStorePickupStore(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [singleVendorId]);
+
+  useEffect(() => {
+    if (fulfillmentMethod === 'store_pickup' || fulfillmentMethod === 'reservation') {
+      setShippingCost(0);
+      setShippingError(null);
+    }
+  }, [fulfillmentMethod]);
+
+  useEffect(() => {
+    const pref = readCheckoutFulfillmentPref();
+    if (pref === 'reservation' && storePickupEligible) {
+      setFulfillmentMethod('reservation');
+      clearCheckoutFulfillmentPref();
+    } else if (pref === 'store_pickup' && storePickupEligible) {
+      setFulfillmentMethod('store_pickup');
+      clearCheckoutFulfillmentPref();
+    }
+  }, [storePickupEligible]);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -766,9 +851,11 @@ export default function CheckoutPage() {
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
-    if (!formData.address1.trim()) newErrors.address1 = 'Address is required';
-    if (!formData.city.trim()) newErrors.city = 'City is required';
-    if (!formData.state.trim()) newErrors.state = 'State is required';
+    if (fulfillmentMethod !== 'store_pickup' && fulfillmentMethod !== 'reservation') {
+      if (!formData.address1.trim()) newErrors.address1 = 'Address is required';
+      if (!formData.city.trim()) newErrors.city = 'City is required';
+      if (!formData.state.trim()) newErrors.state = 'State is required';
+    }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (formData.email && !emailRegex.test(formData.email)) {
@@ -981,7 +1068,15 @@ export default function CheckoutPage() {
     }
 
     const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
-    if (selectedOption && selectedOption.methodId === 'jlo_shipping' && shippingCost === null) {
+    const isLocalCollection =
+      fulfillmentMethod === 'store_pickup' || fulfillmentMethod === 'reservation';
+    const isReservation = fulfillmentMethod === 'reservation';
+    if (
+      !isLocalCollection &&
+      selectedOption &&
+      selectedOption.methodId === 'jlo_shipping' &&
+      shippingCost === null
+    ) {
       toast.error('Please wait for shipping to be calculated.');
       return;
     }
@@ -989,6 +1084,12 @@ export default function CheckoutPage() {
     setIsProcessing(true);
 
     try {
+      const pickupAddress = storePickupStore
+        ? [storePickupStore.area, storePickupStore.city].filter(Boolean).join(', ')
+        : 'Store pickup';
+      const pickupCity = storePickupStore?.city || formData.city;
+      const pickupState = storePickupStore?.state || formData.state;
+
       const orderVendorMeta = (() => {
         const vendorBuckets: Record<
           string,
@@ -1021,8 +1122,10 @@ export default function CheckoutPage() {
       })();
 
       // ✅ FIXED: Only influencer coupons discount shipping
-      const orderShippingDiscount = appliedCoupon ? shippingDiscount : 0;
-      const shippingLineTotal = Math.max(0, (shippingCost ?? 0) - orderShippingDiscount);
+      const orderShippingDiscount = appliedCoupon && !isLocalCollection ? shippingDiscount : 0;
+      const shippingLineTotal = isLocalCollection
+        ? 0
+        : Math.max(0, (shippingCost ?? 0) - orderShippingDiscount);
 
       const orderData = {
         payment_method: selectedPayment,
@@ -1031,10 +1134,10 @@ export default function CheckoutPage() {
         billing: {
           first_name: formData.firstName,
           last_name: formData.lastName,
-          address_1: formData.address1,
+          address_1: isLocalCollection ? pickupAddress : formData.address1,
           address_2: formData.address2,
-          city: formData.city,
-          state: formData.state,
+          city: isLocalCollection ? pickupCity : formData.city,
+          state: isLocalCollection ? pickupState : formData.state,
           postcode: formData.postcode,
           country: formData.country,
           email: formData.email,
@@ -1044,10 +1147,10 @@ export default function CheckoutPage() {
         shipping: {
           first_name: formData.firstName,
           last_name: formData.lastName,
-          address_1: formData.address1,
+          address_1: isLocalCollection ? pickupAddress : formData.address1,
           address_2: formData.address2,
-          city: formData.city,
-          state: formData.state,
+          city: isLocalCollection ? pickupCity : formData.city,
+          state: isLocalCollection ? pickupState : formData.state,
           postcode: formData.postcode,
           country: formData.country,
           company: '',
@@ -1097,6 +1200,23 @@ export default function CheckoutPage() {
                 : []),
               ...(item.variation?.supabaseId
                 ? [{ key: '_supabase_variation_id', value: item.variation.supabaseId }]
+                : []),
+              ...(item.customisation
+                ? [
+                    { key: '_custom_schema_id', value: item.customisation.schema_id },
+                    {
+                      key: '_custom_field_values',
+                      value: JSON.stringify(item.customisation.field_values),
+                    },
+                    {
+                      key: '_custom_price_adjustment',
+                      value: String(item.customisation.price_adjustment),
+                    },
+                    ...item.customisation.summary_lines.map((line: string, i: number) => ({
+                      key: `_custom_line_${i}`,
+                      value: line,
+                    })),
+                  ]
                 : []),
             ],
           };
@@ -1157,22 +1277,37 @@ export default function CheckoutPage() {
               value: voucherDiscount.toString(),
             },
           ] : []),
+          ...(isLocalCollection
+            ? [{
+                key: '_fulfillment_method',
+                value: isReservation ? 'reservation' : 'store_pickup',
+              }]
+            : []),
         ],
-        shipping_lines: selectedShipping ? [{
-          method_id: selectedOption?.methodId || 'flat_rate',
-          method_title: selectedOption?.title || 'Shipping',
-          total: shippingLineTotal.toString(),
-          meta_data: orderShippingDiscount > 0 ? [
-            {
-              key: '_original_shipping_cost',
-              value: shippingCost?.toString() || '0',
-            },
-            {
-              key: '_shipping_discount',
-              value: orderShippingDiscount.toString(),
-            },
-          ] : [],
-        }] : [],
+        shipping_lines: isLocalCollection
+          ? [{
+              method_id: isReservation ? 'reservation' : 'store_pickup',
+              method_title: isReservation ? 'Reserve & collect' : 'Collect from store',
+              total: '0',
+              meta_data: [],
+            }]
+          : selectedShipping
+            ? [{
+              method_id: selectedOption?.methodId || 'flat_rate',
+              method_title: selectedOption?.title || 'Shipping',
+              total: shippingLineTotal.toString(),
+              meta_data: orderShippingDiscount > 0 ? [
+                {
+                  key: '_original_shipping_cost',
+                  value: shippingCost?.toString() || '0',
+                },
+                {
+                  key: '_shipping_discount',
+                  value: orderShippingDiscount.toString(),
+                },
+              ] : [],
+            }]
+            : [],
         // NEW: Add coupon_lines for webhook detection
         coupon_lines: appliedVoucher ? [{
           code: appliedVoucher.code,
@@ -1304,19 +1439,23 @@ export default function CheckoutPage() {
     formData.lastName.trim() &&
     formData.email.trim() &&
     formData.phone.trim() &&
-    formData.address1.trim() &&
-    formData.city.trim() &&
-    formData.state.trim() &&
-    formData.country.trim()
+    formData.country.trim() &&
+    (fulfillmentMethod === 'store_pickup' ||
+      fulfillmentMethod === 'reservation' ||
+      (formData.address1.trim() && formData.city.trim() && formData.state.trim()))
   );
   const shippingReady =
-    Boolean(selectedOption) &&
-    (selectedOption?.methodId !== 'jlo_shipping' || shippingCost !== null);
+    fulfillmentMethod === 'store_pickup' ||
+    fulfillmentMethod === 'reservation' ||
+    (Boolean(selectedOption) &&
+      (selectedOption?.methodId !== 'jlo_shipping' || shippingCost !== null));
   const isCheckoutReady =
     !loading &&
     hasRequiredAddress &&
     Boolean(selectedPayment) &&
-    Boolean(selectedShipping) &&
+    (fulfillmentMethod === 'store_pickup' ||
+      fulfillmentMethod === 'reservation' ||
+      Boolean(selectedShipping)) &&
     shippingReady &&
     !shippingError &&
     !isProcessing;
@@ -1558,8 +1697,87 @@ export default function CheckoutPage() {
               </div>
             </div>
 
+            {/* Fulfillment method */}
+            {storePickupEligible && (
+              <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <div className="mb-4 flex items-center gap-3">
+                  <Store className="h-6 w-6 text-primary-600" />
+                  <h2 className="text-sm font-semibold text-gray-900 md:text-base">
+                    How would you like to receive your order?
+                  </h2>
+                </div>
+                <div className="space-y-3">
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 p-4 transition-colors ${
+                      fulfillmentMethod === 'delivery'
+                        ? 'border-primary-600 bg-primary-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="fulfillment"
+                      checked={fulfillmentMethod === 'delivery'}
+                      onChange={() => setFulfillmentMethod('delivery')}
+                      className="mt-1 h-4 w-4 text-primary-600"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900">Delivery</p>
+                      <p className="text-sm text-gray-600">Ship to your address</p>
+                    </div>
+                  </label>
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 p-4 transition-colors ${
+                      fulfillmentMethod === 'store_pickup'
+                        ? 'border-primary-600 bg-primary-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="fulfillment"
+                      checked={fulfillmentMethod === 'store_pickup'}
+                      onChange={() => setFulfillmentMethod('store_pickup')}
+                      className="mt-1 h-4 w-4 text-primary-600"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900">Collect from store</p>
+                      <p className="text-sm text-gray-600">
+                        Pick up at {storePickupStore?.storeName || "the seller's store"}
+                        {storePickupStore?.area ? ` — ${storePickupStore.area}, ${storePickupStore.city}` : ''}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-green-700">FREE · No delivery fee</p>
+                    </div>
+                  </label>
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 p-4 transition-colors ${
+                      fulfillmentMethod === 'reservation'
+                        ? 'border-emerald-600 bg-emerald-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="fulfillment"
+                      checked={fulfillmentMethod === 'reservation'}
+                      onChange={() => setFulfillmentMethod('reservation')}
+                      className="mt-1 h-4 w-4 text-emerald-600"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900">Reserve & collect</p>
+                      <p className="text-sm text-gray-600">
+                        Pay now — seller holds items for 48 hours at{' '}
+                        {storePickupStore?.storeName || "the seller's store"}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-emerald-700">FREE · Collect when ready</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
             {/* Shipping Method */}
-            {(loading || shippingOptions.length > 0) && (
+            {fulfillmentMethod === 'delivery' && (loading || shippingOptions.length > 0) && (
               <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <div className="flex items-center gap-3 mb-4">
                   <Truck className="w-6 h-6 text-primary-600" />
@@ -1874,6 +2092,8 @@ export default function CheckoutPage() {
                   <span className="text-primary-600">{formatPrice(total)}</span>
                 </div>
               </div>
+
+              <JulineMartProtectBadge variant="compact" className="mt-4" />
 
               {hasPendingPayment ? (
                 <div className="space-y-2">

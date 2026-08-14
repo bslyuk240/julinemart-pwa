@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { ProductImage } from '@/types/product';
+import ActualProductPhotoBadge from '@/components/product/ActualProductPhotoBadge';
 
 interface ProductGalleryProps {
   images: ProductImage[];
@@ -36,18 +37,26 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
     );
   }
 
+  const currentImage = images[selectedImage];
+  const showSellerPhotoBadge = currentImage?.photo_source === 'seller_actual';
+
   return (
     <div className="space-y-4">
       {/* Main Image */}
       <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
+        {showSellerPhotoBadge && (
+          <div className="absolute left-2 top-2 z-10">
+            <ActualProductPhotoBadge compact />
+          </div>
+        )}
         <Image
-          src={images[selectedImage].src}
-          alt={images[selectedImage].alt || productName}
+          src={currentImage.src}
+          alt={currentImage.alt || productName}
           fill
           className="object-cover cursor-zoom-in"
           onClick={() => setIsModalOpen(true)}
           priority
-          unoptimized={isRemoteImage(images[selectedImage].src)}
+          unoptimized={isRemoteImage(currentImage.src)}
         />
 
         {/* Navigation Arrows */}
@@ -139,7 +148,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
               fill
               className="object-contain pointer-events-none"
               sizes="100vw"
-              unoptimized={isRemoteImage(images[selectedImage].src)}
+              unoptimized={isRemoteImage(currentImage.src)}
             />
           </div>
 

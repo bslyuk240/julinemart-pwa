@@ -7,6 +7,7 @@ import TrendingSection from '@/components/home/trending-section';
 import TopSellers from '@/components/home/top-sellers';
 import SponsoredProducts from '@/components/home/sponsored-products';
 import LaunchingDeals from '@/components/home/launching-deals';
+import LocalMakersSection from '@/components/home/local-makers-section';
 import CategoryProductsSection from '@/components/home/category-products-section';
 import type { HomepageSectionsData } from '@/lib/homepage-sections';
 import GenericProductSection from '@/components/home/generic-product-section';
@@ -22,12 +23,13 @@ const EMPTY_SECTIONS: HomepageSectionsData = {
   topSellerProducts: [],
   sponsoredProducts: [],
   launchingProducts: [],
+  localMakersProducts: [],
   electronicsProducts: [],
   fashionProducts: [],
   extraSections: [],
 };
 
-const CACHE_KEY = 'homepage_sections_v1';
+const CACHE_KEY = 'homepage_sections_v2';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function readCache(): HomepageSectionsData | null {
@@ -141,6 +143,7 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
     topSellerProducts,
     sponsoredProducts,
     launchingProducts,
+    localMakersProducts,
     electronicsProducts,
     fashionProducts,
     extraSections,
@@ -168,6 +171,10 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
       )}
 
       {topSellerProducts.length > 0 && <TopSellers products={topSellerProducts} />}
+
+      {localMakersProducts.length > 0 && (
+        <LocalMakersSection products={localMakersProducts} />
+      )}
 
       {dealProducts.length > 0 && <DealsSection products={dealProducts} />}
 
@@ -219,6 +226,7 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
               <li>&bull; Tag products with &quot;top-seller&quot; for Top Sellers section</li>
               <li>&bull; Tag products with &quot;sponsored&quot; for Sponsored Products section</li>
               <li>&bull; Tag products with &quot;launching-deal&quot; for Launching Deals section</li>
+              <li>&bull; Tag products with &quot;handmade&quot;, &quot;made-in-nigeria&quot;, or &quot;customisable&quot; for Local Makers</li>
             </ul>
           </div>
         </div>

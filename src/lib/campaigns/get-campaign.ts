@@ -20,6 +20,8 @@ interface CampaignRow {
   review_rules: Record<string, unknown> | null;
   offer_config: Record<string, unknown> | null;
   meta_seo: Record<string, unknown> | null;
+  vendor_id?: string | null;
+  approval_status?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -83,8 +85,14 @@ function mapCampaign(row: CampaignRow, sections: SectionRow[]): Campaign {
 // service-role client — which bypasses RLS — still respects it consistently
 // for the public GET route. Admin/preview routes should query with
 // requireActive: false instead of relying on this helper's default.
+function isVendorCampaignApproved(row: CampaignRow): boolean {
+  if (!row.vendor_id) return true;
+  return row.approval_status === 'approved';
+}
+
 function isWithinActiveWindow(row: CampaignRow): boolean {
   if (row.status !== 'active') return false;
+  if (!isVendorCampaignApproved(row)) return false;
   const now = Date.now();
   if (row.start_date && new Date(row.start_date).getTime() > now) return false;
   if (row.end_date && new Date(row.end_date).getTime() < now) return false;
@@ -106,6 +114,7 @@ export async function getCampaignBySlug(
 
   if (campaignError || !campaignRow) return null;
   if (requireActive && !isWithinActiveWindow(campaignRow)) return null;
+  if (!requireActive && campaignRow.vendor_id && campaignRow.approval_status !== 'approved') return null;
 
   const { data: sectionRows, error: sectionsError } = await supabase
     .from('campaign_sections')
@@ -164,7 +173,7 @@ export async function getActiveCampaignSummaries(): Promise<CampaignSummary[]> {
 
   const { data, error } = await supabase
     .from('campaigns')
-    .select('id, slug, public_title, status, start_date, end_date, hero_config, offer_config')
+    .select('id, slug, public_title, status, start_date, end_date, hero_config, offer_config, vendor_id, approval_status')
     .eq('status', 'active')
     .order('updated_at', { ascending: false });
 

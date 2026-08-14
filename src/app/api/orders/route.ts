@@ -1,6 +1,26 @@
 import { NextResponse } from 'next/server';
 import { jloItemIdsFromOrderLineItem } from '@/lib/jlo/line-identity';
 
+function customisationFromLineMeta(item: {
+  meta_data?: { key: string; value: unknown }[];
+}) {
+  const meta = item.meta_data || [];
+  const g = (k: string) => meta.find((m) => m.key === k)?.value;
+  const schemaId = g('_custom_schema_id');
+  if (!schemaId) return undefined;
+  let fieldValues: Record<string, string | number> = {};
+  try {
+    fieldValues = JSON.parse(String(g('_custom_field_values') || '{}'));
+  } catch {
+    fieldValues = {};
+  }
+  return {
+    schema_id: String(schemaId),
+    field_values: fieldValues,
+    price_adjustment: Number(g('_custom_price_adjustment') || 0),
+  };
+}
+
 const JLO_BASE = (
   process.env.JLO_API_BASE_URL ||
   process.env.NEXT_PUBLIC_JLO_CATALOG_URL ||
@@ -164,7 +184,13 @@ export async function POST(request: Request) {
     const items = lineItems
       .map((item: any) => {
         const { product_id, variation_id } = jloItemIdsFromOrderLineItem(item);
-        return { product_id, variation_id, quantity: item.quantity };
+        const customisation = customisationFromLineMeta(item);
+        return {
+          product_id,
+          variation_id,
+          quantity: item.quantity,
+          ...(customisation ? { customisation } : {}),
+        };
       })
       .filter((i: any) => i.product_id);
 
@@ -190,6 +216,17 @@ export async function POST(request: Request) {
       if (campaignVoucherId != null && String(campaignVoucherId).trim() !== '') {
         jloPayload.campaign_voucher_id = String(campaignVoucherId).trim();
       }
+    }
+
+    const fulfillmentMethod =
+      getMeta('_fulfillment_method') === 'reservation'
+        ? 'reservation'
+        : getMeta('_fulfillment_method') === 'store_pickup'
+          ? 'store_pickup'
+          : 'delivery';
+    jloPayload.fulfillment_method = fulfillmentMethod;
+    if (fulfillmentMethod === 'store_pickup' || fulfillmentMethod === 'reservation') {
+      jloPayload.shipping_fee = 0;
     }
 
     const jloRes = await fetch(`${JLO_BASE}/api/create-order`, {

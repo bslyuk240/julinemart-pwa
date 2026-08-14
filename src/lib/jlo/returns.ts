@@ -27,6 +27,15 @@ export type JloRefundInfo = {
   refund_currency?: string;
   refund_method?: string;
   refund_completed_at?: string;
+  refund_initiated_at?: string;
+  refund_expected_by?: string;
+};
+
+export type ResolutionTimelineEntry = {
+  at: string;
+  stage: string;
+  label: string;
+  actor?: string;
 };
 
 export type JloReturn = {
@@ -38,8 +47,10 @@ export type JloReturn = {
   order_number?: string;
   preferred_resolution?: 'refund' | 'replacement';
   reason_code?: string;
+  complaint_type?: string;
   reason_note?: string;
   images?: string[];
+  resolution_timeline?: ResolutionTimelineEntry[];
   status: string;
   created_at?: string;
   return_shipment?: JloReturnShipment;

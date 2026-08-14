@@ -141,13 +141,26 @@ function adaptOrder(o: any) {
     line_items: (o.items || []).map((item: any, idx: number) => ({
       id: item.id ?? idx,
       name: item.product_name,
+      product_id: item.product_id ?? 0,
+      variation_id: item.variation_id ?? 0,
       sku: item.product_sku,
       quantity: item.quantity,
       price: item.unit_price,
       total: String(item.subtotal ?? 0),
       meta_data: [],
     })),
-    meta_data: buildMetaData(o),
+    meta_data: [
+      ...buildMetaData(o),
+      ...(o.fulfillment_method
+        ? [{ key: '_fulfillment_method', value: o.fulfillment_method }]
+        : []),
+      ...(o.reservation_status
+        ? [{ key: '_reservation_status', value: o.reservation_status }]
+        : []),
+      ...(o.reserved_until
+        ? [{ key: '_reserved_until', value: o.reserved_until }]
+        : []),
+    ],
   };
 }
 
