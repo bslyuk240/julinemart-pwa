@@ -117,7 +117,20 @@ Settlement: `order_items` still hold component lines for vendor/supplier cost tr
 
 Each phase has an **exit gate**. Do not start N+1 until gate passes.
 
-### Phase G1 — Ready-made boxes (IN PROGRESS)
+### Phase G2 — Gift fulfilment & ops (IN PROGRESS)
+
+| Deliverable | Status |
+|-------------|--------|
+| Ops dashboard tabs | Done |
+| Printable message card | Done |
+| Customer gift timeline | Done |
+| QC + pack photo URL | Done |
+
+**Exit gate:** see BUILD-STATUS.md
+
+---
+
+### Phase G1 — Ready-made boxes (COMPLETE)
 
 **Theme:** Admin-curated boxes, customer purchase as one gift SKU.
 

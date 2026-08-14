@@ -5,6 +5,26 @@
 
 Last updated: **14 August 2026**
 
+## JulineMart Gifts — Phase G2 IN PROGRESS
+
+### G1 — COMPLETE
+- Ready-made boxes, `/gifts` storefront, `create-gift-order`
+
+### G2 shipped (code)
+- [x] Migration `20260814120000_gift_g2_ops.sql`
+- [x] `admin-gift-ops`, `gift-message-card`, `customer-gift-order`
+- [x] Admin `/admin/gift-ops` (New → Packing → Dispatch → Done)
+- [x] PWA `GiftOrderTimeline` on order detail + `/api/gifts/track`
+- [x] Pay confirm moves gift to `paid` queue
+
+### G2 exit gate
+- [x] Migration applied to Supabase
+- [ ] Ops completes full status path on test order
+- [ ] Customer sees gift timeline on `/orders/[id]`
+- [ ] Message card prints from ops UI
+
+---
+
 ## JulineMart Gifts — Phase G1 IN PROGRESS
 
 > **Canonical plan:** [`julinemart-gifts-roadmap.md`](./julinemart-gifts-roadmap.md)

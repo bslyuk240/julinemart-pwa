@@ -11,6 +11,7 @@ import PageLoading from '@/components/ui/page-loading';
 import { toast } from 'sonner';
 import OrderStatusTracker from '@/components/orders/order-status-tracker';
 import CustomOrderTimeline from '@/components/orders/CustomOrderTimeline';
+import GiftOrderTimeline from '@/components/orders/GiftOrderTimeline';
 import BuyAgainButton from '@/components/orders/BuyAgainButton';
 import { JloReturn, formatJloRefundStatus, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
 import type { Order as WooOrder } from '@/types/order';
@@ -490,6 +491,18 @@ export default function OrderDetailPage() {
               dateCompleted={order.date_completed}
               metaData={order.meta_data}
             />
+
+            {customerEmail && (
+              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+                <h2 className="text-base md:text-xl font-semibold text-gray-900 mb-3 md:mb-4">
+                  Gift progress
+                </h2>
+                <GiftOrderTimeline
+                  orderId={orderId}
+                  supabaseOrderId={order._supabase_id}
+                />
+              </div>
+            )}
 
             {customerEmail && (
               <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
