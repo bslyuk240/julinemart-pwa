@@ -117,7 +117,22 @@ Settlement: `order_items` still hold component lines for vendor/supplier cost tr
 
 Each phase has an **exit gate**. Do not start N+1 until gate passes.
 
-### Phase G0 — Foundation (IN PROGRESS)
+### Phase G1 — Ready-made boxes (IN PROGRESS)
+
+**Theme:** Admin-curated boxes, customer purchase as one gift SKU.
+
+| Deliverable | Status |
+|-------------|--------|
+| `gift_boxes`, `gift_box_items`, `gift_orders` | Migration applied |
+| Admin CRUD ready-made boxes | Done |
+| PWA `/gifts` + box PDP + checkout | Done |
+| `create-gift-order` with packing items | Done |
+
+**Exit gate:** see BUILD-STATUS.md
+
+---
+
+### Phase G0 — Foundation (COMPLETE)
 
 **Theme:** Warri hub + admin hub CRUD + gift pool + product eligibility.
 

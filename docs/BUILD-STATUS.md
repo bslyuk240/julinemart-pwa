@@ -5,6 +5,28 @@
 
 Last updated: **14 August 2026**
 
+## JulineMart Gifts — Phase G1 IN PROGRESS
+
+> **Canonical plan:** [`julinemart-gifts-roadmap.md`](./julinemart-gifts-roadmap.md)
+
+### G0 — COMPLETE
+- Migration applied · Warri hub · admin pool · `/api/gifts/pool`
+
+### G1 shipped (code)
+- [x] Migration `20260814110000_gift_g1_ready_made_boxes.sql`
+- [x] `gift_boxes`, `gift_box_items`, `gift_orders`, `orders.order_kind`
+- [x] `admin-gift-boxes`, `gift-boxes`, `create-gift-order`
+- [x] Admin `/admin/gift-boxes`
+- [x] PWA `/gifts`, `/gifts/boxes/[slug]`, `/gifts/checkout`
+
+### G1 exit gate (verify manually)
+- [x] Migration applied to Supabase
+- [ ] 3+ test boxes with pool items in admin
+- [ ] E2E Paystack → gift order with packing checklist in sub_order metadata
+- [ ] Component costs visible in admin margin row
+
+---
+
 ## JulineMart Gifts — Phase G0 IN PROGRESS
 
 > **Canonical plan:** [`julinemart-gifts-roadmap.md`](./julinemart-gifts-roadmap.md)
