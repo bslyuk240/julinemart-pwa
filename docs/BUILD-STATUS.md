@@ -3,7 +3,49 @@
 > **Canonical plan:** [`trusted-local-commerce-roadmap.md`](./trusted-local-commerce-roadmap.md)
 > **Session rules:** `.cursor/rules/trusted-local-commerce-roadmap.mdc`
 
-Last updated: **13 August 2026**
+Last updated: **14 August 2026**
+
+## JulineMart Gifts — Phase G0 IN PROGRESS
+
+> **Canonical plan:** [`julinemart-gifts-roadmap.md`](./julinemart-gifts-roadmap.md)
+> **Rules:** `.cursor/rules/julinemart-gifts.mdc`
+
+**Pilot hub:** Warri (`code=warri`, admin can add more hubs)
+
+### G0 shipped (code)
+- [x] Migration `20260814100000_gift_g0_foundation.sql`
+- [x] `admin-gift-fulfilment-centres` — hub CRUD
+- [x] `admin-gift-pool` — pool assign + product eligibility
+- [x] `gift-pool-products` — public pool API
+- [x] Admin UI `/admin/gift-fulfilment-centres`
+- [x] PWA proxy `/api/gifts/pool`
+
+### G0 exit gate (verify after migration apply)
+- [x] Migration applied to Supabase
+- [ ] Admin added second test hub without deploy
+- [ ] 30+ products in Warri pool
+- [ ] `GET /api/gifts/pool?gfc=warri` returns only pool SKUs
+
+---
+
+## JulineMart Gifts — PLANNED (not started)
+
+> **Canonical plan:** [`julinemart-gifts-roadmap.md`](./julinemart-gifts-roadmap.md)
+> **Rules:** `.cursor/rules/julinemart-gifts.mdc`
+
+**Pilot consolidation hub:** **Warri** — admin can add more hubs via `gift_fulfilment_centres`.
+
+| Phase | Status | Theme |
+|-------|--------|--------|
+| G0 | **Next** | Warri hub + admin hub CRUD + gift pool + eligibility |
+| G1 | Pending | Ready-made boxes |
+| G2 | Pending | Ops dashboard + packing |
+| G3 | Pending | Build your own box |
+| G4–G7 | Pending | Discovery, scheduling, personalisation, growth |
+
+Trusted Local Commerce Phase 4 (Custom) should complete or pass exit gate before heavy G6 personalisation overlap.
+
+---
 
 ## Active phase: **Phase 4** (JulineMart Custom — first slice)
 
