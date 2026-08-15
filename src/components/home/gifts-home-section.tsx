@@ -35,16 +35,18 @@ export default async function GiftsHomeSection() {
           </Link>
         </div>
 
-        <div className="mb-3 flex flex-wrap gap-2 md:gap-3">
-          {GIFT_OCCASIONS.slice(0, 6).map((o) => (
-            <Link
-              key={o.slug}
-              href={`/gifts/${o.slug}`}
-              className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-primary-50 hover:text-primary-800 md:text-sm"
-            >
-              {o.label}
-            </Link>
-          ))}
+        <div className="mb-3 overflow-x-auto pb-1 md:overflow-visible md:pb-0">
+          <div className="flex gap-2 md:flex-wrap md:gap-3">
+            {GIFT_OCCASIONS.slice(0, 6).map((o) => (
+              <Link
+                key={o.slug}
+                href={`/gifts/${o.slug}`}
+                className="flex-shrink-0 whitespace-nowrap rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-primary-50 hover:text-primary-800 md:text-sm"
+              >
+                {o.label}
+              </Link>
+            ))}
+          </div>
         </div>
 
         <div className="overflow-x-auto pb-1">
