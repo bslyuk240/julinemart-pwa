@@ -47,12 +47,11 @@ export default async function GiftsHomeSection() {
           ))}
         </div>
 
-        {/* Mobile: horizontal rail · Desktop: grid */}
-        <div className="overflow-x-auto pb-1 md:overflow-visible md:pb-0">
-          <div className="flex min-w-full snap-x snap-mandatory gap-3 md:gap-4 md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 md:snap-none">
+        <div className="overflow-x-auto pb-1">
+          <div className="flex min-w-full snap-x snap-mandatory gap-3 md:gap-4">
             <Link
               href="/gifts/build"
-              className="flex w-[170px] flex-shrink-0 snap-start flex-col justify-end rounded-2xl bg-primary-600 p-4 text-white sm:w-[200px] md:w-auto md:min-h-[220px]"
+              className="flex w-[170px] flex-shrink-0 snap-start flex-col justify-end rounded-2xl bg-primary-600 p-4 text-white sm:w-[200px] md:w-[230px] lg:w-[260px]"
             >
               <Sparkles className="mb-2 h-6 w-6 opacity-90" />
               <p className="text-sm font-bold">Build your own</p>
@@ -61,7 +60,7 @@ export default async function GiftsHomeSection() {
               <Link
                 key={box.id}
                 href={`/gifts/boxes/${box.slug}`}
-                className="w-[170px] flex-shrink-0 snap-start overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 sm:w-[200px] md:w-auto"
+                className="w-[170px] flex-shrink-0 snap-start overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 sm:w-[200px] md:w-[230px] lg:w-[260px]"
               >
                 <div className="aspect-square bg-rose-50">
                   {box.image_url ? (
