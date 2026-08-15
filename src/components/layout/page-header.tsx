@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
 export interface PageHeaderProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   backHref?: string;
   backLabel?: string;
@@ -29,12 +29,16 @@ export default function PageHeader({
           <ArrowLeft className="w-4 h-4 text-gray-600" />
         </Link>
       ) : null}
-      <div className="min-w-0 flex-1">
-        <h1 className="text-base md:text-xl font-bold text-gray-900 leading-tight">{title}</h1>
-        {subtitle ? (
-          <p className="text-xs md:text-sm text-gray-600 mt-0.5">{subtitle}</p>
-        ) : null}
-      </div>
+      {title ? (
+        <div className="min-w-0 flex-1">
+          <h1 className="text-base md:text-xl font-bold text-gray-900 leading-tight">{title}</h1>
+          {subtitle ? (
+            <p className="text-xs md:text-sm text-gray-600 mt-0.5">{subtitle}</p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex-1" />
+      )}
       {action}
     </div>
   );

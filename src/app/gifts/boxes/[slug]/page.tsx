@@ -5,6 +5,7 @@ import { ArrowRight, Clock, Package, Star } from 'lucide-react';
 import GiftBoxGallery from '@/components/gifts/gift-box-gallery';
 import GiftBoxCard from '@/components/gifts/gift-box-card';
 import GiftBoxReviewTabs from '@/components/gifts/gift-box-review-tabs';
+import GiftBoxActions from '@/components/gifts/gift-box-actions';
 import { fetchGiftBoxBySlug, fetchGiftBoxes } from '@/lib/jlo/gifts';
 import { giftLeadCopy } from '@/lib/gifts/lead-copy';
 import { formatPrice } from '@/lib/utils/format-price';
@@ -51,7 +52,7 @@ export default async function GiftBoxPage({ params }: Props) {
         price={box.list_price}
       />
       <div className="container-custom py-5 md:py-8 max-w-6xl">
-        <PageHeader title={box.name} backHref="/gifts" backLabel="All gift boxes" />
+        <PageHeader backHref="/gifts" backLabel="All gift boxes" />
 
         <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
           <div className="mb-6 overflow-hidden rounded-2xl border bg-white shadow-sm lg:mb-0">
@@ -80,23 +81,37 @@ export default async function GiftBoxPage({ params }: Props) {
           <div className="space-y-6">
             <div className="lg:sticky lg:top-24 space-y-5">
               <div>
-                <p className="text-3xl font-bold text-primary-700">{formatPrice(box.list_price)}</p>
-                <p className="text-sm text-gray-600 mt-1">{box.item_count} curated items included</p>
+                <h1 className="text-base md:text-xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2">
+                  {box.name}
+                </h1>
+
                 {ratingCount > 0 && (
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <div className="flex items-center gap-0.5">
+                  <div className="flex items-center gap-2 md:gap-3 mb-3">
+                    <div className="flex items-center gap-1">
                       {[...Array(5)].map((_, i) => (
                         <Star
                           key={i}
-                          className={`w-3.5 h-3.5 ${i < Math.round(averageRating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                          className={`w-4 h-4 md:w-5 md:h-5 ${
+                            i < Math.floor(averageRating)
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-gray-300'
+                          }`}
                         />
                       ))}
                     </div>
-                    <span className="text-xs text-gray-500">
-                      {averageRating.toFixed(1)} ({ratingCount})
+                    <span className="text-sm text-gray-600">
+                      {averageRating.toFixed(1)} ({ratingCount} review{ratingCount === 1 ? '' : 's'})
                     </span>
                   </div>
                 )}
+
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <span className="text-lg md:text-xl font-bold text-primary-600">
+                    {formatPrice(box.list_price)}
+                  </span>
+                </div>
+
+                <p className="text-sm text-gray-600">{box.item_count} curated items included</p>
               </div>
               {gfc ? (
                 <p className="text-sm text-gray-500 flex items-center gap-2">
@@ -127,12 +142,15 @@ export default async function GiftBoxPage({ params }: Props) {
                 </div>
               )}
 
-              <Link href={`/gifts/checkout?box=${encodeURIComponent(box.slug)}`}>
-                <Button className="w-full h-12 md:h-14 text-base gap-2">
-                  Send this gift
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-              </Link>
+              <div className="flex gap-3">
+                <Link href={`/gifts/checkout?box=${encodeURIComponent(box.slug)}`} className="flex-1">
+                  <Button className="w-full h-12 md:h-14 text-base gap-2">
+                    Send this gift
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+                <GiftBoxActions box={box} />
+              </div>
               <Link
                 href="/gifts/build"
                 className="block text-center text-sm font-medium text-primary-700 hover:text-primary-900"
