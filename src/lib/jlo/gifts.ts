@@ -28,6 +28,14 @@ function budgetParams(budget?: string): { budget_min?: string; budget_max?: stri
   return {};
 }
 
+async function safeJson(res: Response): Promise<{ success?: boolean; data?: unknown; gfc?: unknown } | null> {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchGiftBoxes(
   gfc = 'warri',
   filters: Omit<GiftBoxFilters, 'gfc'> = {},
@@ -47,9 +55,9 @@ export async function fetchGiftBoxes(
   const res = await fetch(`${JLO_BASE}/.netlify/functions/gift-boxes?${params}`, {
     next: { revalidate: 60 },
   });
-  const json = await res.json();
-  if (!res.ok || !json.success) return { boxes: [], gfc: null };
-  return { boxes: json.data || [], gfc: json.gfc || null };
+  const json = await safeJson(res);
+  if (!res.ok || !json?.success) return { boxes: [], gfc: null };
+  return { boxes: (json.data as GiftBox[]) || [], gfc: (json.gfc as GiftFulfilmentCentre) || null };
 }
 
 export async function fetchGiftBoxBySlug(
@@ -63,7 +71,7 @@ export async function fetchGiftBoxBySlug(
   const res = await fetch(`${JLO_BASE}/.netlify/functions/gift-boxes?${params}`, {
     next: { revalidate: 60 },
   });
-  const json = await res.json();
-  if (!res.ok || !json.success) return { box: null, gfc: null };
-  return { box: json.data || null, gfc: json.gfc || null };
+  const json = await safeJson(res);
+  if (!res.ok || !json?.success) return { box: null, gfc: null };
+  return { box: (json.data as GiftBox) || null, gfc: (json.gfc as GiftFulfilmentCentre) || null };
 }
