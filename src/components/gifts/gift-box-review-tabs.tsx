@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ type Props = {
   ratingCount?: number;
 };
 
-export default function GiftBoxReviewTabs({ giftBoxId, slug, description, averageRating = 0, ratingCount = 0 }: Props) {
+export default function GiftBoxReviewTabs({ giftBoxId, slug, description, averageRating: initialAverage = 0, ratingCount: initialCount = 0 }: Props) {
   const [activeTab, setActiveTab] = useState<'description' | 'reviews'>('description');
   const [reviews, setReviews] = useState<GiftBoxReview[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
@@ -34,6 +34,17 @@ export default function GiftBoxReviewTabs({ giftBoxId, slug, description, averag
       cancelled = true;
     };
   }, [giftBoxId, slug]);
+
+  // Locally-fetched reviews are always fresh (no-store); fall back to the
+  // box's server-computed stats only before that fetch resolves.
+  const ratingCount = reviews.length || initialCount;
+  const averageRating = useMemo(() => {
+    if (reviews.length) {
+      const total = reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+      return Number((total / reviews.length).toFixed(1));
+    }
+    return initialAverage;
+  }, [reviews, initialAverage]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -55,6 +66,7 @@ export default function GiftBoxReviewTabs({ giftBoxId, slug, description, averag
 
       if (review) {
         toast.success('Review submitted! It will appear once approved.');
+        setReviews((prev) => [review, ...prev]);
         setForm((prev) => ({ reviewer: prev.reviewer, reviewerEmail: prev.reviewerEmail, rating: 0, review: '' }));
       } else {
         toast.error(error || 'Failed to submit review');
@@ -146,6 +158,9 @@ export default function GiftBoxReviewTabs({ giftBoxId, slug, description, averag
                     </div>
                   </div>
                   <p className="text-sm text-gray-700 whitespace-pre-line">{review.review}</p>
+                  {review.status && review.status !== 'approved' && (
+                    <p className="text-xs text-amber-600 mt-2 font-medium">Pending approval</p>
+                  )}
                 </div>
               ))
             ) : (
