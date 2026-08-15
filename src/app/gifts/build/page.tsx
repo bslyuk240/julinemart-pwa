@@ -6,7 +6,10 @@ import { useRouter } from 'next/navigation';
 import {
   ChevronDown,
   Gift,
+  Heart,
+  MapPin,
   Package,
+  Clock,
   Plus,
   Minus,
   Trash2,
@@ -22,6 +25,7 @@ import { formatPrice } from '@/lib/utils/format-price';
 import { ensurePaystackReady } from '@/lib/paystack';
 import { toast } from 'sonner';
 import { GIFT_OCCASIONS, GIFT_RECIPIENTS } from '@/lib/gifts/discovery';
+import { giftLeadCopy } from '@/lib/gifts/lead-copy';
 import {
   trackGiftBeginCheckout,
   trackGiftByoStart,
@@ -31,6 +35,13 @@ import { useGiftShippingQuote } from '@/hooks/use-gift-shipping-quote';
 import GiftPromoCode from '@/components/gifts/gift-promo-code';
 import GiftDeliveryScheduleFields from '@/components/gifts/gift-delivery-schedule-fields';
 import GiftBuilderCustomiseSheet from '@/components/gifts/gift-builder-customise-sheet';
+import {
+  GiftCheckoutSection,
+  GiftPaymentMethodSection,
+  GiftShippingMethodSection,
+} from '@/components/gifts/gift-checkout-sections';
+import { NIGERIAN_STATES } from '@/lib/constants/nigeria-states';
+import { getEnabledPaymentGateways, type PaymentGateway } from '@/lib/woocommerce/shipping';
 import type { GiftBuilderState, GiftPackagingOption } from '@/types/gifts';
 import type { GiftVoucherResult } from '@/lib/gifts/voucher';
 
@@ -88,6 +99,9 @@ export default function GiftBuildPage() {
   const [submitting, setSubmitting] = useState(false);
   const [appliedVoucher, setAppliedVoucher] = useState<GiftVoucherResult | null>(null);
   const [customiseTarget, setCustomiseTarget] = useState<PoolProduct | null>(null);
+  const [paymentGateways, setPaymentGateways] = useState<PaymentGateway[]>([]);
+  const [selectedPayment, setSelectedPayment] = useState('');
+  const [paymentLoading, setPaymentLoading] = useState(true);
   const [checkout, setCheckout] = useState({
     customer_name: '',
     customer_email: '',
@@ -152,6 +166,26 @@ export default function GiftBuildPage() {
       .then((json) => setPool(json.data?.products || []))
       .catch(() => {});
   }, [initSession]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPaymentLoading(true);
+    getEnabledPaymentGateways()
+      .then((gateways) => {
+        if (cancelled) return;
+        setPaymentGateways(gateways);
+        if (gateways.length) setSelectedPayment(gateways[0].id);
+      })
+      .catch(() => {
+        if (!cancelled) setPaymentGateways([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPaymentLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const token = builder?.session_token;
 
@@ -256,6 +290,9 @@ export default function GiftBuildPage() {
   const boxSubtotal = Math.max((builder?.totals.grand_total || 0) - voucherDiscount, 0);
   const grandTotal = boxSubtotal + (shippingFee ?? 0);
   const maxItems = builder?.packaging?.max_items ?? 12;
+  const hasRecipientAddress = Boolean(
+    checkout.recipient_city.trim() && checkout.recipient_state.trim()
+  );
 
   const poolCategories = useMemo(() => {
     const cats = new Set<string>();
@@ -284,6 +321,14 @@ export default function GiftBuildPage() {
   }, [step, builder, grandTotal]);
 
   const canCheckout = builder && builder.items.length > 0 && builder.packaging != null;
+  const isCheckoutReady =
+    Boolean(canCheckout) &&
+    Boolean(selectedPayment) &&
+    hasRecipientAddress &&
+    shippingQuote.quotedShipping != null &&
+    !shippingQuote.loading &&
+    !shippingQuote.error &&
+    Boolean(checkout.requested_delivery_date);
 
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,6 +343,10 @@ export default function GiftBuildPage() {
       toast.error('Choose a preferred delivery date');
       return;
     }
+    if (!selectedPayment) {
+      toast.error('Select a payment method');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch('/api/gifts/order', {
@@ -308,6 +357,7 @@ export default function GiftBuildPage() {
           gfc_code: 'warri',
           shipping_fee: shippingQuote.quotedShipping,
           voucher_code: appliedVoucher?.code,
+          payment_method: selectedPayment,
           occasion: occasion || undefined,
           ...checkout,
         }),
@@ -316,6 +366,13 @@ export default function GiftBuildPage() {
       if (!res.ok) throw new Error(data.error || 'Checkout failed');
 
       localStorage.removeItem(SESSION_KEY);
+
+      if (selectedPayment !== 'paystack') {
+        toast.success('Gift order placed!');
+        router.push(`/order-success?ref=${data.order_number || data.id}`);
+        return;
+      }
+
       await ensurePaystackReady();
       window.PaystackPop.setup({
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
@@ -343,7 +400,7 @@ export default function GiftBuildPage() {
   if (loading) return <PageLoading />;
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-28 lg:pb-10">
+    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 lg:pb-10">
       <div className="container-custom py-5 md:py-8">
         <PageHeader
           title="Build your own box"
@@ -371,11 +428,11 @@ export default function GiftBuildPage() {
             step === 2
               ? 'lg:grid lg:grid-cols-[1fr_300px] lg:items-start lg:gap-8'
               : step === 3
-                ? 'lg:grid lg:grid-cols-[1fr_340px] lg:items-start lg:gap-8'
+                ? 'grid min-w-0 gap-6 lg:grid-cols-3'
                 : ''
           }
         >
-          <div className="min-w-0 space-y-6">
+          <div className={step === 3 ? 'min-w-0 space-y-6 lg:col-span-2' : 'min-w-0 space-y-6'}>
             {step === 0 && (
               <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -426,6 +483,15 @@ export default function GiftBuildPage() {
                 <div>
                   <h2 className="font-semibold text-gray-900">Choose box size</h2>
                   <p className="mt-1 text-sm text-gray-600">Box fee is added to your item total.</p>
+                  {giftLeadCopy(builder.lead_time_days) ? (
+                    <p className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                      <Clock className="h-4 w-4 shrink-0" />
+                      {giftLeadCopy(builder.lead_time_days)}
+                      {builder.items.length > 0
+                        ? ''
+                        : ' · slower items may add extra days'}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -603,7 +669,7 @@ export default function GiftBuildPage() {
 
             {step === 3 && builder && (
               <form id="gift-build-checkout" onSubmit={handlePay} className="space-y-6">
-                <div className="rounded-2xl border border-gray-200 bg-white p-4 lg:hidden">
+                <div className="rounded-2xl bg-white p-4 shadow-sm lg:hidden">
                   <p className="flex items-center gap-2 font-semibold text-gray-900">
                     <Package className="h-4 w-4" /> Your box
                   </p>
@@ -611,85 +677,123 @@ export default function GiftBuildPage() {
                     {builder.packaging?.name} · {builder.totals.item_count} items
                   </p>
                   <p className="mt-2 font-bold text-primary-700">
-                    {shippingQuote.loading && checkout.recipient_state && checkout.recipient_city
-                      ? 'Calculating delivery…'
-                      : `${formatPrice(grandTotal)} incl. delivery`}
+                    {!hasRecipientAddress
+                      ? formatPrice(boxSubtotal)
+                      : shippingQuote.loading
+                        ? 'Calculating delivery…'
+                        : formatPrice(grandTotal)}
                   </p>
                 </div>
 
-                <section className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
-                  <h2 className="font-semibold text-gray-900">Your details</h2>
-                  <Input
-                    placeholder="Your full name"
-                    required
-                    value={checkout.customer_name}
-                    onChange={(e) => setCheckout({ ...checkout, customer_name: e.target.value })}
-                  />
-                  <Input
-                    type="email"
-                    placeholder="Your email"
-                    required
-                    value={checkout.customer_email}
-                    onChange={(e) => setCheckout({ ...checkout, customer_email: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Your phone"
-                    required
-                    value={checkout.customer_phone}
-                    onChange={(e) => setCheckout({ ...checkout, customer_phone: e.target.value })}
-                  />
-                </section>
+                <GiftCheckoutSection
+                  icon={<MapPin className="h-6 w-6 text-primary-600" />}
+                  title="Contact Information"
+                >
+                  <div className="space-y-4">
+                    <Input
+                      label="Your full name *"
+                      required
+                      value={checkout.customer_name}
+                      onChange={(e) => setCheckout({ ...checkout, customer_name: e.target.value })}
+                      fullWidth
+                    />
+                    <Input
+                      label="Email address *"
+                      type="email"
+                      required
+                      value={checkout.customer_email}
+                      onChange={(e) => setCheckout({ ...checkout, customer_email: e.target.value })}
+                      fullWidth
+                    />
+                    <Input
+                      label="Phone number *"
+                      type="tel"
+                      required
+                      value={checkout.customer_phone}
+                      onChange={(e) => setCheckout({ ...checkout, customer_phone: e.target.value })}
+                      fullWidth
+                    />
+                  </div>
+                </GiftCheckoutSection>
+
+                <GiftCheckoutSection
+                  icon={<MapPin className="h-6 w-6 text-primary-600" />}
+                  title="Recipient & delivery"
+                >
+                  <div className="space-y-4">
+                    <Input
+                      label="Recipient name *"
+                      required
+                      value={checkout.recipient_name}
+                      onChange={(e) => setCheckout({ ...checkout, recipient_name: e.target.value })}
+                      fullWidth
+                    />
+                    <Input
+                      label="Recipient phone *"
+                      required
+                      value={checkout.recipient_phone}
+                      onChange={(e) => setCheckout({ ...checkout, recipient_phone: e.target.value })}
+                      fullWidth
+                    />
+                    <Input
+                      label="Delivery address *"
+                      required
+                      value={checkout.recipient_address}
+                      onChange={(e) => setCheckout({ ...checkout, recipient_address: e.target.value })}
+                      fullWidth
+                    />
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Input
+                        label="City *"
+                        required
+                        value={checkout.recipient_city}
+                        onChange={(e) => setCheckout({ ...checkout, recipient_city: e.target.value })}
+                        fullWidth
+                      />
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-gray-700">State *</label>
+                        <select
+                          required
+                          value={checkout.recipient_state}
+                          onChange={(e) => setCheckout({ ...checkout, recipient_state: e.target.value })}
+                          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        >
+                          <option value="">Select state</option>
+                          {NIGERIAN_STATES.map((state) => (
+                            <option key={state} value={state}>
+                              {state === 'FCT' ? 'Federal Capital Territory (Abuja)' : state}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <Input
+                      label="Delivery zone / area *"
+                      required
+                      value={checkout.recipient_zone}
+                      onChange={(e) => setCheckout({ ...checkout, recipient_zone: e.target.value })}
+                      fullWidth
+                    />
+                  </div>
+                </GiftCheckoutSection>
+
+                <GiftShippingMethodSection
+                  shippingFee={shippingQuote.quotedShipping}
+                  loading={shippingQuote.loading}
+                  error={shippingQuote.error}
+                  zone={shippingQuote.zone}
+                  hasAddress={hasRecipientAddress}
+                />
 
                 <GiftPromoCode
                   customerEmail={checkout.customer_email}
                   orderSubtotal={builder.totals.grand_total}
                   builderSessionToken={token || undefined}
+                  occasion={occasion || undefined}
                   applied={appliedVoucher}
                   onApplied={setAppliedVoucher}
                   onRemoved={() => setAppliedVoucher(null)}
                 />
-
-                <section className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
-                  <h2 className="font-semibold text-gray-900">Recipient & delivery</h2>
-                  <Input
-                    placeholder="Recipient name"
-                    required
-                    value={checkout.recipient_name}
-                    onChange={(e) => setCheckout({ ...checkout, recipient_name: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Recipient phone"
-                    required
-                    value={checkout.recipient_phone}
-                    onChange={(e) => setCheckout({ ...checkout, recipient_phone: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Delivery address"
-                    required
-                    value={checkout.recipient_address}
-                    onChange={(e) => setCheckout({ ...checkout, recipient_address: e.target.value })}
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      placeholder="City"
-                      required
-                      value={checkout.recipient_city}
-                      onChange={(e) => setCheckout({ ...checkout, recipient_city: e.target.value })}
-                    />
-                    <Input
-                      placeholder="State"
-                      required
-                      value={checkout.recipient_state}
-                      onChange={(e) => setCheckout({ ...checkout, recipient_state: e.target.value })}
-                    />
-                  </div>
-                  <Input
-                    placeholder="Delivery zone / area"
-                    required
-                    value={checkout.recipient_zone}
-                    onChange={(e) => setCheckout({ ...checkout, recipient_zone: e.target.value })}
-                  />
-                </section>
 
                 <GiftDeliveryScheduleFields
                   builderSessionToken={token || undefined}
@@ -702,41 +806,37 @@ export default function GiftBuildPage() {
                   enabled={Boolean(token)}
                 />
 
-                <section className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
-                  <h2 className="font-semibold text-gray-900">Gift message</h2>
-                  <textarea
-                    className="min-h-[100px] w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                    placeholder="Write a personal message for the card…"
-                    value={checkout.gift_message}
-                    onChange={(e) => setCheckout({ ...checkout, gift_message: e.target.value })}
-                    maxLength={500}
-                  />
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={checkout.sender_visible}
-                      onChange={(e) => setCheckout({ ...checkout, sender_visible: e.target.checked })}
+                <GiftCheckoutSection icon={<Heart className="h-5 w-5 text-rose-500" />} title="Gift message">
+                  <div className="space-y-3">
+                    <textarea
+                      className="min-h-[100px] w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      placeholder="Write a personal message for the card…"
+                      value={checkout.gift_message}
+                      onChange={(e) => setCheckout({ ...checkout, gift_message: e.target.value })}
+                      maxLength={500}
                     />
-                    Show my name on the gift card
-                  </label>
-                </section>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={checkout.sender_visible}
+                        onChange={(e) => setCheckout({ ...checkout, sender_visible: e.target.checked })}
+                        className="h-4 w-4 text-primary-600"
+                      />
+                      Show my name on the gift card
+                    </label>
+                  </div>
+                </GiftCheckoutSection>
 
-                <div className="flex gap-2 lg:hidden">
-                  <Button type="button" variant="outline" onClick={() => setStep(2)}>
-                    Back
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1"
-                    disabled={submitting || shippingQuote.loading || shippingQuote.quotedShipping == null}
-                  >
-                    {submitting ? 'Opening payment…' : `Pay ${formatPrice(grandTotal)}`}
-                  </Button>
-                </div>
+                <GiftPaymentMethodSection
+                  gateways={paymentGateways}
+                  selectedPayment={selectedPayment}
+                  onSelect={setSelectedPayment}
+                  loading={paymentLoading}
+                />
 
                 <div className="hidden lg:block">
                   <Button type="button" variant="outline" onClick={() => setStep(2)}>
-                    Back
+                    Back to items
                   </Button>
                 </div>
               </form>
@@ -758,48 +858,50 @@ export default function GiftBuildPage() {
           )}
 
           {step === 3 && builder && (
-            <aside className="sticky top-24 hidden lg:block">
-              <div className="space-y-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <p className="flex items-center gap-2 font-semibold text-gray-900">
+            <aside className="min-w-0 lg:col-span-1">
+              <div className="sticky top-4 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <p className="mb-4 flex items-center gap-2 font-semibold text-gray-900">
                   <Package className="h-4 w-4" /> Order summary
                 </p>
                 <p className="text-sm text-gray-600">
                   {builder.packaging?.name} · {builder.totals.item_count} items
                 </p>
-                <div className="space-y-1 border-t pt-3 text-sm">
+                <div className="mt-4 space-y-2 border-t pt-4 text-sm">
                   <div className="flex justify-between">
-                    <span>Items + box</span>
-                    <span>{formatPrice(builder.totals.grand_total)}</span>
+                    <span className="text-gray-600">Items + box</span>
+                    <span className="font-medium">{formatPrice(builder.totals.grand_total)}</span>
                   </div>
                   {voucherDiscount > 0 ? (
-                    <div className="flex justify-between text-green-700">
+                    <div className="flex justify-between text-green-600">
                       <span>Voucher</span>
-                      <span>−{formatPrice(voucherDiscount)}</span>
+                      <span className="font-medium">−{formatPrice(voucherDiscount)}</span>
                     </div>
                   ) : null}
                   <div className="flex justify-between">
-                    <span>Delivery</span>
-                    <span>
-                      {shippingQuote.loading && checkout.recipient_state && checkout.recipient_city
-                        ? 'Calculating…'
-                        : shippingQuote.error
-                          ? '—'
-                          : formatPrice(shippingFee ?? 0)}
+                    <span className="text-gray-600">Delivery</span>
+                    <span className="font-medium">
+                      {!hasRecipientAddress
+                        ? 'Enter city & state'
+                        : shippingQuote.loading
+                          ? 'Calculating…'
+                          : shippingQuote.error
+                            ? '—'
+                            : formatPrice(shippingFee ?? 0)}
                     </span>
                   </div>
                   {shippingQuote.error ? (
                     <p className="text-xs text-amber-700">{shippingQuote.error}</p>
                   ) : null}
-                  <div className="flex justify-between border-t pt-2 text-base font-bold">
+                  <div className="flex justify-between border-t pt-3 text-lg font-bold">
                     <span>Total</span>
-                    <span className="text-primary-700">{formatPrice(grandTotal)}</span>
+                    <span className="text-primary-600">{formatPrice(grandTotal)}</span>
                   </div>
                 </div>
                 <Button
                   type="submit"
                   form="gift-build-checkout"
-                  className="w-full"
-                  disabled={submitting || shippingQuote.loading || shippingQuote.quotedShipping == null}
+                  className="mt-5 hidden h-12 w-full lg:inline-flex"
+                  disabled={submitting || !isCheckoutReady}
                 >
                   {submitting ? 'Opening payment…' : `Pay ${formatPrice(grandTotal)}`}
                 </Button>
@@ -808,6 +910,32 @@ export default function GiftBuildPage() {
           )}
         </div>
       </div>
+
+      {builder && step === 3 && (
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white p-4 shadow-lg lg:hidden">
+          <div className="container-custom flex items-center gap-3">
+            <button
+              type="button"
+              className="shrink-0 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700"
+              onClick={() => setStep(2)}
+            >
+              Back
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-gray-500">Total</p>
+              <p className="text-lg font-bold text-primary-700">{formatPrice(grandTotal)}</p>
+            </div>
+            <Button
+              type="submit"
+              form="gift-build-checkout"
+              className="min-h-[44px] shrink-0 px-6"
+              disabled={submitting || !isCheckoutReady}
+            >
+              {submitting ? 'Paying…' : 'Pay now'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {builder && step >= 1 && step < 3 && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white p-4 shadow-lg lg:hidden">
@@ -857,6 +985,12 @@ function BoxSummary({
         {builder.totals.item_count}/{maxItems} items
         {builder.packaging ? ` · ${builder.packaging.name}` : ''}
       </p>
+      {giftLeadCopy(builder.lead_time_days) ? (
+        <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+          <Clock className="h-3.5 w-3.5 shrink-0" />
+          {giftLeadCopy(builder.lead_time_days)}
+        </p>
+      ) : null}
       {builder.items.length > 0 && (
         <ul className="mt-4 max-h-48 space-y-2 overflow-y-auto border-t pt-4 text-sm">
           {builder.items.map((item) => (
@@ -940,5 +1074,7 @@ function normalizeBuilder(data: Partial<GiftBuilderState>, token: string): GiftB
     packaging_options: data.packaging_options || [],
     totals: data.totals || { items_subtotal: 0, packaging_fee: 0, grand_total: 0, item_count: 0 },
     session: data.session || {},
+    byo_lead_time_days: data.byo_lead_time_days,
+    lead_time_days: data.lead_time_days,
   };
 }

@@ -16,6 +16,7 @@ export type GiftBoxContent = {
 export type GiftBox = {
   id: string;
   slug: string;
+  sku?: string;
   name: string;
   description: string | null;
   image_url: string | null;
@@ -23,7 +24,10 @@ export type GiftBox = {
   list_price: number;
   recipient_types: string[];
   occasion_types: string[];
+  average_rating?: number;
+  rating_count?: number;
   item_count: number;
+  lead_time_days?: number;
   contents: GiftBoxContent[];
 };
 
@@ -86,4 +90,6 @@ export type GiftBuilderState = {
     occasion?: string | null;
     budget_max?: number | null;
   };
+  byo_lead_time_days?: number;
+  lead_time_days?: number;
 };

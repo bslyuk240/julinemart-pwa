@@ -6,7 +6,7 @@
 >
 > **Strategic goal:** When someone thinks *"I need to send somebody a gift,"* JulineMart should be one of the first brands that comes to mind — then discover the wider marketplace.
 
-Last updated: **14 August 2026**
+Last updated: **15 August 2026**
 
 ---
 
@@ -321,6 +321,8 @@ Emotional, simple, visual — not an enterprise form. Large cards, progressive s
 ## Commercial principle
 
 Sell curation + packaging + convenience. Backend tracks full margin stack per order (§57 in original rundown).
+
+**Box SKU (G4.5b):** each gift (ready-made or BYO) has identifier `GBX-{OCCASION}-{RECIPIENT}-{###}`. Campaign vouchers may restrict by that SKU, occasion, and/or recipient. Discount reduces customer total only; vendors inside the box still settle in full. Not the same as G6 personalisation.
 
 ---
 

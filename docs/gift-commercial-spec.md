@@ -46,6 +46,24 @@ Set `vendor_payout_status: pre_settled` on line when stock was bought before sal
 
 - `POST /api/create-gift-order` — accepts `voucher_code` (re-validated server-side against `campaign_vouchers`); no client-supplied discount amount/percent is accepted
 - `POST /api/gift-voucher-validate` — preview campaign voucher discount on gift subtotal
+
+## Gift box SKU + voucher scope (G4.5b)
+
+The ready-made or BYO box is **one sellable unit**. Vouchers match the **box**, not vendor SKUs inside it.
+
+| Identifier | Format | Who sees it |
+|------------|--------|-------------|
+| Ready-made `gift_boxes.sku` | `GBX-{OCCASION}-{RECIPIENT}-{###}` | Admin; used for voucher matching |
+| BYO `gift_builder_sessions.box_sku` | Same format, auto-generated | Hidden from customer |
+| `gift_orders.box_sku` | Snapshot of the box SKU at order | Ops / vouchers |
+
+Voucher columns on `campaign_vouchers` (empty = no filter on that dimension):
+
+- `gift_box_skus` — exact box SKU list
+- `gift_occasion_slugs` — e.g. `birthday`
+- `gift_recipient_slugs` — e.g. `her`
+
+Marketplace-only vouchers (product/vendor/category scope, no gift filters) are **rejected** on gift checkout. Admin: JLO → Marketing → Vouchers.
 - `GET/POST/PUT/DELETE /api/admin-gift-pool-sourced`
 
 ## Remaining (G4.5b)

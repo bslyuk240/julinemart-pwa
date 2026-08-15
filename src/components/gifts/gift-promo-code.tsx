@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { formatPrice } from '@/lib/utils/format-price';
 import { validateGiftVoucher, type GiftVoucherResult } from '@/lib/gifts/voucher';
 import { toast } from 'sonner';
+import { GiftCheckoutSection } from '@/components/gifts/gift-checkout-sections';
 
 type GiftPromoCodeProps = {
   customerEmail: string;
@@ -14,6 +15,7 @@ type GiftPromoCodeProps = {
   giftBoxSlug?: string;
   builderSessionToken?: string;
   gfcCode?: string;
+  occasion?: string;
   applied: GiftVoucherResult | null;
   onApplied: (result: GiftVoucherResult) => void;
   onRemoved: () => void;
@@ -25,6 +27,7 @@ export default function GiftPromoCode({
   giftBoxSlug,
   builderSessionToken,
   gfcCode,
+  occasion,
   applied,
   onApplied,
   onRemoved,
@@ -57,6 +60,7 @@ export default function GiftPromoCode({
         builderSessionToken,
         gfcCode,
         orderSubtotal,
+        occasion,
       });
       onApplied(result);
       toast.success(`Voucher applied (−${formatPrice(result.discount_amount)})`);
@@ -71,21 +75,18 @@ export default function GiftPromoCode({
 
   if (applied) {
     return (
-      <div className="rounded-xl border border-green-200 bg-green-50/60 p-3 text-sm">
-        <div className="flex items-start justify-between gap-2">
+      <GiftCheckoutSection icon={<Tag className="h-6 w-6 text-primary-600" />} title="Have a promo code?">
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
           <div className="min-w-0">
-            <p className="flex items-center gap-1.5 font-medium text-green-900">
-              <Tag className="h-4 w-4 shrink-0" />
-              {applied.code}
-            </p>
+            <p className="truncate text-sm font-semibold text-green-900">{applied.code} applied</p>
             {applied.campaign_name ? (
-              <p className="mt-0.5 text-xs text-green-800">{applied.campaign_name}</p>
+              <p className="text-xs text-green-800">{applied.campaign_name}</p>
             ) : null}
-            <p className="mt-1 text-green-800">−{formatPrice(applied.discount_amount)} off your gift</p>
+            <p className="text-sm text-green-800">−{formatPrice(applied.discount_amount)} off your gift</p>
           </div>
           <button
             type="button"
-            className="rounded-lg p-1 text-green-700 hover:bg-green-100"
+            className="shrink-0 rounded-lg p-1 text-green-700 hover:bg-green-100"
             onClick={() => {
               onRemoved();
               setCode('');
@@ -96,29 +97,37 @@ export default function GiftPromoCode({
             <X className="h-4 w-4" />
           </button>
         </div>
-      </div>
+      </GiftCheckoutSection>
     );
   }
 
   return (
-    <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-3">
-      <p className="text-sm font-medium text-gray-900">Promo code</p>
-      <div className="flex gap-2">
-        <Input
-          placeholder="Campaign voucher code"
-          value={code}
-          onChange={(e) => {
-            setCode(e.target.value.toUpperCase());
-            if (error) setError('');
-          }}
-          className="min-h-[44px] uppercase"
-        />
-        <Button type="button" variant="outline" className="shrink-0" disabled={applying} onClick={apply}>
+    <GiftCheckoutSection icon={<Tag className="h-6 w-6 text-primary-600" />} title="Have a promo code?">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+        <div className="min-w-0 w-full sm:flex-1">
+          <Input
+            placeholder="Enter voucher code"
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value.toUpperCase());
+              if (error) setError('');
+            }}
+            className="uppercase"
+            fullWidth
+          />
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="w-full shrink-0 sm:w-auto"
+          disabled={applying}
+          onClick={apply}
+        >
           {applying ? 'Checking…' : 'Apply'}
         </Button>
       </div>
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
-      <p className="text-xs text-gray-500">Discount applies to your gift total — vendors are paid in full.</p>
-    </div>
+      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+    </GiftCheckoutSection>
   );
 }

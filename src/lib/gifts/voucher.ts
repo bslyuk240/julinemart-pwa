@@ -5,6 +5,7 @@ export type GiftVoucherApplyParams = {
   builderSessionToken?: string;
   gfcCode?: string;
   orderSubtotal: number;
+  occasion?: string;
 };
 
 export type GiftVoucherResult = {
@@ -28,6 +29,7 @@ export async function validateGiftVoucher(
       builder_session_token: params.builderSessionToken,
       gfc_code: params.gfcCode || 'warri',
       order_subtotal: params.orderSubtotal,
+      occasion: params.occasion?.trim() || undefined,
     }),
   });
 

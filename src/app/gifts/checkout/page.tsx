@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Gift, Heart } from 'lucide-react';
+import { Gift, Heart, MapPin } from 'lucide-react';
 import PageHeader from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,13 @@ import { trackGiftBeginCheckout, trackGiftPurchase } from '@/lib/analytics/gifts
 import { useGiftShippingQuote } from '@/hooks/use-gift-shipping-quote';
 import GiftPromoCode from '@/components/gifts/gift-promo-code';
 import GiftDeliveryScheduleFields from '@/components/gifts/gift-delivery-schedule-fields';
+import {
+  GiftPaymentMethodSection,
+  GiftShippingMethodSection,
+  GiftCheckoutSection,
+} from '@/components/gifts/gift-checkout-sections';
+import { NIGERIAN_STATES } from '@/lib/constants/nigeria-states';
+import { getEnabledPaymentGateways, type PaymentGateway } from '@/lib/woocommerce/shipping';
 import type { GiftBox } from '@/types/gifts';
 import type { GiftVoucherResult } from '@/lib/gifts/voucher';
 
@@ -33,6 +40,9 @@ function GiftCheckoutForm() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [appliedVoucher, setAppliedVoucher] = useState<GiftVoucherResult | null>(null);
+  const [paymentGateways, setPaymentGateways] = useState<PaymentGateway[]>([]);
+  const [selectedPayment, setSelectedPayment] = useState('');
+  const [paymentLoading, setPaymentLoading] = useState(true);
 
   const [form, setForm] = useState({
     customer_name: '',
@@ -65,7 +75,27 @@ function GiftCheckoutForm() {
       .finally(() => setLoading(false));
   }, [boxSlug]);
 
-  const { shippingFee, loading: shippingLoading, error: shippingError, quotedShipping } =
+  useEffect(() => {
+    let cancelled = false;
+    setPaymentLoading(true);
+    getEnabledPaymentGateways()
+      .then((gateways) => {
+        if (cancelled) return;
+        setPaymentGateways(gateways);
+        if (gateways.length) setSelectedPayment(gateways[0].id);
+      })
+      .catch(() => {
+        if (!cancelled) setPaymentGateways([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPaymentLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const { shippingFee, loading: shippingLoading, error: shippingError, quotedShipping, zone } =
     useGiftShippingQuote({
       deliveryState: form.recipient_state,
       deliveryCity: form.recipient_city,
@@ -77,6 +107,7 @@ function GiftCheckoutForm() {
   const voucherDiscount = appliedVoucher?.discount_amount ?? 0;
   const discountedSubtotal = Math.max((box?.list_price || 0) - voucherDiscount, 0);
   const total = discountedSubtotal + (shippingFee ?? 0);
+  const hasRecipientAddress = Boolean(form.recipient_city.trim() && form.recipient_state.trim());
 
   useEffect(() => {
     if (!box) return;
@@ -93,6 +124,15 @@ function GiftCheckoutForm() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const isCheckoutReady =
+    Boolean(box) &&
+    Boolean(selectedPayment) &&
+    hasRecipientAddress &&
+    quotedShipping != null &&
+    !shippingLoading &&
+    !shippingError &&
+    Boolean(form.requested_delivery_date);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!box || shippingFee == null || quotedShipping == null) {
@@ -107,6 +147,10 @@ function GiftCheckoutForm() {
       toast.error('Choose a preferred delivery date');
       return;
     }
+    if (!selectedPayment) {
+      toast.error('Select a payment method');
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -118,6 +162,7 @@ function GiftCheckoutForm() {
           gfc_code: 'warri',
           shipping_fee: quotedShipping,
           voucher_code: appliedVoucher?.code,
+          payment_method: selectedPayment,
           ...form,
         }),
       });
@@ -125,8 +170,13 @@ function GiftCheckoutForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not create gift order');
 
+      if (selectedPayment !== 'paystack') {
+        toast.success('Gift order placed!');
+        router.push(`/order-success?ref=${data.order_number || data.id}`);
+        return;
+      }
+
       await ensurePaystackReady();
-      const amountKobo = Math.round(total * 100);
       const reference = data.payment_reference || data.id;
 
       window.PaystackPop.setup({
@@ -169,181 +219,268 @@ function GiftCheckoutForm() {
   if (!boxSlug || !box) {
     return (
       <div className="container-custom py-10 text-center">
-        <p className="text-gray-600 mb-4">Choose a gift box first.</p>
-        <Link href="/gifts" className="text-primary-600 font-medium">
+        <p className="mb-4 text-gray-600">Choose a gift box first.</p>
+        <Link href="/gifts" className="font-medium text-primary-600">
           Browse gift boxes
         </Link>
       </div>
     );
   }
 
-  return (
-    <form onSubmit={handleSubmit} className="lg:grid lg:grid-cols-[1fr_340px] lg:gap-8 lg:items-start">
-      <div className="space-y-6">
-      <div className="bg-white rounded-2xl border p-4 flex gap-4 items-center lg:hidden">
-        <div className="w-14 h-14 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
-          <Gift className="w-7 h-7 text-primary-600" />
+  const orderSummary = (
+    <>
+      <div className="mb-4 flex gap-4">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary-50">
+          <Gift className="h-7 w-7 text-primary-600" />
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-gray-900 truncate">{box.name}</p>
+        <div className="min-w-0">
+          <p className="font-semibold text-gray-900">{box.name}</p>
           <p className="text-sm text-gray-600">{box.item_count} curated items</p>
         </div>
-        <p className="font-bold text-primary-700">{formatPrice(box.list_price)}</p>
       </div>
 
-      <section className="bg-white rounded-2xl border p-4 md:p-5 space-y-3">
-        <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-          <Heart className="w-4 h-4 text-rose-500" /> Your details (sender)
-        </h2>
-        <Input placeholder="Your full name" required value={form.customer_name} onChange={(e) => update('customer_name', e.target.value)} />
-        <Input type="email" placeholder="Your email" required value={form.customer_email} onChange={(e) => update('customer_email', e.target.value)} />
-        <Input placeholder="Your phone" required value={form.customer_phone} onChange={(e) => update('customer_phone', e.target.value)} />
-      </section>
-
-      <GiftPromoCode
-        customerEmail={form.customer_email}
-        orderSubtotal={box.list_price}
-        giftBoxSlug={boxSlug}
-        applied={appliedVoucher}
-        onApplied={setAppliedVoucher}
-        onRemoved={() => setAppliedVoucher(null)}
-      />
-
-      <section className="bg-white rounded-2xl border p-4 md:p-5 space-y-3">
-        <h2 className="font-semibold text-gray-900">Recipient & delivery</h2>
-        <Input placeholder="Recipient name" required value={form.recipient_name} onChange={(e) => update('recipient_name', e.target.value)} />
-        <Input placeholder="Recipient phone" required value={form.recipient_phone} onChange={(e) => update('recipient_phone', e.target.value)} />
-        <Input placeholder="Recipient email (optional)" value={form.recipient_email} onChange={(e) => update('recipient_email', e.target.value)} />
-        <Input placeholder="Delivery address" required value={form.recipient_address} onChange={(e) => update('recipient_address', e.target.value)} />
-        <div className="grid grid-cols-2 gap-2">
-          <Input placeholder="City" required value={form.recipient_city} onChange={(e) => update('recipient_city', e.target.value)} />
-          <Input placeholder="State" required value={form.recipient_state} onChange={(e) => update('recipient_state', e.target.value)} />
-        </div>
-        <Input placeholder="Delivery zone / area" required value={form.recipient_zone} onChange={(e) => update('recipient_zone', e.target.value)} />
-      </section>
-
-      <GiftDeliveryScheduleFields
-        giftBoxSlug={boxSlug}
-        requestedDeliveryDate={form.requested_delivery_date}
-        occasionDate={form.occasion_date}
-        onRequestedDeliveryDateChange={(v) => update('requested_delivery_date', v)}
-        onOccasionDateChange={(v) => update('occasion_date', v)}
-        enabled={Boolean(box)}
-      />
-
-      <section className="bg-white rounded-2xl border p-4 md:p-5 space-y-3">
-        <h2 className="font-semibold text-gray-900">Gift message</h2>
-        <textarea
-          className="w-full border rounded-lg px-3 py-2 text-sm min-h-[100px]"
-          placeholder="Write a personal message for the card…"
-          value={form.gift_message}
-          onChange={(e) => update('gift_message', e.target.value)}
-          maxLength={500}
-        />
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={form.sender_visible}
-            onChange={(e) => update('sender_visible', e.target.checked)}
-          />
-          Show my name on the gift card
-        </label>
-        <Input placeholder="Occasion (optional) e.g. Birthday" value={form.occasion} onChange={(e) => update('occasion', e.target.value)} />
-      </section>
-
-      <div className="lg:hidden bg-white rounded-2xl border p-4 space-y-2 text-sm">
+      <div className="space-y-2 border-t pt-4 text-sm">
         <div className="flex justify-between">
-          <span>Gift box</span>
-          <span>{formatPrice(box.list_price)}</span>
+          <span className="text-gray-600">Gift box</span>
+          <span className="font-medium">{formatPrice(box.list_price)}</span>
         </div>
         {voucherDiscount > 0 ? (
-          <div className="flex justify-between text-green-700">
+          <div className="flex justify-between text-green-600">
             <span>Voucher</span>
-            <span>−{formatPrice(voucherDiscount)}</span>
+            <span className="font-medium">−{formatPrice(voucherDiscount)}</span>
           </div>
         ) : null}
         <div className="flex justify-between">
-          <span>Delivery</span>
-          <span>
-            {shippingLoading
-              ? 'Calculating…'
-              : shippingError
-                ? '—'
-                : formatPrice(shippingFee ?? 0)}
+          <span className="text-gray-600">Delivery</span>
+          <span className="font-medium">
+            {!hasRecipientAddress
+              ? 'Enter city & state'
+              : shippingLoading
+                ? 'Calculating…'
+                : shippingError
+                  ? '—'
+                  : formatPrice(shippingFee ?? 0)}
           </span>
         </div>
-        {shippingError ? (
-          <p className="text-xs text-amber-700">{shippingError}</p>
-        ) : null}
-        <div className="flex justify-between font-bold text-base pt-2 border-t">
+        <div className="flex justify-between border-t pt-3 text-lg font-bold">
           <span>Total</span>
-          <span className="text-primary-700">{formatPrice(total)}</span>
+          <span className="text-primary-600">{formatPrice(total)}</span>
         </div>
       </div>
 
-      <Button type="submit" className="w-full h-12 lg:hidden" disabled={submitting || shippingLoading || quotedShipping == null}>
+      <Button
+        type="submit"
+        className="mt-5 hidden h-12 w-full lg:inline-flex"
+        disabled={submitting || !isCheckoutReady}
+      >
         {submitting ? 'Opening payment…' : `Pay ${formatPrice(total)}`}
       </Button>
-      </div>
+    </>
+  );
 
-      <aside className="hidden lg:block sticky top-24 space-y-4">
-        <div className="bg-white rounded-2xl border p-5 shadow-sm">
-          <div className="flex gap-4 items-start mb-4">
-            <div className="w-14 h-14 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
-              <Gift className="w-7 h-7 text-primary-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-gray-900">{box.name}</p>
-              <p className="text-sm text-gray-600">{box.item_count} curated items</p>
-            </div>
-          </div>
-          <div className="space-y-2 text-sm border-t pt-4">
-            <div className="flex justify-between">
-              <span>Gift box</span>
-              <span>{formatPrice(box.list_price)}</span>
-            </div>
-            {voucherDiscount > 0 ? (
-              <div className="flex justify-between text-green-700">
-                <span>Voucher</span>
-                <span>−{formatPrice(voucherDiscount)}</span>
-              </div>
-            ) : null}
-            <div className="flex justify-between">
-              <span>Delivery</span>
-              <span>
-                {shippingLoading
-                  ? 'Calculating…'
-                  : shippingError
-                    ? '—'
-                    : formatPrice(shippingFee ?? 0)}
-              </span>
-            </div>
-            {shippingError ? (
-              <p className="text-xs text-amber-700">{shippingError}</p>
-            ) : null}
-            <div className="flex justify-between font-bold text-lg pt-3 border-t">
-              <span>Total</span>
-              <span className="text-primary-700">{formatPrice(total)}</span>
-            </div>
-          </div>
-          <Button
-            type="submit"
-            className="w-full h-12 mt-5"
-            disabled={submitting || shippingLoading || quotedShipping == null}
+  return (
+    <>
+    <form id="gift-ready-checkout" onSubmit={handleSubmit}>
+      <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
+          <GiftCheckoutSection
+            icon={<MapPin className="h-6 w-6 text-primary-600" />}
+            title="Contact Information"
           >
-            {submitting ? 'Opening payment…' : `Pay ${formatPrice(total)}`}
-          </Button>
+            <div className="space-y-4">
+              <Input
+                label="Your full name *"
+                required
+                value={form.customer_name}
+                onChange={(e) => update('customer_name', e.target.value)}
+                fullWidth
+              />
+              <Input
+                label="Email address *"
+                type="email"
+                required
+                value={form.customer_email}
+                onChange={(e) => update('customer_email', e.target.value)}
+                fullWidth
+              />
+              <Input
+                label="Phone number *"
+                type="tel"
+                required
+                value={form.customer_phone}
+                onChange={(e) => update('customer_phone', e.target.value)}
+                fullWidth
+              />
+            </div>
+          </GiftCheckoutSection>
+
+          <GiftCheckoutSection
+            icon={<MapPin className="h-6 w-6 text-primary-600" />}
+            title="Recipient & delivery"
+          >
+            <div className="space-y-4">
+              <Input
+                label="Recipient name *"
+                required
+                value={form.recipient_name}
+                onChange={(e) => update('recipient_name', e.target.value)}
+                fullWidth
+              />
+              <Input
+                label="Recipient phone *"
+                required
+                value={form.recipient_phone}
+                onChange={(e) => update('recipient_phone', e.target.value)}
+                fullWidth
+              />
+              <Input
+                label="Recipient email (optional)"
+                type="email"
+                value={form.recipient_email}
+                onChange={(e) => update('recipient_email', e.target.value)}
+                fullWidth
+              />
+              <Input
+                label="Delivery address *"
+                required
+                value={form.recipient_address}
+                onChange={(e) => update('recipient_address', e.target.value)}
+                fullWidth
+              />
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="City *"
+                  required
+                  value={form.recipient_city}
+                  onChange={(e) => update('recipient_city', e.target.value)}
+                  fullWidth
+                />
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">State *</label>
+                  <select
+                    required
+                    value={form.recipient_state}
+                    onChange={(e) => update('recipient_state', e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select state</option>
+                    {NIGERIAN_STATES.map((state) => (
+                      <option key={state} value={state}>
+                        {state === 'FCT' ? 'Federal Capital Territory (Abuja)' : state}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <Input
+                label="Delivery zone / area *"
+                required
+                value={form.recipient_zone}
+                onChange={(e) => update('recipient_zone', e.target.value)}
+                fullWidth
+              />
+            </div>
+          </GiftCheckoutSection>
+
+          <GiftShippingMethodSection
+            shippingFee={quotedShipping}
+            loading={shippingLoading}
+            error={shippingError}
+            zone={zone}
+            hasAddress={hasRecipientAddress}
+          />
+
+          <GiftPromoCode
+            customerEmail={form.customer_email}
+            orderSubtotal={box.list_price}
+            giftBoxSlug={boxSlug}
+            occasion={form.occasion}
+            applied={appliedVoucher}
+            onApplied={setAppliedVoucher}
+            onRemoved={() => setAppliedVoucher(null)}
+          />
+
+          <GiftDeliveryScheduleFields
+            giftBoxSlug={boxSlug}
+            requestedDeliveryDate={form.requested_delivery_date}
+            occasionDate={form.occasion_date}
+            onRequestedDeliveryDateChange={(v) => update('requested_delivery_date', v)}
+            onOccasionDateChange={(v) => update('occasion_date', v)}
+            enabled={Boolean(box)}
+          />
+
+          <GiftCheckoutSection icon={<Heart className="h-5 w-5 text-rose-500" />} title="Gift message">
+            <div className="space-y-3">
+              <textarea
+                className="min-h-[100px] w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="Write a personal message for the card…"
+                value={form.gift_message}
+                onChange={(e) => update('gift_message', e.target.value)}
+                maxLength={500}
+              />
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={form.sender_visible}
+                  onChange={(e) => update('sender_visible', e.target.checked)}
+                  className="h-4 w-4 text-primary-600"
+                />
+                Show my name on the gift card
+              </label>
+              <Input
+                label="Occasion (optional)"
+                placeholder="e.g. Birthday"
+                value={form.occasion}
+                onChange={(e) => update('occasion', e.target.value)}
+                fullWidth
+              />
+            </div>
+          </GiftCheckoutSection>
+
+          <GiftPaymentMethodSection
+            gateways={paymentGateways}
+            selectedPayment={selectedPayment}
+            onSelect={setSelectedPayment}
+            loading={paymentLoading}
+          />
         </div>
-      </aside>
+
+        <div className="min-w-0 lg:col-span-1">
+          <div className="sticky top-4 rounded-2xl bg-white p-4 shadow-sm md:p-5">{orderSummary}</div>
+        </div>
+      </div>
     </form>
+
+    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white p-4 shadow-lg lg:hidden">
+      <div className="container-custom flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-gray-500">Total</p>
+          <p className="text-lg font-bold text-primary-700">{formatPrice(total)}</p>
+        </div>
+        <Button
+          type="submit"
+          form="gift-ready-checkout"
+          className="min-h-[44px] shrink-0 px-6"
+          disabled={submitting || !isCheckoutReady}
+        >
+          {submitting ? 'Paying…' : 'Pay now'}
+        </Button>
+      </div>
+    </div>
+    </>
   );
 }
 
 export default function GiftCheckoutPage() {
   return (
-    <main className="min-h-screen bg-gray-50 pb-24">
-      <div className="container-custom py-5 md:py-8 max-w-6xl">
-        <PageHeader title="Gift checkout" backHref="/gifts" />
+    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+      <div className="container-custom min-w-0 py-5 md:py-6">
+        <PageHeader
+          title="Gift checkout"
+          subtitle="Review your details and complete your gift order"
+          backHref="/gifts"
+          backLabel="Back to gifts"
+        />
         <Suspense fallback={<PageLoading />}>
           <GiftCheckoutForm />
         </Suspense>

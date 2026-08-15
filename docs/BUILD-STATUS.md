@@ -17,6 +17,8 @@ Last updated: **15 August 2026**
 - [ ] Production-day lead time in G5 date validation for custom items
 - [ ] State-aware cancellation after customisation approved (exit gate)
 
+G4.5b box SKU / vouchers / checkout UX is **not** G6 — see G4.5b below.
+
 ---
 
 ## JulineMart Gifts — Phase G5 COMPLETE (code)
@@ -53,6 +55,27 @@ Last updated: **15 August 2026**
 - [x] Voucher/campaign code on gift checkout (platform absorbed)
 - [x] `pre_settled` vendor payout toggle in admin (pool + gift boxes)
 - [x] Sourced items in BYO builder add flow
+
+---
+
+## JulineMart Gifts — G4.5b COMPLETE (code) — box SKU, voucher scope, checkout
+
+**Not customisation.** Gift box is one sellable unit (own SKU). Phase 4 / G6 personalisation is a separate layer on items inside the box.
+
+### G4.5b shipped (15 Aug 2026)
+- [x] Migration `20260815180000_gift_voucher_scope.sql` — `gift_boxes.sku`; voucher filters `gift_box_skus`, `gift_occasion_slugs`, `gift_recipient_slugs`
+- [x] Migration `20260815190000_gift_box_sku_gbx_format.sql` — `gift_orders.box_sku`, `gift_builder_sessions.box_sku`
+- [x] Box SKU format **`GBX-{OCCASION}-{RECIPIENT}-{###}`** (first occasion + recipient tag)
+- [x] Admin Gift Boxes: **SKU** field + **Generate SKU** (`product-sku-next` GBX prefix) — desktop + mobile
+- [x] BYO: auto-generate hidden box SKU at checkout / voucher validate (`ensureBuilderSessionBoxSku`)
+- [x] Gift voucher validation: match box SKU / occasion / recipient; marketplace-only vouchers rejected on gift checkout; discount on customer subtotal only; vendors settled in full
+- [x] Admin Vouchers: gift restrictions (box SKUs, occasion, recipient)
+- [x] PWA gift checkout (ready-made + BYO) mirrors catalog: shipping method, payment method, promo, mobile sticky pay bar
+
+### G4.5b remaining
+- [ ] Smoke **Generate SKU** after Netlify dev restart (was `ReferenceError` from deleted `gift-box-sku-next`)
+- [ ] Retag existing `GIFT-*` boxes to `GBX-*` (pick occasion/recipient, then Generate SKU)
+- [ ] QA: voucher matches box SKU; occasion/recipient filters; catalog voucher rejected on `/gifts/checkout`
 
 ---
 
@@ -156,10 +179,14 @@ Last updated: **15 August 2026**
 |-------|--------|--------|
 | G0 | **Complete** | Warri hub + admin hub CRUD + gift pool + eligibility |
 | G1 | **Complete** | Ready-made boxes |
-| G2 | **Complete** | Ops dashboard + packing |
+| G2 | **Complete** (code) | Ops dashboard + packing |
 | G3 | **Complete** (code) | Build your own box |
 | G4 | **In progress** | Discovery, homepage, SEO filters |
-| G5–G7 | Pending | Scheduling, personalisation, growth |
+| G4.5 | **Complete** (code) | Commercial model (customer price vs vendor settlement) |
+| G4.5b | **Complete** (code) | Box SKU `GBX-*`, gift voucher scope, catalog-style checkout |
+| G5 | **Complete** (code) | Delivery scheduling + secret sender |
+| G6 | **In progress** | Personalisation via Phase 4 schemas |
+| G7 | Pending | Growth |
 
 Trusted Local Commerce Phase 4 (Custom) should complete or pass exit gate before heavy G6 personalisation overlap.
 
@@ -224,6 +251,8 @@ Trusted Local Commerce Phase 4 (Custom) should complete or pass exit gate before
 4. `20260814000003_phase_3_seller_growth.sql`
 5. `20260814000004_phase_3_warranty_purchases.sql`
 6. `20260814000005_phase_4_custom_orders.sql`
+7. Gift: `20260815180000_gift_voucher_scope.sql` (applied)
+8. Gift: `20260815190000_gift_box_sku_gbx_format.sql` (applied)
 
 ---
 

@@ -3,6 +3,7 @@
 import { CalendarDays } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useGiftDeliveryDates } from '@/hooks/use-gift-delivery-dates';
+import { GiftCheckoutSection } from '@/components/gifts/gift-checkout-sections';
 
 type Props = {
   gfcCode?: string;
@@ -40,11 +41,11 @@ export default function GiftDeliveryScheduleFields({
         : null;
 
   return (
-    <section className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
-      <h2 className="flex items-center gap-2 font-semibold text-gray-900">
-        <CalendarDays className="h-4 w-4 text-primary-600" />
-        Delivery schedule
-      </h2>
+    <GiftCheckoutSection
+      icon={<CalendarDays className="h-6 w-6 text-primary-600" />}
+      title="Delivery schedule"
+    >
+      <div className="space-y-4">
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -85,6 +86,7 @@ export default function GiftDeliveryScheduleFields({
           e.g. birthday or anniversary — helps our team schedule the surprise.
         </p>
       </div>
-    </section>
+      </div>
+    </GiftCheckoutSection>
   );
 }
