@@ -44,12 +44,24 @@ export default function GiftBoxActions({ box }: Props) {
 
   return (
     <div className="flex gap-2">
-      <Button type="button" onClick={handleFavorite} variant={favorited ? 'primary' : 'outline'} size="sm">
+      <Button
+        type="button"
+        onClick={handleFavorite}
+        variant={favorited ? 'primary' : 'outline'}
+        size="sm"
+        className="h-full aspect-square"
+      >
         <Heart className={`w-4 h-4 md:w-5 md:h-5 ${favorited ? 'fill-current' : ''}`} />
       </Button>
 
-      <div className="relative">
-        <Button type="button" onClick={() => setShowShareMenu(!showShareMenu)} variant="outline" size="sm">
+      <div className="relative h-full">
+        <Button
+          type="button"
+          onClick={() => setShowShareMenu(!showShareMenu)}
+          variant="outline"
+          size="sm"
+          className="h-full aspect-square"
+        >
           <Share2 className="w-4 h-4 md:w-5 md:h-5" />
         </Button>
 
