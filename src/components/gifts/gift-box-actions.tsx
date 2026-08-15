@@ -37,9 +37,37 @@ export default function GiftBoxActions({ box }: Props) {
     window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank', 'width=600,height=400');
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast.success('Link copied to clipboard!');
+  const handleCopyLink = async () => {
+    const url = window.location.href;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Link copied to clipboard!');
+      return;
+    } catch {
+      // Clipboard API can be denied in restrictive/embedded contexts —
+      // fall back to the legacy selection-based copy before giving up.
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = url;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const copied = document.execCommand('copy');
+      document.body.removeChild(textarea);
+
+      if (copied) {
+        toast.success('Link copied to clipboard!');
+      } else {
+        throw new Error('execCommand copy failed');
+      }
+    } catch {
+      toast.error('Could not copy the link — please copy it from your address bar.');
+    }
   };
 
   return (
