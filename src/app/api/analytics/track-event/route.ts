@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
-const ALLOWED_EVENT_TYPES = ['product_viewed'];
+const ALLOWED_EVENT_TYPES = ['product_viewed', 'gift_landing_view', 'gift_byo_start', 'gift_purchase'];
 
 export async function POST(request: NextRequest) {
   try {

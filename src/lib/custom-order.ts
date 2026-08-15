@@ -4,8 +4,10 @@ import type {
   ProductCustomisationSchema,
 } from '@/types/custom-order';
 
+type CustomisationFieldsSchema = Pick<ProductCustomisationSchema, 'id' | 'fields'>;
+
 export function computeCustomisationAdjustment(
-  schema: ProductCustomisationSchema,
+  schema: CustomisationFieldsSchema,
   fieldValues: Record<string, string | number>
 ): number {
   let total = 0;
@@ -23,7 +25,7 @@ export function computeCustomisationAdjustment(
 }
 
 export function buildCustomisationSummary(
-  schema: ProductCustomisationSchema,
+  schema: CustomisationFieldsSchema,
   fieldValues: Record<string, string | number>
 ): string[] {
   return schema.fields
@@ -40,7 +42,7 @@ export function buildCustomisationSummary(
 }
 
 export function validateCustomisation(
-  schema: ProductCustomisationSchema,
+  schema: CustomisationFieldsSchema,
   fieldValues: Record<string, string | number>
 ): string | null {
   for (const field of schema.fields) {
@@ -66,7 +68,7 @@ export function validateCustomisation(
 }
 
 export function buildCartCustomisation(
-  schema: ProductCustomisationSchema,
+  schema: CustomisationFieldsSchema,
   fieldValues: Record<string, string | number>
 ): CartCustomisation {
   const price_adjustment = computeCustomisationAdjustment(schema, fieldValues);

@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  ChevronDown,
   Gift,
   Package,
   Plus,
@@ -11,6 +12,7 @@ import {
   Trash2,
   ArrowRight,
   ArrowLeft,
+  Search,
 } from 'lucide-react';
 import PageHeader from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -19,27 +21,41 @@ import PageLoading from '@/components/ui/page-loading';
 import { formatPrice } from '@/lib/utils/format-price';
 import { ensurePaystackReady } from '@/lib/paystack';
 import { toast } from 'sonner';
+import { GIFT_OCCASIONS, GIFT_RECIPIENTS } from '@/lib/gifts/discovery';
+import {
+  trackGiftBeginCheckout,
+  trackGiftByoStart,
+  trackGiftPurchase,
+} from '@/lib/analytics/gifts';
+import { useGiftShippingQuote } from '@/hooks/use-gift-shipping-quote';
+import GiftPromoCode from '@/components/gifts/gift-promo-code';
+import GiftDeliveryScheduleFields from '@/components/gifts/gift-delivery-schedule-fields';
+import GiftBuilderCustomiseSheet from '@/components/gifts/gift-builder-customise-sheet';
 import type { GiftBuilderState, GiftPackagingOption } from '@/types/gifts';
+import type { GiftVoucherResult } from '@/lib/gifts/voucher';
 
 const SESSION_KEY = 'julinemart_gift_builder_token';
-const STEPS = ['Who & occasion', 'Box tier', 'Pick items', 'Checkout'] as const;
-const RECIPIENTS = ['Friend', 'Partner', 'Mum', 'Dad', 'Colleague', 'Other'];
-const OCCASIONS = ['Birthday', 'Thank you', 'Anniversary', 'Congratulations', 'Just because'];
+const STEPS = ['Who & occasion', 'Box size', 'Pick items', 'Checkout'] as const;
+
+const SELECT_CLASS =
+  'min-h-[44px] w-full appearance-none rounded-xl border border-gray-200 bg-white px-3 pr-9 text-sm text-gray-900';
 
 type PoolProduct = {
-  product_id: string;
+  pool_id?: string;
+  product_id?: string;
+  sourced_id?: string;
+  item_type?: 'vendor_catalog' | 'jlo_sourced';
   name: string;
-  price: number;
   gift_category?: string | null;
   available_qty: number;
   image?: string | null;
+  customisable?: boolean;
+  customisation_schema_id?: string;
 };
 
 declare global {
   interface Window {
-    PaystackPop: {
-      setup: (config: Record<string, unknown>) => { openIframe: () => void };
-    };
+    PaystackPop: any;
   }
 }
 
@@ -67,7 +83,11 @@ export default function GiftBuildPage() {
   const [recipientType, setRecipientType] = useState('');
   const [occasion, setOccasion] = useState('');
   const [budget, setBudget] = useState('');
+  const [poolSearch, setPoolSearch] = useState('');
+  const [poolCategory, setPoolCategory] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [appliedVoucher, setAppliedVoucher] = useState<GiftVoucherResult | null>(null);
+  const [customiseTarget, setCustomiseTarget] = useState<PoolProduct | null>(null);
   const [checkout, setCheckout] = useState({
     customer_name: '',
     customer_email: '',
@@ -80,6 +100,8 @@ export default function GiftBuildPage() {
     recipient_zone: '',
     gift_message: '',
     sender_visible: true,
+    requested_delivery_date: '',
+    occasion_date: '',
   });
 
   const initSession = useCallback(async () => {
@@ -95,6 +117,7 @@ export default function GiftBuildPage() {
           setRecipientType(json.data.session?.recipient_type || '');
           setOccasion(json.data.session?.occasion || '');
           setBudget(json.data.session?.budget_max != null ? String(json.data.session.budget_max) : '');
+          trackGiftByoStart({ resumed: true });
           return;
         }
         localStorage.removeItem(SESSION_KEY);
@@ -105,6 +128,7 @@ export default function GiftBuildPage() {
       if (!token) throw new Error('No session token');
 
       localStorage.setItem(SESSION_KEY, token);
+      trackGiftByoStart({ resumed: false });
       const res = await fetch(`/api/gifts/builder?session_token=${encodeURIComponent(token)}`);
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to load session');
@@ -154,24 +178,48 @@ export default function GiftBuildPage() {
       });
       setBuilder(normalizeBuilder(data, token));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not select tier');
+      toast.error(err instanceof Error ? err.message : 'Could not select box size');
     }
   };
 
-  const addProduct = async (product: PoolProduct) => {
+  const addProduct = async (
+    product: PoolProduct,
+    customisationSpec?: {
+      schema_id: string;
+      field_values: Record<string, string | number>;
+      price_adjustment: number;
+      summary_lines: string[];
+    }
+  ) => {
     if (!token) return;
     try {
-      const data = await builderPost({
+      const body: Record<string, unknown> = {
         action: 'add_item',
         session_token: token,
-        product_id: product.product_id,
         quantity: 1,
-      });
+      };
+      if (product.sourced_id || product.item_type === 'jlo_sourced') {
+        body.pool_sourced_item_id = product.sourced_id || product.pool_id;
+      } else if (product.product_id) {
+        body.product_id = product.product_id;
+        if (customisationSpec) body.customisation_spec = customisationSpec;
+      } else {
+        throw new Error('Invalid pool item');
+      }
+      const data = await builderPost(body);
       setBuilder(normalizeBuilder(data, token));
       toast.success('Added to box');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not add item');
     }
+  };
+
+  const handlePoolTap = (product: PoolProduct) => {
+    if (product.customisable && product.product_id) {
+      setCustomiseTarget(product);
+      return;
+    }
+    void addProduct(product);
   };
 
   const updateQty = async (itemId: string, quantity: number) => {
@@ -195,17 +243,61 @@ export default function GiftBuildPage() {
     setBuilder(normalizeBuilder(data, token));
   };
 
-  const shippingFee = 2500;
-  const grandTotal = (builder?.totals.grand_total || 0) + shippingFee;
+  const shippingQuote = useGiftShippingQuote({
+    deliveryState: checkout.recipient_state,
+    deliveryCity: checkout.recipient_city,
+    builderSessionToken: token || undefined,
+    orderValue: builder?.totals.grand_total,
+    enabled: step === 3 && Boolean(token),
+  });
 
-  const canCheckout =
-    builder &&
-    builder.items.length > 0 &&
-    builder.packaging != null;
+  const shippingFee = shippingQuote.shippingFee;
+  const voucherDiscount = appliedVoucher?.discount_amount ?? 0;
+  const boxSubtotal = Math.max((builder?.totals.grand_total || 0) - voucherDiscount, 0);
+  const grandTotal = boxSubtotal + (shippingFee ?? 0);
+  const maxItems = builder?.packaging?.max_items ?? 12;
+
+  const poolCategories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const p of pool) {
+      if (p.gift_category) cats.add(p.gift_category);
+    }
+    return Array.from(cats).sort();
+  }, [pool]);
+
+  const filteredPool = useMemo(() => {
+    const q = poolSearch.trim().toLowerCase();
+    return pool.filter((p) => {
+      if (poolCategory && p.gift_category !== poolCategory) return false;
+      if (!q) return true;
+      return p.name.toLowerCase().includes(q);
+    });
+  }, [pool, poolSearch, poolCategory]);
+
+  useEffect(() => {
+    if (step !== 3 || !builder) return;
+    trackGiftBeginCheckout({
+      mode: 'build_your_own',
+      value: grandTotal,
+      itemCount: builder.items.length,
+    });
+  }, [step, builder, grandTotal]);
+
+  const canCheckout = builder && builder.items.length > 0 && builder.packaging != null;
 
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !canCheckout) return;
+    if (shippingQuote.quotedShipping == null) {
+      toast.error(
+        shippingQuote.error || 'Enter recipient city and state to calculate delivery'
+      );
+      return;
+    }
+    if (!checkout.requested_delivery_date) {
+      toast.error('Choose a preferred delivery date');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch('/api/gifts/order', {
@@ -214,7 +306,8 @@ export default function GiftBuildPage() {
         body: JSON.stringify({
           builder_session_token: token,
           gfc_code: 'warri',
-          shipping_fee: shippingFee,
+          shipping_fee: shippingQuote.quotedShipping,
+          voucher_code: appliedVoucher?.code,
           occasion: occasion || undefined,
           ...checkout,
         }),
@@ -230,6 +323,12 @@ export default function GiftBuildPage() {
         amount: Math.round(grandTotal * 100),
         ref: data.payment_reference || data.id,
         callback: () => {
+          trackGiftPurchase({
+            mode: 'build_your_own',
+            transactionId: String(data.order_number || data.id),
+            value: grandTotal,
+            shipping: shippingQuote.quotedShipping ?? 0,
+          });
           toast.success('Payment received!');
           router.push(`/order-success?ref=${data.order_number || data.id}`);
         },
@@ -241,211 +340,595 @@ export default function GiftBuildPage() {
     }
   };
 
-  const maxItems = builder?.packaging?.max_items ?? 12;
-
   if (loading) return <PageLoading />;
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-28">
-      <div className="container-custom py-5 max-w-lg">
-        <PageHeader title="Build your gift box" backHref="/gifts" />
+    <main className="min-h-screen bg-gray-50 pb-28 lg:pb-10">
+      <div className="container-custom py-5 md:py-8">
+        <PageHeader
+          title="Build your own box"
+          subtitle="Pick items, see your total, and send a personalised gift."
+          backHref="/gifts"
+        />
 
-        <div className="flex gap-1 mb-6">
-          {STEPS.map((label, i) => (
-            <div
-              key={label}
-              className={`flex-1 h-1 rounded-full ${i <= step ? 'bg-primary-600' : 'bg-gray-200'}`}
-            />
+        <p className="mb-5 text-xs text-gray-500">
+          Step {step + 1} of {STEPS.length} · {STEPS[step]}
+        </p>
+
+        <div className="mb-6 flex gap-1">
+          {STEPS.map((_, i) => (
+            <div key={STEPS[i]} className="h-1 flex-1 rounded-full bg-gray-200">
+              <div
+                className={`h-full rounded-full transition-all ${i <= step ? 'bg-primary-600' : 'bg-transparent'}`}
+                style={{ width: i <= step ? '100%' : '0%' }}
+              />
+            </div>
           ))}
         </div>
 
-        {step === 0 && (
-          <div className="space-y-4">
-            <h2 className="font-semibold text-gray-900">Who is this gift for?</h2>
-            <div className="flex flex-wrap gap-2">
-              {RECIPIENTS.map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRecipientType(r)}
-                  className={`px-3 py-2 rounded-full text-sm border ${
-                    recipientType === r ? 'bg-primary-600 text-white border-primary-600' : 'bg-white'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-            <h2 className="font-semibold text-gray-900 pt-2">Occasion</h2>
-            <div className="flex flex-wrap gap-2">
-              {OCCASIONS.map((o) => (
-                <button
-                  key={o}
-                  type="button"
-                  onClick={() => setOccasion(o)}
-                  className={`px-3 py-2 rounded-full text-sm border ${
-                    occasion === o ? 'bg-rose-600 text-white border-rose-600' : 'bg-white'
-                  }`}
-                >
-                  {o}
-                </button>
-              ))}
-            </div>
-            <Input
-              placeholder="Budget cap (optional) ₦"
-              value={budget}
-              onChange={(e) => setBudget(e.target.value.replace(/[^\d]/g, ''))}
-            />
-            <Button className="w-full" onClick={saveContext} disabled={!recipientType}>
-              Continue
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-        )}
+        <div
+          className={
+            step === 2
+              ? 'lg:grid lg:grid-cols-[1fr_300px] lg:items-start lg:gap-8'
+              : step === 3
+                ? 'lg:grid lg:grid-cols-[1fr_340px] lg:items-start lg:gap-8'
+                : ''
+          }
+        >
+          <div className="min-w-0 space-y-6">
+            {step === 0 && (
+              <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <BuildSelect
+                    label="Who is this for?"
+                    value={recipientType}
+                    onChange={setRecipientType}
+                    required
+                  >
+                    <option value="">Select recipient</option>
+                    {GIFT_RECIPIENTS.map((r) => (
+                      <option key={r.slug} value={r.label}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </BuildSelect>
 
-        {step === 1 && builder && (
-          <div className="space-y-3">
-            <h2 className="font-semibold text-gray-900">Choose your box</h2>
-            {(builder.packaging_options || []).map((pkg) => (
-              <button
-                key={pkg.code}
-                type="button"
-                onClick={() => selectPackaging(pkg)}
-                className={`w-full text-left bg-white border rounded-xl p-4 ${
-                  builder.packaging?.code === pkg.code ? 'border-primary-600 ring-2 ring-primary-100' : ''
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold">{pkg.name}</p>
-                    <p className="text-xs text-gray-500">{pkg.description}</p>
-                    <p className="text-xs text-gray-500 mt-1">Up to {pkg.max_items} items</p>
-                  </div>
-                  <p className="font-bold text-primary-700">{formatPrice(pkg.price)}</p>
+                  <BuildSelect label="Occasion" value={occasion} onChange={setOccasion}>
+                    <option value="">Select occasion (optional)</option>
+                    {GIFT_OCCASIONS.map((o) => (
+                      <option key={o.slug} value={o.label}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </BuildSelect>
                 </div>
-              </button>
-            ))}
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" onClick={() => setStep(0)}>
-                <ArrowLeft className="w-4 h-4 mr-1" /> Back
-              </Button>
-              <Button className="flex-1" disabled={!builder.packaging} onClick={() => setStep(2)}>
-                Pick items
-              </Button>
-            </div>
-          </div>
-        )}
 
-        {step === 2 && builder && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              {builder.totals.item_count}/{maxItems} items · Pool only (Warri hub)
-            </p>
-            {builder.items.length > 0 && (
-              <ul className="bg-white border rounded-xl divide-y">
-                {builder.items.map((item) => (
-                  <li key={item.id} className="p-3 flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
-                      <p className="text-xs text-gray-500">{formatPrice(item.line_total)}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button type="button" className="p-1" onClick={() => updateQty(item.id, item.quantity - 1)}>
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="w-6 text-center text-sm">{item.quantity}</span>
-                      <button type="button" className="p-1" onClick={() => updateQty(item.id, item.quantity + 1)}>
-                        <Plus className="w-4 h-4" />
-                      </button>
-                      <button type="button" className="p-1 text-red-500 ml-1" onClick={() => removeItem(item.id)}>
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-gray-500">
+                    Budget cap (optional)
+                  </span>
+                  <Input
+                    placeholder="e.g. 25000"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value.replace(/[^\d]/g, ''))}
+                  />
+                </label>
+
+                <Button className="w-full sm:w-auto sm:min-w-[200px]" onClick={saveContext} disabled={!recipientType}>
+                  Continue
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </section>
             )}
-            <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-              {pool.map((p) => (
-                <button
-                  key={p.product_id}
-                  type="button"
-                  onClick={() => addProduct(p)}
-                  disabled={builder.totals.item_count >= maxItems}
-                  className="bg-white border rounded-xl p-2 text-left hover:border-primary-300 disabled:opacity-50"
-                >
-                  {p.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.image} alt="" className="w-full aspect-square object-cover rounded-lg mb-2" />
+
+            {step === 1 && builder && (
+              <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
+                <div>
+                  <h2 className="font-semibold text-gray-900">Choose box size</h2>
+                  <p className="mt-1 text-sm text-gray-600">Box fee is added to your item total.</p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(builder.packaging_options || []).map((pkg) => {
+                    const selected = builder.packaging?.code === pkg.code;
+                    return (
+                      <button
+                        key={pkg.code}
+                        type="button"
+                        onClick={() => selectPackaging(pkg)}
+                        className={`rounded-xl border p-4 text-left transition-colors ${
+                          selected
+                            ? 'border-primary-600 bg-primary-50/40 ring-1 ring-primary-600'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-gray-900">{pkg.name}</p>
+                            {pkg.description ? (
+                              <p className="mt-0.5 text-xs text-gray-500">{pkg.description}</p>
+                            ) : null}
+                            <p className="mt-2 text-xs text-gray-500">Up to {pkg.max_items} items</p>
+                          </div>
+                          <p className="shrink-0 font-bold text-primary-700">{formatPrice(pkg.price)}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <StepNav
+                  onBack={() => setStep(0)}
+                  onNext={() => setStep(2)}
+                  nextLabel="Pick items"
+                  nextDisabled={!builder.packaging}
+                />
+              </section>
+            )}
+
+            {step === 2 && builder && (
+              <>
+                {builder.items.length > 0 && (
+                  <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <h2 className="font-semibold text-gray-900">In your box</h2>
+                      <p className="text-xs text-gray-500">
+                        {builder.totals.item_count}/{maxItems} items
+                      </p>
+                    </div>
+                    <ul className="divide-y divide-gray-100">
+                      {builder.items.map((item) => (
+                        <li key={item.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-gray-900">{item.name}</p>
+                            {item.customisation_summary?.length ? (
+                              <p className="text-xs text-primary-700 line-clamp-2">
+                                {item.customisation_summary.join(' · ')}
+                              </p>
+                            ) : null}
+                            <p className="text-xs text-gray-500">Qty {item.quantity}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              className="rounded-lg p-1.5 hover:bg-gray-100"
+                              onClick={() => updateQty(item.id, item.quantity - 1)}
+                              aria-label="Decrease quantity"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                            <span className="w-6 text-center text-sm">{item.quantity}</span>
+                            <button
+                              type="button"
+                              className="rounded-lg p-1.5 hover:bg-gray-100"
+                              onClick={() => updateQty(item.id, item.quantity + 1)}
+                              aria-label="Increase quantity"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              className="ml-1 rounded-lg p-1.5 text-red-500 hover:bg-red-50"
+                              onClick={() => removeItem(item.id)}
+                              aria-label="Remove item"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Add items</h2>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Tap to add. Your running total updates as you go.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        className="pl-9"
+                        placeholder="Search items…"
+                        value={poolSearch}
+                        onChange={(e) => setPoolSearch(e.target.value)}
+                      />
+                    </div>
+                    {poolCategories.length > 0 && (
+                      <BuildSelect
+                        label="Category"
+                        value={poolCategory}
+                        onChange={setPoolCategory}
+                        compact
+                      >
+                        <option value="">All categories</option>
+                        {poolCategories.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </BuildSelect>
+                    )}
+                  </div>
+
+                  {filteredPool.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-gray-500">
+                      {pool.length === 0 ? 'No gift items available right now.' : 'No items match your search.'}
+                    </p>
                   ) : (
-                    <div className="w-full aspect-square bg-gray-100 rounded-lg mb-2 flex items-center justify-center">
-                      <Gift className="w-8 h-8 text-gray-300" />
+                    <div className="grid max-h-[min(520px,60vh)] grid-cols-2 gap-3 overflow-y-auto pr-1 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
+                      {filteredPool.map((p) => (
+                        <button
+                          key={p.product_id || p.sourced_id || p.name}
+                          type="button"
+                          onClick={() => handlePoolTap(p)}
+                          disabled={builder.totals.item_count >= maxItems}
+                          className="rounded-xl border border-gray-200 bg-white p-2 text-left hover:border-primary-300 disabled:opacity-50"
+                        >
+                          {p.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={p.image}
+                              alt=""
+                              className="mb-2 aspect-square w-full rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="mb-2 flex aspect-square w-full items-center justify-center rounded-lg bg-gray-100">
+                              <Gift className="h-8 w-8 text-gray-300" />
+                            </div>
+                          )}
+                          <p className="line-clamp-2 text-xs font-medium text-gray-900">{p.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {p.customisable ? 'Personalise & add' : 'Tap to add'}
+                          </p>
+                        </button>
+                      ))}
                     </div>
                   )}
-                  <p className="text-xs font-medium line-clamp-2">{p.name}</p>
-                  <p className="text-xs text-primary-700 font-semibold">{formatPrice(p.price)}</p>
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button className="flex-1" disabled={!canCheckout} onClick={() => setStep(3)}>
-                Checkout
-              </Button>
-            </div>
-          </div>
-        )}
 
-        {step === 3 && builder && (
-          <form onSubmit={handlePay} className="space-y-4">
-            <div className="bg-white border rounded-xl p-4 text-sm space-y-1">
-              <p className="font-semibold flex items-center gap-2">
-                <Package className="w-4 h-4" /> Your box
-              </p>
-              <p>{builder.packaging?.name} · {builder.totals.item_count} items</p>
-              <p className="font-bold text-primary-700 pt-1">{formatPrice(grandTotal)} incl. delivery</p>
-            </div>
-            <Input placeholder="Your name" required value={checkout.customer_name} onChange={(e) => setCheckout({ ...checkout, customer_name: e.target.value })} />
-            <Input type="email" placeholder="Your email" required value={checkout.customer_email} onChange={(e) => setCheckout({ ...checkout, customer_email: e.target.value })} />
-            <Input placeholder="Your phone" required value={checkout.customer_phone} onChange={(e) => setCheckout({ ...checkout, customer_phone: e.target.value })} />
-            <Input placeholder="Recipient name" required value={checkout.recipient_name} onChange={(e) => setCheckout({ ...checkout, recipient_name: e.target.value })} />
-            <Input placeholder="Recipient phone" required value={checkout.recipient_phone} onChange={(e) => setCheckout({ ...checkout, recipient_phone: e.target.value })} />
-            <Input placeholder="Delivery address" required value={checkout.recipient_address} onChange={(e) => setCheckout({ ...checkout, recipient_address: e.target.value })} />
-            <div className="grid grid-cols-2 gap-2">
-              <Input placeholder="City" required value={checkout.recipient_city} onChange={(e) => setCheckout({ ...checkout, recipient_city: e.target.value })} />
-              <Input placeholder="State" required value={checkout.recipient_state} onChange={(e) => setCheckout({ ...checkout, recipient_state: e.target.value })} />
-            </div>
-            <Input placeholder="Delivery zone" required value={checkout.recipient_zone} onChange={(e) => setCheckout({ ...checkout, recipient_zone: e.target.value })} />
-            <textarea
-              className="w-full border rounded-lg px-3 py-2 text-sm min-h-[80px]"
-              placeholder="Gift message"
-              value={checkout.gift_message}
-              onChange={(e) => setCheckout({ ...checkout, gift_message: e.target.value })}
-            />
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setStep(2)}>Back</Button>
-              <Button type="submit" className="flex-1" disabled={submitting}>
-                {submitting ? 'Opening payment…' : `Pay ${formatPrice(grandTotal)}`}
-              </Button>
-            </div>
-          </form>
-        )}
+                  <StepNav
+                    onBack={() => setStep(1)}
+                    onNext={() => setStep(3)}
+                    nextLabel="Checkout"
+                    nextDisabled={!canCheckout}
+                  />
+                </section>
+              </>
+            )}
+
+            {step === 3 && builder && (
+              <form id="gift-build-checkout" onSubmit={handlePay} className="space-y-6">
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 lg:hidden">
+                  <p className="flex items-center gap-2 font-semibold text-gray-900">
+                    <Package className="h-4 w-4" /> Your box
+                  </p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {builder.packaging?.name} · {builder.totals.item_count} items
+                  </p>
+                  <p className="mt-2 font-bold text-primary-700">
+                    {shippingQuote.loading && checkout.recipient_state && checkout.recipient_city
+                      ? 'Calculating delivery…'
+                      : `${formatPrice(grandTotal)} incl. delivery`}
+                  </p>
+                </div>
+
+                <section className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
+                  <h2 className="font-semibold text-gray-900">Your details</h2>
+                  <Input
+                    placeholder="Your full name"
+                    required
+                    value={checkout.customer_name}
+                    onChange={(e) => setCheckout({ ...checkout, customer_name: e.target.value })}
+                  />
+                  <Input
+                    type="email"
+                    placeholder="Your email"
+                    required
+                    value={checkout.customer_email}
+                    onChange={(e) => setCheckout({ ...checkout, customer_email: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Your phone"
+                    required
+                    value={checkout.customer_phone}
+                    onChange={(e) => setCheckout({ ...checkout, customer_phone: e.target.value })}
+                  />
+                </section>
+
+                <GiftPromoCode
+                  customerEmail={checkout.customer_email}
+                  orderSubtotal={builder.totals.grand_total}
+                  builderSessionToken={token || undefined}
+                  applied={appliedVoucher}
+                  onApplied={setAppliedVoucher}
+                  onRemoved={() => setAppliedVoucher(null)}
+                />
+
+                <section className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
+                  <h2 className="font-semibold text-gray-900">Recipient & delivery</h2>
+                  <Input
+                    placeholder="Recipient name"
+                    required
+                    value={checkout.recipient_name}
+                    onChange={(e) => setCheckout({ ...checkout, recipient_name: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Recipient phone"
+                    required
+                    value={checkout.recipient_phone}
+                    onChange={(e) => setCheckout({ ...checkout, recipient_phone: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Delivery address"
+                    required
+                    value={checkout.recipient_address}
+                    onChange={(e) => setCheckout({ ...checkout, recipient_address: e.target.value })}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="City"
+                      required
+                      value={checkout.recipient_city}
+                      onChange={(e) => setCheckout({ ...checkout, recipient_city: e.target.value })}
+                    />
+                    <Input
+                      placeholder="State"
+                      required
+                      value={checkout.recipient_state}
+                      onChange={(e) => setCheckout({ ...checkout, recipient_state: e.target.value })}
+                    />
+                  </div>
+                  <Input
+                    placeholder="Delivery zone / area"
+                    required
+                    value={checkout.recipient_zone}
+                    onChange={(e) => setCheckout({ ...checkout, recipient_zone: e.target.value })}
+                  />
+                </section>
+
+                <GiftDeliveryScheduleFields
+                  builderSessionToken={token || undefined}
+                  requestedDeliveryDate={checkout.requested_delivery_date}
+                  occasionDate={checkout.occasion_date}
+                  onRequestedDeliveryDateChange={(v) =>
+                    setCheckout({ ...checkout, requested_delivery_date: v })
+                  }
+                  onOccasionDateChange={(v) => setCheckout({ ...checkout, occasion_date: v })}
+                  enabled={Boolean(token)}
+                />
+
+                <section className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
+                  <h2 className="font-semibold text-gray-900">Gift message</h2>
+                  <textarea
+                    className="min-h-[100px] w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                    placeholder="Write a personal message for the card…"
+                    value={checkout.gift_message}
+                    onChange={(e) => setCheckout({ ...checkout, gift_message: e.target.value })}
+                    maxLength={500}
+                  />
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={checkout.sender_visible}
+                      onChange={(e) => setCheckout({ ...checkout, sender_visible: e.target.checked })}
+                    />
+                    Show my name on the gift card
+                  </label>
+                </section>
+
+                <div className="flex gap-2 lg:hidden">
+                  <Button type="button" variant="outline" onClick={() => setStep(2)}>
+                    Back
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                    disabled={submitting || shippingQuote.loading || shippingQuote.quotedShipping == null}
+                  >
+                    {submitting ? 'Opening payment…' : `Pay ${formatPrice(grandTotal)}`}
+                  </Button>
+                </div>
+
+                <div className="hidden lg:block">
+                  <Button type="button" variant="outline" onClick={() => setStep(2)}>
+                    Back
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          {step === 2 && builder && (
+            <aside className="sticky top-24 hidden space-y-4 lg:block">
+              <BoxSummary
+                builder={builder}
+                maxItems={maxItems}
+                action={
+                  <Button className="w-full" disabled={!canCheckout} onClick={() => setStep(3)}>
+                    Continue to checkout
+                  </Button>
+                }
+              />
+            </aside>
+          )}
+
+          {step === 3 && builder && (
+            <aside className="sticky top-24 hidden lg:block">
+              <div className="space-y-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <p className="flex items-center gap-2 font-semibold text-gray-900">
+                  <Package className="h-4 w-4" /> Order summary
+                </p>
+                <p className="text-sm text-gray-600">
+                  {builder.packaging?.name} · {builder.totals.item_count} items
+                </p>
+                <div className="space-y-1 border-t pt-3 text-sm">
+                  <div className="flex justify-between">
+                    <span>Items + box</span>
+                    <span>{formatPrice(builder.totals.grand_total)}</span>
+                  </div>
+                  {voucherDiscount > 0 ? (
+                    <div className="flex justify-between text-green-700">
+                      <span>Voucher</span>
+                      <span>−{formatPrice(voucherDiscount)}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between">
+                    <span>Delivery</span>
+                    <span>
+                      {shippingQuote.loading && checkout.recipient_state && checkout.recipient_city
+                        ? 'Calculating…'
+                        : shippingQuote.error
+                          ? '—'
+                          : formatPrice(shippingFee ?? 0)}
+                    </span>
+                  </div>
+                  {shippingQuote.error ? (
+                    <p className="text-xs text-amber-700">{shippingQuote.error}</p>
+                  ) : null}
+                  <div className="flex justify-between border-t pt-2 text-base font-bold">
+                    <span>Total</span>
+                    <span className="text-primary-700">{formatPrice(grandTotal)}</span>
+                  </div>
+                </div>
+                <Button
+                  type="submit"
+                  form="gift-build-checkout"
+                  className="w-full"
+                  disabled={submitting || shippingQuote.loading || shippingQuote.quotedShipping == null}
+                >
+                  {submitting ? 'Opening payment…' : `Pay ${formatPrice(grandTotal)}`}
+                </Button>
+              </div>
+            </aside>
+          )}
+        </div>
       </div>
 
       {builder && step >= 1 && step < 3 && (
-        <div className="fixed bottom-0 inset-x-0 bg-white border-t shadow-lg p-4 z-20">
-          <div className="container-custom max-w-lg flex items-center justify-between">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white p-4 shadow-lg lg:hidden">
+          <div className="container-custom flex items-center justify-between gap-3">
             <div>
               <p className="text-xs text-gray-500">Running total</p>
               <p className="text-lg font-bold text-primary-700">{formatPrice(builder.totals.grand_total)}</p>
             </div>
-            {builder.packaging && (
-              <p className="text-xs text-gray-500">{builder.packaging.name}</p>
-            )}
+            <div className="text-right text-xs text-gray-500">
+              {builder.packaging ? <p>{builder.packaging.name}</p> : null}
+              <p>
+                {builder.totals.item_count}/{maxItems} items
+              </p>
+            </div>
           </div>
         </div>
       )}
+
+      <GiftBuilderCustomiseSheet
+        productId={customiseTarget?.product_id || ''}
+        productName={customiseTarget?.name || ''}
+        open={Boolean(customiseTarget)}
+        onClose={() => setCustomiseTarget(null)}
+        onConfirm={(spec) => {
+          if (customiseTarget) void addProduct(customiseTarget, spec);
+          setCustomiseTarget(null);
+        }}
+      />
     </main>
+  );
+}
+
+function BoxSummary({
+  builder,
+  maxItems,
+  action,
+}: {
+  builder: GiftBuilderState;
+  maxItems: number;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Your box</p>
+      <p className="mt-1 text-2xl font-bold text-primary-700">{formatPrice(builder.totals.grand_total)}</p>
+      <p className="mt-1 text-sm text-gray-600">
+        {builder.totals.item_count}/{maxItems} items
+        {builder.packaging ? ` · ${builder.packaging.name}` : ''}
+      </p>
+      {builder.items.length > 0 && (
+        <ul className="mt-4 max-h-48 space-y-2 overflow-y-auto border-t pt-4 text-sm">
+          {builder.items.map((item) => (
+            <li key={item.id} className="flex justify-between gap-2">
+              <span className="truncate text-gray-700">{item.name}</span>
+              <span className="shrink-0 text-gray-500">×{item.quantity}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {action}
+    </div>
+  );
+}
+
+function StepNav({
+  onBack,
+  onNext,
+  nextLabel,
+  nextDisabled,
+}: {
+  onBack: () => void;
+  onNext: () => void;
+  nextLabel: string;
+  nextDisabled?: boolean;
+}) {
+  return (
+    <div className="flex gap-2 border-t border-gray-100 pt-4">
+      <Button type="button" variant="outline" onClick={onBack}>
+        <ArrowLeft className="mr-1 h-4 w-4" /> Back
+      </Button>
+      <Button type="button" className="flex-1 sm:flex-none" disabled={nextDisabled} onClick={onNext}>
+        {nextLabel}
+      </Button>
+    </div>
+  );
+}
+
+function BuildSelect({
+  label,
+  value,
+  onChange,
+  children,
+  required,
+  compact,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+  required?: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <label className={`block min-w-0 ${compact ? 'sm:w-44' : ''}`}>
+      <span className="mb-1 block text-xs font-medium text-gray-500">
+        {label}
+        {required ? ' *' : ''}
+      </span>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={SELECT_CLASS}
+          aria-label={label}
+          required={required}
+        >
+          {children}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+      </div>
+    </label>
   );
 }
 

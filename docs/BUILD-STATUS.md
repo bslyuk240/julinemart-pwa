@@ -3,23 +3,79 @@
 > **Canonical plan:** [`trusted-local-commerce-roadmap.md`](./trusted-local-commerce-roadmap.md)
 > **Session rules:** `.cursor/rules/trusted-local-commerce-roadmap.mdc`
 
-Last updated: **14 August 2026**
+Last updated: **15 August 2026**
 
-## JulineMart Gifts — Phase G3 IN PROGRESS
+## JulineMart Gifts — Phase G6 IN PROGRESS (personalisation)
 
-### G2 — COMPLETE
-- Gift ops dashboard, message card, customer timeline
+### G6 shipped (code)
+- [x] Migration: `customisation_spec` on `gift_builder_items` + `gift_order_line_items`
+- [x] Reuse `product_customisation_schemas` via `gift-customisation.js` + `gift-product-customisation` API
+- [x] BYO builder: customisable pool flag, personalise sheet, server validation on add
+- [x] Packing checklist + ops UI show customisation summary lines
 
-### G3 shipped (code)
-- [x] Migration `20260814130000_gift_g3_builder.sql`
-- [x] `gift_builder_sessions`, `gift_builder_items`, `gift_packaging_types`
-- [x] `gift-builder` API + `create-gift-order` Mode B
-- [x] PWA `/gifts/build` wizard with running total
+### G6 remaining
+- [ ] Production-day lead time in G5 date validation for custom items
+- [ ] State-aware cancellation after customisation approved (exit gate)
 
-### G3 exit gate
-- [x] Migration applied to Supabase
-- [ ] Running total updates on add/remove
-- [ ] Non-pool items rejected
+---
+
+## JulineMart Gifts — Phase G5 COMPLETE (code)
+
+### G5 shipped
+- [x] Migration: `requested_delivery_date`, `occasion_date` on `gift_orders`
+- [x] `gift-delivery-schedule.js` — Lagos timezone, hub cutoffs, lead time validation
+- [x] `gift-delivery-dates` preview API
+- [x] `create-gift-order` rejects invalid/past/too-soon dates
+- [x] PWA date pickers on ready-made checkout + BYO checkout
+- [x] Admin gift ops shows requested delivery + occasion dates
+- [x] Secret sender (`sender_visible`) — already on checkout/build
+
+### G5 exit gate
+- [ ] Manual QA: impossible dates rejected server-side
+- [ ] Recipient address separate from buyer (already implemented — verify E2E)
+
+---
+
+## JulineMart Gifts — Phase G4.5 COMPLETE (commercial model)
+
+### G4.5 shipped (code)
+- [x] Migration: `gift_commercial_settings`, `gift_pool_sourced_items`, `gift_order_line_items`
+- [x] `gift-commercial.js` — customer margin stack + vendor catalog settlement
+- [x] Ready-made + BYO checkout via `insertGiftCommercialOrder` (vendor lines at catalog retail)
+- [x] Platform gift discounts absorbed (`gift_discount_amount` / `gift_discount_percent`)
+- [x] Admin: sourced pool CRUD + commercial settings per hub (Gift Fulfilment Centres → Pool)
+- [x] BYO builder: customer running total with margin baked in; per-item prices hidden in PWA
+- [x] BYO builder supports JLO-sourced pool items (`pool_sourced_item_id`)
+- [x] Admin pre-paid stock toggle on pool + gift box lines → `vendor_payout_status: pre_settled`
+
+### G4.5 remaining
+- [x] Catalog shipping quote on gift checkout (JLO `gift-shipping-quote` + PWA hook)
+- [x] Voucher/campaign code on gift checkout (platform absorbed)
+- [x] `pre_settled` vendor payout toggle in admin (pool + gift boxes)
+- [x] Sourced items in BYO builder add flow
+
+---
+
+## JulineMart Gifts — Phase G4 IN PROGRESS
+
+### G3 — COMPLETE (code)
+- Build your own box wizard, builder API, packaging tiers
+
+### G4 shipped (code)
+- [x] Homepage **Gifts for Every Moment** rail (`GiftsHomeSection`)
+- [x] `/gifts` landing with occasion, recipient, budget filters
+- [x] SEO routes `/gifts/birthday`, `/gifts/romantic`, etc.
+- [x] JLO `gift-boxes` API filter params (`occasion`, `recipient`, `budget_min`/`budget_max`)
+
+### G4 exit gate
+- [ ] Homepage section visible with 1+ live boxes (needs tagged boxes + pool SKUs)
+- [x] Public catalog hides boxes with no pool-available items at default GFC
+- [x] Admin occasion/recipient tagging (desktop + mobile Gift Boxes)
+- [x] Analytics: landing → BYO start → purchase (GA4 + `customer_journey_events`)
+
+### G3 exit gate (parallel)
+- [ ] Running total updates on add/remove (manual QA)
+- [ ] Non-pool items rejected (manual QA)
 - [ ] E2E custom box purchase at Warri
 
 ---
@@ -98,11 +154,12 @@ Last updated: **14 August 2026**
 
 | Phase | Status | Theme |
 |-------|--------|--------|
-| G0 | **Next** | Warri hub + admin hub CRUD + gift pool + eligibility |
-| G1 | Pending | Ready-made boxes |
-| G2 | Pending | Ops dashboard + packing |
-| G3 | Pending | Build your own box |
-| G4–G7 | Pending | Discovery, scheduling, personalisation, growth |
+| G0 | **Complete** | Warri hub + admin hub CRUD + gift pool + eligibility |
+| G1 | **Complete** | Ready-made boxes |
+| G2 | **Complete** | Ops dashboard + packing |
+| G3 | **Complete** (code) | Build your own box |
+| G4 | **In progress** | Discovery, homepage, SEO filters |
+| G5–G7 | Pending | Scheduling, personalisation, growth |
 
 Trusted Local Commerce Phase 4 (Custom) should complete or pass exit gate before heavy G6 personalisation overlap.
 

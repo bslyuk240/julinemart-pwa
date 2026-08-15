@@ -19,6 +19,7 @@ export type GiftBox = {
   name: string;
   description: string | null;
   image_url: string | null;
+  gallery_urls?: string[];
   list_price: number;
   recipient_types: string[];
   occasion_types: string[];
@@ -43,6 +44,8 @@ export type GiftCheckoutPayload = {
   gift_message?: string;
   sender_visible?: boolean;
   occasion?: string;
+  requested_delivery_date?: string;
+  occasion_date?: string;
   shipping_fee?: number;
 };
 
@@ -57,13 +60,14 @@ export type GiftPackagingOption = {
 
 export type GiftBuilderItem = {
   id: string;
-  product_id: string;
+  product_id?: string | null;
+  pool_sourced_item_id?: string | null;
+  line_source?: 'vendor_catalog' | 'jlo_sourced';
   quantity: number;
-  unit_price: number;
-  line_total: number;
   name?: string;
   gift_category?: string | null;
   image?: string | null;
+  customisation_summary?: string[] | null;
 };
 
 export type GiftBuilderState = {

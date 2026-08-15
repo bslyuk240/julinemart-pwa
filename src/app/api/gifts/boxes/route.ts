@@ -15,9 +15,18 @@ export async function GET(request: NextRequest) {
 
   const gfc = request.nextUrl.searchParams.get('gfc') || 'warri';
   const slug = request.nextUrl.searchParams.get('slug');
+  const occasion = request.nextUrl.searchParams.get('occasion');
+  const recipient = request.nextUrl.searchParams.get('recipient');
+  const budget = request.nextUrl.searchParams.get('budget');
 
   const params = new URLSearchParams({ gfc });
   if (slug) params.set('slug', slug);
+  if (occasion) params.set('occasion', occasion);
+  if (recipient) params.set('recipient', recipient);
+  if (budget === 'under-10k') params.set('budget_max', '10000');
+  else if (budget === 'under-20k') params.set('budget_max', '20000');
+  else if (budget === 'under-50k') params.set('budget_max', '50000');
+  else if (budget === 'premium') params.set('budget_min', '50000');
 
   const res = await fetch(`${JLO_BASE}/.netlify/functions/gift-boxes?${params}`, {
     next: { revalidate: 60 },

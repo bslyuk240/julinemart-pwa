@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Gift, ArrowRight } from 'lucide-react';
+import { ArrowRight, Package } from 'lucide-react';
+import GiftBoxGallery from '@/components/gifts/gift-box-gallery';
 import { fetchGiftBoxBySlug } from '@/lib/jlo/gifts';
 import { formatPrice } from '@/lib/utils/format-price';
 import PageHeader from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import GiftAnalyticsBeacon from '@/components/gifts/gift-analytics-beacon';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -28,33 +30,24 @@ export default async function GiftBoxPage({ params }: Props) {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24">
-      <div className="container-custom py-5 md:py-8 max-w-3xl">
+      <GiftAnalyticsBeacon
+        kind="box"
+        boxSlug={box.slug}
+        boxName={box.name}
+        price={box.list_price}
+      />
+      <div className="container-custom py-5 md:py-8 max-w-6xl">
         <PageHeader title={box.name} backHref="/gifts" backLabel="All gift boxes" />
 
-        <div className="bg-white rounded-2xl border overflow-hidden shadow-sm mb-6">
-          <div className="aspect-video bg-gradient-to-br from-primary-50 to-rose-100 relative">
-            {box.image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={box.image_url} alt={box.name} className="w-full h-full object-cover" />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Gift className="w-20 h-20 text-primary-300" />
-              </div>
-            )}
-          </div>
-          <div className="p-5 md:p-6">
-            <p className="text-2xl font-bold text-primary-700 mb-3">{formatPrice(box.list_price)}</p>
-            {box.description ? (
-              <p className="text-sm text-gray-700 mb-4 leading-relaxed">{box.description}</p>
-            ) : null}
-            {gfc ? (
-              <p className="text-xs text-gray-500 mb-4">
-                Packed at {gfc.name} · {gfc.city}, {gfc.state}
-              </p>
-            ) : null}
-
+        <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
+          <div className="mb-6 overflow-hidden rounded-2xl border bg-white shadow-sm lg:mb-0">
+            <GiftBoxGallery
+              name={box.name}
+              coverUrl={box.image_url}
+              galleryUrls={box.gallery_urls}
+            />
             {box.contents.length > 0 && (
-              <div className="border-t pt-4">
+              <div className="p-5 md:p-6 border-t lg:hidden">
                 <h2 className="text-sm font-semibold text-gray-900 mb-3">What&apos;s inside</h2>
                 <ul className="space-y-2">
                   {box.contents.map((item) => (
@@ -69,14 +62,54 @@ export default async function GiftBoxPage({ params }: Props) {
               </div>
             )}
           </div>
-        </div>
 
-        <Link href={`/gifts/checkout?box=${encodeURIComponent(box.slug)}`}>
-          <Button className="w-full h-12 text-base gap-2">
-            Send this gift
-            <ArrowRight className="w-4 h-4" />
-          </Button>
-        </Link>
+          <div className="space-y-6">
+            <div className="lg:sticky lg:top-24 space-y-5">
+              <div>
+                <p className="text-3xl font-bold text-primary-700">{formatPrice(box.list_price)}</p>
+                <p className="text-sm text-gray-600 mt-1">{box.item_count} curated items included</p>
+              </div>
+              {box.description ? (
+                <p className="text-sm md:text-base text-gray-700 leading-relaxed">{box.description}</p>
+              ) : null}
+              {gfc ? (
+                <p className="text-sm text-gray-500 flex items-center gap-2">
+                  <Package className="w-4 h-4 shrink-0" />
+                  Packed at {gfc.name} · {gfc.city}, {gfc.state}
+                </p>
+              ) : null}
+
+              {box.contents.length > 0 && (
+                <div className="hidden lg:block bg-white rounded-2xl border p-5">
+                  <h2 className="text-sm font-semibold text-gray-900 mb-3">What&apos;s inside</h2>
+                  <ul className="space-y-2">
+                    {box.contents.map((item) => (
+                      <li key={item.product_id} className="flex items-center gap-3 text-sm text-gray-700">
+                        <span className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-medium">
+                          {item.quantity}×
+                        </span>
+                        <span>{item.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <Link href={`/gifts/checkout?box=${encodeURIComponent(box.slug)}`}>
+                <Button className="w-full h-12 md:h-14 text-base gap-2">
+                  Send this gift
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </Link>
+              <Link
+                href="/gifts/build"
+                className="block text-center text-sm font-medium text-primary-700 hover:text-primary-900"
+              >
+                Or build your own box
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
   );

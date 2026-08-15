@@ -6,6 +6,7 @@ import VendorStrip from '@/components/home/vendor-strip';
 import ReviewsCarousel from '@/components/home/reviews-carousel';
 import CampaignOffersStrip from '@/components/campaigns/CampaignOffersStrip';
 import CampaignOffersPopup from '@/components/campaigns/CampaignOffersPopup';
+import GiftsHomeSection from '@/components/home/gifts-home-section';
 import { getHomepageSectionsData } from '@/lib/homepage-sections';
 import { getActiveCampaignSummaries } from '@/lib/campaigns/get-campaign';
 
@@ -34,6 +35,8 @@ export default async function HomePage() {
       {activeCampaigns.length > 0 && <CampaignOffersPopup campaigns={activeCampaigns} />}
 
       <CategoryStrip />
+
+      <GiftsHomeSection />
 
       <Suspense fallback={
         <div className="space-y-2">

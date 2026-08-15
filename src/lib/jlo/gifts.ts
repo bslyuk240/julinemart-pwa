@@ -12,13 +12,38 @@ function gfcParams(gfc?: string) {
   return params;
 }
 
-export async function fetchGiftBoxes(gfc = 'warri'): Promise<{
+export type GiftBoxFilters = {
+  gfc?: string;
+  occasion?: string;
+  recipient?: string;
+  budget?: string;
+};
+
+function budgetParams(budget?: string): { budget_min?: string; budget_max?: string } {
+  if (!budget) return {};
+  if (budget === 'under-10k') return { budget_max: '10000' };
+  if (budget === 'under-20k') return { budget_max: '20000' };
+  if (budget === 'under-50k') return { budget_max: '50000' };
+  if (budget === 'premium') return { budget_min: '50000' };
+  return {};
+}
+
+export async function fetchGiftBoxes(
+  gfc = 'warri',
+  filters: Omit<GiftBoxFilters, 'gfc'> = {},
+): Promise<{
   boxes: GiftBox[];
   gfc: GiftFulfilmentCentre | null;
 }> {
   if (!JLO_BASE) return { boxes: [], gfc: null };
 
   const params = gfcParams(gfc);
+  if (filters.occasion) params.set('occasion', filters.occasion);
+  if (filters.recipient) params.set('recipient', filters.recipient);
+  const bp = budgetParams(filters.budget);
+  if (bp.budget_min) params.set('budget_min', bp.budget_min);
+  if (bp.budget_max) params.set('budget_max', bp.budget_max);
+
   const res = await fetch(`${JLO_BASE}/.netlify/functions/gift-boxes?${params}`, {
     next: { revalidate: 60 },
   });
