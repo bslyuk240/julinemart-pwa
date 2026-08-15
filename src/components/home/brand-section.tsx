@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { ChevronRight, Store } from 'lucide-react';
-import { Brand } from '@/lib/woocommerce/brands';
+import type { Brand } from '@/lib/catalog/brands';
 
 interface BrandSectionProps {
   brands: Brand[];

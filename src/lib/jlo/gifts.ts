@@ -29,6 +29,10 @@ function budgetParams(budget?: string): { budget_min?: string; budget_max?: stri
 }
 
 async function safeJson(res: Response): Promise<{ success?: boolean; data?: unknown; gfc?: unknown } | null> {
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    return null;
+  }
   try {
     return await res.json();
   } catch {

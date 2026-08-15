@@ -1,4 +1,4 @@
-import { getBrands } from '@/lib/woocommerce/brands';
+import { getBrands } from '@/lib/catalog/brands';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Store, ArrowLeft } from 'lucide-react';

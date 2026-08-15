@@ -1,4 +1,4 @@
-import { getProductsByBrand, getBrandBySlug } from '@/lib/woocommerce/brands';
+import { getBrandBySlug, getProductsByBrand } from '@/lib/catalog/brands';
 import ProductCard from '@/components/product/product-card';
 import Image from 'next/image';
 import Link from 'next/link';

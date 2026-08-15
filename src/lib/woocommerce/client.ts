@@ -22,33 +22,43 @@ type ApiErrorLike = {
   };
 };
 
+export class WooCommerceRetiredError extends Error {
+  constructor() {
+    super(
+      "WooCommerce API is retired — use Supabase/JLO catalog and order endpoints instead."
+    );
+    this.name = "WooCommerceRetiredError";
+  }
+}
+
 // Utility: scrub credentials from URLs/headers before logging
 const scrubAuth = (value?: string) =>
   value?.replace(/\/\/([^:]+):([^@]+)@/g, "//***:***@");
 
-function getServerApi() {
+export function isWooCommerceConfigured(): boolean {
+  return Boolean(
+    process.env.WC_BASE_URL &&
+      process.env.WC_KEY &&
+      process.env.WC_SECRET
+  );
+}
+
+function getServerApi(): WooCommerceRestApi | null {
   if (isClient) return null;
   if (serverApi) return serverApi;
 
   const wcBaseUrl = process.env.WC_BASE_URL;
   const consumerKey = process.env.WC_KEY;
   const consumerSecret = process.env.WC_SECRET;
-  const missing = [
-    !wcBaseUrl ? "WC_BASE_URL" : null,
-    !consumerKey ? "WC_KEY" : null,
-    !consumerSecret ? "WC_SECRET" : null,
-  ].filter(Boolean);
 
-  if (missing.length > 0) {
-    throw new Error(
-      `Missing WooCommerce configuration: ${missing.join(", ")}`
-    );
+  if (!wcBaseUrl || !consumerKey || !consumerSecret) {
+    return null;
   }
 
   serverApi = new WooCommerceRestApi({
-    url: wcBaseUrl!.replace("/wp-json/wc/v3", ""),
-    consumerKey: consumerKey!,
-    consumerSecret: consumerSecret!,
+    url: wcBaseUrl.replace("/wp-json/wc/v3", ""),
+    consumerKey,
+    consumerSecret,
     version: "wc/v3",
     queryStringAuth: true,
     timeout: WC_REQUEST_TIMEOUT_MS,
@@ -72,7 +82,6 @@ async function callProxy(
   if (!res.ok) {
     throw new Error(json?.message || "Proxy request failed");
   }
-  // Forward WooCommerce pagination headers so list pages can load all items (e.g. 300+ products)
   const total = res.headers.get("X-WP-Total");
   const totalPages = res.headers.get("X-WP-TotalPages");
   return {
@@ -82,60 +91,56 @@ async function callProxy(
   };
 }
 
+function requireApi(): WooCommerceRestApi {
+  const api = getServerApi();
+  if (!api) throw new WooCommerceRetiredError();
+  return api;
+}
+
 // Client-safe wrapper for WooCommerce endpoints (wc/v3)
 export const wcApi = {
   get: async (endpoint: string, params?: unknown) => {
     const api = getServerApi();
     if (api) {
       const res = await api.get(endpoint, params);
-      // Normalize: server returns axios-style { data, headers }; add total/totalPages for parity
       const total = res.headers?.["x-wp-total"] ?? res.headers?.["X-WP-Total"];
-      const totalPages = res.headers?.["x-wp-totalpages"] ?? res.headers?.["X-WP-TotalPages"];
+      const totalPages =
+        res.headers?.["x-wp-totalpages"] ?? res.headers?.["X-WP-TotalPages"];
       return {
         data: res.data,
         ...(total != null && { total: parseInt(String(total), 10) }),
-        ...(totalPages != null && { totalPages: parseInt(String(totalPages), 10) }),
+        ...(totalPages != null && {
+          totalPages: parseInt(String(totalPages), 10),
+        }),
       };
     }
-    return callProxy("get", endpoint, { params });
+    if (isClient) {
+      return callProxy("get", endpoint, { params });
+    }
+    throw new WooCommerceRetiredError();
   },
   post: async (endpoint: string, data?: unknown) => {
-    const api = getServerApi();
-    if (api) return api.post(endpoint, data);
-    const proxyData = await callProxy("post", endpoint, { data });
-    return { data: proxyData };
+    const api = requireApi();
+    return api.post(endpoint, data);
   },
   put: async (endpoint: string, data?: unknown) => {
-    const api = getServerApi();
-    if (api) return api.put(endpoint, data);
-    const proxyData = await callProxy("put", endpoint, { data });
-    return { data: proxyData };
+    const api = requireApi();
+    return api.put(endpoint, data);
   },
   delete: async (endpoint: string, params?: unknown) => {
-    const api = getServerApi();
-    if (api) return api.delete(endpoint, params);
-    const proxyData = await callProxy("delete", endpoint, { params });
-    return { data: proxyData };
+    const api = requireApi();
+    return api.delete(endpoint, params);
   },
 };
 
-/**
- * ✅ NEW: Client-safe wrapper for WP/WCFM endpoints (/wp-json/*)
- * - On client: uses proxy (does NOT expose keys)
- * - On server: you can also route through proxy or direct axios, but easiest is proxy only.
- *
- * Endpoint format:
- *   wpApi.get("wcfmmp/v1/vendors/35")
- * This will send "wp:wcfmmp/v1/vendors/35" to the proxy route.
- */
 export const wpApi = {
   get: async (endpoint: string, params?: unknown) => {
+    if (!isWooCommerceConfigured()) throw new WooCommerceRetiredError();
     const data = await callProxy("get", `wp:${endpoint}`, { params });
     return { data };
   },
 };
 
-// Helper function for error handling
 export const handleApiError = (error: unknown, context?: string) => {
   const typedError =
     typeof error === "object" && error !== null ? (error as ApiErrorLike) : undefined;

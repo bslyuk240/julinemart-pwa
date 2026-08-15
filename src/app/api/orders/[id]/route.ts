@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { wcApi, handleApiError } from '@/lib/woocommerce/client';
 import { getJloBaseUrl } from '@/lib/jlo/returns';
 
 const JLO_BASE = getJloBaseUrl();
@@ -17,21 +16,13 @@ const SUB_STATUS_RANK: Record<string, number> = {
   delivered: 5,
 };
 
-// Derive WC-compatible status from sub_orders progression
 function deriveOrderStatus(o: any): string {
   const dbStatus: string = o.overall_status || 'pending';
 
-  // Unpaid / not-yet-confirmed orders stay 'pending'. Sub-orders are created at
-  // checkout (before payment) with status 'pending', so we must NOT let that
-  // derive a 'pending' order forward to 'processing'. verify-payment is what
-  // moves overall_status to 'processing' once payment is confirmed.
   if (dbStatus === 'pending') return 'pending';
-
-  // Terminal states pass through untouched
   if (dbStatus === 'cancelled' || dbStatus === 'refunded') return dbStatus;
 
   const subOrders: any[] = o.sub_orders || [];
-
   if (!subOrders.length) return dbStatus;
 
   const ranks = subOrders
@@ -42,7 +33,6 @@ function deriveOrderStatus(o: any): string {
 
   const minRank = Math.min(...ranks);
   const allDelivered = ranks.every((r: number) => r === 5);
-
   if (allDelivered) return 'delivered';
 
   const rankToWc: Record<number, string> = {
@@ -58,11 +48,9 @@ function deriveOrderStatus(o: any): string {
 function getTrackingLink(courierName: string, trackingNumber: string): string | null {
   const name = courierName.toLowerCase();
   if (name.includes('fez')) return `https://fezdelivery.co/track/${trackingNumber}`;
-  // For Local Riders and other local couriers, no public tracking URL — use JLO portal
   return null;
 }
 
-// Build tracking meta_data from sub_orders so OrderStatusTracker can display it
 function buildMetaData(o: any): any[] {
   const subOrders: any[] = o.sub_orders || [];
   const trackingItems = subOrders
@@ -79,12 +67,10 @@ function buildMetaData(o: any): any[] {
     });
 
   const meta: any[] = [];
-
   if (trackingItems.length) {
     meta.push({ key: 'wc_shipment_tracking_items', value: trackingItems });
   }
 
-  // Show assigned carrier / hub even before tracking is added
   const first = subOrders[0];
   if (first?.couriers?.name) {
     meta.push({ key: 'jlo_recommended_carrier', value: first.couriers.name });
@@ -100,10 +86,7 @@ function adaptOrder(o: any) {
   const nameParts = (o.customer_name || '').split(' ');
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ') || '';
-
   const derivedStatus = deriveOrderStatus(o);
-
-  // date_completed: use delivered_at from the last sub-order if all delivered
   const subOrders: any[] = o.sub_orders || [];
   const allDelivered = subOrders.length > 0 && subOrders.every((so: any) => so.status === 'delivered');
   const lastDeliveredAt = allDelivered
@@ -164,158 +147,112 @@ function adaptOrder(o: any) {
   };
 }
 
+async function fetchSupabaseOrder(request: Request, id: string): Promise<any | null> {
+  if (!JLO_BASE) return null;
+
+  const url = new URL(request.url);
+  const email = url.searchParams.get('email') || '';
+  let supabaseOrder: any = null;
+
+  if (email) {
+    const res = await fetch(
+      `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(email)}&order_id=${encodeURIComponent(id)}`
+    );
+    if (res.ok) {
+      const json = await res.json().catch(() => null);
+      if (json?.success && json.data) supabaseOrder = json.data;
+    }
+  }
+
+  if (!supabaseOrder) {
+    const isUUID = /^[0-9a-f-]{36}$/i.test(id);
+    if (isUUID) {
+      const adminRes = await fetch(`${JLO_BASE}/.netlify/functions/orders/${id}`);
+      if (adminRes.ok) {
+        const adminJson = await adminRes.json().catch(() => null);
+        if (adminJson?.success && adminJson.data) {
+          const orderRaw = adminJson.data;
+          if (orderRaw.customer_email) {
+            const itemsRes = await fetch(
+              `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(orderRaw.customer_email)}&order_id=${encodeURIComponent(id)}`
+            );
+            if (itemsRes.ok) {
+              const itemsJson = await itemsRes.json().catch(() => null);
+              if (itemsJson?.success && itemsJson.data) {
+                supabaseOrder = itemsJson.data;
+              }
+            }
+          }
+          if (!supabaseOrder) {
+            supabaseOrder = { ...orderRaw, items: [] };
+          }
+        }
+      }
+    }
+  }
+
+  return supabaseOrder;
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
 
-  // ----------------------------------------------------------
-  // 1. Try Supabase first via customer-orders Netlify function
-  //    Pass ?email from the request if provided; otherwise use
-  //    the admin orders endpoint for UUID lookups.
-  // ----------------------------------------------------------
-  if (JLO_BASE) {
-    try {
-      const url = new URL(request.url);
-      const email = url.searchParams.get('email') || '';
-
-      // Build the customer-orders URL — requires email for scoped lookup.
-      // If no email, fall back to the admin orders endpoint (UUID only).
-      let supabaseOrder: any = null;
-
-      if (email) {
-        // Scoped customer lookup
-        const res = await fetch(
-          `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(email)}&order_id=${encodeURIComponent(id)}`
-        );
-        if (res.ok) {
-          const json = await res.json().catch(() => null);
-          if (json?.success && json.data) {
-            supabaseOrder = json.data;
-          }
-        }
-      }
-
-      // If no email or scoped lookup missed, try admin orders by UUID
-      if (!supabaseOrder) {
-        const isUUID = /^[0-9a-f-]{36}$/i.test(id);
-        if (isUUID) {
-          const adminRes = await fetch(`${JLO_BASE}/.netlify/functions/orders/${id}`);
-          if (adminRes.ok) {
-            const adminJson = await adminRes.json().catch(() => null);
-            if (adminJson?.success && adminJson.data) {
-              // Admin orders function returns full order but no order_items join —
-              // fetch items separately via customer-orders using the UUID
-              const orderRaw = adminJson.data;
-              // Try to get items via customer-orders with email from the order
-              if (orderRaw.customer_email) {
-                const itemsRes = await fetch(
-                  `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(orderRaw.customer_email)}&order_id=${encodeURIComponent(id)}`
-                );
-                if (itemsRes.ok) {
-                  const itemsJson = await itemsRes.json().catch(() => null);
-                  if (itemsJson?.success && itemsJson.data) {
-                    supabaseOrder = itemsJson.data;
-                  }
-                }
-              }
-              // If still no items data, use the admin order with empty items
-              if (!supabaseOrder) {
-                supabaseOrder = { ...orderRaw, items: [] };
-              }
-            }
-          }
-        }
-      }
-
-      if (supabaseOrder) {
-        const supabaseId = supabaseOrder.id as string;
-        const adapted = adaptOrder(supabaseOrder);
-
-        let jloReturns: any[] = [];
-        if (supabaseId) {
-          try {
-            const returnsRes = await fetch(
-              `${JLO_BASE}/.netlify/functions/get-order-returns?order_id=${supabaseId}`
-            );
-            const returnsJson = await returnsRes.json().catch(() => null);
-            if (returnsRes.ok && returnsJson?.success) {
-              const payload = returnsJson.data ?? returnsJson;
-              jloReturns = Array.isArray(payload)
-                ? payload
-                : Array.isArray(payload?.returns)
-                ? payload.returns
-                : [];
-            }
-          } catch (err) {
-            console.warn('Failed to fetch returns from Supabase', err);
-          }
-        }
-
-        return NextResponse.json({ order: adapted, returns: jloReturns });
-      }
-    } catch (err) {
-      console.warn('Supabase order lookup failed, falling back to WC:', err);
-    }
-  }
-
-  // ----------------------------------------------------------
-  // 2. Fallback: WooCommerce (legacy orders)
-  // ----------------------------------------------------------
-  const orderId = Number(id);
-  if (Number.isNaN(orderId)) {
-    return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
+  if (!JLO_BASE) {
+    return NextResponse.json(
+      { error: 'Order service not configured' },
+      { status: 503 }
+    );
   }
 
   try {
-    const response = await wcApi.get(`orders/${orderId}`);
-    const order = response.data;
+    const supabaseOrder = await fetchSupabaseOrder(request, id);
+    if (!supabaseOrder) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    const supabaseId = supabaseOrder.id as string;
+    const adapted = adaptOrder(supabaseOrder);
 
     let jloReturns: any[] = [];
-    if (JLO_BASE) {
+    if (supabaseId) {
       try {
-        const jloResponse = await fetch(`${JLO_BASE}/api/orders/${orderId}/returns`);
-        const jloData = await jloResponse.json().catch(async () => {
-          const text = await jloResponse.text().catch(() => '');
-          return { message: text || null };
-        });
-        if (jloResponse.ok) {
-          const payload = jloData?.data ?? jloData;
+        const returnsRes = await fetch(
+          `${JLO_BASE}/.netlify/functions/get-order-returns?order_id=${supabaseId}`
+        );
+        const returnsJson = await returnsRes.json().catch(() => null);
+        if (returnsRes.ok && returnsJson?.success) {
+          const payload = returnsJson.data ?? returnsJson;
           jloReturns = Array.isArray(payload)
             ? payload
             : Array.isArray(payload?.returns)
             ? payload.returns
             : [];
         }
-      } catch (error) {
-        console.warn('Failed to fetch JLO returns', error);
+      } catch (err) {
+        console.warn('Failed to fetch returns from Supabase', err);
       }
     }
 
-    return NextResponse.json({ order, returns: jloReturns });
-  } catch (error) {
-    handleApiError(error);
+    return NextResponse.json({ order: adapted, returns: jloReturns });
+  } catch (err) {
+    console.error('Supabase order lookup failed:', err);
     return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 });
   }
 }
 
 export async function PUT(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const orderId = Number(id);
-  if (Number.isNaN(orderId)) {
-    return NextResponse.json({ error: 'Invalid order id' }, { status: 400 });
-  }
-
-  try {
-    const body = await request.json();
-    const response = await wcApi.put(`orders/${orderId}`, body);
-    return NextResponse.json(response.data);
-  } catch (error) {
-    handleApiError(error);
-    return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
-  }
+  return NextResponse.json(
+    {
+      error: 'Order updates are managed in JLO — WooCommerce order API is retired.',
+      order_id: id,
+    },
+    { status: 410 }
+  );
 }

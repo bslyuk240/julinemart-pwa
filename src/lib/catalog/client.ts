@@ -3,11 +3,10 @@
  *
  * Calls JLO Netlify functions which serve product data from Supabase.
  * Must never run in the browser (CORS is locked to production domain).
- * A runtime guard in jloFetch() returns null immediately in the browser
- * so client components fall through to the WooCommerce fallback.
+ * A runtime guard in jloFetch() returns null immediately in the browser.
  * The JLO backend site URL must be set via NEXT_PUBLIC_JLO_CATALOG_URL.
  *
- * All functions return null/[] on any error so callers can fall back to WooCommerce.
+ * All functions return null/[] on any error so callers can degrade gracefully.
  */
 
 import type { Product, ProductAttribute, ProductVariation, ProductsQueryParams } from '@/types/product';
@@ -23,7 +22,6 @@ function getJloCatalogBase(): string | null {
 
 async function jloFetch<T>(path: string): Promise<T | null> {
   // Never run in the browser — JLO CORS is locked to production domain.
-  // Client components will get null and fall back to WooCommerce.
   if (typeof window !== 'undefined') return null;
 
   const base = getJloCatalogBase();
@@ -449,7 +447,6 @@ export interface CatalogCategory {
 
 /**
  * Fetch categories from the Supabase/JLO catalog (catalog-meta?type=categories).
- * Returns null on any error so callers can fall back to WooCommerce.
  */
 export async function catalogGetCategories(): Promise<CatalogCategory[] | null> {
   const resp = await jloFetch<JloListResponse>(
@@ -462,6 +459,30 @@ export async function catalogGetCategories(): Promise<CatalogCategory[] | null> 
     name: String(row.name ?? ''),
     slug: String(row.slug ?? ''),
     parent: Number(row.parent_id ?? 0) || 0,
+  }));
+}
+
+export interface CatalogTagAudit {
+  id: string;
+  name: string;
+  slug: string;
+  product_count: number;
+}
+
+/**
+ * Tags with published product counts — used for brand browse pages.
+ */
+export async function catalogGetTagsAudit(): Promise<CatalogTagAudit[] | null> {
+  const resp = await jloFetch<JloListResponse>(
+    `/.netlify/functions/catalog-meta?type=tags_audit`
+  );
+  if (!resp?.success || !Array.isArray(resp.data)) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (resp.data as any[]).map((row) => ({
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    slug: String(row.slug ?? ''),
+    product_count: Number(row.product_count ?? 0),
   }));
 }
 

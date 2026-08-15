@@ -1,76 +1,40 @@
-/**
- * Debug Script to Test WooCommerce Product Tags
- * 
- * This will help you verify:
- * 1. If tags exist in WooCommerce
- * 2. If products are correctly tagged
- * 3. If the API is returning tagged products
- * 
- * HOW TO USE:
- * 1. Create this file: src/app/api/debug/tags/route.ts
- * 2. Visit: http://localhost:3000/api/debug/tags
- * 3. Check the JSON response
- */
-
 import { NextResponse } from 'next/server';
-import { wcApi } from '@/lib/woocommerce/client';
+import { catalogGetProducts, catalogGetTagsAudit } from '@/lib/catalog/client';
+import { PRODUCT_TAGS } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const TARGET_TAGS = [
+  PRODUCT_TAGS.FLASH_SALE,
+  PRODUCT_TAGS.DEAL,
+  PRODUCT_TAGS.BEST_SELLER,
+];
+
 export async function GET() {
   try {
-    console.log('🔍 Starting tag debug...');
+    const allTags = (await catalogGetTagsAudit()) ?? [];
+    const foundTags = allTags.filter((tag) => TARGET_TAGS.includes(tag.slug));
 
-    // Step 1: Get all product tags
-    console.log('\n📌 Fetching all product tags...');
-    const tagsResponse = await wcApi.get('products/tags', { per_page: 100 });
-    const allTags = tagsResponse.data;
-    
-    console.log(`Found ${allTags.length} total tags`);
-
-    // Step 2: Find our specific tags
-    const targetTags = ['flash-sale', 'deal', 'best-seller'];
-    const foundTags = allTags.filter((tag: any) => 
-      targetTags.includes(tag.slug)
-    );
-
-    console.log('\n🎯 Target tags status:');
-    targetTags.forEach(tagSlug => {
-      const found = foundTags.find((t: any) => t.slug === tagSlug);
-      if (found) {
-        console.log(`✅ ${tagSlug}: EXISTS (ID: ${found.id}, Count: ${found.count})`);
-      } else {
-        console.log(`❌ ${tagSlug}: NOT FOUND`);
-      }
-    });
-
-    // Step 3: Try fetching products with each tag
-    console.log('\n📦 Fetching products by tag...');
-    const results = await Promise.all(
-      targetTags.map(async (tagSlug) => {
+    const productsByTag = await Promise.all(
+      TARGET_TAGS.map(async (tagSlug) => {
         try {
-          const productsResponse = await wcApi.get('products', { 
-            tag: tagSlug,
-            per_page: 10 
-          });
-          const products = productsResponse.data;
-          
+          const products = await catalogGetProducts({ tag: tagSlug, per_page: 10 });
           return {
             tag: tagSlug,
             success: true,
-            count: products.length,
-            products: products.map((p: any) => ({
+            count: products?.length ?? 0,
+            products: (products ?? []).map((p) => ({
               id: p.id,
               name: p.name,
-              tags: p.tags.map((t: any) => t.slug),
+              slug: p.slug,
             })),
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           return {
             tag: tagSlug,
             success: false,
-            error: error.message,
+            error: error instanceof Error ? error.message : String(error),
             count: 0,
             products: [],
           };
@@ -79,79 +43,52 @@ export async function GET() {
     );
 
     const recommendations: string[] = [];
-
-    // Step 4: Return comprehensive debug info
-    const debugInfo = {
-      timestamp: new Date().toISOString(),
-      summary: {
-        totalTags: allTags.length,
-        foundTargetTags: foundTags.length,
-        expectedTags: targetTags.length,
-      },
-      tags: {
-        all: allTags.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          slug: t.slug,
-          count: t.count,
-        })),
-        target: foundTags.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          slug: t.slug,
-          count: t.count,
-        })),
-      },
-      productsByTag: results,
-      recommendations,
-    };
-
-    // Generate recommendations
-    results.forEach(result => {
+    productsByTag.forEach((result) => {
       if (!result.success) {
-        recommendations.push(
-          `❌ Tag "${result.tag}" failed to fetch products: ${result.error}`
-        );
+        recommendations.push(`Tag "${result.tag}" failed: ${result.error}`);
       } else if (result.count === 0) {
-        const tagExists = foundTags.find((t: any) => t.slug === result.tag);
-        if (!tagExists) {
-          recommendations.push(
-            `⚠️ Tag "${result.tag}" does not exist in WooCommerce. Create it in WordPress Admin → Products → Tags`
-          );
-        } else {
-          recommendations.push(
-            `⚠️ Tag "${result.tag}" exists but has no products. Add this tag to products in WordPress Admin`
-          );
-        }
-      } else {
+        const exists = foundTags.find((t) => t.slug === result.tag);
         recommendations.push(
-          `✅ Tag "${result.tag}" working correctly with ${result.count} product(s)`
+          exists
+            ? `Tag "${result.tag}" exists but has no published catalog products.`
+            : `Tag "${result.tag}" is missing — add it in JLO catalog meta.`
         );
+      } else {
+        recommendations.push(`Tag "${result.tag}" OK (${result.count} products).`);
       }
     });
 
-    console.log('\n✅ Debug complete!');
-    console.log('Recommendations:', debugInfo.recommendations);
-
-    return NextResponse.json(debugInfo, { 
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-
-  } catch (error: any) {
-    console.error('❌ Debug failed:', error);
-    
-    return NextResponse.json({
-      error: true,
-      message: error.message,
-      details: error.response?.data || 'No additional details',
-      recommendations: [
-        '1. Check your WooCommerce API credentials in .env.local',
-        '2. Verify your WordPress site is accessible',
-        '3. Ensure WooCommerce REST API is enabled',
-      ],
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        timestamp: new Date().toISOString(),
+        source: 'supabase-catalog',
+        summary: {
+          totalTags: allTags.length,
+          foundTargetTags: foundTags.length,
+          expectedTags: TARGET_TAGS.length,
+        },
+        tags: {
+          target: foundTags.map((t) => ({
+            slug: t.slug,
+            name: t.name,
+            count: t.product_count,
+          })),
+        },
+        productsByTag,
+        recommendations,
+      },
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (error: unknown) {
+    return NextResponse.json(
+      {
+        error: true,
+        message: error instanceof Error ? error.message : String(error),
+        recommendations: [
+          'Check NEXT_PUBLIC_JLO_CATALOG_URL / JLO_API_BASE_URL on Netlify.',
+        ],
+      },
+      { status: 500 }
+    );
   }
 }
