@@ -32,6 +32,7 @@ import {
   trackGiftPurchase,
 } from '@/lib/analytics/gifts';
 import { useGiftShippingQuote } from '@/hooks/use-gift-shipping-quote';
+import { useLocationLgas } from '@/hooks/use-location-lgas';
 import GiftPromoCode from '@/components/gifts/gift-promo-code';
 import GiftDeliveryScheduleFields from '@/components/gifts/gift-delivery-schedule-fields';
 import GiftBuilderCustomiseSheet from '@/components/gifts/gift-builder-customise-sheet';
@@ -286,6 +287,21 @@ export default function GiftBuildPage() {
   });
 
   const shippingFee = shippingQuote.shippingFee;
+
+  // Recipient's area/LGA — same picker as regular checkout, sourced from the
+  // Vendor Locations admin page. Falls back to free text for recipients
+  // outside a hub-serviced city (gift boxes can ship anywhere in Nigeria).
+  const lgaOptions = useLocationLgas(checkout.recipient_state, checkout.recipient_city);
+  useEffect(() => {
+    if (
+      lgaOptions.length > 0 &&
+      checkout.recipient_zone &&
+      !lgaOptions.some((o) => o.lga === checkout.recipient_zone)
+    ) {
+      setCheckout((prev) => ({ ...prev, recipient_zone: '' }));
+    }
+  }, [lgaOptions, checkout.recipient_zone]);
+
   const voucherDiscount = appliedVoucher?.discount_amount ?? 0;
   const boxSubtotal = Math.max((builder?.totals.grand_total || 0) - voucherDiscount, 0);
   const grandTotal = boxSubtotal + (shippingFee ?? 0);
@@ -767,13 +783,37 @@ export default function GiftBuildPage() {
                         </select>
                       </div>
                     </div>
-                    <Input
-                      label="Delivery zone / area *"
-                      required
-                      value={checkout.recipient_zone}
-                      onChange={(e) => setCheckout({ ...checkout, recipient_zone: e.target.value })}
-                      fullWidth
-                    />
+                    {lgaOptions.length > 0 ? (
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                          Area / LGA *
+                        </label>
+                        <select
+                          required
+                          value={checkout.recipient_zone}
+                          onChange={(e) => setCheckout({ ...checkout, recipient_zone: e.target.value })}
+                          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        >
+                          <option value="">Select area</option>
+                          {lgaOptions.map((o) => (
+                            <option key={o.lga} value={o.lga}>
+                              {o.lga}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-1.5 text-xs text-gray-500">
+                          Helps us offer same-day local rider delivery where available.
+                        </p>
+                      </div>
+                    ) : (
+                      <Input
+                        label="Delivery zone / area *"
+                        required
+                        value={checkout.recipient_zone}
+                        onChange={(e) => setCheckout({ ...checkout, recipient_zone: e.target.value })}
+                        fullWidth
+                      />
+                    )}
                   </div>
                 </GiftCheckoutSection>
 
@@ -781,7 +821,6 @@ export default function GiftBuildPage() {
                   shippingFee={shippingQuote.quotedShipping}
                   loading={shippingQuote.loading}
                   error={shippingQuote.error}
-                  zone={shippingQuote.zone}
                   hasAddress={hasRecipientAddress}
                 />
 

@@ -13,6 +13,7 @@ import { ensurePaystackReady } from '@/lib/paystack';
 import { toast } from 'sonner';
 import { trackGiftBeginCheckout, trackGiftPurchase } from '@/lib/analytics/gifts';
 import { useGiftShippingQuote } from '@/hooks/use-gift-shipping-quote';
+import { useLocationLgas } from '@/hooks/use-location-lgas';
 import GiftPromoCode from '@/components/gifts/gift-promo-code';
 import GiftDeliveryScheduleFields from '@/components/gifts/gift-delivery-schedule-fields';
 import {
@@ -95,7 +96,7 @@ function GiftCheckoutForm() {
     };
   }, []);
 
-  const { shippingFee, loading: shippingLoading, error: shippingError, quotedShipping, zone } =
+  const { shippingFee, loading: shippingLoading, error: shippingError, quotedShipping } =
     useGiftShippingQuote({
       deliveryState: form.recipient_state,
       deliveryCity: form.recipient_city,
@@ -103,6 +104,25 @@ function GiftCheckoutForm() {
       orderValue: box?.list_price,
       enabled: Boolean(box),
     });
+
+  // Recipient's area/LGA — same picker as regular checkout, sourced from the
+  // Vendor Locations admin page. Falls back to free text for recipients
+  // outside a hub-serviced city (gift boxes can ship anywhere in Nigeria).
+  const lgaOptions = useLocationLgas(form.recipient_state, form.recipient_city);
+  // Unlike regular checkout's optional picker, this field stays required and
+  // falls back to free text when the city isn't hub-serviced — only clear a
+  // stale selection when we're actually in dropdown mode (lgaOptions.length
+  // > 0); otherwise the field is free text and every keystroke would get
+  // wiped by this effect.
+  useEffect(() => {
+    if (
+      lgaOptions.length > 0 &&
+      form.recipient_zone &&
+      !lgaOptions.some((o) => o.lga === form.recipient_zone)
+    ) {
+      setForm((prev) => ({ ...prev, recipient_zone: '' }));
+    }
+  }, [lgaOptions, form.recipient_zone]);
 
   const voucherDiscount = appliedVoucher?.discount_amount ?? 0;
   const discountedSubtotal = Math.max((box?.list_price || 0) - voucherDiscount, 0);
@@ -372,13 +392,37 @@ function GiftCheckoutForm() {
                   </select>
                 </div>
               </div>
-              <Input
-                label="Delivery zone / area *"
-                required
-                value={form.recipient_zone}
-                onChange={(e) => update('recipient_zone', e.target.value)}
-                fullWidth
-              />
+              {lgaOptions.length > 0 ? (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Area / LGA *
+                  </label>
+                  <select
+                    required
+                    value={form.recipient_zone}
+                    onChange={(e) => update('recipient_zone', e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select area</option>
+                    {lgaOptions.map((o) => (
+                      <option key={o.lga} value={o.lga}>
+                        {o.lga}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    Helps us offer same-day local rider delivery where available.
+                  </p>
+                </div>
+              ) : (
+                <Input
+                  label="Delivery zone / area *"
+                  required
+                  value={form.recipient_zone}
+                  onChange={(e) => update('recipient_zone', e.target.value)}
+                  fullWidth
+                />
+              )}
             </div>
           </GiftCheckoutSection>
 
@@ -386,7 +430,6 @@ function GiftCheckoutForm() {
             shippingFee={quotedShipping}
             loading={shippingLoading}
             error={shippingError}
-            zone={zone}
             hasAddress={hasRecipientAddress}
           />
 

@@ -33,6 +33,7 @@ import { useCartStore } from '@/store/cart-store';
 import { jloItemIdsFromCartLine } from '@/lib/jlo/line-identity';
 import { ensurePaystackReady, resetPaystackLoader } from '@/lib/paystack';
 import { logActivity } from '@/lib/logActivity';
+import { useLocationLgas } from '@/hooks/use-location-lgas';
 import {
   clearPendingCampaignVoucher,
   readPendingCampaignVoucher,
@@ -225,12 +226,27 @@ export default function CheckoutPage() {
     address2: '',
     city: '',
     state: '',
+    lga: '',
     postcode: '',
     country: 'NG',
     notes: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Optional LGA picker: only appears when the typed city matches a
+  // hub-serviced location (Vendor Locations admin page). Picking the right
+  // LGA is what makes local-rider delivery eligibility resolve correctly —
+  // a plain city match alone can miss areas like Effurun that fall under
+  // the Warri hub's territory but aren't the literal hub city name.
+  const lgaOptions = useLocationLgas(formData.state, formData.city);
+
+  // Clear a stale LGA selection if the city/state no longer matches it
+  useEffect(() => {
+    if (formData.lga && !lgaOptions.some((o) => o.lga === formData.lga)) {
+      setFormData((prev) => ({ ...prev, lga: '' }));
+    }
+  }, [lgaOptions, formData.lga]);
 
   const applyShippingAddress = useCallback((): void => {
     if (!defaultShippingAddress) return;
@@ -1242,6 +1258,9 @@ export default function CheckoutPage() {
             key: '_hub_name',
             value: items[0]?.hubName || 'Default Hub',
           },
+          ...(!isLocalCollection && formData.lga
+            ? [{ key: '_delivery_lga', value: formData.lga }]
+            : []),
           ...(selectedOption?.zoneId
             ? [{ key: '_jlo_destination_zone_id', value: String(selectedOption.zoneId) }]
             : []),
@@ -1650,6 +1669,30 @@ export default function CheckoutPage() {
                       )}
                     </div>
                   </div>
+
+                  {lgaOptions.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Area / LGA
+                      </label>
+                      <select
+                        name="lga"
+                        value={formData.lga}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="">Select your area (optional)</option>
+                        {lgaOptions.map((o) => (
+                          <option key={o.lga} value={o.lga}>
+                            {o.lga}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1.5 text-xs text-gray-500">
+                        Helps us offer same-day local rider delivery where available.
+                      </p>
+                    </div>
+                  )}
 
                   <Input
                     label="Postal Code (optional)"

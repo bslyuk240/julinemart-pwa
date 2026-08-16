@@ -26,13 +26,15 @@ export default function JulineMartProtectBadge({
   if (variant === 'compact') {
     return (
       <div
-        className={`flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 ${className}`}
+        className={`flex items-center gap-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-50/30 px-3.5 py-3 ring-1 ring-emerald-100 ${className}`}
       >
-        <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" aria-hidden />
-        <div className="min-w-0">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-emerald-600/10">
+          <ShieldCheck className="h-5 w-5 text-emerald-600" aria-hidden />
+        </div>
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-emerald-900">JulineMart Protect</p>
-          <p className="text-[11px] leading-snug text-emerald-800">
-            Eligible purchases are covered against non-delivery and significant order issues.
+          <p className="mt-0.5 text-[11px] leading-snug text-emerald-700">
+            Covered against non-delivery and significant order issues
           </p>
         </div>
       </div>

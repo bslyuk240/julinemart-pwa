@@ -29,13 +29,11 @@ export function GiftShippingMethodSection({
   shippingFee,
   loading,
   error,
-  zone,
   hasAddress,
 }: {
   shippingFee: number | null;
   loading: boolean;
   error: string | null;
-  zone: string | null;
   hasAddress: boolean;
 }) {
   return (
@@ -57,10 +55,6 @@ export function GiftShippingMethodSection({
                       : formatPrice(shippingFee ?? 0)}
             </p>
           </div>
-          <p className="mt-1 text-sm text-gray-600">
-            Packed at the gift hub and delivered to your recipient&apos;s address.
-          </p>
-          {zone ? <p className="mt-1 text-xs text-gray-500">Delivery zone: {zone}</p> : null}
         </div>
       </label>
       {loading ? <p className="mt-2 text-sm text-gray-500">Calculating delivery fee…</p> : null}

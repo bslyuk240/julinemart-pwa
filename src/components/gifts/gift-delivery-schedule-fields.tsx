@@ -45,47 +45,46 @@ export default function GiftDeliveryScheduleFields({
       icon={<CalendarDays className="h-6 w-6 text-primary-600" />}
       title="Delivery schedule"
     >
-      <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Preferred delivery date <span className="text-rose-600">*</span>
+          </label>
+          <Input
+            type="date"
+            required
+            min={earliestDate || undefined}
+            max={latestDate || undefined}
+            value={requestedDeliveryDate}
+            onChange={(e) => onRequestedDeliveryDateChange(e.target.value)}
+            disabled={loading && !earliestDate}
+          />
+          {loading ? (
+            <p className="mt-1 text-xs text-gray-500">Checking earliest available date…</p>
+          ) : error ? (
+            <p className="mt-1 text-xs text-amber-700">{error}</p>
+          ) : earliestDate ? (
+            <p className="mt-1 text-xs text-gray-500">
+              Earliest: {earliestDate}
+              {latestDate ? ` · Latest: ${latestDate}` : null}
+              {hint ? ` · ${hint}` : null}
+            </p>
+          ) : null}
+        </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Preferred delivery date <span className="text-rose-600">*</span>
-        </label>
-        <Input
-          type="date"
-          required
-          min={earliestDate || undefined}
-          max={latestDate || undefined}
-          value={requestedDeliveryDate}
-          onChange={(e) => onRequestedDeliveryDateChange(e.target.value)}
-          disabled={loading && !earliestDate}
-        />
-        {loading ? (
-          <p className="mt-1 text-xs text-gray-500">Checking earliest available date…</p>
-        ) : error ? (
-          <p className="mt-1 text-xs text-amber-700">{error}</p>
-        ) : earliestDate ? (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Occasion date <span className="font-normal text-gray-500">(optional)</span>
+          </label>
+          <Input
+            type="date"
+            value={occasionDate}
+            onChange={(e) => onOccasionDateChange(e.target.value)}
+          />
           <p className="mt-1 text-xs text-gray-500">
-            Earliest: {earliestDate}
-            {latestDate ? ` · Latest: ${latestDate}` : null}
-            {hint ? ` · ${hint}` : null}
+            e.g. birthday or anniversary — helps our team schedule the surprise.
           </p>
-        ) : null}
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Occasion date <span className="font-normal text-gray-500">(optional)</span>
-        </label>
-        <Input
-          type="date"
-          value={occasionDate}
-          onChange={(e) => onOccasionDateChange(e.target.value)}
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          e.g. birthday or anniversary — helps our team schedule the surprise.
-        </p>
-      </div>
+        </div>
       </div>
     </GiftCheckoutSection>
   );
