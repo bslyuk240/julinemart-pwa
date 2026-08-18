@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { jloItemIdsFromOrderLineItem } from '@/lib/jlo/line-identity';
+import { getRouteUserFromRequest } from '@/lib/supabase/route-auth';
 
 function customisationFromLineMeta(item: {
   meta_data?: { key: string; value: unknown }[];
@@ -116,12 +117,14 @@ function adaptOrder(o: any) {
 }
 
 export async function GET(request: Request) {
-  const email = new URL(request.url).searchParams.get('email');
-  if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
+  const user = await getRouteUserFromRequest(request);
+  if (!user?.email) {
+    return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
+  }
 
   if (!JLO_BASE) return NextResponse.json({ orders: [] });
 
-  const res = await fetch(`${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(email)}`);
+  const res = await fetch(`${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(user.email)}`);
   const json = await res.json().catch(() => ({ success: false, data: [] }));
 
   if (!res.ok || !json.success) return NextResponse.json({ orders: [] });

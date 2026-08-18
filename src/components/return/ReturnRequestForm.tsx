@@ -8,6 +8,7 @@ import { ArrowLeft, Package, AlertCircle, Loader2, MapPin, Image, Info } from 'l
 import { Order } from '@/types/order';
 import { formatPrice } from '@/lib/utils/format-price';
 import { JloReturn, JloReturnShipment, formatJloRefundStatus, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
+import { getAuthHeader } from '@/lib/supabase/client';
 
 interface ReturnRequestFormProps {
   orderId: number;
@@ -136,7 +137,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const fetchOrder = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/orders/${orderId}`);
+      const res = await fetch(`/api/orders/${orderId}`, { headers: await getAuthHeader() });
       if (!res.ok) throw new Error('Failed to fetch order');
       const data = await res.json();
 

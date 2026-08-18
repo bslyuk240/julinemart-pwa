@@ -4,7 +4,6 @@ export type GiftBoxReview = {
   review: string;
   rating: number;
   reviewer: string;
-  reviewer_email: string;
   verified: boolean;
   status: string;
 };

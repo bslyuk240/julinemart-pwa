@@ -21,7 +21,6 @@ function mapRow(row: {
     review: row.body,
     rating: row.rating,
     reviewer: row.reviewer_name,
-    reviewer_email: row.reviewer_email,
     verified: row.verified_purchase,
     status: row.status,
   };

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getJloBaseUrl } from '@/lib/jlo/returns';
+import { getRouteUserFromRequest } from '@/lib/supabase/route-auth';
 
 const JLO_BASE = getJloBaseUrl();
 
@@ -147,51 +148,43 @@ function adaptOrder(o: any) {
   };
 }
 
-async function fetchSupabaseOrder(request: Request, id: string): Promise<any | null> {
+async function fetchSupabaseOrder(id: string, ownerEmail: string): Promise<any | null> {
   if (!JLO_BASE) return null;
 
-  const url = new URL(request.url);
-  const email = url.searchParams.get('email') || '';
-  let supabaseOrder: any = null;
-
-  if (email) {
-    const res = await fetch(
-      `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(email)}&order_id=${encodeURIComponent(id)}`
-    );
-    if (res.ok) {
-      const json = await res.json().catch(() => null);
-      if (json?.success && json.data) supabaseOrder = json.data;
-    }
+  // Primary: ask JLO for this owner's own order by id — works regardless of
+  // whether `id` is a Supabase UUID or a legacy order number, since it's
+  // scoped by the authenticated customer's email.
+  const res = await fetch(
+    `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(ownerEmail)}&order_id=${encodeURIComponent(id)}`
+  );
+  if (res.ok) {
+    const json = await res.json().catch(() => null);
+    if (json?.success && json.data) return json.data;
   }
 
-  if (!supabaseOrder) {
-    const isUUID = /^[0-9a-f-]{36}$/i.test(id);
-    if (isUUID) {
-      const adminRes = await fetch(`${JLO_BASE}/.netlify/functions/orders/${id}`);
-      if (adminRes.ok) {
-        const adminJson = await adminRes.json().catch(() => null);
-        if (adminJson?.success && adminJson.data) {
-          const orderRaw = adminJson.data;
-          if (orderRaw.customer_email) {
-            const itemsRes = await fetch(
-              `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(orderRaw.customer_email)}&order_id=${encodeURIComponent(id)}`
-            );
-            if (itemsRes.ok) {
-              const itemsJson = await itemsRes.json().catch(() => null);
-              if (itemsJson?.success && itemsJson.data) {
-                supabaseOrder = itemsJson.data;
-              }
-            }
-          }
-          if (!supabaseOrder) {
-            supabaseOrder = { ...orderRaw, items: [] };
-          }
+  // Fallback: admin lookup by UUID. Only accept the result if it actually
+  // belongs to the authenticated caller — this must never be trusted blind,
+  // or any signed-in user could read any other customer's order by UUID.
+  const isUUID = /^[0-9a-f-]{36}$/i.test(id);
+  if (isUUID) {
+    const adminRes = await fetch(`${JLO_BASE}/.netlify/functions/orders/${id}`);
+    if (adminRes.ok) {
+      const adminJson = await adminRes.json().catch(() => null);
+      const orderRaw = adminJson?.success ? adminJson.data : null;
+      if (orderRaw?.customer_email?.toLowerCase() === ownerEmail.toLowerCase()) {
+        const itemsRes = await fetch(
+          `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(orderRaw.customer_email)}&order_id=${encodeURIComponent(id)}`
+        );
+        if (itemsRes.ok) {
+          const itemsJson = await itemsRes.json().catch(() => null);
+          if (itemsJson?.success && itemsJson.data) return itemsJson.data;
         }
+        return { ...orderRaw, items: [] };
       }
     }
   }
 
-  return supabaseOrder;
+  return null;
 }
 
 export async function GET(
@@ -207,8 +200,13 @@ export async function GET(
     );
   }
 
+  const user = await getRouteUserFromRequest(request);
+  if (!user?.email) {
+    return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
+  }
+
   try {
-    const supabaseOrder = await fetchSupabaseOrder(request, id);
+    const supabaseOrder = await fetchSupabaseOrder(id, user.email);
     if (!supabaseOrder) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }

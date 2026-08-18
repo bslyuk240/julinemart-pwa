@@ -17,6 +17,7 @@ import { JloReturn, formatJloRefundStatus, formatJloReturnStatus, buildFezTracki
 import type { Order as WooOrder } from '@/types/order';
 import { ensurePaystackReady, resetPaystackLoader } from '@/lib/paystack';
 import { logActivity } from '@/lib/logActivity';
+import { getAuthHeader } from '@/lib/supabase/client';
 
 type OrderDetail = WooOrder & {
   subtotal?: string;
@@ -79,7 +80,7 @@ export default function OrderDetailPage() {
   const loadOrder = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/orders/${orderId}`);
+      const res = await fetch(`/api/orders/${orderId}`, { headers: await getAuthHeader() });
       if (!res.ok) throw new Error('Failed to fetch order');
       const { order: orderData, returns: jloReturns } = await res.json();
       if (orderData) {

@@ -46,3 +46,10 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 // Singleton browser client — safe to import in any client component
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+/** Bearer header for the signed-in customer's session, for calling auth-gated API routes. */
+export async function getAuthHeader(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
