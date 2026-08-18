@@ -146,12 +146,7 @@ export default function CustomiseProductPanel({
                 min={field.min}
                 max={field.max}
                 value={String(values[field.id] ?? '')}
-                onChange={(e) =>
-                  setField(
-                    field.id,
-                    field.type === 'number' ? Number(e.target.value) : e.target.value
-                  )
-                }
+                onChange={(e) => setField(field.id, e.target.value)}
               />
             )}
           </div>

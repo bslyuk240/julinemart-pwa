@@ -87,7 +87,10 @@ export default function VendorStorePage() {
         source: string;
       };
 
-      if (data.vendor) setVendor(data.vendor);
+      // Vendor info (incl. rating) is only computed by the API on page 1 —
+      // it doesn't change across pagination, so don't overwrite it with a
+      // later page's response, which omits the rating to avoid recomputing it.
+      if (data.vendor && !append) setVendor(data.vendor);
 
       try {
         const trustRes = await fetch(`/api/vendor/${encodeURIComponent(vendorId)}/trust`);

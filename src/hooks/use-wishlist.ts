@@ -1,21 +1,17 @@
-import { useEffect, useState } from 'react';
 import { useWishlistStore } from '@/store/wishlist-store';
+import { useHydratedFavorites } from '@/lib/create-favorites-store';
 
 export function useWishlist() {
-  const [hasMounted, setHasMounted] = useState(false);
-  useEffect(() => { setHasMounted(true); }, []);
-
   const items = useWishlistStore((state) => state.items);
   const addItem = useWishlistStore((state) => state.addItem);
   const removeItem = useWishlistStore((state) => state.removeItem);
-  const clearWishlist = useWishlistStore((state) => state.clearWishlist);
+  const isSaved = useWishlistStore((state) => state.isSaved);
+  const clear = useWishlistStore((state) => state.clear);
 
-  // Return 0 on server / before hydration to match SSR HTML
-  const itemCount = hasMounted ? items.length : 0;
+  const { hasMounted, items: visibleItems } = useHydratedFavorites(items);
+  const itemCount = visibleItems.length;
 
-  const isInWishlist = (productId: number) => {
-    return hasMounted && items.some((item) => item.productId === productId);
-  };
+  const isInWishlist = (productId: number) => hasMounted && isSaved(productId);
 
   const toggleWishlist = (productId: number, productData?: any) => {
     if (isInWishlist(productId)) {
@@ -30,10 +26,10 @@ export function useWishlist() {
   };
 
   return {
-    items: hasMounted ? items : [],
+    items: visibleItems,
     addItem,
     removeItem,
-    clearWishlist,
+    clearWishlist: clear,
     itemCount,
     isInWishlist,
     toggleWishlist,

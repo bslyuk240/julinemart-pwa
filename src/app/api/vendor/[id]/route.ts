@@ -81,17 +81,21 @@ export async function GET(
     const firstRow = body.data[0] as any;
     const vendorRow = firstRow?.vendor ?? null;
 
-    // Fetch vendor rating from product_reviews using the vendor's UUID
+    // Fetch vendor rating from product_reviews using the vendor's UUID.
+    // The rating doesn't change per page, so only compute it on page 1 —
+    // the frontend keeps the vendor object from that first fetch across
+    // "load more" pagination and never needs it recomputed.
     let vendorRating: { avg: string; count: number } | null = null;
     const vendorUuid: string | null = vendorRow?.id ?? null;
-    if (vendorUuid) {
+    if (vendorUuid && page === 1) {
       try {
         const supabase = getSupabaseServerClient();
         const { data: ratingData } = await supabase
           .from('product_reviews')
           .select('rating')
           .eq('vendor_id', vendorUuid)
-          .eq('status', 'approved');
+          .eq('status', 'approved')
+          .limit(2000);
         if (ratingData && ratingData.length > 0) {
           const avg = ratingData.reduce((s, r) => s + Number(r.rating), 0) / ratingData.length;
           vendorRating = { avg: avg.toFixed(1), count: ratingData.length };

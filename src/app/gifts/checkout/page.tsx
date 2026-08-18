@@ -284,7 +284,9 @@ function GiftCheckoutForm() {
         </div>
         <div className="flex justify-between border-t pt-3 text-lg font-bold">
           <span>Total</span>
-          <span className="text-primary-600">{formatPrice(total)}</span>
+          <span className="text-primary-600">
+            {shippingFee == null && hasRecipientAddress && !shippingLoading ? '—' : formatPrice(total)}
+          </span>
         </div>
       </div>
 
@@ -498,7 +500,9 @@ function GiftCheckoutForm() {
       <div className="container-custom flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs text-gray-500">Total</p>
-          <p className="text-lg font-bold text-primary-700">{formatPrice(total)}</p>
+          <p className="text-lg font-bold text-primary-700">
+            {shippingFee == null && hasRecipientAddress && !shippingLoading ? '—' : formatPrice(total)}
+          </p>
         </div>
         <Button
           type="submit"

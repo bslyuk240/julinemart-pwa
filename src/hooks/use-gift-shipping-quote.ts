@@ -62,7 +62,7 @@ export function useGiftShippingQuote(params: GiftShippingQuoteParams & { enabled
     rest.orderValue,
   ]);
 
-  const resolvedShipping = shippingFee ?? (loading ? null : FALLBACK_SHIPPING);
+  const resolvedShipping = shippingFee ?? (loading || error ? null : FALLBACK_SHIPPING);
 
   return {
     shippingFee: resolvedShipping,

@@ -710,7 +710,7 @@ export default function GiftBuildPage() {
                       label="Your full name *"
                       required
                       value={checkout.customer_name}
-                      onChange={(e) => setCheckout({ ...checkout, customer_name: e.target.value })}
+                      onChange={(e) => setCheckout((prev) => ({ ...prev, customer_name: e.target.value }))}
                       fullWidth
                     />
                     <Input
@@ -718,7 +718,7 @@ export default function GiftBuildPage() {
                       type="email"
                       required
                       value={checkout.customer_email}
-                      onChange={(e) => setCheckout({ ...checkout, customer_email: e.target.value })}
+                      onChange={(e) => setCheckout((prev) => ({ ...prev, customer_email: e.target.value }))}
                       fullWidth
                     />
                     <Input
@@ -726,7 +726,7 @@ export default function GiftBuildPage() {
                       type="tel"
                       required
                       value={checkout.customer_phone}
-                      onChange={(e) => setCheckout({ ...checkout, customer_phone: e.target.value })}
+                      onChange={(e) => setCheckout((prev) => ({ ...prev, customer_phone: e.target.value }))}
                       fullWidth
                     />
                   </div>
@@ -741,21 +741,21 @@ export default function GiftBuildPage() {
                       label="Recipient name *"
                       required
                       value={checkout.recipient_name}
-                      onChange={(e) => setCheckout({ ...checkout, recipient_name: e.target.value })}
+                      onChange={(e) => setCheckout((prev) => ({ ...prev, recipient_name: e.target.value }))}
                       fullWidth
                     />
                     <Input
                       label="Recipient phone *"
                       required
                       value={checkout.recipient_phone}
-                      onChange={(e) => setCheckout({ ...checkout, recipient_phone: e.target.value })}
+                      onChange={(e) => setCheckout((prev) => ({ ...prev, recipient_phone: e.target.value }))}
                       fullWidth
                     />
                     <Input
                       label="Delivery address *"
                       required
                       value={checkout.recipient_address}
-                      onChange={(e) => setCheckout({ ...checkout, recipient_address: e.target.value })}
+                      onChange={(e) => setCheckout((prev) => ({ ...prev, recipient_address: e.target.value }))}
                       fullWidth
                     />
                     <div className="grid gap-4 md:grid-cols-2">
@@ -763,7 +763,7 @@ export default function GiftBuildPage() {
                         label="City *"
                         required
                         value={checkout.recipient_city}
-                        onChange={(e) => setCheckout({ ...checkout, recipient_city: e.target.value })}
+                        onChange={(e) => setCheckout((prev) => ({ ...prev, recipient_city: e.target.value }))}
                         fullWidth
                       />
                       <div>
@@ -771,7 +771,7 @@ export default function GiftBuildPage() {
                         <select
                           required
                           value={checkout.recipient_state}
-                          onChange={(e) => setCheckout({ ...checkout, recipient_state: e.target.value })}
+                          onChange={(e) => setCheckout((prev) => ({ ...prev, recipient_state: e.target.value }))}
                           className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
                         >
                           <option value="">Select state</option>
@@ -791,7 +791,7 @@ export default function GiftBuildPage() {
                         <select
                           required
                           value={checkout.recipient_zone}
-                          onChange={(e) => setCheckout({ ...checkout, recipient_zone: e.target.value })}
+                          onChange={(e) => setCheckout((prev) => ({ ...prev, recipient_zone: e.target.value }))}
                           className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
                         >
                           <option value="">Select area</option>
@@ -810,7 +810,7 @@ export default function GiftBuildPage() {
                         label="Delivery zone / area *"
                         required
                         value={checkout.recipient_zone}
-                        onChange={(e) => setCheckout({ ...checkout, recipient_zone: e.target.value })}
+                        onChange={(e) => setCheckout((prev) => ({ ...prev, recipient_zone: e.target.value }))}
                         fullWidth
                       />
                     )}
@@ -839,9 +839,9 @@ export default function GiftBuildPage() {
                   requestedDeliveryDate={checkout.requested_delivery_date}
                   occasionDate={checkout.occasion_date}
                   onRequestedDeliveryDateChange={(v) =>
-                    setCheckout({ ...checkout, requested_delivery_date: v })
+                    setCheckout((prev) => ({ ...prev, requested_delivery_date: v }))
                   }
-                  onOccasionDateChange={(v) => setCheckout({ ...checkout, occasion_date: v })}
+                  onOccasionDateChange={(v) => setCheckout((prev) => ({ ...prev, occasion_date: v }))}
                   enabled={Boolean(token)}
                 />
 
@@ -851,14 +851,14 @@ export default function GiftBuildPage() {
                       className="min-h-[100px] w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                       placeholder="Write a personal message for the card…"
                       value={checkout.gift_message}
-                      onChange={(e) => setCheckout({ ...checkout, gift_message: e.target.value })}
+                      onChange={(e) => setCheckout((prev) => ({ ...prev, gift_message: e.target.value }))}
                       maxLength={500}
                     />
                     <label className="flex items-center gap-2 text-sm text-gray-700">
                       <input
                         type="checkbox"
                         checked={checkout.sender_visible}
-                        onChange={(e) => setCheckout({ ...checkout, sender_visible: e.target.checked })}
+                        onChange={(e) => setCheckout((prev) => ({ ...prev, sender_visible: e.target.checked }))}
                         className="h-4 w-4 text-primary-600"
                       />
                       Show my name on the gift card

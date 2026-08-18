@@ -54,6 +54,10 @@ interface ShippingOption {
 
 type FulfillmentMethod = 'delivery' | 'store_pickup' | 'reservation';
 
+function isLocalCollectionMethod(method: FulfillmentMethod): boolean {
+  return method === 'store_pickup' || method === 'reservation';
+}
+
 
 const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
 
@@ -114,6 +118,7 @@ export default function CheckoutPage() {
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
   const [shippingError, setShippingError] = useState<string | null>(null);
   const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod>('delivery');
+  const isLocalCollection = isLocalCollectionMethod(fulfillmentMethod);
   const [storePickupStore, setStorePickupStore] = useState<{
     area?: string;
     city?: string;
@@ -163,9 +168,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!singleVendorId) {
       setStorePickupStore(null);
-      setFulfillmentMethod((prev) =>
-        prev === 'store_pickup' || prev === 'reservation' ? 'delivery' : prev
-      );
+      setFulfillmentMethod((prev) => (isLocalCollectionMethod(prev) ? 'delivery' : prev));
       return;
     }
 
@@ -184,9 +187,7 @@ export default function CheckoutPage() {
           });
         } else {
           setStorePickupStore(null);
-          setFulfillmentMethod((prev) =>
-        prev === 'store_pickup' || prev === 'reservation' ? 'delivery' : prev
-      );
+          setFulfillmentMethod((prev) => (isLocalCollectionMethod(prev) ? 'delivery' : prev));
         }
       })
       .catch(() => {
@@ -199,11 +200,11 @@ export default function CheckoutPage() {
   }, [singleVendorId]);
 
   useEffect(() => {
-    if (fulfillmentMethod === 'store_pickup' || fulfillmentMethod === 'reservation') {
+    if (isLocalCollection) {
       setShippingCost(0);
       setShippingError(null);
     }
-  }, [fulfillmentMethod]);
+  }, [isLocalCollection]);
 
   useEffect(() => {
     const pref = readCheckoutFulfillmentPref();
@@ -867,7 +868,7 @@ export default function CheckoutPage() {
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
-    if (fulfillmentMethod !== 'store_pickup' && fulfillmentMethod !== 'reservation') {
+    if (!isLocalCollection) {
       if (!formData.address1.trim()) newErrors.address1 = 'Address is required';
       if (!formData.city.trim()) newErrors.city = 'City is required';
       if (!formData.state.trim()) newErrors.state = 'State is required';
@@ -1084,8 +1085,6 @@ export default function CheckoutPage() {
     }
 
     const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
-    const isLocalCollection =
-      fulfillmentMethod === 'store_pickup' || fulfillmentMethod === 'reservation';
     const isReservation = fulfillmentMethod === 'reservation';
     if (
       !isLocalCollection &&
@@ -1459,22 +1458,18 @@ export default function CheckoutPage() {
     formData.email.trim() &&
     formData.phone.trim() &&
     formData.country.trim() &&
-    (fulfillmentMethod === 'store_pickup' ||
-      fulfillmentMethod === 'reservation' ||
+    (isLocalCollection ||
       (formData.address1.trim() && formData.city.trim() && formData.state.trim()))
   );
   const shippingReady =
-    fulfillmentMethod === 'store_pickup' ||
-    fulfillmentMethod === 'reservation' ||
+    isLocalCollection ||
     (Boolean(selectedOption) &&
       (selectedOption?.methodId !== 'jlo_shipping' || shippingCost !== null));
   const isCheckoutReady =
     !loading &&
     hasRequiredAddress &&
     Boolean(selectedPayment) &&
-    (fulfillmentMethod === 'store_pickup' ||
-      fulfillmentMethod === 'reservation' ||
-      Boolean(selectedShipping)) &&
+    (isLocalCollection || Boolean(selectedShipping)) &&
     shippingReady &&
     !shippingError &&
     !isProcessing;
