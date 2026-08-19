@@ -6,11 +6,13 @@ import { Home, LayoutGrid, ShoppingCart, Heart, User } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useCart } from '@/hooks/use-cart';
 import { useWishlist } from '@/hooks/use-wishlist';
+import { useGiftBoxFavorites } from '@/hooks/use-gift-box-favorites';
 
 export default function BottomNav() {
   const pathname = usePathname();
   const { itemCount } = useCart();
   const { itemCount: wishlistCount } = useWishlist();
+  const { itemCount: giftBoxFavoriteCount } = useGiftBoxFavorites();
 
   const navItems = [
     {
@@ -33,7 +35,7 @@ export default function BottomNav() {
       name: 'Wishlist',
       href: '/wishlist',
       icon: Heart,
-      badge: wishlistCount,
+      badge: wishlistCount + giftBoxFavoriteCount,
     },
     {
       name: 'Account',
