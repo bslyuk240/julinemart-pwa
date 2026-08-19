@@ -3,14 +3,22 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, ShoppingCart, ArrowLeft, Trash2, Share2, X } from 'lucide-react';
+import { Gift, Heart, ShoppingCart, ArrowLeft, Trash2, Share2, X } from 'lucide-react';
 import PageHeader from '@/components/layout/page-header';
 import { useWishlist } from '@/hooks/use-wishlist';
+import { useGiftBoxFavorites } from '@/hooks/use-gift-box-favorites';
 import { useCart } from '@/hooks/use-cart';
 import { Button } from '@/components/ui/button';
 
 export default function WishlistPage() {
   const { items, removeItem, clearWishlist, itemCount } = useWishlist();
+  const {
+    items: giftBoxItems,
+    removeItem: removeGiftBoxFavorite,
+    clearFavorites: clearGiftBoxFavorites,
+    itemCount: giftBoxItemCount,
+  } = useGiftBoxFavorites();
+  const totalCount = itemCount + giftBoxItemCount;
   const { addItem } = useCart();
   const [addingToCart, setAddingToCart] = useState<number | null>(null);
 
@@ -73,12 +81,12 @@ export default function WishlistPage() {
       <div className="container-custom min-w-0 py-5 md:py-6">
         <PageHeader
           title="My Wishlist"
-          subtitle={`${itemCount} ${itemCount === 1 ? 'item' : 'items'} saved`}
+          subtitle={`${totalCount} ${totalCount === 1 ? 'item' : 'items'} saved`}
           backHref="/"
           backLabel="Continue shopping"
         />
 
-        {itemCount === 0 ? (
+        {totalCount === 0 ? (
           <div className="text-center py-12 md:py-16 bg-white rounded-2xl shadow-sm p-6">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
               <Heart className="w-8 h-8 text-gray-400" />
@@ -91,6 +99,7 @@ export default function WishlistPage() {
           </div>
         ) : (
           <div>
+            {itemCount > 0 && (
             <div className="bg-white rounded-2xl p-3 md:p-4 mb-4 md:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shadow-sm">
               <p className="text-xs md:text-sm text-gray-700">
                 <span className="font-semibold text-primary-600">{itemCount}</span>{' '}
@@ -114,7 +123,9 @@ export default function WishlistPage() {
                 </Button>
               </div>
             </div>
+            )}
 
+            {itemCount > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {items.map((item) => {
                 const isAddingThisItem = addingToCart === item.productId;
@@ -198,6 +209,87 @@ export default function WishlistPage() {
                 );
               })}
             </div>
+            )}
+
+            {giftBoxItemCount > 0 && (
+              <div className={itemCount > 0 ? 'mt-8' : undefined}>
+                <div className="bg-white rounded-2xl p-3 md:p-4 mb-4 md:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shadow-sm">
+                  <p className="text-xs md:text-sm text-gray-700">
+                    <span className="font-semibold text-primary-600">{giftBoxItemCount}</span>{' '}
+                    saved {giftBoxItemCount === 1 ? 'gift box' : 'gift boxes'}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (confirm('Are you sure you want to clear your saved gift boxes?')) {
+                        clearGiftBoxFavorites();
+                      }
+                    }}
+                  >
+                    Clear All
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {giftBoxItems.map((item) => (
+                    <div
+                      key={item.giftBoxId}
+                      className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
+                    >
+                      <div className="relative">
+                        <Link href={`/gifts/boxes/${item.slug}`}>
+                          <div className="relative aspect-square overflow-hidden bg-gray-100">
+                            {item.image ? (
+                              <Image
+                                src={item.image}
+                                alt={item.name}
+                                fill
+                                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 33vw, 25vw"
+                                className="object-cover transition-transform duration-200 hover:scale-105"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center">
+                                <Gift className="h-10 w-10 text-gray-300" />
+                              </div>
+                            )}
+                          </div>
+                        </Link>
+                        <button
+                          onClick={() => removeGiftBoxFavorite(item.giftBoxId)}
+                          className="absolute top-2 right-2 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-md transition-colors group"
+                          title="Remove from saved gift boxes"
+                        >
+                          <X className="w-4 h-4 text-gray-600 group-hover:text-red-600" />
+                        </button>
+                      </div>
+
+                      <div className="p-3 md:p-4">
+                        <Link href={`/gifts/boxes/${item.slug}`} className="block">
+                          <h3 className="font-semibold text-sm md:text-base text-gray-900 mb-1.5 line-clamp-2 hover:text-primary-600 transition-colors min-h-[40px]">
+                            {item.name}
+                          </h3>
+                        </Link>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-base md:text-lg font-bold text-primary-600">
+                            {`₦${item.price.toLocaleString()}`}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-2.5">
+                          Added {new Date(item.addedAt).toLocaleDateString()}
+                        </p>
+                        <Link href={`/gifts/boxes/${item.slug}`}>
+                          <Button variant="primary" size="sm" fullWidth>
+                            <Gift className="w-3.5 h-3.5 mr-1.5" />
+                            View gift box
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="text-center mt-8">
               <Link

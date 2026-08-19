@@ -5,6 +5,7 @@ import type { GiftBox } from '@/types/gifts';
 export function useGiftBoxFavorites() {
   const items = useGiftBoxFavoritesStore((state) => state.items);
   const toggleItem = useGiftBoxFavoritesStore((state) => state.toggleItem);
+  const removeItem = useGiftBoxFavoritesStore((state) => state.removeItem);
   const isSaved = useGiftBoxFavoritesStore((state) => state.isSaved);
   const clear = useGiftBoxFavoritesStore((state) => state.clear);
 
@@ -19,6 +20,7 @@ export function useGiftBoxFavorites() {
     itemCount,
     isFavorite,
     toggleFavorite,
+    removeItem,
     clearFavorites: clear,
   };
 }
