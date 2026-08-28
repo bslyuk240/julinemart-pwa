@@ -3,17 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, Menu, ShoppingCart, MessageCircle } from 'lucide-react';
+import { Search, Menu, ShoppingCart } from 'lucide-react';
 import MobileMenu from '@/components/layout/mobile-menu';
 import { useCart } from '@/hooks/use-cart';
 import { Product } from '@/types/product';
 import { useRouter } from 'next/navigation';
-import { trackWhatsappClick } from '@/lib/gtag';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
-
-// WhatsApp configuration
-const WHATSAPP_NUMBER = '2347048929309';
-const WHATSAPP_MESSAGE = 'Hello! I need help with shopping on JulineMart.';
 
 // Banner data interface
 interface BannerData {
@@ -138,17 +133,6 @@ export default function Header() {
     }
   };
 
-  // WhatsApp click handler
-  const handleWhatsAppClick = () => {
-    const encodedMessage = encodeURIComponent(WHATSAPP_MESSAGE);
-    const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
-    trackWhatsappClick({
-      linkUrl: whatsappUrl,
-      placement: 'header_button',
-    });
-    window.open(whatsappUrl, '_blank');
-  };
-
   return (
     <header className="safe-top sticky top-0 z-50 bg-white shadow-sm">
       {/* ==================== TOP BAR - NOW DYNAMIC (UPDATED!) ==================== */}
@@ -243,17 +227,6 @@ export default function Header() {
               </div>
             )}
           </div>
-
-          {/* ==================== WHATSAPP ICON ==================== */}
-          <button
-            onClick={handleWhatsAppClick}
-            className="hidden md:inline-flex items-center justify-center p-2 rounded-lg hover:bg-green-600 bg-green-500 text-white transition-colors"
-            aria-label="Chat on WhatsApp"
-            title="Chat with us on WhatsApp"
-          >
-            <MessageCircle className="w-5 h-5" />
-          </button>
-          {/* ======================================================= */}
 
           {/* Desktop cart icon */}
           <Link
