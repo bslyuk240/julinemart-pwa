@@ -15,6 +15,7 @@ const sectionTypeSchema = z.enum([
   'reviews',
   'media_gallery',
   'cta_footer',
+  'giveaway_entry',
 ]);
 
 const reviewScopeSchema = z.enum(['product', 'featured_products', 'vendor', 'category', 'mixed']);

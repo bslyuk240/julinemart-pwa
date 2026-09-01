@@ -1,5 +1,5 @@
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import type { Campaign, CampaignSection, CampaignSectionType, CampaignOfferConfig, CampaignSummary } from '@/types/campaigns';
+import type { Campaign, CampaignKind, CampaignSection, CampaignSectionType, CampaignOfferConfig, CampaignSummary } from '@/types/campaigns';
 
 interface CampaignRow {
   id: string;
@@ -22,6 +22,11 @@ interface CampaignRow {
   meta_seo: Record<string, unknown> | null;
   vendor_id?: string | null;
   approval_status?: string | null;
+  // Giveaway fields — deliberately NOT including secret_code here even though
+  // `select('*')` fetches it: mapCampaign() below is a whitelist, and the
+  // secret code must never be serialized into the page sent to the browser.
+  campaign_kind?: string | null;
+  grand_prize_description?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -75,6 +80,9 @@ function mapCampaign(row: CampaignRow, sections: SectionRow[]): Campaign {
     reviewRules: (row.review_rules as unknown as Campaign['reviewRules']) ?? { scope: 'mixed' },
     offerConfig: (row.offer_config as unknown as Campaign['offerConfig']) ?? undefined,
     metaSeo: (row.meta_seo as unknown as Campaign['metaSeo']) ?? undefined,
+
+    campaignKind: (row.campaign_kind as CampaignKind | undefined) ?? 'merchandising',
+    grandPrizeDescription: row.grand_prize_description ?? undefined,
 
     createdAt: row.created_at,
     updatedAt: row.updated_at,
