@@ -10,6 +10,7 @@ import ProductsSection from '@/components/campaigns/ProductsSection';
 import OfferSection from '@/components/campaigns/OfferSection';
 import ReviewsSection from '@/components/campaigns/ReviewsSection';
 import MediaGallerySection from '@/components/campaigns/MediaGallerySection';
+import GiveawayEntrySection from '@/components/campaigns/GiveawayEntrySection';
 
 // FE-303 — maps the campaign_sections payload to components in order.
 // Unrecognized/unsupported section types are silently skipped rather than
@@ -80,6 +81,19 @@ export default function SectionRenderer({
                 key={section.id}
                 campaignId={campaign.id}
                 items={section.config.items as CampaignMediaItem[] | undefined}
+                qrVariants={qrVariants}
+              />
+            );
+          case 'giveaway_entry':
+            return (
+              <GiveawayEntrySection
+                key={section.id}
+                campaignId={campaign.id}
+                slug={campaign.slug}
+                publicTitle={campaign.publicTitle}
+                startDate={campaign.startDate}
+                endDate={campaign.endDate}
+                grandPrizeDescription={campaign.grandPrizeDescription ?? undefined}
                 qrVariants={qrVariants}
               />
             );
