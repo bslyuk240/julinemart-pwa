@@ -151,6 +151,7 @@ export default function GiveawayEntrySection({
           email: email.trim() || undefined,
           location: location === 'Other' ? otherLocation.trim() : location || undefined,
           marketingOptIn,
+          acceptedTerms,
           source,
         }),
       });

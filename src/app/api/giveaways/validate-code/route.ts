@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { giveawayCodeSchema } from '@/lib/validations/giveaways';
 
 /**
  * Giveaway secret-code validation lives in the JLO Netlify function
@@ -14,10 +15,19 @@ const getJloCatalogBase = () =>
   );
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== 'object') {
+  const rawBody = await request.json().catch(() => null);
+  if (!rawBody || typeof rawBody !== 'object') {
     return NextResponse.json({ success: false, error: 'Invalid request body' }, { status: 400 });
   }
+
+  const parsed = giveawayCodeSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { success: false, error: 'Invalid request', details: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
+  const body = parsed.data;
 
   const jloBase = getJloCatalogBase();
   if (!jloBase) {
