@@ -314,7 +314,7 @@ export default function GiveawayEntrySection({
                 onChange={(e) => setMarketingOptIn(e.target.checked)}
                 className="mt-0.5"
               />
-              Send me JulineMart deals and Secret Drop alerts on WhatsApp
+              Send me JulineMart deals and Secret Drop alerts by WhatsApp and email
             </label>
 
             {formError && <p className="text-sm font-medium text-red-600">{formError}</p>}
