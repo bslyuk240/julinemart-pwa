@@ -21,7 +21,9 @@ export const giveawayEntrySchema = z
       .string()
       .trim()
       .regex(NG_PHONE_RE, 'Enter a valid Nigerian WhatsApp number'),
-    email: z.string().trim().email().optional().or(z.literal('')),
+    // Required — winner/reward notifications need a real address; a
+    // WhatsApp-only entry had no way to receive them.
+    email: z.string().trim().email('Enter a valid email address'),
     location: z.string().trim().max(80).optional(),
     marketingOptIn: z.boolean().optional(),
     acceptedTerms: z.literal(true, {

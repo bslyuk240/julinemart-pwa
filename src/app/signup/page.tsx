@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -24,6 +24,26 @@ export default function SignupPage() {
     confirmPassword: '',
     agreeToTerms: false,
   });
+  // Pre-fill from a link elsewhere in the app (e.g. after a giveaway entry) —
+  // read directly from window.location.search in an effect rather than
+  // next/navigation's useSearchParams(), which would require wrapping this
+  // page in a Suspense boundary it doesn't otherwise need.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const firstName = params.get('firstName');
+    const lastName = params.get('lastName');
+    const email = params.get('email');
+    const phone = params.get('phone');
+    if (!firstName && !lastName && !email && !phone) return;
+    setFormData((prev) => ({
+      ...prev,
+      firstName: firstName || prev.firstName,
+      lastName: lastName || prev.lastName,
+      email: email || prev.email,
+      phone: phone || prev.phone,
+    }));
+  }, []);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});

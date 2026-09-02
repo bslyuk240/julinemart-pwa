@@ -6,6 +6,15 @@ import { useCampaignTelemetry, type CampaignQrVariantRef } from '@/hooks/useCamp
 import { savePendingCampaignVoucher } from '@/components/campaigns/OfferSection';
 
 const LOCATION_OPTIONS = ['Warri', 'Asaba', 'Benin', 'Lagos', 'Abuja', 'Other'];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** "Chioma Okafor" -> { firstName: "Chioma", lastName: "Okafor" } — best-effort split for the signup pre-fill link. */
+function splitName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: '', lastName: '' };
+  if (parts.length === 1) return { firstName: parts[0], lastName: '' };
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+}
 
 type Phase = 'pending' | 'locked' | 'unlocked' | 'success' | 'duplicate' | 'closed';
 
@@ -132,6 +141,10 @@ export default function GiveawayEntrySection({
       setFormError('Enter a valid Nigerian WhatsApp number');
       return;
     }
+    if (!EMAIL_RE.test(email.trim())) {
+      setFormError('Enter a valid email address — we use it to send your prize if you win');
+      return;
+    }
     if (!acceptedTerms) {
       setFormError('You must accept the giveaway terms');
       return;
@@ -148,7 +161,7 @@ export default function GiveawayEntrySection({
           code: code.trim(),
           fullName: fullName.trim(),
           whatsappNumber: whatsappNumber.trim(),
-          email: email.trim() || undefined,
+          email: email.trim(),
           location: location === 'Other' ? otherLocation.trim() : location || undefined,
           marketingOptIn,
           acceptedTerms,
@@ -278,9 +291,10 @@ export default function GiveawayEntrySection({
               />
             )}
             <input
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email (optional)"
+              placeholder="Email — we'll send your prize here if you win"
               className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm"
             />
 
@@ -348,6 +362,25 @@ export default function GiveawayEntrySection({
               Explore JulineMart
             </a>
           )}
+
+          <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-4 text-left">
+            <p className="text-sm font-semibold text-gray-900">Want an easier way to claim it?</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Create a free JulineMart account and we&apos;ll have your details ready — faster checkout,
+              order tracking, and you won&apos;t need to retype anything.
+            </p>
+            <a
+              href={(() => {
+                const { firstName, lastName } = splitName(fullName);
+                const params = new URLSearchParams({ firstName, lastName, email: email.trim(), phone: whatsappNumber.trim() });
+                return `/signup?${params.toString()}`;
+              })()}
+              onClick={() => track('cta_click', { cta: 'giveaway_account_creation' })}
+              className="mt-3 block min-h-[40px] w-full rounded-full border border-purple-600 px-6 py-2 text-center text-sm font-bold leading-6 text-purple-700"
+            >
+              Create my JulineMart account
+            </a>
+          </div>
         </div>
       )}
 
