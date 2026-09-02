@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import GiftsCatalog from '@/components/gifts/gifts-catalog';
 import GiftAnalyticsBeacon from '@/components/gifts/gift-analytics-beacon';
+import AppDownloadSection from '@/components/layout/app-download-section';
 import { fetchGiftBoxes } from '@/lib/jlo/gifts';
 import type { GiftBudgetSlug } from '@/lib/gifts/discovery';
 
@@ -27,6 +28,9 @@ export default async function GiftsLandingPage({ searchParams }: Props) {
       <Suspense fallback={null}>
         <GiftsCatalog boxes={boxes} gfc={gfc} />
       </Suspense>
+      <div className="container-custom py-6">
+        <AppDownloadSection />
+      </div>
     </>
   );
 }
