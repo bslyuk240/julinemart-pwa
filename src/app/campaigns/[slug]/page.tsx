@@ -9,6 +9,7 @@ import PromoBanner from '@/components/campaigns/PromoBanner';
 import CampaignCountdown from '@/components/campaigns/CampaignCountdown';
 import SectionRenderer from '@/components/campaigns/SectionRenderer';
 import CampaignFooter from '@/components/campaigns/CampaignFooter';
+import AppDownloadSection from '@/components/layout/app-download-section';
 import StickyOfferBar from '@/components/campaigns/StickyOfferBar';
 import PageViewBeacon from '@/components/campaigns/PageViewBeacon';
 import CampaignOffline from '@/components/campaigns/CampaignOffline';
@@ -95,6 +96,7 @@ export default async function CampaignLandingPage({ params }: CampaignPageProps)
       <div className="mx-auto flex max-w-6xl flex-col gap-5 p-4 pb-28 sm:p-6 sm:pb-8">
         {campaign.endDate && <CampaignCountdown endDate={campaign.endDate} />}
         <SectionRenderer campaign={campaign} products={products} reviews={reviews} qrVariants={qrVariants} />
+        <AppDownloadSection />
         <CampaignFooter />
       </div>
       <StickyOfferBar offer={campaign.offerConfig} endDate={campaign.endDate} />
