@@ -37,3 +37,17 @@ export const giveawayEntrySchema = z
   });
 
 export type GiveawayEntryInput = z.infer<typeof giveawayEntrySchema>;
+
+// entryId is the giveaway_entries.id from the review link — it IS the access
+// control for the review composer, no login involved (see JLO's
+// giveaway-get-review-context.js for why that's safe: it's an unguessable uuid).
+export const giveawayReviewContextSchema = z.object({
+  entryId: z.string().uuid('Invalid review link'),
+});
+
+export const giveawayReviewSubmitSchema = z.object({
+  entryId: z.string().uuid('Invalid review link'),
+  rating: z.number().int().min(1, 'Pick a rating').max(5),
+  body: z.string().trim().min(10, 'Tell us a bit more (at least 10 characters)').max(2000),
+  reviewerName: z.string().trim().max(120).optional(),
+});
