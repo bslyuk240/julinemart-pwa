@@ -11,11 +11,42 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+interface KnowledgeEntry {
+  title: string;
+  content: string;
+}
+
+// Staff-authored knowledge managed from JLO's AI Assistant Knowledge page
+// (ai_assistant_knowledge table) — covers anything outside the three fixed
+// policy pages below, e.g. an active giveaway's rules. Failing open (empty
+// list) on error, same as the policy fetches, so a DB hiccup degrades the
+// assistant rather than breaking the chat.
+async function getActiveKnowledgeEntries(): Promise<KnowledgeEntry[]> {
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('ai_assistant_knowledge')
+      .select('title, content')
+      .eq('is_active', true)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('[support/message] failed to load ai_assistant_knowledge', error);
+      return [];
+    }
+    return (data || []) as KnowledgeEntry[];
+  } catch (error) {
+    console.error('[support/message] unexpected ai_assistant_knowledge error', error);
+    return [];
+  }
+}
+
 async function buildSystemPrompt(): Promise<string> {
-  const [shipping, refund, terms] = await Promise.allSettled([
+  const [shipping, refund, terms, knowledgeEntries] = await Promise.allSettled([
     getShippingPolicy(),
     getRefundPolicy(),
     getTermsAndConditions(),
+    getActiveKnowledgeEntries(),
   ]);
 
   const shippingText = shipping.status === 'fulfilled' && shipping.value
@@ -26,6 +57,10 @@ async function buildSystemPrompt(): Promise<string> {
     : 'Contact support for refund information.';
   const termsText = terms.status === 'fulfilled' && terms.value
     ? stripHtml(terms.value.content).slice(0, 2000)
+    : '';
+  const entries = knowledgeEntries.status === 'fulfilled' ? knowledgeEntries.value : [];
+  const knowledgeText = entries.length
+    ? entries.map((e) => `${e.title}:\n${e.content}`).join('\n\n')
     : '';
 
   return `You are a friendly and helpful customer support assistant for JulineMart, a Nigerian e-commerce marketplace.
@@ -45,6 +80,7 @@ ${refundText.slice(0, 1500)}
 
 --- TERMS ---
 ${termsText}
+${knowledgeText ? `\nAdditional things you know about:\n${knowledgeText}\n` : ''}
 
 Important rules:
 - Never invent order details, tracking numbers, or account information
