@@ -158,16 +158,24 @@ export async function POST(request: Request) {
 
     const influencerCouponCode = getMeta('_influencer_coupon_code') || undefined;
 
+    const rawCampaignVoucher = getMeta('_campaign_voucher_code');
+    const voucherCode =
+      rawCampaignVoucher != null && String(rawCampaignVoucher).trim() !== ''
+        ? String(rawCampaignVoucher).trim().toUpperCase()
+        : undefined;
+
     const getShippingLineMeta = (key: string) => {
       const lineMeta: any[] = shippingLines[0]?.meta_data || [];
       return lineMeta.find((m: any) => m.key === key)?.value ?? null;
     };
 
     // Checkout sends discounted total in shipping_lines[0].total when an influencer
-    // code applies; JLO create-order expects base shipping and re-applies the discount.
+    // code or a shipping-discounting campaign voucher applies; JLO create-order
+    // expects base shipping and re-applies the discount itself server-side from
+    // the influencer/voucher row — restore to base here so it isn't double-applied.
     let shippingFee =
       shippingLines.length > 0 ? parseFloat(shippingLines[0].total || '0') : 0;
-    if (influencerCouponCode) {
+    if (influencerCouponCode || voucherCode) {
       const originalRaw = getShippingLineMeta('_original_shipping_cost');
       if (originalRaw != null && String(originalRaw).trim() !== '') {
         const original = parseFloat(String(originalRaw));
@@ -176,12 +184,6 @@ export async function POST(request: Request) {
         }
       }
     }
-
-    const rawCampaignVoucher = getMeta('_campaign_voucher_code');
-    const voucherCode =
-      rawCampaignVoucher != null && String(rawCampaignVoucher).trim() !== ''
-        ? String(rawCampaignVoucher).trim().toUpperCase()
-        : undefined;
 
     // Map line items — same identity rules as voucherHelpers (src/lib/jlo/line-identity.ts)
     const items = lineItems

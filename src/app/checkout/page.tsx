@@ -141,6 +141,9 @@ export default function CheckoutPage() {
   const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
   const [voucherError, setVoucherError] = useState('');
   const [voucherDiscount, setVoucherDiscount] = useState(0);
+  // Separate from voucherDiscount (which discounts products) — set only when
+  // the voucher itself carries a shipping_discount_type other than 'none'.
+  const [voucherShippingDiscount, setVoucherShippingDiscount] = useState(0);
 
   // Prefill campaign voucher saved from "Save offer & shop" on a landing page.
   useEffect(() => {
@@ -272,8 +275,11 @@ export default function CheckoutPage() {
 
   const formatPrice = (price: number) => `NGN ${price.toLocaleString()}`;
   
-  // ✅ FIXED: Correct calculation - vouchers discount products, coupons discount shipping
-  const activeShippingDiscount = appliedCoupon ? shippingDiscount : 0; // Only influencer coupons discount shipping
+  // Vouchers discount products by default, but can also carry their own shipping
+  // discount (voucherShippingDiscount, from the voucher's shipping_discount_type).
+  // Influencer coupons only ever discount shipping. The two promo kinds are
+  // mutually exclusive (applying one clears the other), so at most one of these is nonzero.
+  const activeShippingDiscount = appliedCoupon ? shippingDiscount : appliedVoucher ? voucherShippingDiscount : 0;
   const discountedShipping = Math.max(0, (shippingCost || 0) - activeShippingDiscount);
   const discountedSubtotal = Math.max(0, subtotal - voucherDiscount); // Vouchers discount products
   const total = discountedSubtotal + discountedShipping + taxAmount;
@@ -1025,6 +1031,10 @@ export default function CheckoutPage() {
       const voucherValue = Number.isFinite(normalizedDiscount)
         ? normalizedDiscount
         : 0;
+      const rawShippingDiscount = result.data?.shipping_discount ?? 0;
+      const normalizedShippingDiscount =
+        typeof rawShippingDiscount === 'string' ? parseFloat(rawShippingDiscount) : rawShippingDiscount;
+      setVoucherShippingDiscount(Number.isFinite(normalizedShippingDiscount) ? normalizedShippingDiscount : 0);
 
       // JLO `voucherHelpers` may not echo `code` on `data` — we must keep the
       // canonical string for order meta and create-order, or JLO returns "Invalid or expired voucher code".
@@ -1054,6 +1064,7 @@ export default function CheckoutPage() {
   const removeVoucher = () => {
     setAppliedVoucher(null);
     setVoucherDiscount(0);
+    setVoucherShippingDiscount(0);
     setVoucherError('');
     setVoucherCode('');
     toast.info('Voucher removed');
@@ -1136,8 +1147,15 @@ export default function CheckoutPage() {
           : [];
       })();
 
-      // ✅ FIXED: Only influencer coupons discount shipping
-      const orderShippingDiscount = appliedCoupon && !isLocalCollection ? shippingDiscount : 0;
+      // Same precedence as activeShippingDiscount above: influencer coupon OR
+      // voucher shipping discount, never both (mutually exclusive promo kinds).
+      const orderShippingDiscount = isLocalCollection
+        ? 0
+        : appliedCoupon
+          ? shippingDiscount
+          : appliedVoucher
+            ? voucherShippingDiscount
+            : 0;
       const shippingLineTotal = isLocalCollection
         ? 0
         : Math.max(0, (shippingCost ?? 0) - orderShippingDiscount);
@@ -2110,7 +2128,7 @@ export default function CheckoutPage() {
                   </p>
                 )}
                 
-                {/* ✅ Show shipping discount from influencer coupon */}
+                {/* Shipping discount from either an influencer coupon or a voucher's own shipping_discount_type */}
                 {activeShippingDiscount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Shipping Discount</span>
