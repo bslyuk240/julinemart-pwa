@@ -61,6 +61,19 @@ function isLocalCollectionMethod(method: FulfillmentMethod): boolean {
 
 const DEFAULT_HUB_ID = '75489a58-69bf-4f17-8d21-880e8196e31d';
 
+// create-order.js re-validates the voucher server-side and returns one of these
+// exact messages when it's no longer redeemable (e.g. a low-max-uses code
+// someone else redeemed after we applied it here but before Place Order) —
+// distinguish those from other order-creation failures so we can drop the
+// stale discount instead of leaving the customer looking at a voucher error
+// next to a total that still reflects the rejected voucher.
+const VOUCHER_REJECTION_MESSAGES = new Set([
+  'Invalid or expired voucher code',
+  'Voucher is not yet valid',
+  'Voucher has expired',
+  'Voucher has reached its usage limit',
+]);
+
 /**
  * Campaign vouchers: browser must call same-origin `/api/vouchers/validate` only.
  * That route server-proxies to JLO `voucherHelpers`. Do not set
@@ -1061,13 +1074,13 @@ export default function CheckoutPage() {
     }
   };
 
-  const removeVoucher = () => {
+  const removeVoucher = (options?: { silent?: boolean }) => {
     setAppliedVoucher(null);
     setVoucherDiscount(0);
     setVoucherShippingDiscount(0);
     setVoucherError('');
     setVoucherCode('');
-    toast.info('Voucher removed');
+    if (!options?.silent) toast.info('Voucher removed');
   };
 
   // NEW: Remove applied coupon
@@ -1441,7 +1454,15 @@ export default function CheckoutPage() {
       }
     } catch (error: any) {
       console.error('❌ Order creation error:', error);
-      toast.error(error.message || 'Failed to place order. Please try again.');
+      if (appliedVoucher && VOUCHER_REJECTION_MESSAGES.has(error.message)) {
+        removeVoucher({ silent: true });
+        toast.error(
+          `${error.message} — it's been removed and your total updated. Please review and place your order again.`,
+          { duration: 6000 }
+        );
+      } else {
+        toast.error(error.message || 'Failed to place order. Please try again.');
+      }
       setIsProcessing(false);
     }
   };
