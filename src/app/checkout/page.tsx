@@ -1397,8 +1397,29 @@ export default function CheckoutPage() {
         if (requiresPayment) {
           const amountKobo = Math.max(0, Math.round(total * 100));
           if (amountKobo <= 0) {
-            toast.error('Invalid payment amount');
-            setIsProcessing(false);
+            // A 100%-off voucher can zero the total — Paystack can't charge
+            // ₦0, so confirm the order directly instead of opening its popup.
+            try {
+              const orderRef = order.payment_reference ?? order.id;
+              const freeOrderRes = await fetch('/api/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reference: orderRef, orderId: orderRef }),
+              });
+              const freeOrderData = await freeOrderRes.json().catch(() => ({}));
+              if (!freeOrderRes.ok || !freeOrderData.success) {
+                throw new Error(freeOrderData.error || 'Failed to confirm order');
+              }
+              await persistCheckoutProfileIfNeeded();
+              trackPurchaseForOrder(order.id);
+              clearCart();
+              toast.success('Order placed successfully!');
+              router.push(`/order-success?ref=${order.order_number || order.id}`);
+            } catch (freeOrderError: any) {
+              toast.error(freeOrderError.message || 'Failed to confirm order. Please contact support.');
+            } finally {
+              setIsProcessing(false);
+            }
             return;
           }
 

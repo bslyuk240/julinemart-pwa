@@ -273,8 +273,16 @@ export default function OrderDetailPage() {
     const email = order.billing?.email;
     const amountKobo = Math.round(parseFloat(order.total || '0') * 100);
 
-    if (!order.transaction_id || !email || amountKobo <= 0) {
+    if (!order.transaction_id || !email) {
       toast.error('Unable to start payment for this order. Please contact support.');
+      return;
+    }
+
+    // A 100%-off voucher can leave nothing to charge — Paystack can't process
+    // a ₦0 transaction, so confirm the order directly instead of opening it.
+    if (amountKobo <= 0) {
+      setIsPaying(true);
+      await verifyCompletedPayment(order.transaction_id);
       return;
     }
 
