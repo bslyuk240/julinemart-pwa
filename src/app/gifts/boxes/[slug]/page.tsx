@@ -66,7 +66,7 @@ export default async function GiftBoxPage({ params }: Props) {
                 <h2 className="text-sm font-semibold text-gray-900 mb-3">What&apos;s inside</h2>
                 <ul className="space-y-2">
                   {box.contents.map((item) => (
-                    <li key={item.product_id} className="flex items-center gap-3 text-sm text-gray-700">
+                    <li key={item.pool_sourced_item_id || item.product_id || item.name} className="flex items-center gap-3 text-sm text-gray-700">
                       <span className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-medium">
                         {item.quantity}×
                       </span>
@@ -131,7 +131,7 @@ export default async function GiftBoxPage({ params }: Props) {
                   <h2 className="text-sm font-semibold text-gray-900 mb-3">What&apos;s inside</h2>
                   <ul className="space-y-2">
                     {box.contents.map((item) => (
-                      <li key={item.product_id} className="flex items-center gap-3 text-sm text-gray-700">
+                      <li key={item.pool_sourced_item_id || item.product_id || item.name} className="flex items-center gap-3 text-sm text-gray-700">
                         <span className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-medium">
                           {item.quantity}×
                         </span>

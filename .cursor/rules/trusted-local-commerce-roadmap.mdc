@@ -1,0 +1,79 @@
+---
+description: JulineMart Trusted Local Commerce phased build plan — positioning, phases, priorities, and repo ownership
+alwaysApply: true
+---
+
+# JulineMart Trusted Local Commerce — Active Build Plan
+
+**Full doc:** `docs/trusted-local-commerce-roadmap.md`
+
+**Positioning:** JulineMart — Nigeria's marketplace for trusted local businesses.
+
+**Consumer proposition:** Find it. Customise it. Buy it. Collect or deliver — from businesses you can trust.
+
+## Current priority — Phase 2B (local discovery)
+
+### Phase 0 (Week 1–2) — COMPLETE
+1. ~~Remove fake vendor metrics~~ — done
+2. ~~JulineMart Protect badge on PDP + checkout~~ — done
+3. ~~Product tags + Local Makers homepage rail~~ — done
+4. ~~Shared trust types in both repos~~ — done
+
+### Phase 1 (Week 3–8) — COMPLETE (apply Supabase migration)
+- `seller_verifications` migration at `supabase/migrations/20260814000000_seller_trust_foundation.sql`
+- JLO: `/admin/seller-verifications` (desktop + mobile-native)
+- PWA: trust badges mobile-first on vendor page + PDP
+- Structured disputes + refund timeline UX
+
+### Phase 2A (Week 9–12) — COMPLETE (apply Supabase migration)
+- Follow store, store QR, customer pickup at checkout, reorder, seller actual photos
+- Migration: `supabase/migrations/20260814000001_phase_2a_retention_local.sql`
+- See `docs/BUILD-STATUS.md` for file list
+
+### Phase 2B (Week 13–16) — COMPLETE (apply Supabase migration)
+- Local discovery by area, optional geolocation, reserve & collect
+- Migration: `supabase/migrations/20260814000002_phase_2b_local_discovery.sql`
+
+## Current priority — Phase 4 (JulineMart Custom)
+
+### Phase 3 (Week 17–22) — COMPLETE (apply migrations 3–5)
+- Vendor campaigns, seller quality, warranty, My Purchases
+
+### Phase 4 (Week 23–36) — ACTIVE
+- Customisation schema + vendor builder (pilot: bakers)
+- PDP customise flow, cart/checkout, custom order timeline
+- Migration: `supabase/migrations/20260814000005_phase_4_custom_orders.sql`
+- See `docs/BUILD-STATUS.md`
+
+## Later phases (do not start until prior phase exit gate passes)
+
+| Phase | Weeks | Focus |
+|---|---|---|
+| 2A | 9–12 | Follow store, store QR, customer pickup, reorder, seller actual photos |
+| 2B | 13–16 | Local discovery by area, reserve & collect, optional geolocation |
+| 3 | 17–22 | Self-service vendor campaigns, marketing toolkit, seller quality ranking, warranty |
+| 4 | 23–36 | JulineMart Custom — pilot ONE vertical (bakers/printers/tailors) first |
+| 5 | 37+ | Request quote, bulk pricing, seller CRM-lite, corporate purchasing |
+
+## Already built — extend, don't rebuild
+- Vendor storefronts, campaign pages (`src/app/campaigns/[slug]/`)
+- Order tracking (`src/components/orders/order-status-tracker.tsx`)
+- Returns/refunds (`src/lib/jlo/returns.ts` + JLO `return_requests`)
+- Distributed fulfilment in JLO (order split, hub dispatch, vendor dispatch)
+
+## Explicitly deferred / minimal
+- **#21 Delivery transparency** — exists; polish/marketing only
+- **#22 Seller delivery choice** — JLO ops config exists; customer checkout choice in Phase 2B
+- **#32 Handmade marketplace** — tags + homepage rail only; full layer is JulineService
+- **#35 Corporate purchasing** — Phase 5; start from Request a Quote (#34)
+
+## Repo ownership
+- **PWA:** customer trust UX, Protect badge, vendor page, checkout pickup, custom PDP flows
+- **JLO:** verifications schema, metrics jobs, disputes backend, ranking, logistics extensions
+- **Vendor portal (in JLO):** verification upload, followers, campaigns builder, customisation builder
+
+## Implementation principles
+- Minimize scope per phase; pass exit gates before advancing
+- Never ship placeholder/fake trust metrics
+- Custom orders: one vertical pilot before generic builder
+- Reuse campaigns/returns/QR infrastructure rather than parallel systems

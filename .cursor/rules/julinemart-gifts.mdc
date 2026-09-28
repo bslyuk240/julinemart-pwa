@@ -1,0 +1,80 @@
+---
+description: JulineMart Gifts — phased build plan, Warri-first consolidation hub, exit gates
+alwaysApply: true
+---
+
+# JulineMart Gifts — Active Build Plan
+
+**Full doc:** `docs/julinemart-gifts-roadmap.md`
+
+**Positioning:** Gifting **layer** on the existing marketplace — not a separate shop.
+
+**Pilot consolidation hub:** **Warri** (`gift_fulfilment_centres`, `is_default = true`).
+
+**Admin must be able to add/edit/deactivate consolidation hubs** — never hard-code a single city in app logic.
+
+## Current priority — Phase G6 (JulineMart Gifts)
+
+### Phase G6 — IN PROGRESS
+- BYO personalisation via existing `product_customisation_schemas`
+- Customisation on packing checklist + ops UI
+
+### Phase G5 — COMPLETE (code)
+- Delivery date validation, occasion date, secret sender
+
+### Phase G4 — IN PROGRESS
+- Homepage "Gifts for Every Moment" rail
+- Full `/gifts` landing with occasion, recipient, budget filters
+- SEO occasion routes (`/gifts/birthday`, etc.)
+- JLO admin box tagging (occasion + recipient) — desktop + mobile
+
+### Phase G3 — COMPLETE
+- Build your own box at `/gifts/build`
+
+### Phase G2 — COMPLETE
+- Gift ops dashboard, printable card, customer timeline
+
+### Phase G1 — COMPLETE
+- Ready-made gift boxes (Mode A)
+- Admin `/admin/gift-boxes`
+- PWA `/gifts`, checkout with recipient + message
+
+### Phase G0 — COMPLETE
+- Warri seed hub + admin-managed `gift_fulfilment_centres`
+- Gift pool + `gift_eligible` products
+- Admin `/admin/gift-fulfilment-centres`
+
+**Exit gate:** second hub addable without deploy; 30+ Warri pool SKUs; marketplace checkout unchanged.
+
+## Phase sequence (do not skip exit gates)
+
+| Phase | Focus |
+|-------|--------|
+| G0 | Warri hub + admin hubs + gift pool + eligibility |
+| G1 | Ready-made gift boxes (Mode A) |
+| G2 | Ops dashboard, packing, card print, gift timeline |
+| G3 | Build your own box (Mode B) + running total |
+| G4 | Homepage, `/gifts` landing, discovery filters, SEO |
+| G5 | Delivery scheduling, secret sender |
+| G6 | Personalisation — **reuse Phase 4** `product_customisation_schemas` |
+| G7 | Surprise Me, corporate, QR loop, multi-hub routing, AI |
+
+## Reuse — do not rebuild
+
+- `orders`, Paystack, `create-order` patterns → extend with `order_kind` + `gift_orders`
+- JulineMart Custom (Phase 4) for personalisation in G6
+- JulineMart Protect, returns/disputes patterns
+- JLO logistics after pack complete
+
+## Do not
+
+- Expose full marketplace catalog in gift builder
+- Create duplicate `product_customisation_fields` (use Phase 4 schemas)
+- Promise delivery dates without server-side validation (G5)
+- Split gift orders into per-vendor customer shipments — consolidate at GFC
+
+## Repo ownership
+
+- **PWA:** `/gifts`, builder UX, homepage rail, gift checkout recipient UI
+- **JLO:** GFC admin, pool, gift APIs, ops dashboard, migrations
+- **Vendor portal:** gift programme opt-in (after G0)

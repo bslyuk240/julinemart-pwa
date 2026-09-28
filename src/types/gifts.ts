@@ -7,7 +7,8 @@ export type GiftFulfilmentCentre = {
 };
 
 export type GiftBoxContent = {
-  product_id: string;
+  product_id: string | null;
+  pool_sourced_item_id?: string | null;
   name: string;
   quantity: number;
   image: string | null;
