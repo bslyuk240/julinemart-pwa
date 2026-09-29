@@ -17,9 +17,12 @@ export default function GiftBoxCard({ box, compact, grid }: Props) {
       : 'w-[152px] sm:w-[168px] md:w-full md:flex-shrink';
 
   return (
+    <article
+      className={`group flex flex-shrink-0 snap-start flex-col overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-100 transition-shadow md:rounded-2xl md:hover:shadow-md ${widthClass}`}
+    >
     <Link
       href={`/gifts/boxes/${box.slug}`}
-      className={`group flex-shrink-0 snap-start overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-100 transition-shadow active:scale-[0.98] md:rounded-2xl md:active:scale-100 md:hover:shadow-md ${widthClass}`}
+      className="block min-w-0 active:scale-[0.98] md:active:scale-100"
     >
       <div className="relative aspect-square overflow-hidden bg-gray-100">
         {box.image_url ? (
@@ -52,5 +55,14 @@ export default function GiftBoxCard({ box, compact, grid }: Props) {
         </div>
       </div>
     </Link>
+    <div className="px-2.5 pb-2.5 md:px-3 md:pb-3">
+      <Link
+        href={`/gifts/checkout?box=${encodeURIComponent(box.slug)}`}
+        className="flex w-full items-center justify-center rounded bg-primary-600 px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700 md:py-2 md:text-sm"
+      >
+        Send this gift
+      </Link>
+    </div>
+    </article>
   );
 }

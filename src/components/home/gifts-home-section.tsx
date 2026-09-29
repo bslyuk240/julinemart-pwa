@@ -59,26 +59,35 @@ export default async function GiftsHomeSection() {
               <p className="text-sm font-bold">Build your own</p>
             </Link>
             {featured.map((box) => (
-              <Link
+              <article
                 key={box.id}
-                href={`/gifts/boxes/${box.slug}`}
-                className="w-[170px] flex-shrink-0 snap-start overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 sm:w-[200px] md:w-[230px] lg:w-[260px]"
+                className="flex w-[170px] flex-shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 sm:w-[200px] md:w-[230px] lg:w-[260px]"
               >
-                <div className="aspect-square bg-rose-50">
-                  {box.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={box.image_url} alt={box.name} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <Gift className="h-10 w-10 text-primary-300" />
-                    </div>
-                  )}
+                <Link href={`/gifts/boxes/${box.slug}`} className="block min-w-0">
+                  <div className="aspect-square bg-rose-50">
+                    {box.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={box.image_url} alt={box.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <Gift className="h-10 w-10 text-primary-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3 pb-2">
+                    <p className="line-clamp-2 text-sm font-semibold text-gray-900">{box.name}</p>
+                    <p className="mt-1 text-sm font-bold text-primary-700">{formatPrice(box.list_price)}</p>
+                  </div>
+                </Link>
+                <div className="mt-auto px-3 pb-3">
+                  <Link
+                    href={`/gifts/checkout?box=${encodeURIComponent(box.slug)}`}
+                    className="flex w-full items-center justify-center rounded bg-primary-600 px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700 md:py-2 md:text-sm"
+                  >
+                    Send this gift
+                  </Link>
                 </div>
-                <div className="p-3">
-                  <p className="line-clamp-2 text-sm font-semibold text-gray-900">{box.name}</p>
-                  <p className="mt-1 text-sm font-bold text-primary-700">{formatPrice(box.list_price)}</p>
-                </div>
-              </Link>
+              </article>
             ))}
           </div>
         </div>

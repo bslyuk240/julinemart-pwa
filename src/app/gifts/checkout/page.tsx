@@ -292,10 +292,10 @@ function GiftCheckoutForm() {
 
       <Button
         type="submit"
-        className="mt-5 hidden h-12 w-full lg:inline-flex"
+        className="mt-5 h-12 w-full"
         disabled={submitting || !isCheckoutReady}
       >
-        {submitting ? 'Opening payment…' : `Pay ${formatPrice(total)}`}
+        {submitting ? 'Opening payment…' : 'Place Order'}
       </Button>
     </>
   );
@@ -496,7 +496,7 @@ function GiftCheckoutForm() {
       </div>
     </form>
 
-    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white p-4 shadow-lg lg:hidden">
+    <div className="fixed inset-x-0 z-[70] border-t border-gray-200 bg-white p-4 shadow-lg bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] md:bottom-0 lg:hidden">
       <div className="container-custom flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs text-gray-500">Total</p>
@@ -510,7 +510,7 @@ function GiftCheckoutForm() {
           className="min-h-[44px] shrink-0 px-6"
           disabled={submitting || !isCheckoutReady}
         >
-          {submitting ? 'Paying…' : 'Pay now'}
+          {submitting ? 'Paying…' : 'Place Order'}
         </Button>
       </div>
     </div>
@@ -520,7 +520,7 @@ function GiftCheckoutForm() {
 
 export default function GiftCheckoutPage() {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-36 md:pb-28 lg:pb-8">
       <div className="container-custom min-w-0 py-5 md:py-6">
         <PageHeader
           title="Gift checkout"

@@ -416,7 +416,7 @@ export default function GiftBuildPage() {
   if (loading) return <PageLoading />;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 lg:pb-10">
+    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-36 md:pb-28 lg:pb-10">
       <div className="container-custom py-5 md:py-8">
         <PageHeader
           title="Build your own box"
@@ -939,10 +939,10 @@ export default function GiftBuildPage() {
                 <Button
                   type="submit"
                   form="gift-build-checkout"
-                  className="mt-5 hidden h-12 w-full lg:inline-flex"
+                  className="mt-5 h-12 w-full"
                   disabled={submitting || !isCheckoutReady}
                 >
-                  {submitting ? 'Opening payment…' : `Pay ${formatPrice(grandTotal)}`}
+                  {submitting ? 'Opening payment…' : 'Place Order'}
                 </Button>
               </div>
             </aside>
@@ -951,7 +951,7 @@ export default function GiftBuildPage() {
       </div>
 
       {builder && step === 3 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white p-4 shadow-lg lg:hidden">
+        <div className="fixed inset-x-0 z-[70] border-t border-gray-200 bg-white p-4 shadow-lg bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] md:bottom-0 lg:hidden">
           <div className="container-custom flex items-center gap-3">
             <button
               type="button"
@@ -970,14 +970,14 @@ export default function GiftBuildPage() {
               className="min-h-[44px] shrink-0 px-6"
               disabled={submitting || !isCheckoutReady}
             >
-              {submitting ? 'Paying…' : 'Pay now'}
+              {submitting ? 'Paying…' : 'Place Order'}
             </Button>
           </div>
         </div>
       )}
 
       {builder && step >= 1 && step < 3 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white p-4 shadow-lg lg:hidden">
+        <div className="fixed inset-x-0 z-[70] border-t border-gray-200 bg-white p-4 shadow-lg bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] md:bottom-0 lg:hidden">
           <div className="container-custom flex items-center justify-between gap-3">
             <div>
               <p className="text-xs text-gray-500">Running total</p>
