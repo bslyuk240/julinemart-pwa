@@ -42,6 +42,14 @@ import {
   GiftShippingMethodSection,
 } from '@/components/gifts/gift-checkout-sections';
 import { NIGERIAN_STATES } from '@/lib/constants/nigeria-states';
+import {
+  cityError,
+  emailError,
+  firstError,
+  fullNameError,
+  phoneError,
+  streetError,
+} from '@/lib/checkout/delivery-details';
 import { getEnabledPaymentGateways, type PaymentGateway } from '@/lib/woocommerce/shipping';
 import type { GiftBuilderState, GiftPackagingOption } from '@/types/gifts';
 import type { GiftVoucherResult } from '@/lib/gifts/voucher';
@@ -363,6 +371,22 @@ export default function GiftBuildPage() {
       toast.error('Select a payment method');
       return;
     }
+
+    const detailsError = firstError([
+      fullNameError(checkout.customer_name, 'Your name'),
+      emailError(checkout.customer_email),
+      phoneError(checkout.customer_phone),
+      fullNameError(checkout.recipient_name, 'Recipient name'),
+      phoneError(checkout.recipient_phone),
+      streetError(checkout.recipient_address),
+      cityError(checkout.recipient_city, checkout.recipient_state),
+      checkout.recipient_state.trim() ? null : 'Select a delivery state',
+    ]);
+    if (detailsError) {
+      toast.error(detailsError);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch('/api/gifts/order', {
@@ -711,6 +735,8 @@ export default function GiftBuildPage() {
                       required
                       value={checkout.customer_name}
                       onChange={(e) => setCheckout((prev) => ({ ...prev, customer_name: e.target.value }))}
+                      placeholder="e.g. Adaeze Okonkwo"
+                      helperText="First and last name"
                       fullWidth
                     />
                     <Input
@@ -742,6 +768,8 @@ export default function GiftBuildPage() {
                       required
                       value={checkout.recipient_name}
                       onChange={(e) => setCheckout((prev) => ({ ...prev, recipient_name: e.target.value }))}
+                      placeholder="e.g. John Doe"
+                      helperText="First and last name — couriers require this"
                       fullWidth
                     />
                     <Input
@@ -760,10 +788,12 @@ export default function GiftBuildPage() {
                     />
                     <div className="grid gap-4 md:grid-cols-2">
                       <Input
-                        label="City *"
+                        label="City / town *"
                         required
                         value={checkout.recipient_city}
                         onChange={(e) => setCheckout((prev) => ({ ...prev, recipient_city: e.target.value }))}
+                        placeholder="e.g. Akure"
+                        helperText="Town name, not the state (e.g. Akure — not Ondo State)"
                         fullWidth
                       />
                       <div>

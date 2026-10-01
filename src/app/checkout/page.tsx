@@ -39,6 +39,13 @@ import {
   readPendingCampaignVoucher,
 } from '@/components/campaigns/OfferSection';
 import {
+  cityError,
+  emailError,
+  namePartError,
+  phoneError,
+  streetError,
+} from '@/lib/checkout/delivery-details';
+import {
   clearCheckoutFulfillmentPref,
   readCheckoutFulfillmentPref,
 } from '@/lib/local/geolocation';
@@ -883,35 +890,23 @@ export default function CheckoutPage() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
-    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+    const firstNameErr = namePartError(formData.firstName, 'First name');
+    const lastNameErr = namePartError(formData.lastName, 'Last name');
+    if (firstNameErr) newErrors.firstName = firstNameErr;
+    if (lastNameErr) newErrors.lastName = lastNameErr;
+
+    const emailErr = emailError(formData.email);
+    if (emailErr) newErrors.email = emailErr;
+
+    const phoneErr = phoneError(formData.phone);
+    if (phoneErr) newErrors.phone = phoneErr;
+
     if (!isLocalCollection) {
-      if (!formData.address1.trim()) newErrors.address1 = 'Address is required';
-      if (!formData.city.trim()) newErrors.city = 'City is required';
+      const addressErr = streetError(formData.address1);
+      const townErr = cityError(formData.city, formData.state);
+      if (addressErr) newErrors.address1 = addressErr;
+      if (townErr) newErrors.city = townErr;
       if (!formData.state.trim()) newErrors.state = 'State is required';
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (formData.email && !emailRegex.test(formData.email)) {
-      newErrors.email = 'Invalid email address';
-    }
-
-    // Accept any common Nigerian format: +2348012345678, 2348012345678,
-    // 08012345678, or a bare 8012345678. Normalise to digits first so we don't
-    // reject a perfectly valid stored number just because of its prefix/spacing.
-    if (formData.phone) {
-      const digits = formData.phone.replace(/\D/g, '');
-      const localTen = digits.startsWith('234')
-        ? digits.slice(3)
-        : digits.startsWith('0')
-        ? digits.slice(1)
-        : digits;
-      // local part must be 10 digits starting 7/8/9 (e.g. 8012345678)
-      if (!/^[789]\d{9}$/.test(localTen)) {
-        newErrors.phone = 'Invalid Nigerian phone number';
-      }
     }
 
     setErrors(newErrors);
@@ -1568,6 +1563,7 @@ export default function CheckoutPage() {
                     value={formData.firstName}
                     onChange={handleInputChange}
                     error={errors.firstName}
+                    placeholder="John"
                     fullWidth
                   />
                   <Input
@@ -1576,6 +1572,7 @@ export default function CheckoutPage() {
                     value={formData.lastName}
                     onChange={handleInputChange}
                     error={errors.lastName}
+                    placeholder="Doe"
                     fullWidth
                   />
                 </div>
@@ -1662,11 +1659,13 @@ export default function CheckoutPage() {
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <Input
-                      label="City *"
+                      label="City / town *"
                       name="city"
                       value={formData.city}
                       onChange={handleInputChange}
                       error={errors.city}
+                      placeholder="e.g. Akure"
+                      helperText="Town name, not the state (e.g. Akure — not Ondo State)"
                       fullWidth
                     />
                     

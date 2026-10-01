@@ -22,6 +22,14 @@ import {
   GiftCheckoutSection,
 } from '@/components/gifts/gift-checkout-sections';
 import { NIGERIAN_STATES } from '@/lib/constants/nigeria-states';
+import {
+  cityError,
+  emailError,
+  firstError,
+  fullNameError,
+  phoneError,
+  streetError,
+} from '@/lib/checkout/delivery-details';
 import { getEnabledPaymentGateways, type PaymentGateway } from '@/lib/woocommerce/shipping';
 import type { GiftBox } from '@/types/gifts';
 import type { GiftVoucherResult } from '@/lib/gifts/voucher';
@@ -171,6 +179,22 @@ function GiftCheckoutForm() {
       toast.error('Select a payment method');
       return;
     }
+
+    const detailsError = firstError([
+      fullNameError(form.customer_name, 'Your name'),
+      emailError(form.customer_email),
+      phoneError(form.customer_phone),
+      fullNameError(form.recipient_name, 'Recipient name'),
+      phoneError(form.recipient_phone),
+      streetError(form.recipient_address),
+      cityError(form.recipient_city, form.recipient_state),
+      form.recipient_state.trim() ? null : 'Select a delivery state',
+    ]);
+    if (detailsError) {
+      toast.error(detailsError);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -315,6 +339,8 @@ function GiftCheckoutForm() {
                 required
                 value={form.customer_name}
                 onChange={(e) => update('customer_name', e.target.value)}
+                placeholder="e.g. Adaeze Okonkwo"
+                helperText="First and last name"
                 fullWidth
               />
               <Input
@@ -346,6 +372,8 @@ function GiftCheckoutForm() {
                 required
                 value={form.recipient_name}
                 onChange={(e) => update('recipient_name', e.target.value)}
+                placeholder="e.g. John Doe"
+                helperText="First and last name — couriers require this"
                 fullWidth
               />
               <Input
@@ -371,10 +399,12 @@ function GiftCheckoutForm() {
               />
               <div className="grid gap-4 md:grid-cols-2">
                 <Input
-                  label="City *"
+                  label="City / town *"
                   required
                   value={form.recipient_city}
                   onChange={(e) => update('recipient_city', e.target.value)}
+                  placeholder="e.g. Akure"
+                  helperText="Town name, not the state (e.g. Akure — not Ondo State)"
                   fullWidth
                 />
                 <div>
