@@ -168,29 +168,9 @@ async function fetchSupabaseOrder(
     if (json?.success && json.data) return json.data;
   }
 
-  // Fallback: admin lookup by UUID. Only accept the result if it actually
-  // belongs to the authenticated caller — this must never be trusted blind,
-  // or any signed-in user could read any other customer's order by UUID.
-  const isUUID = /^[0-9a-f-]{36}$/i.test(id);
-  if (isUUID) {
-    const adminRes = await fetch(`${JLO_BASE}/.netlify/functions/orders/${id}`);
-    if (adminRes.ok) {
-      const adminJson = await adminRes.json().catch(() => null);
-      const orderRaw = adminJson?.success ? adminJson.data : null;
-      if (orderRaw?.customer_email?.toLowerCase() === ownerEmail.toLowerCase()) {
-        const itemsRes = await fetch(
-          `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(orderRaw.customer_email)}&order_id=${encodeURIComponent(id)}`,
-          { headers: authHeaders }
-        );
-        if (itemsRes.ok) {
-          const itemsJson = await itemsRes.json().catch(() => null);
-          if (itemsJson?.success && itemsJson.data) return itemsJson.data;
-        }
-        return { ...orderRaw, items: [] };
-      }
-    }
-  }
-
+  // There used to be a fallback here that called the staff-only orders function
+  // without a login. That function now requires staff login, so the fallback
+  // could only ever return 404; it is gone. customer-orders is the one lookup.
   return null;
 }
 

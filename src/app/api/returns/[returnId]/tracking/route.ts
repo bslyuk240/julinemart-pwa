@@ -15,6 +15,8 @@ export async function GET(
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          // JLO requires the customer's login and checks the return is theirs.
+          ...(req.headers.get('authorization') ? { Authorization: req.headers.get('authorization') as string } : {}),
         },
         cache: 'no-store',
       }

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { ArrowLeft, Hash, Loader2 } from 'lucide-react';
+import { getAuthHeader } from '@/lib/supabase/client';
 
 const extractShipmentId = (candidate: any): string | null => {
   if (!candidate) return null;
@@ -44,7 +45,7 @@ export default function AddTrackingPage() {
       setLoading(true);
       try {
           // Fetch tracking data from the return endpoint
-        const res = await fetch(trackingGetUrl);
+        const res = await fetch(trackingGetUrl, { headers: await getAuthHeader() });
         const data = await res.json().catch(() => ({}));
         
         // Try to parse tracking from the response
@@ -82,7 +83,7 @@ export default function AddTrackingPage() {
       setSubmitting(true);
       const response = await fetch(`/api/return-shipments/${encodeURIComponent(idToUse)}/tracking`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
         body: JSON.stringify({ tracking_number: trackingNumber.trim() }),
       });
       const result = await response.json().catch(() => ({}));

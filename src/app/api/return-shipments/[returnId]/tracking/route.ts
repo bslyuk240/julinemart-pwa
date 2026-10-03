@@ -15,6 +15,7 @@ export async function GET(
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          ...(req.headers.get('authorization') ? { Authorization: req.headers.get('authorization') as string } : {}),
         },
         cache: 'no-store',
       }
@@ -55,6 +56,8 @@ export async function POST(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          // JLO requires the customer's login and checks the shipment is theirs.
+          ...(req.headers.get('authorization') ? { Authorization: req.headers.get('authorization') as string } : {}),
         },
         body: JSON.stringify(body),
       }

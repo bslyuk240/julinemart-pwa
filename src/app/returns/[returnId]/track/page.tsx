@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, MapPin, RefreshCw, Truck } from 'lucide-react';
 import { buildFezTrackingUrl } from '@/lib/jlo/returns';
+import { getAuthHeader } from '@/lib/supabase/client';
 
 type TrackingEvent = {
   status?: string;
@@ -67,7 +68,7 @@ export default function TrackReturnPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(trackingGetUrl);
+      const res = await fetch(trackingGetUrl, { headers: await getAuthHeader() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.success === false) {
         throw new Error(data?.message || data?.error || 'Failed to fetch tracking');

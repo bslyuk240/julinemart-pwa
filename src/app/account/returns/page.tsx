@@ -68,7 +68,9 @@ export default function ReturnsPage() {
         const updated = await Promise.all(
           needsEnrich.map(async (r) => {
             try {
-              const res = await fetch(`/api/returns/${encodeURIComponent(r.return_request_id)}/tracking`);
+              const res = await fetch(`/api/returns/${encodeURIComponent(r.return_request_id)}/tracking`, {
+                headers: await getAuthHeader(),
+              });
               const data = await res.json().catch(() => ({}));
               const payload = data?.data ?? data;
               const shipment = payload?.return_shipment;
