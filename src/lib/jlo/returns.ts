@@ -8,6 +8,8 @@ export type JloReturnShipment = {
   return_request_id: string;
   return_code: string | null;
   tracking_number: string | null;
+  /** A courier's own tracking page (e.g. Shipbubble), used when there's no Fez tracking number. */
+  tracking_url?: string | null;
   status: string;
   tracking_submitted_at?: string | null;
 };
@@ -68,7 +70,8 @@ export type JloReturn = {
   pickup?: JloReturnPickup | null;
   /** What the customer owes for the pickup; 0 when it's our fault. Deducted from the refund. */
   pickup_fee?: number;
-  pickup_lane?: 'fez' | 'local_rider' | null;
+  pickup_lane?: 'fez' | 'local_rider' | 'shipbubble' | null;
+  tracking_url?: string | null;
   return_shipment?: JloReturnShipment;
   line_items?: JloReturnLineItem[];
 } & JloRefundInfo;

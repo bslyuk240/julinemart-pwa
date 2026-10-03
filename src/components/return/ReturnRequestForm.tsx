@@ -498,6 +498,15 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                       >
                         Track return
                       </a>
+                    ) : activeShipment?.tracking_url || activeReturn.tracking_url ? (
+                      <a
+                        href={(activeShipment?.tracking_url || activeReturn.tracking_url) as string}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
+                      >
+                        Track return
+                      </a>
                     ) : (
                       <Link
                         href={`/returns/${returnId}/track`}
