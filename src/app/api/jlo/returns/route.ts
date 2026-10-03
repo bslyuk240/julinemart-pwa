@@ -64,8 +64,10 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
+    const authorization = request.headers.get('authorization');
     return await proxy('/api/returns-create', {
       method: 'POST',
+      headers: authorization ? { Authorization: authorization } : {},
       body: JSON.stringify(body),
     });
   } catch (error: any) {

@@ -366,7 +366,7 @@ export default function OrderDetailPage() {
       const supabaseId = (order as any)._supabase_id ?? order.id;
       const res = await fetch(`/api/orders/${supabaseId}/cancel`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
         body: JSON.stringify({ reason: 'Customer requested cancellation' }),
       });
       const data = await res.json();
@@ -408,7 +408,10 @@ export default function OrderDetailPage() {
   const returnRequestsCount = returns.length;
   const returnEligible = canOrderBeReturned(order.status) && !activeReturn && returnRequestsCount < 2;
   const returnShipment = activeReturn?.return_shipment;
-  const cancelEligible = canOrderBeCancelled(order.status);
+  // JLO also says whether a shipment or rider already exists (can_cancel).
+  // Only an explicit false hides the button; when the server didn't send the
+  // flag it stays eligible and the cancel endpoint still enforces the rule.
+  const cancelEligible = canOrderBeCancelled(order.status) && (order as any)._can_cancel !== false;
   const isPaid = order.payment_status === 'paid' || Boolean(order.date_paid);
   const paymentPending = order.status === 'pending' && !isPaid;
   const canCompletePayment = paymentPending && Boolean(order.transaction_id);

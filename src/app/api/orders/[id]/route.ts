@@ -98,6 +98,7 @@ function adaptOrder(o: any) {
     id: o.order_number ?? o.id,
     number: o.order_number ?? o.id,
     _supabase_id: o.id,
+    _can_cancel: typeof o.can_cancel === 'boolean' ? o.can_cancel : undefined,
     status: derivedStatus,
     date_created: o.created_at,
     date_paid: o.paid_at ?? null,

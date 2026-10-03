@@ -18,9 +18,14 @@ export async function POST(
   }
 
   try {
+    // Forward the customer's login: JLO requires it to cancel a paid order.
+    const authorization = request.headers.get('authorization');
     const jloRes = await fetch(`${JLO_BASE}/.netlify/functions/cancel-order`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authorization ? { Authorization: authorization } : {}),
+      },
       body: JSON.stringify({ order_id: id, reason: body.reason }),
     });
 

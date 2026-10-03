@@ -182,7 +182,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
       const response = await fetch(JLO_RETURNS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
         body: JSON.stringify({
           order_id: order.id,
           refund_amount: selectedAmount,
