@@ -21,8 +21,34 @@ const COMPLAINT_TYPES = [
   { value: 'not_as_described', label: 'Product significantly different from description' },
   { value: 'missing_items', label: 'Missing items' },
   { value: 'suspected_counterfeit', label: 'Suspected counterfeit' },
+  { value: 'changed_mind', label: 'I changed my mind / no longer need it' },
   { value: 'other', label: 'Other' },
 ] as const;
+
+type PickupQuote = {
+  enabled: boolean;
+  available: boolean;
+  /** true when the return is our fault, so we pay for the pickup */
+  free: boolean;
+  fee: number;
+  quoted_fee: number | null;
+};
+
+const JLO_PICKUP_QUOTE_URL = 'https://jlo.julinemart.com/api/return-pickup-quote';
+
+async function requestPickupQuote(body: Record<string, unknown>): Promise<PickupQuote | null> {
+  try {
+    const res = await fetch(JLO_PICKUP_QUOTE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => ({}));
+    return res.ok ? (json?.data as PickupQuote) : null;
+  } catch {
+    return null;
+  }
+}
 
 type FezHub = {
   name: string;
@@ -96,7 +122,15 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [hubSearch, setHubSearch] = useState('');
 
-  const method: 'dropoff' = 'dropoff';
+  // Pickup is only offered once the server says it's enabled.
+  const [method, setMethod] = useState<'dropoff' | 'pickup'>('dropoff');
+  const [pickupEnabled, setPickupEnabled] = useState(false);
+  const [pickup, setPickup] = useState({
+    name: '', phone: '', address: '', city: '', state: '', preferred_date: '', notes: '',
+  });
+  const [quote, setQuote] = useState<PickupQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [feeConfirmed, setFeeConfirmed] = useState(false);
   const hubId = useMemo(() => extractHubId(order) || DEFAULT_HUB_ID, [order]);
   const activeReturn = useMemo(() => latestReturn(returns), [returns]);
   const currency = order?.currency || 'NGN';
@@ -123,6 +157,64 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   useEffect(() => {
     fetchOrder();
   }, [orderId]);
+
+  // Is pickup switched on? (Hidden until JLO's pickup setup is in place.)
+  useEffect(() => {
+    let cancelled = false;
+    requestPickupQuote({ probe: true }).then((q) => {
+      if (!cancelled) setPickupEnabled(Boolean(q?.enabled));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Start the pickup details from where the order was delivered; the customer
+  // can change them (the item may be somewhere else now).
+  useEffect(() => {
+    if (!order) return;
+    setPickup((prev) =>
+      prev.address || prev.name
+        ? prev
+        : {
+            ...prev,
+            name: `${order.shipping?.first_name || ''} ${order.shipping?.last_name || ''}`.trim(),
+            phone: order.billing?.phone || '',
+            address: order.shipping?.address_1 || '',
+            city: order.shipping?.city || '',
+            state: order.shipping?.state || '',
+          }
+    );
+  }, [order]);
+
+  // Quote the pickup (free if it's our fault, otherwise the customer's fee)
+  // as soon as we know why and where.
+  useEffect(() => {
+    setFeeConfirmed(false);
+    if (method !== 'pickup' || !order || !complaintType || !pickup.state || !pickup.city) {
+      setQuote(null);
+      return;
+    }
+    let cancelled = false;
+    setQuoteLoading(true);
+    const timer = setTimeout(async () => {
+      const q = await requestPickupQuote({
+        order_id: order.id,
+        reason_code: complaintType === 'changed_mind' ? 'changed_mind' : 'other',
+        complaint_type: complaintType,
+        pickup_state: pickup.state,
+        pickup_city: pickup.city,
+      });
+      if (!cancelled) {
+        setQuote(q);
+        setQuoteLoading(false);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [method, order, complaintType, pickup.state, pickup.city]);
 
   useEffect(() => {
     const fromQuery = searchParams.get('complaint_type');
@@ -163,13 +255,22 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
     if (!complaintType) return toast.error('Select the type of problem');
     if (complaintType === 'other' && !reasonNote.trim()) return toast.error('Add details about the problem');
-    if (!hubId) return toast.error('Hub not found for this order.');
+    if (method === 'dropoff' && !hubId) return toast.error('Hub not found for this order.');
+
+    if (method === 'pickup') {
+      if (!pickup.name.trim() || !pickup.phone.trim() || !pickup.address.trim() || !pickup.city.trim() || !pickup.state.trim()) {
+        return toast.error('Enter the pickup contact, address, city and state');
+      }
+      if (!quote?.available) return toast.error("Pickup isn't available for that area. Please choose drop-off.");
+      if (quote.fee > 0 && !feeConfirmed) return toast.error('Please confirm the pickup fee to continue');
+    }
 
     const mappedReasonCode =
       complaintType === 'wrong_product' ? 'wrong_item'
         : complaintType === 'damaged' ? 'damaged'
           : complaintType === 'not_as_described' ? 'not_as_described'
-            : 'other';
+            : complaintType === 'changed_mind' ? 'changed_mind'
+              : 'other';
 
     try {
       setSubmitting(true);
@@ -192,7 +293,21 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           reason_note: reasonNote,
           images,
           method,
-          hub_id: hubId,
+          ...(method === 'pickup'
+            ? {
+                pickup: {
+                  name: pickup.name.trim(),
+                  phone: pickup.phone.trim(),
+                  address: pickup.address.trim(),
+                  city: pickup.city.trim(),
+                  state: pickup.state.trim(),
+                  preferred_date: pickup.preferred_date || undefined,
+                  notes: pickup.notes.trim() || undefined,
+                },
+                // The exact fee the customer agreed to; the server refuses if it changed.
+                ...(quote && quote.fee > 0 ? { accepted_pickup_fee: quote.fee } : {}),
+              }
+            : { hub_id: hubId }),
         }),
       });
 
@@ -201,15 +316,10 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
         throw new Error(result?.error || result?.message || 'Failed to submit return');
       }
 
-      const payload = result?.data ?? result;
-      const createdReturn = payload?.return_request || payload;
-
       toast.success('Return request submitted successfully');
-      if (createdReturn) {
-        setReturns((prev) => [createdReturn, ...prev]);
-      } else {
-        await fetchOrder();
-      }
+      // Reload so the return shows in the same shape as every other return
+      // (the raw response here isn't, and would hide the track links).
+      await fetchOrder();
     } catch (error: any) {
       console.error('Error submitting return:', error);
       toast.error(error?.message || 'Failed to submit return request');
@@ -266,7 +376,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-1">
         <div className="flex items-center gap-2 text-blue-900 font-semibold">
           <MapPin className="w-4 h-4" />
-          <span className="capitalize">Dropoff Shipment</span>
+          <span className="capitalize">{activeReturn?.method === 'pickup' ? 'Pickup Shipment' : 'Dropoff Shipment'}</span>
         </div>
         {shipment.return_code && <p className="text-sm text-blue-800">Return Code: {shipment.return_code}</p>}
         {tracking && <p className="text-sm text-blue-800">Tracking: {tracking}</p>}
@@ -371,12 +481,14 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                 </div>
                 {returnId ? (
                   <div className="flex gap-2">
-                    <Link
-                      href={`/returns/${returnId}/add-tracking`}
-                      className="px-3 py-2 rounded-md bg-white text-indigo-700 border border-indigo-200 text-sm font-semibold hover:bg-indigo-100"
-                    >
-                      Add tracking number
-                    </Link>
+                    {activeReturn.method !== 'pickup' ? (
+                      <Link
+                        href={`/returns/${returnId}/add-tracking`}
+                        className="px-3 py-2 rounded-md bg-white text-indigo-700 border border-indigo-200 text-sm font-semibold hover:bg-indigo-100"
+                      >
+                        Add tracking number
+                      </Link>
+                    ) : null}
                     {activeShipment?.tracking_number ? (
                       <a
                         href={buildFezTrackingUrl(activeShipment.tracking_number) || '#'}
@@ -397,6 +509,39 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                   </div>
                 ) : null}
               </div>
+              {activeReturn.method === 'pickup' ? (
+                <div className="space-y-3 text-sm text-indigo-900">
+                  <div>
+                    <p className="font-semibold">1) Package your item securely</p>
+                    <p>Put your return code inside the package.</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold">2) We collect it from you</p>
+                    {activeReturn.pickup ? (
+                      <p>
+                        {[activeReturn.pickup.address, activeReturn.pickup.city, activeReturn.pickup.state].filter(Boolean).join(', ')}
+                        {activeReturn.pickup.preferred_date ? `. Preferred day: ${activeReturn.pickup.preferred_date}` : ''}
+                      </p>
+                    ) : null}
+                    <p>
+                      {activeReturn.status === 'pending_review'
+                        ? "We're reviewing your request. Once it's approved we'll arrange the pickup and let you know."
+                        : activeReturn.pickup_lane === 'local_rider'
+                        ? 'A JulineMart rider will collect it. Please keep your phone on.'
+                        : 'A courier will collect it. Please keep your phone on.'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold">3) Pickup cost</p>
+                    <p>
+                      {Number(activeReturn.pickup_fee || 0) > 0
+                        ? `${formatPrice(Number(activeReturn.pickup_fee), currency)} will be deducted from your refund.`
+                        : 'Free: the problem is on our side.'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+              <>
               <div className="space-y-3 text-sm text-indigo-900">
                 <div>
                   <p className="font-semibold">1) Package your item securely</p>
@@ -433,6 +578,8 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                   </ul>
                 </div>
               ) : null}
+              </>
+              )}
             </div>
 
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-2">
@@ -563,14 +710,130 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           <div>
             <h2 className="font-semibold text-gray-900 mb-3">Return method</h2>
             <div className="grid grid-cols-1 gap-3">
-              <div className="border rounded-lg p-3 bg-primary-50 border-primary-600">
-                <p className="font-semibold text-gray-900">Ship via Courier</p>
+              <label
+                className={`border rounded-lg p-3 cursor-pointer ${
+                  method === 'dropoff' ? 'bg-primary-50 border-primary-600' : 'border-gray-200 bg-white'
+                }`}
+              >
+                <input type="radio" name="return_method" className="sr-only" checked={method === 'dropoff'} onChange={() => setMethod('dropoff')} />
+                <p className="font-semibold text-gray-900">Drop off at a Fez location (free)</p>
                 <p className="text-xs text-gray-600">Take your item to any Fez Delivery location near you.</p>
                 <p className="text-xs text-gray-700 mt-2">You'll get a tracking number to monitor your return.</p>
-              </div>
+              </label>
+              {pickupEnabled ? (
+                <label
+                  className={`border rounded-lg p-3 cursor-pointer ${
+                    method === 'pickup' ? 'bg-primary-50 border-primary-600' : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <input type="radio" name="return_method" className="sr-only" checked={method === 'pickup'} onChange={() => setMethod('pickup')} />
+                  <p className="font-semibold text-gray-900">We collect it from you</p>
+                  <p className="text-xs text-gray-600">A rider or courier picks the item up from your address.</p>
+                  <p className="text-xs text-gray-700 mt-2">
+                    Free when the problem is on our side. Otherwise a pickup fee is taken off your refund.
+                  </p>
+                </label>
+              ) : null}
             </div>
           </div>
 
+          {method === 'pickup' ? (
+            <div className="rounded-xl border border-gray-100 p-4 space-y-3">
+              <h2 className="font-semibold text-gray-900">Pickup details</h2>
+              <p className="text-sm text-gray-600">Where should we collect the item from?</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <input
+                  value={pickup.name}
+                  onChange={(e) => setPickup((p) => ({ ...p, name: e.target.value }))}
+                  placeholder="Contact name"
+                  autoComplete="name"
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <input
+                  value={pickup.phone}
+                  onChange={(e) => setPickup((p) => ({ ...p, phone: e.target.value }))}
+                  placeholder="Phone (08012345678)"
+                  autoComplete="tel"
+                  inputMode="tel"
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <input
+                value={pickup.address}
+                onChange={(e) => setPickup((p) => ({ ...p, address: e.target.value }))}
+                placeholder="Street address"
+                autoComplete="street-address"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <input
+                  value={pickup.city}
+                  onChange={(e) => setPickup((p) => ({ ...p, city: e.target.value }))}
+                  placeholder="Town / city"
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <input
+                  value={pickup.state}
+                  onChange={(e) => setPickup((p) => ({ ...p, state: e.target.value }))}
+                  placeholder="State"
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs text-gray-600">
+                  Preferred day (optional)
+                  <input
+                    type="date"
+                    value={pickup.preferred_date}
+                    min={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setPickup((p) => ({ ...p, preferred_date: e.target.value }))}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="text-xs text-gray-600">
+                  Note for the rider (optional)
+                  <input
+                    value={pickup.notes}
+                    onChange={(e) => setPickup((p) => ({ ...p, notes: e.target.value }))}
+                    maxLength={300}
+                    placeholder="Gate code, landmark…"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </label>
+              </div>
+
+              {!complaintType ? (
+                <p className="text-sm text-gray-600">Choose the problem below to see what the pickup costs.</p>
+              ) : quoteLoading ? (
+                <p className="text-sm text-gray-600">Checking the pickup cost…</p>
+              ) : quote && !quote.available ? (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  We can&apos;t collect from that area yet. Please choose drop-off instead.
+                </p>
+              ) : quote?.free ? (
+                <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                  Pickup is free. The problem is on our side, so we cover it.
+                </p>
+              ) : quote ? (
+                <div className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                  <p>
+                    Pickup costs <strong>{formatPrice(quote.fee, currency)}</strong>. It&apos;s taken off your refund. Drop-off is free.
+                  </p>
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={feeConfirmed}
+                      onChange={(e) => setFeeConfirmed(e.target.checked)}
+                      className="mt-0.5 h-4 w-4"
+                    />
+                    <span>I agree that {formatPrice(quote.fee, currency)} will be deducted from my refund.</span>
+                  </label>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {method === 'dropoff' ? (
           <div className="bg-white rounded-xl shadow-sm p-6 space-y-3 border border-gray-100">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-semibold text-gray-900">Nearby Fez Hubs</h2>
@@ -599,6 +862,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
               {filteredHubs.length === 0 ? <p className="text-sm text-gray-500">No hubs match your search.</p> : null}
             </div>
           </div>
+          ) : null}
 
           <div>
             <h2 className="font-semibold text-gray-900 mb-3">Report a problem</h2>

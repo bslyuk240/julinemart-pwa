@@ -51,6 +51,9 @@ export default function TrackReturnPage() {
   const statusLabel = useMemo(() => {
     const map: Record<string, string> = {
       awaiting_tracking: 'Awaiting tracking number',
+      pending_review: 'Under review',
+      awaiting_pickup: 'Pickup scheduled',
+      awaiting_dropoff: 'Awaiting drop-off',
       in_transit: 'In transit',
       delivered_to_hub: 'Delivered to Hub',
       inspection_in_progress: 'Inspection in progress',

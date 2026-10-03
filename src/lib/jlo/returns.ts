@@ -12,6 +12,16 @@ export type JloReturnShipment = {
   tracking_submitted_at?: string | null;
 };
 
+export type JloReturnPickup = {
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  preferred_date: string | null;
+  notes: string | null;
+};
+
 export type JloReturnLineItem = {
   wc_order_item_id: number;
   product_id: number;
@@ -53,6 +63,12 @@ export type JloReturn = {
   resolution_timeline?: ResolutionTimelineEntry[];
   status: string;
   created_at?: string;
+  /** 'pickup' (we collect it) or 'dropoff' (the customer takes it to a Fez location). */
+  method?: 'pickup' | 'dropoff';
+  pickup?: JloReturnPickup | null;
+  /** What the customer owes for the pickup; 0 when it's our fault. Deducted from the refund. */
+  pickup_fee?: number;
+  pickup_lane?: 'fez' | 'local_rider' | null;
   return_shipment?: JloReturnShipment;
   line_items?: JloReturnLineItem[];
 } & JloRefundInfo;
@@ -66,6 +82,9 @@ export function formatJloReturnStatus(
 ): { label: string; color: string; bgColor: string } {
   const map: Record<string, { label: string; color: string; bgColor: string }> = {
     requested: { label: 'Requested', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+    pending_review: { label: 'Under review', color: 'text-amber-700', bgColor: 'bg-amber-100' },
+    awaiting_pickup: { label: 'Pickup scheduled', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+    awaiting_dropoff: { label: 'Awaiting drop-off', color: 'text-blue-700', bgColor: 'bg-blue-100' },
     awaiting_tracking: { label: 'Awaiting Tracking', color: 'text-gray-700', bgColor: 'bg-gray-100' },
     in_transit: { label: 'In Transit', color: 'text-purple-700', bgColor: 'bg-purple-100' },
     delivered_to_hub: { label: 'At Hub', color: 'text-teal-700', bgColor: 'bg-teal-100' },
