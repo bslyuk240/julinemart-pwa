@@ -11,6 +11,7 @@ export const GIFT_STATUS_LABELS: Record<string, string> = {
   packed: 'Gift box ready',
   dispatch: 'On the way',
   delivered: 'Delivered',
+  cancelled: 'Gift order cancelled',
 };
 
 const TIMELINE = ['paid', 'packing', 'packed', 'dispatch', 'delivered'];
@@ -73,6 +74,12 @@ export default function GiftOrderTimeline({ orderId, supabaseOrderId }: Props) {
           <p className="text-sm text-gray-600">For {gift.recipient_name}</p>
         </div>
       </div>
+
+      {gift.gift_status === 'cancelled' && (
+        <p className="rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-sm text-red-700">
+          {GIFT_STATUS_LABELS.cancelled}. Any refund is returned to your original payment method.
+        </p>
+      )}
 
       <ol className="space-y-2">
         {TIMELINE.map((step, idx) => {
