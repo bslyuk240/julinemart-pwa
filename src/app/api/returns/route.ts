@@ -26,8 +26,13 @@ export async function GET(request: Request) {
     return NextResponse.json([], { status: 200 });
   }
 
+  // JLO requires the customer's login and only returns their own returns.
+  const authorization = request.headers.get('authorization') || request.headers.get('Authorization');
+
   try {
-    const res = await fetch(`${JLO_BASE}${path}`);
+    const res = await fetch(`${JLO_BASE}${path}`, {
+      headers: authorization ? { Authorization: authorization } : {},
+    });
     const data = await res.json().catch(async () => {
       const text = await res.text().catch(() => '');
       return { message: text || null };

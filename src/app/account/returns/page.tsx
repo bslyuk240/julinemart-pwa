@@ -11,6 +11,7 @@ import { JloReturn, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo
 import RefundTimeline from '@/components/return/RefundTimeline';
 import { formatPrice } from '@/lib/utils/format-price';
 import { toast } from 'sonner';
+import { getAuthHeader } from '@/lib/supabase/client';
 
 export default function ReturnsPage() {
   const router = useRouter();
@@ -33,7 +34,9 @@ export default function ReturnsPage() {
   const loadReturns = async (email: string) => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/returns?customer_email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/returns?customer_email=${encodeURIComponent(email)}`, {
+        headers: await getAuthHeader(),
+      });
       if (!res.ok) throw new Error('Failed to fetch returns');
       const json = await res.json();
       const payload = json?.data ?? json;

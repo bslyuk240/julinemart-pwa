@@ -149,14 +149,19 @@ function adaptOrder(o: any) {
   };
 }
 
-async function fetchSupabaseOrder(id: string, ownerEmail: string): Promise<any | null> {
+async function fetchSupabaseOrder(
+  id: string,
+  ownerEmail: string,
+  authHeaders: Record<string, string>
+): Promise<any | null> {
   if (!JLO_BASE) return null;
 
   // Primary: ask JLO for this owner's own order by id — works regardless of
-  // whether `id` is a Supabase UUID or a legacy order number, since it's
-  // scoped by the authenticated customer's email.
+  // whether `id` is a Supabase UUID or a legacy order number. JLO verifies the
+  // forwarded login and scopes the lookup to that customer's email.
   const res = await fetch(
-    `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(ownerEmail)}&order_id=${encodeURIComponent(id)}`
+    `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(ownerEmail)}&order_id=${encodeURIComponent(id)}`,
+    { headers: authHeaders }
   );
   if (res.ok) {
     const json = await res.json().catch(() => null);
@@ -174,7 +179,8 @@ async function fetchSupabaseOrder(id: string, ownerEmail: string): Promise<any |
       const orderRaw = adminJson?.success ? adminJson.data : null;
       if (orderRaw?.customer_email?.toLowerCase() === ownerEmail.toLowerCase()) {
         const itemsRes = await fetch(
-          `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(orderRaw.customer_email)}&order_id=${encodeURIComponent(id)}`
+          `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(orderRaw.customer_email)}&order_id=${encodeURIComponent(id)}`,
+          { headers: authHeaders }
         );
         if (itemsRes.ok) {
           const itemsJson = await itemsRes.json().catch(() => null);
@@ -206,8 +212,12 @@ export async function GET(
     return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
   }
 
+  // Forwarded to JLO, which now requires the customer's login on these lookups.
+  const authorization = request.headers.get('authorization') || request.headers.get('Authorization');
+  const authHeaders: Record<string, string> = authorization ? { Authorization: authorization } : {};
+
   try {
-    const supabaseOrder = await fetchSupabaseOrder(id, user.email);
+    const supabaseOrder = await fetchSupabaseOrder(id, user.email, authHeaders);
     if (!supabaseOrder) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
@@ -219,7 +229,8 @@ export async function GET(
     if (supabaseId) {
       try {
         const returnsRes = await fetch(
-          `${JLO_BASE}/.netlify/functions/get-order-returns?order_id=${supabaseId}`
+          `${JLO_BASE}/.netlify/functions/get-order-returns?order_id=${supabaseId}`,
+          { headers: authHeaders }
         );
         const returnsJson = await returnsRes.json().catch(() => null);
         if (returnsRes.ok && returnsJson?.success) {

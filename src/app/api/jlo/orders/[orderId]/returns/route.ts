@@ -4,7 +4,7 @@ import { getJloBaseUrl } from '@/lib/jlo/returns';
 const JLO_BASE = getJloBaseUrl();
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ orderId: string }> }
 ) {
   if (!JLO_BASE) {
@@ -17,7 +17,10 @@ export async function GET(
   }
 
   try {
-    const response = await fetch(`${JLO_BASE}/api/orders/${orderId}/returns`);
+    const authorization = request.headers.get('authorization');
+    const response = await fetch(`${JLO_BASE}/api/orders/${orderId}/returns`, {
+      headers: authorization ? { Authorization: authorization } : {},
+    });
     const data = await response.json().catch(async () => {
       const text = await response.text().catch(() => '');
       return { message: text || null };

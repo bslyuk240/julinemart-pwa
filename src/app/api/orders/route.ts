@@ -124,7 +124,12 @@ export async function GET(request: Request) {
 
   if (!JLO_BASE) return NextResponse.json({ orders: [] });
 
-  const res = await fetch(`${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(user.email)}`);
+  // JLO verifies this login and returns only that customer's orders.
+  const authorization = request.headers.get('authorization') || request.headers.get('Authorization');
+  const res = await fetch(
+    `${JLO_BASE}/.netlify/functions/customer-orders?email=${encodeURIComponent(user.email)}`,
+    { headers: authorization ? { Authorization: authorization } : {} }
+  );
   const json = await res.json().catch(() => ({ success: false, data: [] }));
 
   if (!res.ok || !json.success) return NextResponse.json({ orders: [] });

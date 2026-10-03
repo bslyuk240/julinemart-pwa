@@ -48,7 +48,11 @@ export async function GET(request: Request) {
     : '/api/returns-list';
 
   try {
-    return await proxy(path, { method: 'GET' });
+    const authorization = request.headers.get('authorization');
+    return await proxy(path, {
+      method: 'GET',
+      headers: authorization ? { Authorization: authorization } : {},
+    });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, message: error?.message || 'Failed to fetch returns from JLO' },

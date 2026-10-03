@@ -104,7 +104,7 @@ export default function OrderDetailPage() {
         // Fallback: fetch returns by order_id if none came back on the order response
         if (!initialReturns.length) {
           try {
-            const fallbackRes = await fetch(`/api/returns?order_id=${orderId}`);
+            const fallbackRes = await fetch(`/api/returns?order_id=${orderId}`, { headers: await getAuthHeader() });
             if (fallbackRes.ok) {
               const fallbackJson = await fallbackRes.json();
               const fbPayload = fallbackJson?.data ?? fallbackJson;
@@ -123,7 +123,9 @@ export default function OrderDetailPage() {
         // Backup: use customer returns and filter by order_id
         if (!initialReturns.length && customerEmail) {
           try {
-            const custRes = await fetch(`/api/returns?customer_email=${encodeURIComponent(customerEmail)}`);
+            const custRes = await fetch(`/api/returns?customer_email=${encodeURIComponent(customerEmail)}`, {
+              headers: await getAuthHeader(),
+            });
             if (custRes.ok) {
               const custJson = await custRes.json();
               const cpayload = custJson?.data ?? custJson;
