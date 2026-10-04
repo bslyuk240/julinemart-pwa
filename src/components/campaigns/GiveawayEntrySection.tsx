@@ -85,7 +85,8 @@ export default function GiveawayEntrySection({
   const [location, setLocation] = useState('');
   const [otherLocation, setOtherLocation] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [marketingOptIn, setMarketingOptIn] = useState(true);
+  // Unticked by default: consent has to be an active choice, not a default.
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -99,7 +100,12 @@ export default function GiveawayEntrySection({
 
   const source = useMemo(() => {
     if (typeof window === 'undefined') return undefined;
-    return new URLSearchParams(window.location.search).get('qr_source') ?? undefined;
+    // Any one tag per channel link works: ?src=whatsapp-channel, ?utm_source=ig,
+    // ?ref=..., or the QR system's ?qr_source=. Capped so a long value can't
+    // fail entry validation.
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('qr_source') ?? params.get('src') ?? params.get('utm_source') ?? params.get('ref');
+    return raw?.trim().slice(0, 60) || undefined;
   }, []);
 
   async function handleUnlock() {
