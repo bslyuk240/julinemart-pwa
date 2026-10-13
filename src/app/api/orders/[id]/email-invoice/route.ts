@@ -23,18 +23,24 @@ export async function POST(
     return NextResponse.json({ success: false, error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { customer_email, pdf_base64, file_name } = body;
+  const { pdf_base64, file_name } = body;
 
-  if (!customer_email || !pdf_base64) {
-    return NextResponse.json({ success: false, error: 'customer_email and pdf_base64 are required' }, { status: 400 });
+  if (!pdf_base64) {
+    return NextResponse.json({ success: false, error: 'pdf_base64 is required' }, { status: 400 });
+  }
+
+  // JLO only emails the signed-in customer, for their own order, so it needs
+  // the customer's token.
+  const authorization = request.headers.get('authorization');
+  if (!authorization) {
+    return NextResponse.json({ success: false, error: 'Sign in required' }, { status: 401 });
   }
 
   const jloRes = await fetch(`${JLO_BASE}/.netlify/functions/send-invoice-email`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: authorization },
     body: JSON.stringify({
       order_id: id,
-      customer_email,
       pdf_base64,
       file_name: file_name || `Invoice-${id}.pdf`,
     }),

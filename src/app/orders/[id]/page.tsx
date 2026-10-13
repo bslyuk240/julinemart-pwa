@@ -220,7 +220,7 @@ export default function OrderDetailPage() {
       const supabaseId = (order as any)._supabase_id ?? order.id;
       const res = await fetch(`/api/orders/${supabaseId}/email-invoice`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
         body: JSON.stringify({
           customer_email: email,
           pdf_base64: base64,
