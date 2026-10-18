@@ -1,5 +1,7 @@
 'use client';
 
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -11,6 +13,9 @@ import { useCart } from '@/hooks/use-cart';
 import { Button } from '@/components/ui/button';
 
 export default function WishlistPage() {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 2): account sub-pages use the
+  // shell below md; the top bar comes from AccountPageHeader.
+  const tier = useMobileTier() !== null;
   const { items, removeItem, clearWishlist, itemCount } = useWishlist();
   const {
     items: giftBoxItems,
@@ -77,7 +82,7 @@ export default function WishlistPage() {
     `₦${parseFloat(String(price) || '0').toLocaleString()}`;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
+    <main className={clsx('min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
       <div className="container-custom min-w-0 py-5 md:py-6">
         <AccountPageHeader
           title="My Wishlist"

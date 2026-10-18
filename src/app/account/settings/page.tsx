@@ -1,5 +1,7 @@
 'use client';
 
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -15,6 +17,9 @@ import PageLoading from '@/components/ui/page-loading';
 import { ACCOUNT_DELETION_EMAIL } from '@/lib/constants';
 
 export default function AccountSettingsPage() {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 2): account sub-pages use the
+  // shell below md; the top bar comes from AccountPageHeader.
+  const tier = useMobileTier() !== null;
   const router = useRouter();
   const { user, customer, isAuthenticated, isLoading: authLoading, refreshCustomer } = useCustomerAuth();
 
@@ -101,7 +106,7 @@ export default function AccountSettingsPage() {
   if (!isAuthenticated || !customer) return null;
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
       <div className="container mx-auto px-4 py-5 md:py-6 max-w-4xl">
         <AccountPageHeader
           title="Profile Settings"

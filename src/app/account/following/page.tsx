@@ -1,5 +1,8 @@
 'use client';
 
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -18,6 +21,9 @@ type FollowedStore = {
 };
 
 export default function FollowingPage() {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 2): account sub-pages use the
+  // shell below md; the top bar comes from AccountPageHeader.
+  const tier = useMobileTier() !== null;
   const router = useRouter();
   const { isAuthenticated, isLoading } = useCustomerAuth();
   const [stores, setStores] = useState<FollowedStore[]>([]);
@@ -57,9 +63,14 @@ export default function FollowingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
       <div className="mx-auto max-w-lg px-4 py-5 md:max-w-3xl">
-        <div className="mb-5 flex items-center gap-3">
+        {tier && (
+          <div className="sticky top-0 z-m-header -mx-4 -mt-5 mb-3 bg-m-surface-low md:hidden">
+            <MobileTopBar title="Following" subtitle="Stores you follow on JulineMart" backHref="/account" />
+          </div>
+        )}
+        <div className={clsx('mb-5 flex items-center gap-3', tier && 'max-md:hidden')}>
           <Link
             href="/account"
             className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700"

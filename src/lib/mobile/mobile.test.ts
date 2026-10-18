@@ -68,10 +68,12 @@ describe('getMobileTierRoute', () => {
     expect(getMobileTierRoute('/gifts/birthday')?.tabBar).toBe(true);
   });
 
-  it('puts the tab roots in the mobile tier but not account sub-pages yet', () => {
+  it('puts the tab roots and account sub-pages in the mobile tier, not the return flow', () => {
     expect(getMobileTierRoute('/wishlist')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/account')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/account/orders')).toBeNull();
+    expect(getMobileTierRoute('/account/addresses')?.tabBar).toBe(true);
+    expect(getMobileTierRoute('/account/orders/12/return')).toBeNull();
     expect(getMobileTierRoute('/orders')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/orders/abc-123')?.tabBar).toBe(true);
   });

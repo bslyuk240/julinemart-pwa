@@ -24,7 +24,17 @@ const ROUTES: MobileTierRoute[] = [
   { pattern: '/gifts/*', tabBar: true }, // M5: occasion catalogues (after the specific /gifts routes above)
   { pattern: '/categories', tabBar: true }, // M6: tab roots
   { pattern: '/wishlist', tabBar: true }, // M6
-  { pattern: '/account', tabBar: true }, // M6: hub only; sub-pages later
+  { pattern: '/account', tabBar: true }, // M6: hub
+  ...[
+    'addresses',
+    'following',
+    'notifications',
+    'payments',
+    'purchases',
+    'returns',
+    'settings',
+    'wishlist',
+  ].map((page) => ({ pattern: `/account/${page}`, tabBar: true })), // M8: account sub-pages
   { pattern: '/orders', tabBar: true }, // M7: orders list (Account tab stays lit)
   { pattern: '/orders/*', tabBar: true }, // M7: order detail
 ];

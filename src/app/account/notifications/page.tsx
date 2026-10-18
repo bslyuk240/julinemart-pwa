@@ -1,5 +1,7 @@
 'use client';
 
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -57,6 +59,9 @@ function maskToken(token: string) {
 }
 
 export default function AccountNotificationsPage() {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 2): account sub-pages use the
+  // shell below md; the top bar comes from AccountPageHeader.
+  const tier = useMobileTier() !== null;
   const router = useRouter();
   const { user, customer, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
   const customerId = user?.id ?? null;
@@ -378,7 +383,7 @@ export default function AccountNotificationsPage() {
 
   if (!isAuthenticated || !customer) {
     return (
-      <main className="min-h-screen bg-gray-50 pb-24 md:pb-8 flex items-center justify-center">
+      <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8 flex items-center justify-center', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
         <div className="bg-white rounded-2xl shadow-sm p-5 text-center max-w-md">
           <h1 className="text-base md:text-xl font-bold text-gray-900 mb-2">Sign in required</h1>
           <p className="text-sm text-gray-600 mb-4">
@@ -393,7 +398,7 @@ export default function AccountNotificationsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
       <div className="container mx-auto px-4 py-5 md:py-6 max-w-4xl">
         <AccountPageHeader
           title="Notifications"

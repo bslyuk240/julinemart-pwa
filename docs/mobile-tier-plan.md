@@ -341,6 +341,24 @@ Desktop is unchanged.
 
 Not verified on screen: the signed-in views, which need a customer account. The signed-out redirect to /login still works.
 
+**M8 status (2026-10-18): account sub-pages built, not committed.**
+
+`/account/{addresses, following, notifications, payments, purchases, returns, settings, wishlist}` are on the allowlist with the navigation bar.
+- `AccountPageHeader` now renders a Material top bar below `md` (title, subtitle, back to /account, the page's action), so seven pages pick it up from one place. `/account/following`, which has its own header, gets the top bar directly.
+- Each page's old-nav bottom padding is trimmed on the tier.
+- Lint warnings are unchanged (28 before and after).
+
+Desktop is unchanged.
+
+Checked:
+- the account hub, signed in (from your screenshot)
+- `/account/wishlist`, signed out
+- the signed-out redirects for the other pages
+
+Not checked yet: the signed-in sub-pages.
+
+The return-request flow (`/account/orders/[id]/return…`) stays on the old chrome until wave 3.
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---

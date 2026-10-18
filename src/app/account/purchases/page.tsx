@@ -1,5 +1,7 @@
 'use client';
 
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -52,6 +54,9 @@ function formatPrice(amount: number) {
 }
 
 export default function PurchasesPage() {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 2): account sub-pages use the
+  // shell below md; the top bar comes from AccountPageHeader.
+  const tier = useMobileTier() !== null;
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useCustomerAuth();
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
@@ -96,7 +101,7 @@ export default function PurchasesPage() {
   const withWarranty = purchases.filter((p) => p.warranty_type && p.warranty_type !== 'none');
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
       <div className="container-custom py-5 md:py-6">
         <AccountPageHeader
           title="My Purchases"
