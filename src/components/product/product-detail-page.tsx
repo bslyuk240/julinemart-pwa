@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Star, ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, Minus, Plus, Store, BadgeCheck, ArrowLeft } from 'lucide-react';
+import { Star, ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, Minus, Plus, Store, BadgeCheck, ArrowLeft, Check, ChevronDown, Link2 } from 'lucide-react';
+import { clsx } from 'clsx';
 import { Button } from '@/components/ui/button';
 import ProductGallery from '@/components/product/product-gallery';
 import ProductCarousel from '@/components/product/product-carousel';
@@ -33,6 +34,12 @@ import {
 } from '@/lib/gtag';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { trackJourneyEvent } from '@/lib/analytics/track-event';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar, { TopBarAction } from '@/components/mobile/shell/mobile-top-bar';
+import StickyActionBar from '@/components/mobile/shell/sticky-action-bar';
+import ActionSheet from '@/components/mobile/primitives/action-sheet';
+import { useCart } from '@/hooks/use-cart';
+import { haptic } from '@/lib/mobile/haptics';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -147,6 +154,15 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     review: '',
   });
   const [vendorTrust, setVendorTrust] = useState<VendorTrustResponse | null>(null);
+  // Mobile tier (docs/mobile-tier-plan.md, M1): every mobile-only piece below
+  // is gated on `tier` plus `md:hidden` / `max-md:` classes, so desktop is
+  // untouched and removing /product/* from the allowlist reverts this page.
+  const tier = useMobileTier() !== null;
+  const [mobileShareOpen, setMobileShareOpen] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const variationsRef = useRef<HTMLDivElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const { itemCount: cartCount } = useCart();
 
   const { user, customer } = useCustomerAuth();
 
@@ -273,7 +289,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
     const requiresSelection = product.type === 'variable' && variationAttributes.length > 0;
     if (requiresSelection && !selectedVariation) {
-      toast.error('Please choose your options first');
+      promptForOptions();
       return;
     }
 
@@ -301,7 +317,18 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       : undefined;
 
     addToCart(product, quantity, variationPayload);
-    toast.success('Added to cart');
+    if (isMobileTierViewport()) {
+      // Stay on the page: confirm with a "View cart" action instead of a bare toast.
+      haptic('success');
+      const optionLabel = selectedVariation
+        ? selectedVariation.attributes.map((attr) => cleanOptionLabel(attr.option)).join(', ')
+        : '';
+      toast.success(optionLabel ? `Added to cart · ${optionLabel}` : 'Added to cart', {
+        action: { label: 'View cart', onClick: () => router.push('/cart') },
+      });
+    } else {
+      toast.success('Added to cart');
+    }
     trackAddToCart({
       value: selectedPrice * quantity,
       items: [{
@@ -315,12 +342,24 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     });
   };
 
+  // True only on a mobile-tier route at phone width; decides behaviour, never layout.
+  const isMobileTierViewport = () =>
+    tier && typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+
+  const promptForOptions = () => {
+    if (isMobileTierViewport()) {
+      haptic('warning');
+      variationsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    toast.error('Please choose your options first');
+  };
+
   const handleBuyNow = () => {
     if (!product) return;
 
     const requiresSelection = product.type === 'variable' && variationAttributes.length > 0;
     if (requiresSelection && !selectedVariation) {
-      toast.error('Please choose your options first');
+      promptForOptions();
       return;
     }
 
@@ -366,6 +405,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
       image: product.images?.[0]?.src || '/images/placeholder.svg',
     });
 
+    if (isMobileTierViewport()) haptic(wasAdded ? 'success' : 'tap');
     if (wasAdded) {
       trackAddToWishlist({
         itemId: String(product.id),
@@ -639,6 +679,20 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
     return product?.average_rating ? parseFloat(product.average_rating) : 0;
   }, [reviews, product?.average_rating]);
 
+  const ratingCounts = useMemo(() => {
+    const counts = [0, 0, 0, 0, 0];
+    reviews.forEach((review) => {
+      const stars = Math.round(Number(review.rating) || 0);
+      if (stars >= 1 && stars <= 5) counts[stars - 1] += 1;
+    });
+    return counts;
+  }, [reviews]);
+
+  const openReviews = () => {
+    setActiveTab('reviews');
+    requestAnimationFrame(() => tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
   const effectiveStockStatus =
     selectedVariation?.stock_status || product?.stock_status || 'outofstock';
   const effectiveStockQty =
@@ -682,13 +736,39 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
   const primaryBrandName = product.brands?.[0]?.name
     ? decodeHtmlEntities(product.brands[0].name)
     : '';
+  const storeName = product.store
+    ? product.store.shop_name ||
+      product.store.name ||
+      (product.store.url
+        ? product.store.url.split('/').pop()?.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+        : 'Vendor Store')
+    : '';
+  const backHref = product.categories?.[0]?.slug ? `/category/${product.categories[0].slug}` : '/';
+
   const displaySku =
     (selectedVariation?.sku && String(selectedVariation.sku).trim()) ||
     (product.sku && String(product.sku).trim()) ||
     '';
 
   return (
-    <main className="min-h-screen bg-white pb-24 md:pb-8 overflow-x-hidden">
+    <main className={clsx('min-h-screen bg-white pb-24 md:pb-8 overflow-x-hidden', tier && 'max-md:overflow-x-clip max-md:pb-0')}>
+      {tier && (
+        <MobileTopBar
+          variant={fromCampaignSlug ? 'small' : 'overlay'}
+          title={decodedProductName}
+          backHref={backHref}
+          actions={
+            <>
+              <TopBarAction label="Share" onImage={!fromCampaignSlug} onClick={() => setMobileShareOpen(true)}>
+                <Share2 className="h-5 w-5" aria-hidden />
+              </TopBarAction>
+              <TopBarAction label="Cart" href="/cart" badge={cartCount} onImage={!fromCampaignSlug}>
+                <ShoppingCart className="h-5 w-5" aria-hidden />
+              </TopBarAction>
+            </>
+          }
+        />
+      )}
       {fromCampaignSlug && (
         <Link
           href={`/campaigns/${fromCampaignSlug}`}
@@ -701,9 +781,9 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
           </span>
         </Link>
       )}
-      <div className="container-custom py-4 md:py-6 overflow-x-hidden">
+      <div className={clsx('container-custom py-4 md:py-6 overflow-x-hidden', tier && 'max-md:pt-0')}>
         {/* Breadcrumb */}
-        <nav className="text-sm text-gray-600 mb-4">
+        <nav className={clsx('text-sm text-gray-600 mb-4', tier && 'max-md:hidden')}>
           <a href="/" className="hover:text-primary-600">Home</a>
           <span className="mx-2">/</span>
           {product.categories && product.categories.length > 0 && (
@@ -719,7 +799,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
         {/* ==================== PRODUCT BADGES (LIKE JUMIA) ==================== */}
         {(hasOfficialTag || hasShipsFromAbroadTag || productBadges.length > 0) && (
-          <div className="mb-4 flex flex-wrap gap-2">
+          <div className={clsx('mb-4 flex flex-wrap gap-2', tier && 'max-md:hidden')}>
             {/* Official Store Badge */}
             {hasOfficialTag && (
               <div className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-xs md:text-sm font-semibold px-3 py-1.5 rounded-md shadow-sm">
@@ -752,13 +832,36 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
         <div className="grid md:grid-cols-2 gap-6 md:gap-8 mb-10 max-w-full">
           {/* Product Gallery */}
-          <div className="min-w-0">
-            <ProductGallery images={galleryImages} productName={decodedProductName} />
+          <div className={clsx('min-w-0', tier && 'max-md:-mx-4')}>
+            <ProductGallery images={galleryImages} productName={decodedProductName} edgeToEdge={tier} />
           </div>
 
           {/* Product Info */}
           <div className="space-y-5 min-w-0">
             <div>
+              {tier && (hasOfficialTag || hasShipsFromAbroadTag || productBadges.length > 0) && (
+                <div className="mb-3 flex flex-wrap gap-2 md:hidden">
+                  {hasOfficialTag && (
+                    <span className="inline-flex h-6 items-center gap-1 rounded-md bg-blue-600 px-2 text-m-label-s text-white">
+                      <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
+                      Official Store
+                    </span>
+                  )}
+                  {hasShipsFromAbroadTag && (
+                    <span className="inline-flex h-6 items-center rounded-md bg-m-surface-high px-2 text-m-label-s text-m-on-surface-variant">
+                      Ships from abroad
+                    </span>
+                  )}
+                  {productBadges.map((tag) => {
+                    const config = getBadgeConfig(tag.slug);
+                    return (
+                      <span key={tag.id} className={`${config.bgColor} inline-flex h-6 items-center rounded-md px-2 text-m-label-s text-white`}>
+                        {config.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
               {/* Vendor Badge */}
               {product.store && (
                 <div className="inline-flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full mb-3">
@@ -772,7 +875,12 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                 </div>
               )}
 
-              <h1 className="text-base md:text-xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2">
+              <h1
+                className={clsx(
+                  'text-base md:text-xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2',
+                  tier && 'max-md:text-[22px] max-md:font-medium max-md:leading-7 max-md:tracking-[-0.01em] max-md:line-clamp-3 max-md:text-m-on-surface',
+                )}
+              >
                 {decodedProductName}
               </h1>
               
@@ -799,7 +907,12 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
               {/* Price */}
               <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className="text-lg md:text-xl font-bold text-primary-600">
+                <span
+                  className={clsx(
+                    'text-lg md:text-xl font-bold text-primary-600',
+                    tier && 'max-md:text-[28px] max-md:leading-9 max-md:tracking-[-0.02em] max-md:text-m-on-surface max-md:tabular-nums',
+                  )}
+                >
                   {formatPrice(selectedPrice.toString())}
                 </span>
                 {discountPercentage > 0 && (
@@ -833,7 +946,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
             {/* Variations */}
             {product.type === 'variable' && variationAttributes.length > 0 && (
-              <div className="border-t pt-4 md:pt-5 space-y-4">
+              <div ref={variationsRef} className="border-t pt-4 md:pt-5 space-y-4 scroll-mt-24">
                 {variationAttributes.map((attr) => {
                   const key = normalizeVariationKey(attr.name ?? '');
                   const selected = key ? selectedAttributes[key] : undefined;
@@ -867,19 +980,27 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                               key={`${key || 'variation'}-${optionTrimmed || index}`}
                               type="button"
                               disabled={disabled}
-                              onClick={() =>
-                                key &&
+                              onClick={() => {
+                                if (!key) return;
+                                if (isMobileTierViewport()) haptic('selection');
                                 setSelectedAttributes((prev) => ({
                                   ...prev,
                                   [key]: optionTrimmed,
-                                }))
-                              }
-                              className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
-                                isSelected
-                                  ? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
-                                  : 'border-gray-300 text-gray-700 hover:border-primary-500'
-                              } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                }));
+                              }}
+                              className={clsx(
+                                `px-3 py-2 rounded-lg border text-sm transition-colors ${
+                                  isSelected
+                                    ? 'border-primary-600 bg-primary-50 text-primary-700 font-semibold'
+                                    : 'border-gray-300 text-gray-700 hover:border-primary-500'
+                                } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`,
+                                // Material filter chip: 40px tall, selected = tonal fill + check.
+                                tier && 'max-md:inline-flex max-md:h-10 max-md:items-center max-md:gap-1.5 max-md:px-4 max-md:font-semibold',
+                                tier && isSelected && 'max-md:border-transparent max-md:bg-m-primary-container max-md:text-m-on-primary-container',
+                                tier && !isSelected && 'max-md:border-m-outline-variant max-md:text-m-on-surface-variant',
+                              )}
                             >
+                              {tier && isSelected && <Check className="h-[18px] w-[18px] md:hidden" aria-hidden />}
                               {cleanOptionLabel(optionTrimmed)}
                             </button>
                           );
@@ -984,7 +1105,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
 
             {/* Add to Cart Section */}
             <div className="space-y-3 md:space-y-4 border-t pt-4 md:pt-6">
-              <JulineMartProtectBadge className="mb-1" />
+              <JulineMartProtectBadge className={clsx('mb-1', tier && 'max-md:hidden')} />
               <ProductWarrantyBadge
                 warrantyType={product.warranty_type}
                 warrantyMonths={product.warranty_months}
@@ -1002,7 +1123,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                 />
               )}
 
-              <div className="flex gap-3 md:gap-4 flex-wrap md:flex-nowrap">
+              <div className={clsx('flex gap-3 md:gap-4 flex-wrap md:flex-nowrap', tier && 'max-md:hidden')}>
                 <Button
                   onClick={handleAddToCart}
                   variant="primary"
@@ -1117,7 +1238,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
                     variationAttributes.length > 0 &&
                     !selectedVariation)
                 }
-                className="text-sm md:text-base"
+                className={clsx('text-sm md:text-base', tier && 'max-md:hidden')}
               >
                 Buy Now
               </Button>
@@ -1140,11 +1261,12 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
             )}
 
             {/* Features */}
-            <ProductFeatures className="border-t pt-6" />
+            <ProductFeatures className={clsx('border-t pt-6', tier && 'max-md:hidden')} />
+            {tier && <ProductFeatures variant="list" className="-mx-4 border-t border-m-outline-variant py-1 md:hidden" />}
 
             {/* Vendor Info Card */}
             {product.store && (
-              <div className="border-t pt-6">
+              <div className={clsx('border-t pt-6', tier && 'max-md:hidden')}>
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -1181,7 +1303,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
         </div>
 
         {/* Tabs */}
-        <div className="border-t pt-8 mb-12">
+        <div ref={tabsRef} className={clsx('border-t pt-8 mb-12', tier && 'max-md:mb-0 max-md:scroll-mt-20')}>
           <div className="flex gap-4 md:gap-8 border-b mb-6 overflow-x-auto pb-1 md:overflow-visible">
             <button
               onClick={() => setActiveTab('description')}
@@ -1206,10 +1328,26 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
           </div>
 
           {activeTab === 'description' && product.description && (
-            <div 
-              className="prose max-w-none break-words [overflow-wrap:anywhere] [&>table]:w-full [&>table]:max-w-full [&>table]:block [&>table]:overflow-x-auto [&>table]:whitespace-nowrap [&_img]:max-w-full [&_img]:h-auto"
-              dangerouslySetInnerHTML={{ __html: product.description }}
-            />
+            <>
+              <div
+                className={clsx(
+                  'prose max-w-none break-words [overflow-wrap:anywhere] [&>table]:w-full [&>table]:max-w-full [&>table]:block [&>table]:overflow-x-auto [&>table]:whitespace-nowrap [&_img]:max-w-full [&_img]:h-auto',
+                  tier && !descriptionExpanded && 'max-md:max-h-72 max-md:overflow-hidden max-md:[mask-image:linear-gradient(to_bottom,black_70%,transparent)]',
+                )}
+                dangerouslySetInnerHTML={{ __html: product.description }}
+              />
+              {tier && (
+                <button
+                  type="button"
+                  onClick={() => setDescriptionExpanded((open) => !open)}
+                  aria-expanded={descriptionExpanded}
+                  className="-ml-3 mt-1 inline-flex h-10 items-center gap-1 rounded-full px-3 text-m-label-l text-m-primary md:hidden"
+                >
+                  {descriptionExpanded ? 'Show less' : 'Read more'}
+                  <ChevronDown className={clsx('h-[18px] w-[18px] transition-transform', descriptionExpanded && 'rotate-180')} aria-hidden />
+                </button>
+              )}
+            </>
           )}
 
           {activeTab === 'reviews' && (
@@ -1335,6 +1473,80 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
           )}
         </div>
 
+        {tier && (
+          <div className="-mx-4 mt-6 md:hidden">
+            <div className="h-2 bg-m-surface-low" />
+            <section aria-labelledby="mobile-reviews-heading" className="p-4">
+              <div className="flex items-center justify-between">
+                <h2 id="mobile-reviews-heading" className="text-m-title-m text-m-on-surface">Reviews</h2>
+                <button type="button" onClick={openReviews} className="-mr-3 h-10 rounded-full px-3 text-m-label-l text-m-primary">
+                  {reviewCount > 0 ? 'See all' : 'Write a review'}
+                </button>
+              </div>
+              {reviewCount > 0 ? (
+                <div className="mt-1 flex items-center gap-4">
+                  <div className="shrink-0">
+                    <p className="text-[36px] font-bold leading-[44px] tabular-nums text-m-on-surface">{averageRating.toFixed(1)}</p>
+                    <p className="text-m-body-s text-m-on-surface-variant">
+                      {reviewCount} {reviewCount === 1 ? 'review' : 'reviews'}
+                    </p>
+                  </div>
+                  <div className="grid flex-1 gap-1" aria-label="Rating breakdown">
+                    {[5, 4, 3, 2, 1].map((stars) => {
+                      const count = ratingCounts[stars - 1];
+                      const total = reviews.length || 1;
+                      return (
+                        <div key={stars} className="flex items-center gap-2 text-m-body-s text-m-on-surface-variant">
+                          <span className="w-2 tabular-nums">{stars}</span>
+                          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-m-surface-high">
+                            <span
+                              className="block h-full rounded-full bg-m-primary"
+                              style={{ width: `${Math.round((count / total) * 100)}%` }}
+                            />
+                          </span>
+                          <span className="sr-only">{count} with {stars} stars</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-1 text-m-body-m text-m-on-surface-variant">No reviews yet. Be the first to share your thoughts.</p>
+              )}
+            </section>
+
+            {product.store && (
+              <>
+                <div className="h-2 bg-m-surface-low" />
+                <div className="flex min-h-[72px] items-center gap-4 px-4 py-3">
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-m-primary-container text-m-primary">
+                    <Store className="h-6 w-6" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-m-body-m text-m-on-surface-variant">Sold by</p>
+                    <p className="truncate text-[15px] font-semibold leading-5 text-m-on-surface">{storeName}</p>
+                    {vendorTrust && (
+                      <SellerTrustBadge
+                        level={vendorTrust.level}
+                        verifications={vendorTrust.verifications}
+                        compact
+                        className="mt-1"
+                      />
+                    )}
+                  </div>
+                  <Link
+                    href={`/vendor/${product.store.id}`}
+                    className="inline-flex h-10 shrink-0 items-center rounded-full px-4 text-m-label-l text-m-primary shadow-[inset_0_0_0_1px_var(--m-outline)] active:bg-m-primary-container"
+                  >
+                    Visit store
+                  </Link>
+                </div>
+              </>
+            )}
+            <div className="h-2 bg-m-surface-low" />
+          </div>
+        )}
+
         {/* Related Products */}
         {relatedProducts.length > 0 && (
           <section className="border-t pt-8">
@@ -1343,6 +1555,66 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
           </section>
         )}
       </div>
+
+      {tier && (
+        <StickyActionBar>
+          <button
+            type="button"
+            onClick={handleWishlist}
+            aria-label={inWishlist ? 'Remove from wishlist' : 'Save to wishlist'}
+            aria-pressed={inWishlist}
+            className={clsx(
+              'grid h-12 w-12 shrink-0 place-items-center rounded-full shadow-[inset_0_0_0_1px_var(--m-outline)]',
+              inWishlist ? 'text-m-primary' : 'text-m-on-surface-variant',
+            )}
+          >
+            <Heart className={clsx('h-5 w-5', inWishlist && 'fill-current')} aria-hidden />
+          </button>
+          {effectiveStockStatus === 'outofstock' ? (
+            <button
+              type="button"
+              disabled
+              className="h-12 flex-1 rounded-full bg-m-surface-high text-m-label-l text-m-on-surface-variant"
+            >
+              Out of stock
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                className="inline-flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-m-primary px-4 text-m-label-l text-m-on-primary shadow-[0_1px_2px_rgb(60_4_69/0.3)] active:opacity-90"
+              >
+                <ShoppingCart className="h-[18px] w-[18px] shrink-0" aria-hidden />
+                <span className="truncate">Add to cart</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleBuyNow}
+                className="inline-flex h-12 min-w-0 flex-1 items-center justify-center rounded-full bg-m-tertiary px-4 text-m-label-l text-m-on-tertiary active:opacity-90"
+              >
+                Buy now
+              </button>
+            </>
+          )}
+        </StickyActionBar>
+      )}
+
+      {tier && (
+        <ActionSheet
+          open={mobileShareOpen}
+          onClose={() => setMobileShareOpen(false)}
+          title="Share"
+          actions={[
+            ...(typeof navigator !== 'undefined' && 'share' in navigator
+              ? [{ label: 'Share via…', icon: <Share2 className="h-5 w-5" aria-hidden />, onSelect: handleShare }]
+              : []),
+            { label: 'WhatsApp', icon: <Share2 className="h-5 w-5" aria-hidden />, onSelect: handleWhatsAppShare },
+            { label: 'Facebook', icon: <Share2 className="h-5 w-5" aria-hidden />, onSelect: handleFacebookShare },
+            { label: 'Copy link', icon: <Link2 className="h-5 w-5" aria-hidden />, onSelect: handleCopyLink },
+          ]}
+        />
+      )}
     </main>
   );
 }

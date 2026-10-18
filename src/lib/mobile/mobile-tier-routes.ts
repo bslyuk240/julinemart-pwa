@@ -10,7 +10,8 @@ export type MobileTierRoute = {
 };
 
 const ROUTES: MobileTierRoute[] = [
-  // Wave 1 pages are added here one milestone at a time (M1 product page, ...).
+  // Wave 1, one milestone at a time.
+  { pattern: '/product/*', tabBar: false }, // M1
 ];
 
 const DEV_ROUTES: MobileTierRoute[] = [{ pattern: '/dev/mobile-shell', tabBar: true }];

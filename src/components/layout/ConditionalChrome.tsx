@@ -6,6 +6,7 @@ import Header from '@/components/layout/header';
 import Footer from '@/components/layout/footer';
 import BottomNav from '@/components/layout/BottomNavClient';
 import TabBar from '@/components/mobile/shell/tab-bar';
+import { MobileTierProvider } from '@/components/mobile/mobile-tier-context';
 import { getMobileTierRoute } from '@/lib/mobile/mobile-tier-routes';
 import { recordNavigation } from '@/lib/mobile/nav-history';
 
@@ -33,7 +34,7 @@ export default function ConditionalChrome({ children }: { children: React.ReactN
 
   if (mobileTierRoute) {
     return (
-      <>
+      <MobileTierProvider route={mobileTierRoute}>
         <div className="hidden md:block">
           <Header />
         </div>
@@ -50,7 +51,7 @@ export default function ConditionalChrome({ children }: { children: React.ReactN
           <Footer />
         </div>
         {mobileTierRoute.tabBar && <TabBar />}
-      </>
+      </MobileTierProvider>
     );
   }
 

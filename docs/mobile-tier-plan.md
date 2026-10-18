@@ -235,6 +235,25 @@ Still open from the M0 scope:
 - **(c)** Closing sheets with the browser's Back on the web (outside the app) is deferred until we confirm it works safely with the Next router's history.
 - **(d)** The cookie banner and install prompt aren't on the new z-scale yet.
 
+**M1 status (2026-10-18): built, not committed.**
+
+`/product/*` is on the allowlist. Below `md`, the product page has:
+- the overlay top bar (back, share sheet, cart badge)
+- a full-bleed swipe gallery with a counter
+- Material option chips with a selection haptic
+- a pinned buy bar (wishlist / Add to cart / Buy now) instead of the inline buttons
+- "Add to cart" before choosing options scrolls to the options and gives a warning haptic
+- a success haptic plus a "View cart" toast after adding
+- the description collapsed behind "Read more"
+
+Everything is gated on `useMobileTier()` plus `md:hidden` / `max-md:`, so desktop is unchanged and removing the route reverts the page. The Android project was synced with `@capacitor/haptics` (`npx cap sync android`). `npm run build` currently fails locally while prerendering `/` (ECONNREFUSED fetch), which is unrelated to this work.
+
+Polish pass done:
+- Delivery, Protect (links to the terms page) and 3-day returns (links to `/page/refund_returns`) are list rows, via `ProductFeatures variant="list"`.
+- A review summary shows the average, the count and 5→1 bars, with "See all" opening the Reviews tab.
+- The seller card shows a store avatar, the trust badge and a "Visit store" button.
+- On the mobile tier these replace the Protect card, the feature tiles and the seller box. Desktop keeps the originals.
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---

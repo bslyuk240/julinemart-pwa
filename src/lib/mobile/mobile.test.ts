@@ -53,6 +53,10 @@ describe('getMobileTierRoute', () => {
   it('keeps Home out of the mobile tier', () => {
     expect(getMobileTierRoute('/')).toBeNull();
   });
+
+  it('puts product pages in the mobile tier without the tab bar', () => {
+    expect(getMobileTierRoute('/product/water-pump')).toEqual({ pattern: '/product/*', tabBar: false });
+  });
 });
 
 describe('activeTab', () => {

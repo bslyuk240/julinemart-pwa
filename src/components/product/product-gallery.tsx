@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { ProductImage } from '@/types/product';
@@ -9,16 +9,23 @@ import ActualProductPhotoBadge from '@/components/product/ActualProductPhotoBadg
 interface ProductGalleryProps {
   images: ProductImage[];
   productName: string;
+  /**
+   * Mobile tier: below md, show a full-bleed swipe gallery (scroll-snap) with a
+   * counter instead of arrows + thumbnails. md and up are unchanged.
+   */
+  edgeToEdge?: boolean;
 }
 
-export default function ProductGallery({ images, productName }: ProductGalleryProps) {
+export default function ProductGallery({ images, productName, edgeToEdge = false }: ProductGalleryProps) {
   const [selectedImage, setSelectedImage] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const swipeRef = useRef<HTMLDivElement>(null);
   const isRemoteImage = (src: string) => /^https?:\/\//i.test(src);
 
   // Reset to first image whenever the images array changes (e.g. variation selected)
   useEffect(() => {
     setSelectedImage(0);
+    swipeRef.current?.scrollTo({ left: 0 });
   }, [images]);
 
   const goToPrevious = () => {
@@ -42,8 +49,47 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
 
   return (
     <div className="space-y-4">
+      {edgeToEdge && (
+        <div className="relative bg-white md:hidden">
+          <div
+            ref={swipeRef}
+            className="flex snap-x snap-mandatory overflow-x-auto scrollbar-hide"
+            onScroll={(event) => {
+              const el = event.currentTarget;
+              const index = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+              if (index !== selectedImage) setSelectedImage(index);
+            }}
+          >
+            {images.map((image, index) => (
+              <div key={`${image.src || 'image'}-${index}`} className="relative aspect-[1/0.92] w-full flex-none snap-start">
+                <Image
+                  src={image.src}
+                  alt={image.alt || `${productName} - Image ${index + 1}`}
+                  fill
+                  sizes="100vw"
+                  className="object-contain px-8 pb-4 pt-14"
+                  onClick={() => setIsModalOpen(true)}
+                  priority={index === 0}
+                  unoptimized={isRemoteImage(image.src)}
+                />
+              </div>
+            ))}
+          </div>
+          {showSellerPhotoBadge && (
+            <div className="absolute bottom-3 left-4 z-10">
+              <ActualProductPhotoBadge compact />
+            </div>
+          )}
+          {images.length > 1 && (
+            <div className="absolute bottom-3 right-4 rounded-full bg-black/60 px-3 py-1 text-sm text-white tabular-nums">
+              {selectedImage + 1} / {images.length}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Main Image */}
-      <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
+      <div className={`relative aspect-square rounded-lg overflow-hidden bg-gray-100 group ${edgeToEdge ? 'max-md:hidden' : ''}`}>
         {showSellerPhotoBadge && (
           <div className="absolute left-2 top-2 z-10">
             <ActualProductPhotoBadge compact />
@@ -90,7 +136,7 @@ export default function ProductGallery({ images, productName }: ProductGalleryPr
 
       {/* Thumbnail Images */}
       {images.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+        <div className={`flex gap-2 overflow-x-auto scrollbar-hide ${edgeToEdge ? 'max-md:hidden' : ''}`}>
           {images.map((image, index) => (
             <button
               key={`${image.src || 'image'}-${index}`}
