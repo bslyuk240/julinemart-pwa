@@ -60,9 +60,12 @@ describe('getMobileTierRoute', () => {
     expect(getMobileTierRoute('/categories')).toBeNull();
   });
 
-  it('runs the gift builder full-screen without the tab bar', () => {
+  it('runs gift flows full-screen and gift catalogues with the tab bar', () => {
     expect(getMobileTierRoute('/gifts/build')?.tabBar).toBe(false);
-    expect(getMobileTierRoute('/gifts')).toBeNull();
+    expect(getMobileTierRoute('/gifts/checkout')?.tabBar).toBe(false);
+    expect(getMobileTierRoute('/gifts/boxes/bloom-box')?.tabBar).toBe(false);
+    expect(getMobileTierRoute('/gifts')?.tabBar).toBe(true);
+    expect(getMobileTierRoute('/gifts/birthday')?.tabBar).toBe(true);
   });
 
   it('shows the tab bar on the cart but not during checkout', () => {

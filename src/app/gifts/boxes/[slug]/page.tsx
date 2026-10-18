@@ -12,6 +12,9 @@ import { formatPrice } from '@/lib/utils/format-price';
 import PageHeader from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import GiftAnalyticsBeacon from '@/components/gifts/gift-analytics-beacon';
+import { GiftBoxMobileBar, GiftBoxMobileTopBar } from '@/components/gifts/gift-box-mobile';
+import { getMobileTierRoute } from '@/lib/mobile/mobile-tier-routes';
+import { clsx } from 'clsx';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -42,20 +45,30 @@ export default async function GiftBoxPage({ params }: Props) {
       : {};
   const { boxes: relatedCandidates } = await fetchGiftBoxes(gfc?.code, relatedFilter);
   const relatedBoxes = relatedCandidates.filter((b) => b.slug !== box.slug).slice(0, 8);
+  // Mobile tier: same allowlist switch as the client chrome (docs/mobile-tier-plan.md).
+  const tier = getMobileTierRoute(`/gifts/boxes/${slug}`) !== null;
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24', tier && 'max-md:bg-white max-md:pb-0')}>
+      <GiftBoxMobileTopBar box={box} />
       <GiftAnalyticsBeacon
         kind="box"
         boxSlug={box.slug}
         boxName={box.name}
         price={box.list_price}
       />
-      <div className="container-custom py-5 md:py-8 max-w-6xl">
-        <PageHeader backHref="/gifts" backLabel="All gift boxes" />
+      <div className={clsx('container-custom py-5 md:py-8 max-w-6xl', tier && 'max-md:pt-0')}>
+        <div className={clsx(tier && 'max-md:hidden')}>
+          <PageHeader backHref="/gifts" backLabel="All gift boxes" />
+        </div>
 
         <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
-          <div className="mb-6 overflow-hidden rounded-2xl border bg-white shadow-sm lg:mb-0">
+          <div
+            className={clsx(
+              'mb-6 overflow-hidden rounded-2xl border bg-white shadow-sm lg:mb-0',
+              tier && 'max-md:-mx-4 max-md:rounded-none max-md:border-x-0 max-md:border-t-0 max-md:shadow-none',
+            )}
+          >
             <GiftBoxGallery
               name={box.name}
               coverUrl={box.image_url}
@@ -81,7 +94,12 @@ export default async function GiftBoxPage({ params }: Props) {
           <div className="space-y-6">
             <div className="lg:sticky lg:top-24 space-y-5">
               <div>
-                <h1 className="text-base md:text-xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2">
+                <h1
+                  className={clsx(
+                    'text-base md:text-xl font-bold text-gray-900 mb-2 leading-tight line-clamp-2',
+                    tier && 'max-md:text-[22px] max-md:font-medium max-md:leading-7 max-md:text-m-on-surface',
+                  )}
+                >
                   {box.name}
                 </h1>
 
@@ -106,7 +124,12 @@ export default async function GiftBoxPage({ params }: Props) {
                 )}
 
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <span className="text-lg md:text-xl font-bold text-primary-600">
+                  <span
+                    className={clsx(
+                      'text-lg md:text-xl font-bold text-primary-600',
+                      tier && 'max-md:text-[28px] max-md:leading-9 max-md:tracking-[-0.02em] max-md:tabular-nums max-md:text-m-on-surface',
+                    )}
+                  >
                     {formatPrice(box.list_price)}
                   </span>
                 </div>
@@ -142,7 +165,7 @@ export default async function GiftBoxPage({ params }: Props) {
                 </div>
               )}
 
-              <div className="flex gap-3">
+              <div className={clsx('flex gap-3', tier && 'max-md:hidden')}>
                 <Link href={`/gifts/checkout?box=${encodeURIComponent(box.slug)}`} className="flex-1">
                   <Button className="w-full h-12 md:h-14 text-base gap-2">
                     Send this gift
@@ -180,6 +203,7 @@ export default async function GiftBoxPage({ params }: Props) {
           </section>
         )}
       </div>
+      <GiftBoxMobileBar box={box} />
     </main>
   );
 }

@@ -306,6 +306,18 @@ Not done yet:
 - moving the customise sheet onto the shared `Sheet`
 - the rest of wave 2: the gifts catalogue, account and orders, wishlist, and `/categories`
 
+**M5 status (2026-10-18): gifts catalogue, box page and gift checkout built, not committed.**
+
+`/gifts` and `/gifts/*` occasion pages (with the navigation bar), plus `/gifts/boxes/*` and `/gifts/checkout` (without it), are on the allowlist.
+
+- **Catalogue:** keeps its existing mobile header, chips and filter sheet, and now sits in the shell (no site header, new navigation bar).
+- **Box page:** a top bar with a share sheet, an edge-to-edge gallery and a pinned "Send this gift · ₦price" bar with save. The box page is a server component, so it reads the same allowlist via `getMobileTierRoute`.
+- **Gift checkout:** layout only, with a "Secure" top bar and a pinned total + Place order bar replacing the old floating bar.
+
+Desktop is unchanged.
+
+Note: before an address is entered, gift totals include the hook's ₦2,500 fallback delivery estimate. That's pre-existing behaviour, which is why the bar says "Total", not "Total with delivery".
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---

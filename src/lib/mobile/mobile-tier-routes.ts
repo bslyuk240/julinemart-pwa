@@ -18,6 +18,10 @@ const ROUTES: MobileTierRoute[] = [
   { pattern: '/checkout', tabBar: false }, // M3: layout only
   // Wave 2
   { pattern: '/gifts/build', tabBar: false }, // M4: gift builder flow
+  { pattern: '/gifts/checkout', tabBar: false }, // M5: layout only
+  { pattern: '/gifts/boxes/*', tabBar: false }, // M5: box page with a pinned Send bar
+  { pattern: '/gifts', tabBar: true }, // M5: catalogue
+  { pattern: '/gifts/*', tabBar: true }, // M5: occasion catalogues (after the specific /gifts routes above)
 ];
 
 const DEV_ROUTES: MobileTierRoute[] = [{ pattern: '/dev/mobile-shell', tabBar: true }];

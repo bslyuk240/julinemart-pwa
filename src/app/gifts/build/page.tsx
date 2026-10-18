@@ -1076,7 +1076,7 @@ export default function GiftBuildPage() {
             <div className="flex items-baseline justify-between gap-3">
               <span className="min-w-0 truncate text-m-body-m text-m-on-surface-variant">
                 {step === 3
-                  ? 'Total with delivery'
+                  ? 'Total'
                   : `${builder.totals.item_count}/${maxItems} items${builder.packaging ? ` · ${builder.packaging.name}` : ''}`}
               </span>
               <span className="shrink-0 text-lg font-bold tabular-nums text-m-on-surface">

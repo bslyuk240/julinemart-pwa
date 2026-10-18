@@ -3,7 +3,12 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Gift, Heart, MapPin } from 'lucide-react';
+import { Gift, Heart, Lock, MapPin } from 'lucide-react';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import StickyActionBar from '@/components/mobile/shell/sticky-action-bar';
+import { haptic } from '@/lib/mobile/haptics';
 import PageHeader from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +49,8 @@ function GiftCheckoutForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const boxSlug = searchParams.get('box') || '';
+  // Mobile tier (wave 2): layout only — a pinned total + Place order bar below md.
+  const tier = useMobileTier() !== null;
 
   const [box, setBox] = useState<GiftBox | null>(null);
   const [loading, setLoading] = useState(true);
@@ -316,7 +323,7 @@ function GiftCheckoutForm() {
 
       <Button
         type="submit"
-        className="mt-5 h-12 w-full"
+        className={clsx('mt-5 h-12 w-full', tier && 'max-md:hidden')}
         disabled={submitting || !isCheckoutReady}
       >
         {submitting ? 'Opening payment…' : 'Place Order'}
@@ -526,7 +533,28 @@ function GiftCheckoutForm() {
       </div>
     </form>
 
-    <div className="fixed inset-x-0 z-[70] border-t border-gray-200 bg-white p-4 shadow-lg bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] md:bottom-0 lg:hidden">
+    {tier && (
+      <StickyActionBar className="flex-col items-stretch gap-2.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-m-body-m text-m-on-surface-variant">Total</span>
+          <span className="text-lg font-bold tabular-nums text-m-on-surface">
+            {shippingFee == null && hasRecipientAddress && !shippingLoading ? '—' : formatPrice(total)}
+          </span>
+        </div>
+        <button
+          type="submit"
+          form="gift-ready-checkout"
+          disabled={submitting || !isCheckoutReady}
+          onClick={() => haptic('tap')}
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-m-primary text-m-label-l text-m-on-primary shadow-[0_1px_2px_rgb(60_4_69/0.3)] active:opacity-90 disabled:bg-m-surface-high disabled:text-m-on-surface-variant disabled:shadow-none"
+        >
+          <Lock className="h-[18px] w-[18px]" aria-hidden />
+          {submitting ? 'Paying…' : 'Place order'}
+        </button>
+      </StickyActionBar>
+    )}
+
+    <div className={clsx('fixed inset-x-0 z-[70] border-t border-gray-200 bg-white p-4 shadow-lg bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] md:bottom-0 lg:hidden', tier && 'max-md:hidden')}>
       <div className="container-custom flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs text-gray-500">Total</p>
@@ -549,15 +577,37 @@ function GiftCheckoutForm() {
 }
 
 export default function GiftCheckoutPage() {
+  const tier = useMobileTier() !== null;
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-36 md:pb-28 lg:pb-8">
-      <div className="container-custom min-w-0 py-5 md:py-6">
-        <PageHeader
-          title="Gift checkout"
-          subtitle="Review your details and complete your gift order"
-          backHref="/gifts"
-          backLabel="Back to gifts"
-        />
+    <main
+      className={clsx(
+        'min-h-screen overflow-x-hidden bg-gray-50 pb-36 md:pb-28 lg:pb-8',
+        tier && 'max-md:overflow-x-clip max-md:bg-m-surface-low max-md:pb-4',
+      )}
+    >
+      {tier && (
+        <div className="bg-m-surface-low">
+          <MobileTopBar
+            title="Gift checkout"
+            backHref="/gifts"
+            actions={
+              <span className="inline-flex items-center gap-1.5 px-4 text-m-label-m text-m-success">
+                <Lock className="h-4 w-4" aria-hidden />
+                Secure
+              </span>
+            }
+          />
+        </div>
+      )}
+      <div className={clsx('container-custom min-w-0 py-5 md:py-6', tier && 'max-md:pt-1')}>
+        <div className={clsx(tier && 'max-md:hidden')}>
+          <PageHeader
+            title="Gift checkout"
+            subtitle="Review your details and complete your gift order"
+            backHref="/gifts"
+            backLabel="Back to gifts"
+          />
+        </div>
         <Suspense fallback={<PageLoading />}>
           <GiftCheckoutForm />
         </Suspense>

@@ -17,6 +17,8 @@ import {
 import { trackGiftFilterApplied } from '@/lib/analytics/gifts';
 import GiftBoxCard from '@/components/gifts/gift-box-card';
 import GiftBoxRow from '@/components/gifts/gift-box-row';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import type { GiftBox, GiftFulfilmentCentre } from '@/types/gifts';
 
 type Props = {
@@ -38,6 +40,7 @@ export default function GiftsCatalog({
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const tier = useMobileTier() !== null;
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftRecipient, setDraftRecipient] = useState('');
   const [draftBudget, setDraftBudget] = useState('');
@@ -120,7 +123,13 @@ export default function GiftsCatalog({
       : `${filtered.length} result${filtered.length === 1 ? '' : 's'}`;
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-24">
+    <main
+      className={clsx(
+        'min-h-screen bg-gray-50 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-24',
+        // The mobile tier chrome already pads <main> for the navigation bar.
+        tier && 'max-md:pb-4',
+      )}
+    >
       {/* Desktop hero */}
       <div className="hidden border-b border-gray-200 bg-white md:block">
         <div className="container-custom py-6">
