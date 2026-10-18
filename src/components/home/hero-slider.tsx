@@ -120,6 +120,7 @@ function SlideContent({
             fill
             className="object-cover"
             priority={isActive}
+            quality={90}
             sizes="(max-width: 768px) 100vw, 60vw"
           />
           {slide.overlayOpacity > 0 && (
@@ -180,6 +181,7 @@ function AdPanel({ ad, side }: { ad?: HeroAd; side: 'left' | 'right' }) {
             alt={`${side} ad banner`}
             fill
             className="object-cover"
+            quality={90}
             sizes="20vw"
           />
         )}
