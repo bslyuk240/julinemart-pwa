@@ -54,6 +54,12 @@ describe('getMobileTierRoute', () => {
     expect(getMobileTierRoute('/')).toBeNull();
   });
 
+  it('puts category listings in the mobile tier with the tab bar, search without', () => {
+    expect(getMobileTierRoute('/category/electronics')?.tabBar).toBe(true);
+    expect(getMobileTierRoute('/search')?.tabBar).toBe(false);
+    expect(getMobileTierRoute('/categories')).toBeNull();
+  });
+
   it('puts product pages in the mobile tier without the tab bar', () => {
     expect(getMobileTierRoute('/product/water-pump')).toEqual({ pattern: '/product/*', tabBar: false });
   });

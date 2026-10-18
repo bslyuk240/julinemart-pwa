@@ -1,11 +1,23 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { clsx } from 'clsx';
 import ProductGrid from '@/components/product/product-grid';
-import { Filter, ChevronDown, X } from 'lucide-react';
+import { Filter, ChevronDown, X, Search } from 'lucide-react';
 import { Product } from '@/types/product';
 import { getCategoryDisplayName } from '@/lib/utils/category-display';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar, { TopBarAction } from '@/components/mobile/shell/mobile-top-bar';
+import ListingToolbar from '@/components/mobile/listing/listing-toolbar';
+import ListingSkeleton from '@/components/mobile/listing/listing-skeleton';
+import {
+  EMPTY_LISTING_FILTERS,
+  applyListingFilters,
+  countActiveFilters,
+  sellerOptions,
+  type ListingFilters,
+} from '@/lib/mobile/listing-filters';
 
 type CategorySortOption = 'date' | 'popularity' | 'rating' | 'price' | 'price-desc';
 
@@ -13,10 +25,30 @@ type CategorySortOption = 'date' | 'popularity' | 'rating' | 'price' | 'price-de
 const CATALOG_PER_PAGE = 100;
 /** How many already-fetched products to reveal per render batch (images lazy-load, so no extra network cost). */
 const VISIBLE_PAGE_SIZE = 50;
+/**
+ * The catalog API ignores price/stock filters, so mobile filters run client-side.
+ * While one is on, pull up to this many API pages so results are not limited to page 1.
+ */
+const MAX_FILTER_PAGES = 5;
+
+const SORT_OPTIONS: { value: CategorySortOption; label: string }[] = [
+  { value: 'date', label: 'Latest' },
+  { value: 'popularity', label: 'Popular' },
+  { value: 'rating', label: 'Top rated' },
+  { value: 'price', label: 'Price: low to high' },
+  { value: 'price-desc', label: 'Price: high to low' },
+];
 
 export default function CategoryPage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
+  // Mobile tier (docs/mobile-tier-plan.md, M2): mobile-only pieces are gated on
+  // `tier` plus md:hidden / max-md: classes; desktop is unchanged.
+  const tier = useMobileTier() !== null;
+  const [filters, setFilters] = useState<ListingFilters>(EMPTY_LISTING_FILTERS);
+  const filtersActive = countActiveFilters(filters) > 0;
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,16 +118,22 @@ export default function CategoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, sortBy]);
 
-  const visibleProducts = useMemo(() => products.slice(0, visibleCount), [products, visibleCount]);
-  const hasMoreInBuffer = visibleCount < products.length;
+  const filteredProducts = useMemo(() => applyListingFilters(products, filters), [products, filters]);
+  const visibleProducts = useMemo(() => filteredProducts.slice(0, visibleCount), [filteredProducts, visibleCount]);
+  const sellers = useMemo(() => sellerOptions(products), [products]);
+  const hasMoreInBuffer = visibleCount < filteredProducts.length;
   const hasMoreFromApi = apiPage < totalPages;
   const hasMore = hasMoreInBuffer || hasMoreFromApi;
 
   const loadMore = async () => {
-    if (visibleCount < products.length) {
-      setVisibleCount((current) => Math.min(current + VISIBLE_PAGE_SIZE, products.length));
+    if (visibleCount < filteredProducts.length) {
+      setVisibleCount((current) => Math.min(current + VISIBLE_PAGE_SIZE, filteredProducts.length));
       return;
     }
+    await fetchNextPage();
+  };
+
+  const fetchNextPage = async () => {
     if (apiPage >= totalPages || loadingMore) return;
     try {
       setLoadingMore(true);
@@ -112,11 +150,67 @@ export default function CategoryPage() {
     }
   };
 
+  // While a mobile filter is on, fill the buffer from more API pages (capped).
+  useEffect(() => {
+    if (!filtersActive || loading || loadingMore) return;
+    if (apiPage >= Math.min(totalPages, MAX_FILTER_PAGES)) return;
+    const fill = async () => {
+      await fetchNextPage();
+    };
+    void fill();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersActive, loading, loadingMore, apiPage, totalPages]);
+
+  // Mobile tier: infinite scroll instead of the "View More Products" button.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!tier || !sentinel || !hasMore || loadingMore) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadMore();
+      },
+      { rootMargin: '600px 0px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tier, hasMore, loadingMore, visibleCount, filteredProducts.length]);
+
+  const mobileTopBar = tier && (
+    <MobileTopBar
+      title={categoryName}
+      backHref="/categories"
+      actions={
+        <TopBarAction label="Search" onClick={() => router.push('/search')}>
+          <Search className="h-6 w-6" aria-hidden />
+        </TopBarAction>
+      }
+    />
+  );
+
+  const mobileToolbar = tier && (
+    <ListingToolbar
+      sort={sortBy}
+      sortOptions={SORT_OPTIONS}
+      onSortChange={setSortBy}
+      filters={filters}
+      onFiltersChange={(next) => {
+        setFilters(next);
+        setVisibleCount(VISIBLE_PAGE_SIZE);
+        window.scrollTo({ top: 0 });
+      }}
+      sellers={sellers}
+      countFor={(draft) => applyListingFilters(products, draft).length}
+    />
+  );
+
   if (loading) {
     return (
-      <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
-        <div className="container-custom min-w-0 py-6">
-          <div className="py-20 text-center">
+      <main className={clsx('min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8', tier && 'max-md:overflow-x-clip max-md:bg-m-surface max-md:pb-6')}>
+        {mobileTopBar}
+        <div className={clsx('container-custom min-w-0 py-6', tier && 'max-md:pt-0')}>
+          {tier && <ListingSkeleton />}
+          <div className={clsx('py-20 text-center', tier && 'max-md:hidden')}>
             <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
             <p className="text-gray-600">Loading products...</p>
           </div>
@@ -126,9 +220,11 @@ export default function CategoryPage() {
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom min-w-0 py-6">
-        <nav className="mb-6 text-sm text-gray-600">
+    <main className={clsx('min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8', tier && 'max-md:overflow-x-clip max-md:bg-m-surface max-md:pb-6')}>
+      {mobileTopBar}
+      <div className={clsx('container-custom min-w-0 py-6', tier && 'max-md:pt-0')}>
+        {mobileToolbar}
+        <nav className={clsx('mb-6 text-sm text-gray-600', tier && 'max-md:hidden')}>
           <a href="/" className="hover:text-primary-600">
             Home
           </a>
@@ -140,14 +236,14 @@ export default function CategoryPage() {
           <span className="text-gray-900">{categoryName}</span>
         </nav>
 
-        <div className="mb-6">
+        <div className={clsx('mb-6', tier && 'max-md:hidden')}>
           <h1 className="mb-1 text-base font-bold text-gray-900 md:text-xl">{categoryName}</h1>
           <p className="text-xs text-gray-600 md:text-sm">
             {total > 0 ? `${total} products found` : 'Browse products in this category'}
           </p>
         </div>
 
-        <div className="mb-6 flex items-center justify-between rounded-2xl bg-white p-3 md:p-4 shadow-sm">
+        <div className={clsx('mb-6 flex items-center justify-between rounded-2xl bg-white p-3 md:p-4 shadow-sm', tier && 'max-md:hidden')}>
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -183,7 +279,7 @@ export default function CategoryPage() {
         </div>
 
         {showFilters && (
-          <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className={clsx('mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm', tier && 'max-md:hidden')}>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">Quick filters</h3>
               <button
@@ -222,9 +318,16 @@ export default function CategoryPage() {
 
         {visibleProducts.length > 0 ? (
           <>
-            <ProductGrid products={visibleProducts} columns={4} />
+            <ProductGrid products={visibleProducts} columns={4} mobileTier={tier} />
+            {tier && hasMore && (
+              <div ref={sentinelRef} className="grid h-16 place-items-center md:hidden" aria-hidden={!loadingMore}>
+                {loadingMore && (
+                  <span className="h-6 w-6 animate-spin rounded-full border-[3px] border-m-primary border-t-transparent" />
+                )}
+              </div>
+            )}
             {hasMore && (
-              <div className="mt-8 text-center">
+              <div className={clsx('mt-8 text-center', tier && 'max-md:hidden')}>
                 <button
                   type="button"
                   onClick={() => void loadMore()}
@@ -236,6 +339,18 @@ export default function CategoryPage() {
               </div>
             )}
           </>
+        ) : tier && filtersActive && products.length > 0 ? (
+          <div className="px-6 py-16 text-center md:hidden">
+            <h2 className="text-m-title-m text-m-on-surface">No products match these filters</h2>
+            <p className="mt-1 text-m-body-m text-m-on-surface-variant">Try a wider price range or fewer filters.</p>
+            <button
+              type="button"
+              onClick={() => setFilters(EMPTY_LISTING_FILTERS)}
+              className="mt-5 h-10 rounded-full bg-m-primary-container px-5 text-m-label-l text-m-on-primary-container"
+            >
+              Clear filters
+            </button>
+          </div>
         ) : (
           <div className="rounded-lg bg-white py-16 text-center">
             <div className="mb-4 inline-flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">

@@ -12,6 +12,8 @@ export type MobileTierRoute = {
 const ROUTES: MobileTierRoute[] = [
   // Wave 1, one milestone at a time.
   { pattern: '/product/*', tabBar: false }, // M1
+  { pattern: '/category/*', tabBar: true }, // M2
+  { pattern: '/search', tabBar: false }, // M2: full-screen search
 ];
 
 const DEV_ROUTES: MobileTierRoute[] = [{ pattern: '/dev/mobile-shell', tabBar: true }];

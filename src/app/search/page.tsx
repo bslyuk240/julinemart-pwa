@@ -8,10 +8,16 @@ import AreaFilterBar, { type AreaFilters } from '@/components/local/AreaFilterBa
 import { Product } from '@/types/product';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
 import { trackSearchUsed } from '@/lib/gtag';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileSearchView from '@/components/mobile/listing/mobile-search-view';
+import ListingSkeleton from '@/components/mobile/listing/listing-skeleton';
 
 function SearchContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q')?.trim() ?? '';
+  // Mobile tier (docs/mobile-tier-plan.md, M2): full-screen search below md.
+  const tier = useMobileTier() !== null;
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,16 +67,8 @@ function SearchContent() {
     return () => { isCancelled = true; };
   }, [query, filters]);
 
-  return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-12">
-      <div className="container-custom py-5 md:py-6">
-        <PageHeader
-          title="Search results"
-          subtitle={query ? `Showing matches for "${query}"` : 'Enter a search term above to see matching products.'}
-          backHref="/"
-          backLabel="Back to home"
-        />
-
+  const results = (
+    <>
         {query && (
           <AreaFilterBar
             value={filters}
@@ -80,8 +78,9 @@ function SearchContent() {
           />
         )}
 
+        {loading && tier && <ListingSkeleton />}
         {loading && (
-          <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
+          <div className={clsx('bg-white rounded-2xl shadow-sm p-8 text-center', tier && 'max-md:hidden')}>
             <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-gray-600">Searching products...</p>
           </div>
@@ -89,10 +88,10 @@ function SearchContent() {
 
         {!loading && query && products.length > 0 && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className={clsx('flex items-center justify-between text-sm text-gray-600', tier && 'max-md:pt-3 max-md:text-m-body-m max-md:text-m-on-surface-variant')}>
               <span>{products.length} product{products.length === 1 ? '' : 's'} found</span>
             </div>
-            <ProductGrid products={products} columns={6} />
+            <ProductGrid products={products} columns={6} mobileTier={tier} />
           </div>
         )}
 
@@ -112,6 +111,22 @@ function SearchContent() {
             </p>
           </div>
         )}
+    </>
+  );
+
+  return (
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-12', tier && 'max-md:overflow-x-clip max-md:bg-m-surface')}>
+      <div className={clsx('container-custom py-5 md:py-6', tier && 'max-md:pt-0')}>
+        <div className={clsx(tier && 'max-md:hidden')}>
+          <PageHeader
+            title="Search results"
+            subtitle={query ? `Showing matches for "${query}"` : 'Enter a search term above to see matching products.'}
+            backHref="/"
+            backLabel="Back to home"
+          />
+        </div>
+
+        {tier ? <MobileSearchView query={query}>{results}</MobileSearchView> : results}
       </div>
     </main>
   );

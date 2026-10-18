@@ -4,7 +4,9 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Heart, ShoppingCart, Star, BadgeCheck, Plane, SlidersHorizontal } from 'lucide-react';
+import { Heart, ShoppingCart, Star, BadgeCheck, Plane, SlidersHorizontal, Plus } from 'lucide-react';
+import { clsx } from 'clsx';
+import { haptic } from '@/lib/mobile/haptics';
 import { Product } from '@/types/product';
 import { useCart } from '@/hooks/use-cart';
 import { useWishlist } from '@/hooks/use-wishlist';
@@ -17,13 +19,20 @@ interface ProductCardProps {
   showBadge?: boolean;
   fullWidth?: boolean;
   floatingBadge?: React.ReactNode;
+  /**
+   * Mobile tier listing card (docs/mobile-tier-plan.md, M2): below md, a
+   * Material card (contain-fit photo, 2-line name, meta, price + round add
+   * button). md and up, and every caller that omits it, are unchanged.
+   */
+  mobileTier?: boolean;
 }
 
 export default function ProductCard({ 
   product, 
   showBadge = false, 
   fullWidth = false,
-  floatingBadge 
+  floatingBadge,
+  mobileTier = false,
 }: ProductCardProps) {
   const isRemoteImage = (src: string) => /^https?:\/\//i.test(src);
   const decodedName = decodeHtmlEntities(product.name);
@@ -72,7 +81,14 @@ export default function ProductCard({
     setIsAddingToCart(true);
     try {
       addItem(product, 1);
-      toast.success('Added to cart!');
+      if (mobileTier && window.matchMedia('(max-width: 767px)').matches) {
+        haptic('success');
+        toast.success('Added to cart', {
+          action: { label: 'View cart', onClick: () => router.push('/cart') },
+        });
+      } else {
+        toast.success('Added to cart!');
+      }
     } catch {
       toast.error('Failed to add to cart');
     } finally {
@@ -130,7 +146,12 @@ export default function ProductCard({
       href={`/product/${product.slug}`}
       className={`block group ${fullWidth ? 'w-full' : 'max-w-[220px]'}`}
     >
-      <div className="relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+      <div
+        className={clsx(
+          'relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden',
+          mobileTier && 'max-md:rounded-m-card max-md:shadow-[inset_0_0_0_1px_rgb(30_26_31/0.06)]',
+        )}
+      >
         {/* Badges Section - Top of Image */}
         <div className="absolute top-2 left-2 right-2 z-10 flex flex-col gap-1">
           {/* Official Store Badge */}
@@ -171,7 +192,10 @@ export default function ProductCard({
         {/* Wishlist Button */}
         <button
           onClick={handleWishlistToggle}
-          className="absolute top-2 right-2 z-20 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-red-50 transition-colors"
+          className={clsx(
+            'absolute top-2 right-2 z-20 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-red-50 transition-colors',
+            mobileTier && 'max-md:right-1 max-md:top-1 max-md:h-10 max-md:w-10 max-md:bg-white/90 max-md:shadow-none',
+          )}
           aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
         >
           <Heart 
@@ -189,22 +213,31 @@ export default function ProductCard({
         )}
 
         {/* Product Image */}
-        <div className="relative aspect-square overflow-hidden rounded-t-lg bg-gray-50">
+        <div className={clsx('relative aspect-square overflow-hidden rounded-t-lg bg-gray-50', mobileTier && 'max-md:bg-white')}>
           <Image
             src={product.images[0]?.src || '/images/placeholder.svg'}
             alt={decodedName}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 220px"
-            className="object-cover transition-transform duration-200 group-hover:scale-105"
+            className={clsx(
+              'object-cover transition-transform duration-200 group-hover:scale-105',
+              mobileTier && 'max-md:object-contain max-md:p-2.5',
+            )}
             unoptimized={isRemoteImage(product.images[0]?.src || '')}
           />
+          {mobileTier && hasShipsFromAbroadTag && (
+            <span className="absolute bottom-2 left-2 inline-flex h-[22px] items-center gap-1 rounded-md bg-m-surface-high px-2 text-m-label-s text-m-on-surface-variant md:hidden">
+              <Plane className="h-3 w-3" aria-hidden />
+              Ships from abroad
+            </span>
+          )}
         </div>
       </div>
 
       {/* Product Info */}
-      <div className="p-2 md:p-4 space-y-1 md:space-y-2">
+      <div className={clsx('p-2 md:p-4 space-y-1 md:space-y-2', mobileTier && 'max-md:space-y-0.5 max-md:px-0 max-md:pb-0 max-md:pt-2')}>
         {(hasShipsFromAbroadTag || product.store?.shop_name) && (
-          <div className="flex min-h-[18px] items-center gap-2 overflow-hidden md:min-h-[20px]">
+          <div className={clsx('flex min-h-[18px] items-center gap-2 overflow-hidden md:min-h-[20px]', mobileTier && 'max-md:hidden')}>
             {product.store?.shop_name && (
               <p className="min-w-0 flex-1 truncate text-[10px] md:text-xs text-gray-500">
                 {product.store.shop_name}
@@ -221,15 +254,57 @@ export default function ProductCard({
         )}
 
         {/* Title */}
-        <h3 className="line-clamp-2 
-          text-xs md:text-sm 
-          font-semibold text-gray-900 leading-tight 
-          min-h-[32px] md:min-h-[40px]">
+        <h3
+          className={clsx(
+            'line-clamp-2 text-xs md:text-sm font-semibold text-gray-900 leading-tight min-h-[32px] md:min-h-[40px]',
+            mobileTier && 'max-md:min-h-10 max-md:text-sm max-md:font-normal max-md:leading-5 max-md:text-m-on-surface',
+          )}
+        >
           {decodedName}
         </h3>
 
+        {mobileTier && (
+          <div className="md:hidden">
+            {(rating > 0 || product.store?.shop_name) && (
+              <p className="flex items-center gap-1 truncate text-m-body-s text-m-on-surface-variant">
+                {rating > 0 && (
+                  <>
+                    <Star className="h-3.5 w-3.5 shrink-0 text-[#e8a500]" fill="currentColor" aria-hidden />
+                    <span>{rating.toFixed(1)}</span>
+                    {product.store?.shop_name && <span aria-hidden>·</span>}
+                  </>
+                )}
+                {product.store?.shop_name && <span className="truncate">{product.store.shop_name}</span>}
+              </p>
+            )}
+            <div className="mt-0.5 flex items-center justify-between gap-2">
+              <span className="min-w-0">
+                <span className="block truncate text-base font-bold leading-6 tabular-nums text-m-on-surface">
+                  {formatCurrency(price)}
+                </span>
+                {outOfStock ? (
+                  <span className="block text-m-body-s font-medium text-m-error">Out of stock</span>
+                ) : (
+                  regularPrice > price && (
+                    <span className="block text-m-body-s text-m-on-surface-variant line-through">{formatCurrency(regularPrice)}</span>
+                  )
+                )}
+              </span>
+              <button
+                type="button"
+                disabled={outOfStock || isAddingToCart}
+                onClick={handleAddToCart}
+                aria-label={outOfStock ? 'Out of stock' : isVariable ? 'Choose options' : 'Add to cart'}
+                className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-m-primary-container text-m-on-primary-container before:absolute before:-inset-1 before:content-[''] disabled:opacity-40"
+              >
+                {isVariable ? <SlidersHorizontal className="h-5 w-5" aria-hidden /> : <Plus className="h-5 w-5" aria-hidden />}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Price */}
-        <div className="flex items-center gap-1 md:gap-2">
+        <div className={clsx('flex items-center gap-1 md:gap-2', mobileTier && 'max-md:hidden')}>
           <span className="text-sm md:text-lg font-bold text-primary-700">
             {formatCurrency(price)}
           </span>
@@ -241,7 +316,7 @@ export default function ProductCard({
         </div>
 
         {/* Rating & Stock */}
-        <div className="flex items-center justify-between text-[10px] md:text-xs text-gray-500">
+        <div className={clsx('flex items-center justify-between text-[10px] md:text-xs text-gray-500', mobileTier && 'max-md:hidden')}>
           <span className="flex items-center gap-0.5 md:gap-1">
             <Star className="h-2.5 w-2.5 md:h-4 md:w-4 text-yellow-400" fill="currentColor" />
             <span>{rating.toFixed(1)}</span>
@@ -257,13 +332,10 @@ export default function ProductCard({
           type="button"
           disabled={outOfStock || isAddingToCart}
           onClick={handleAddToCart}
-          className="w-full flex items-center justify-center gap-1 md:gap-2
-            bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300
-            text-white
-            text-[10px] md:text-sm
-            font-medium
-            py-1.5 md:py-2
-            rounded transition-colors"
+          className={clsx(
+            'w-full flex items-center justify-center gap-1 md:gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white text-[10px] md:text-sm font-medium py-1.5 md:py-2 rounded transition-colors',
+            mobileTier && 'max-md:hidden',
+          )}
         >
           {isVariable
             ? <SlidersHorizontal className="h-3 w-3 md:h-4 md:w-4" />

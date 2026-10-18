@@ -7,12 +7,15 @@ interface ProductGridProps {
   products: Product[];
   columns?: 2 | 3 | 4 | 5 | 6;
   showBadge?: boolean;
+  /** Mobile tier listing: Material cards and roomier gaps below md. */
+  mobileTier?: boolean;
 }
 
 export default function ProductGrid({
   products,
   columns = 4,
   showBadge = false,
+  mobileTier = false,
 }: ProductGridProps) {
   const gridCols = {
     2: 'grid-cols-2',
@@ -47,13 +50,14 @@ export default function ProductGrid({
   }
 
   return (
-    <div className={`grid ${gridCols[columns]} gap-2 md:gap-3 lg:gap-4`}>
+    <div className={`grid ${gridCols[columns]} gap-2 md:gap-3 lg:gap-4 ${mobileTier ? 'max-md:gap-x-3 max-md:gap-y-5' : ''}`}>
       {products.map((product) => (
         <ProductCard
           key={product.supabaseId ?? product.slug ?? `wc-${product.id}`}
           product={product}
           showBadge={showBadge}
           fullWidth
+          mobileTier={mobileTier}
         />
       ))}
     </div>

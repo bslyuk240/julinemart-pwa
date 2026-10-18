@@ -254,6 +254,24 @@ Polish pass done:
 - The seller card shows a store avatar, the trust badge and a "Visit store" button.
 - On the mobile tier these replace the Protect card, the feature tiles and the seller box. Desktop keeps the originals.
 
+**M2 status (2026-10-18): built, not committed.**
+
+`/category/*` (with the navigation bar) and `/search` (full-screen, no navigation bar) are on the allowlist.
+
+Category listing below `md`:
+- a compact top bar (back to /categories, search)
+- a sticky chip row: sort, filters, "In stock", "Under ₦20,000"
+- a sort sheet (radio rows)
+- a filter sheet: price fields and presets, an in-stock switch, sellers, and a live "Show n results" count
+- Material product cards (`ProductCard mobileTier`); Home and every other caller keep the current card
+- a skeleton instead of the spinner, and infinite scroll
+
+Search below `md` has its own search field, live product matches while typing, "Search for …", and recent searches (stored per device). Desktop is unchanged on both pages.
+
+Follow-ups:
+- The catalog API ignores `min_price` / `max_price` / `stock_status`, so filters run client-side over up to 5 loaded pages. Real server-side filtering belongs in JLO's catalog-products.
+- `/products` and `/categories` are not on the tier yet. Moving between tier and non-tier pages switches between the new and old navigation bars (open question 6).
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---
