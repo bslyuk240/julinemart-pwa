@@ -21,6 +21,9 @@ import {
   Store,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { getCustomerOrders } from '@/lib/supabase/customers';
 import PageLoading from '@/components/ui/page-loading';
@@ -79,6 +82,8 @@ export default function AccountPage() {
   const [recentOrders, setRecentOrders] = useState<AccountOrder[]>([]);
   const [orderStats, setOrderStats] = useState<OrderStats>(emptyOrderStats);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  // Mobile tier (docs/mobile-tier-plan.md, wave 2): settings-style list below md.
+  const tier = useMobileTier() !== null;
   const loggingOutRef = useRef(false);
 
   useEffect(() => {
@@ -242,11 +247,60 @@ export default function AccountPage() {
     { label: 'Completed', value: orderStats.completed, icon: CheckCircle2, color: 'text-green-600', bgColor: 'bg-green-50' },
   ];
 
+  // Mobile tier groups for the settings-style list (same destinations as the shortcuts grid).
+  const menuGroups = [
+    { title: 'Orders & purchases', hrefs: ['/orders', '/account/returns', '/account/purchases'] },
+    { title: 'Saved', hrefs: ['/account/wishlist', '/account/following'] },
+    { title: 'Your account', hrefs: ['/account/addresses', '/account/payments', '/account/notifications', '/account/settings'] },
+  ].map((group) => ({
+    title: group.title,
+    items: group.hrefs
+      .map((href) => accountMenuItems.find((item) => item.href === href))
+      .filter((item): item is (typeof accountMenuItems)[number] => Boolean(item)),
+  }));
+
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom py-5 md:py-8 space-y-5 md:space-y-6">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
+      {tier && (
+        <div className="bg-m-surface-low">
+          <MobileTopBar title="Account" />
+        </div>
+      )}
+      <div className={clsx('container-custom py-5 md:py-8 space-y-5 md:space-y-6', tier && 'max-md:space-y-3 max-md:pt-1')}>
+        {tier && (
+          <section className="rounded-2xl bg-m-surface-lowest shadow-[0_0_0_1px_rgb(30_26_31/0.07)] md:hidden">
+            <div className="flex items-center gap-4 p-4">
+              {customer.avatar_url ? (
+                <img src={customer.avatar_url} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
+              ) : (
+                <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-m-primary-container text-m-primary">
+                  <User className="h-7 w-7" aria-hidden />
+                </span>
+              )}
+              <div className="min-w-0">
+                <h1 className="truncate text-m-title-m text-m-on-surface">
+                  {[customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Welcome back'}
+                </h1>
+                <p className="truncate text-m-body-m text-m-on-surface-variant">{customer.email}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 border-t border-m-outline-variant">
+              {statItems.map((s, index) => (
+                <div key={s.label} className={clsx('px-1 py-3 text-center', index > 0 && 'border-l border-m-outline-variant')}>
+                  {ordersLoading ? (
+                    <div className="mx-auto h-6 w-6 animate-pulse rounded bg-m-surface-container" />
+                  ) : (
+                    <p className="text-m-title-m tabular-nums text-m-on-surface">{s.value}</p>
+                  )}
+                  <p className="truncate text-m-label-s text-m-on-surface-variant">{s.label.replace('Total Orders', 'Orders')}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Welcome card */}
-        <section className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg p-5 md:p-7 text-white">
+        <section className={clsx('bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg p-5 md:p-7 text-white', tier && 'max-md:hidden')}>
           <div className="flex items-center gap-4 md:gap-5">
             {customer.avatar_url ? (
               <img
@@ -276,7 +330,7 @@ export default function AccountPage() {
         </section>
 
         {/* Account shortcuts */}
-        <section className="bg-white rounded-2xl shadow-sm p-4">
+        <section className={clsx('bg-white rounded-2xl shadow-sm p-4', tier && 'max-md:hidden')}>
           <div className="mb-3">
             <h2 className="text-sm md:text-base font-bold text-gray-900">Account shortcuts</h2>
             <p className="text-xs text-gray-500 mt-0.5">One place for each account function.</p>
@@ -302,7 +356,7 @@ export default function AccountPage() {
         </section>
 
         {/* Stats */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <section className={clsx('grid grid-cols-2 md:grid-cols-4 gap-3', tier && 'max-md:hidden')}>
           {statItems.map((s) => (
             <div key={s.label} className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3">
               <div className={`w-11 h-11 rounded-xl ${s.bgColor} flex items-center justify-center flex-shrink-0`}>
@@ -383,6 +437,46 @@ export default function AccountPage() {
             </div>
           )}
         </section>
+
+        {tier && (
+          <div className="space-y-3 md:hidden">
+            {menuGroups.map((group) => (
+              <section
+                key={group.title}
+                aria-label={group.title}
+                className="rounded-2xl bg-m-surface-lowest shadow-[0_0_0_1px_rgb(30_26_31/0.07)]"
+              >
+                <h2 className="px-4 pb-1 pt-3 text-m-title-s text-m-on-surface-variant">{group.title}</h2>
+                {group.items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex min-h-14 items-center gap-4 px-4 py-2 active:bg-black/5"
+                  >
+                    <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${item.bgColor}`}>
+                      <item.icon className={`h-5 w-5 ${item.color}`} aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[15px] font-medium leading-5 text-m-on-surface">{item.title}</span>
+                      <span className="block truncate text-m-body-s text-m-on-surface-variant">{item.description}</span>
+                    </span>
+                    <ChevronRight className="h-5 w-5 shrink-0 text-m-on-surface-variant" aria-hidden />
+                  </Link>
+                ))}
+              </section>
+            ))}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex min-h-14 w-full items-center gap-4 rounded-2xl bg-m-surface-lowest px-4 text-left text-m-error shadow-[0_0_0_1px_rgb(30_26_31/0.07)] active:bg-black/5"
+            >
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-50">
+                <LogOut className="h-5 w-5" aria-hidden />
+              </span>
+              <span className="text-[15px] font-medium">Log out</span>
+            </button>
+          </div>
+        )}
       </div>
     </main>
   );

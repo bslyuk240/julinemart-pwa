@@ -9,6 +9,10 @@ import { useWishlist } from '@/hooks/use-wishlist';
 import { useGiftBoxFavorites } from '@/hooks/use-gift-box-favorites';
 import { useCart } from '@/hooks/use-cart';
 import { Button } from '@/components/ui/button';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import MobileWishlist from '@/components/mobile/wishlist/mobile-wishlist';
 
 export default function WishlistPage() {
   const { items, removeItem, clearWishlist, itemCount } = useWishlist();
@@ -21,6 +25,8 @@ export default function WishlistPage() {
   const totalCount = itemCount + giftBoxItemCount;
   const { addItem } = useCart();
   const [addingToCart, setAddingToCart] = useState<number | null>(null);
+  // Mobile tier (docs/mobile-tier-plan.md, wave 2): compact list rows below md.
+  const tier = useMobileTier() !== null;
 
   const handleAddToCart = (item: typeof items[0]) => {
     setAddingToCart(item.productId);
@@ -77,14 +83,38 @@ export default function WishlistPage() {
     `₦${parseFloat(String(price) || '0').toLocaleString()}`;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom min-w-0 py-5 md:py-6">
-        <PageHeader
-          title="My Wishlist"
-          subtitle={`${totalCount} ${totalCount === 1 ? 'item' : 'items'} saved`}
-          backHref="/"
-          backLabel="Continue shopping"
-        />
+    <main
+      className={clsx(
+        'min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8',
+        tier && 'max-md:overflow-x-clip max-md:bg-m-surface-low max-md:pb-4',
+      )}
+    >
+      {tier && (
+        <div className="bg-m-surface-low">
+          <MobileTopBar
+            title={
+              <>
+                Wishlist
+                {totalCount > 0 && (
+                  <span className="font-normal text-m-on-surface-variant">
+                    {' '}
+                    · {totalCount} saved
+                  </span>
+                )}
+              </>
+            }
+          />
+        </div>
+      )}
+      <div className={clsx('container-custom min-w-0 py-5 md:py-6', tier && 'max-md:pt-1')}>
+        <div className={clsx(tier && 'max-md:hidden')}>
+          <PageHeader
+            title="My Wishlist"
+            subtitle={`${totalCount} ${totalCount === 1 ? 'item' : 'items'} saved`}
+            backHref="/"
+            backLabel="Continue shopping"
+          />
+        </div>
 
         {totalCount === 0 ? (
           <div className="text-center py-12 md:py-16 bg-white rounded-2xl shadow-sm p-6">
@@ -98,7 +128,18 @@ export default function WishlistPage() {
             </Link>
           </div>
         ) : (
-          <div>
+          <>
+          {tier && (
+            <MobileWishlist
+              items={items}
+              giftBoxes={giftBoxItems}
+              onAddToCart={handleAddToCart}
+              onAddAll={handleAddAllToCart}
+              onRemove={removeItem}
+              onRemoveGiftBox={removeGiftBoxFavorite}
+            />
+          )}
+          <div className={clsx(tier && 'max-md:hidden')}>
             {itemCount > 0 && (
             <div className="bg-white rounded-2xl p-3 md:p-4 mb-4 md:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shadow-sm">
               <p className="text-xs md:text-sm text-gray-700">
@@ -301,6 +342,7 @@ export default function WishlistPage() {
               </Link>
             </div>
           </div>
+          </>
         )}
       </div>
     </main>

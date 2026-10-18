@@ -22,6 +22,9 @@ const ROUTES: MobileTierRoute[] = [
   { pattern: '/gifts/boxes/*', tabBar: false }, // M5: box page with a pinned Send bar
   { pattern: '/gifts', tabBar: true }, // M5: catalogue
   { pattern: '/gifts/*', tabBar: true }, // M5: occasion catalogues (after the specific /gifts routes above)
+  { pattern: '/categories', tabBar: true }, // M6: tab roots
+  { pattern: '/wishlist', tabBar: true }, // M6
+  { pattern: '/account', tabBar: true }, // M6: hub only; sub-pages later
 ];
 
 const DEV_ROUTES: MobileTierRoute[] = [{ pattern: '/dev/mobile-shell', tabBar: true }];

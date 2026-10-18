@@ -318,6 +318,19 @@ Desktop is unchanged.
 
 Note: before an address is entered, gift totals include the hook's ₦2,500 fallback delivery estimate. That's pre-existing behaviour, which is why the bar says "Total", not "Total with delivery".
 
+**M6 status (2026-10-18): tab roots built, not committed.**
+
+`/categories`, `/wishlist` and `/account` (the hub only) are on the allowlist, with the navigation bar. Every tab except Home now uses the new shell. Below `md`:
+- **Categories:** a "Categories" top bar and a tappable "Search JulineMart" field. The bottom promo card is hidden on phones.
+- **Wishlist:** a "Wishlist · n saved" top bar, and compact rows (photo, name, price, add, remove) grouped into Products (with "Add all to cart") and Saved gift boxes.
+- **Account hub:** an "Account" top bar, a profile row with an orders/pending/processing/completed strip, and recent orders. The shortcuts become grouped list rows (Orders & purchases, Saved, Your account) with a Log out row.
+
+Desktop is unchanged.
+
+Not verified on screen: the account hub, which needs a signed-in customer.
+
+Still on the old chrome: `/login` and the `/account/*` sub-pages (wave 3).
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---

@@ -1,4 +1,8 @@
 import Link from 'next/link';
+import { Search } from 'lucide-react';
+import { clsx } from 'clsx';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import { getMobileTierRoute } from '@/lib/mobile/mobile-tier-routes';
 import { decodeHtmlEntities } from '@/lib/utils/helpers';
 import { getTopLevelCategories } from '@/lib/woocommerce/categories';
 import {
@@ -36,10 +40,27 @@ export default async function CategoriesPage() {
     .filter((category) => isVisibleCategorySlug(category.slug))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
+  // Mobile tier (docs/mobile-tier-plan.md, wave 2): root tab with a top bar and search field.
+  const tier = getMobileTierRoute('/categories') !== null;
+
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom py-5 md:py-6">
-        <div className="mb-4 md:mb-6">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface max-md:pb-4')}>
+      {tier && (
+        <div className="sticky top-0 z-m-header bg-m-surface pb-3 md:hidden">
+          <MobileTopBar title="Categories" />
+          <div className="px-4">
+            <Link
+              href="/search"
+              className="flex h-12 items-center gap-3 rounded-full bg-m-surface-container px-4 text-m-body-l text-m-on-surface-variant"
+            >
+              <Search className="h-5 w-5 shrink-0" aria-hidden />
+              Search JulineMart
+            </Link>
+          </div>
+        </div>
+      )}
+      <div className={clsx('container-custom py-5 md:py-6', tier && 'max-md:pt-1')}>
+        <div className={clsx('mb-4 md:mb-6', tier && 'max-md:hidden')}>
           <h1 className="mb-1 text-base font-bold text-gray-900 md:text-xl">Shop by Category</h1>
           <p className="text-xs text-gray-600 md:text-sm">
             Browse all {categories.length} product categories
@@ -119,7 +140,7 @@ export default async function CategoriesPage() {
           </div>
         </div>
 
-        <div className="mt-8 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-800 p-6 text-white md:p-8">
+        <div className={clsx('mt-8 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-800 p-6 text-white md:p-8', tier && 'max-md:hidden')}>
           <h2 className="mb-2 text-2xl font-bold">Can't find what you're looking for?</h2>
           <p className="mb-4 text-primary-100">Use our search to find specific products</p>
           <Link

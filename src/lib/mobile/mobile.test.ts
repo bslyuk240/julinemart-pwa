@@ -57,7 +57,7 @@ describe('getMobileTierRoute', () => {
   it('puts category listings in the mobile tier with the tab bar, search without', () => {
     expect(getMobileTierRoute('/category/electronics')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/search')?.tabBar).toBe(false);
-    expect(getMobileTierRoute('/categories')).toBeNull();
+    expect(getMobileTierRoute('/categories')?.tabBar).toBe(true);
   });
 
   it('runs gift flows full-screen and gift catalogues with the tab bar', () => {
@@ -66,6 +66,12 @@ describe('getMobileTierRoute', () => {
     expect(getMobileTierRoute('/gifts/boxes/bloom-box')?.tabBar).toBe(false);
     expect(getMobileTierRoute('/gifts')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/gifts/birthday')?.tabBar).toBe(true);
+  });
+
+  it('puts the tab roots in the mobile tier but not account sub-pages yet', () => {
+    expect(getMobileTierRoute('/wishlist')?.tabBar).toBe(true);
+    expect(getMobileTierRoute('/account')?.tabBar).toBe(true);
+    expect(getMobileTierRoute('/account/orders')).toBeNull();
   });
 
   it('shows the tab bar on the cart but not during checkout', () => {
