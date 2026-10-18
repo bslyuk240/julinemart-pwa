@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Truck, Package, MapPin, Tag, Store, Lock } from 'lucide-react';
+import { CreditCard, Truck, Package, MapPin, Tag, Store, Lock, Check, ShieldCheck } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
@@ -303,6 +303,16 @@ export default function CheckoutPage() {
   const applyBillingAddress = useCallback((): void => {}, []);
 
   const formatPrice = (price: number) => `NGN ${price.toLocaleString()}`;
+  // Mobile tier shows ₦ amounts (as in the approved preview); desktop keeps NGN.
+  const money = (price: number) =>
+    tier ? (
+      <>
+        <span className="md:hidden">₦{price.toLocaleString()}</span>
+        <span className="max-md:hidden">{formatPrice(price)}</span>
+      </>
+    ) : (
+      formatPrice(price)
+    );
   
   // Vouchers discount products by default, but can also carry their own shipping
   // discount (voucherShippingDiscount, from the voucher's shipping_discount_type).
@@ -1541,6 +1551,24 @@ export default function CheckoutPage() {
     !isCheckoutReady ||
     (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null);
 
+  const cancelPendingOrder = async () => {
+    const orderId = currentOrderRef.current;
+    if (orderId) {
+      try {
+        await fetch(`/api/orders/${orderId}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'Customer cancelled before completing payment' }),
+        });
+      } catch {
+        // best-effort — don't block the user if cancel call fails
+      }
+    }
+    currentOrderRef.current = null;
+    pendingPaystackConfigRef.current = null;
+    setHasPendingPayment(false);
+  };
+
   const retryPendingPayment = async () => {
     if (pendingPaystackConfigRef.current) {
       setIsProcessing(true);
@@ -1590,6 +1618,51 @@ export default function CheckoutPage() {
         <div className="grid min-w-0 gap-6 lg:grid-cols-3">
           {/* Checkout Form */}
           <div className="min-w-0 space-y-6 lg:col-span-2">
+            {tier && storePickupEligible && (
+              <div className="md:hidden">
+                <div
+                  role="radiogroup"
+                  aria-label="How to get your order"
+                  className="grid grid-cols-3 overflow-hidden rounded-full shadow-[inset_0_0_0_1px_var(--m-outline)]"
+                >
+                  {([
+                    ['delivery', 'Delivery'],
+                    ['store_pickup', 'Collect'],
+                    ['reservation', 'Reserve'],
+                  ] as const).map(([method, label], index) => {
+                    const selected = fulfillmentMethod === method;
+                    return (
+                      <button
+                        key={method}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => {
+                          haptic('selection');
+                          setFulfillmentMethod(method);
+                        }}
+                        className={clsx(
+                          'inline-flex h-10 items-center justify-center gap-1 text-m-label-l',
+                          index > 0 && 'shadow-[inset_1px_0_0_var(--m-outline)]',
+                          selected ? 'bg-m-primary-container text-m-on-primary-container' : 'text-m-on-surface',
+                        )}
+                      >
+                        {selected && <Check className="h-[18px] w-[18px]" aria-hidden />}
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 px-1 text-m-body-s text-m-on-surface-variant">
+                  {fulfillmentMethod === 'delivery'
+                    ? 'Ship to your address'
+                    : fulfillmentMethod === 'store_pickup'
+                      ? `Pick up at ${storePickupStore?.storeName || "the seller's store"} · free`
+                      : `Pay now — held 48 hours at ${storePickupStore?.storeName || "the seller's store"} · free`}
+                </p>
+              </div>
+            )}
+
             {/* Customer Information */}
             <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
               <div className="flex items-center gap-3 mb-4">
@@ -1838,7 +1911,7 @@ export default function CheckoutPage() {
 
             {/* Fulfillment method */}
             {storePickupEligible && (
-              <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
+              <div className={clsx('rounded-2xl bg-white p-4 shadow-sm md:p-5', tier && 'max-md:hidden')}>
                 <div className="mb-4 flex items-center gap-3">
                   <Store className="h-6 w-6 text-primary-600" />
                   <h2 className="text-sm font-semibold text-gray-900 md:text-base">
@@ -1932,11 +2005,17 @@ export default function CheckoutPage() {
                       return (
                         <label
                           key={option.id}
-                          className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                            selectedShipping === option.id
-                              ? 'border-primary-600 bg-primary-50'
-                              : 'border-gray-300 hover:border-gray-400'
-                          }`}
+                          className={clsx(
+                            `flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                              selectedShipping === option.id
+                                ? 'border-primary-600 bg-primary-50'
+                                : 'border-gray-300 hover:border-gray-400'
+                            }`,
+                            tier && 'max-md:rounded-xl max-md:border max-md:p-3.5',
+                            tier && (selectedShipping === option.id
+                              ? 'max-md:border-transparent max-md:bg-m-primary-container'
+                              : 'max-md:border-m-outline-variant'),
+                          )}
                         >
                           <input
                             type="radio"
@@ -1949,11 +2028,11 @@ export default function CheckoutPage() {
                           <div className="min-w-0 flex-1">
                             <div className="flex min-w-0 items-center justify-between gap-2">
                               <p className="min-w-0 break-words font-medium text-gray-900">{option.title}</p>
-                              <p className="shrink-0 font-semibold text-primary-600">
+                              <p className={clsx('shrink-0 font-semibold text-primary-600', tier && 'max-md:tabular-nums max-md:text-m-on-surface')}>
                                 {displayCost !== null
                                   ? (displayCost === 0
                                     ? 'FREE'
-                                    : formatPrice(displayCost))
+                                    : money(displayCost))
                                   : 'Calculated at checkout'}
                               </p>
                             </div>
@@ -2005,6 +2084,38 @@ export default function CheckoutPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    {tier && (
+                      <div className="flex gap-2 md:hidden" role="radiogroup" aria-label="Code type">
+                        {([
+                          ['voucher', 'Voucher'],
+                          ['influencer', 'Influencer code'],
+                        ] as const).map(([kind, label]) => {
+                          const selected = promoKind === kind;
+                          return (
+                            <button
+                              key={kind}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              onClick={() => {
+                                setPromoKind(kind);
+                                setVoucherError('');
+                                setCouponError('');
+                              }}
+                              className={clsx(
+                                "relative inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']",
+                                selected
+                                  ? 'bg-m-primary-container text-m-on-primary-container'
+                                  : 'text-m-on-surface-variant shadow-[inset_0_0_0_1px_var(--m-outline-variant)]',
+                              )}
+                            >
+                              {selected && <Check className="h-4 w-4" aria-hidden />}
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                     <select
                       value={promoKind}
                       onChange={(e) => {
@@ -2013,13 +2124,16 @@ export default function CheckoutPage() {
                         setVoucherError('');
                         setCouponError('');
                       }}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                      className={clsx(
+                        'w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30',
+                        tier && 'max-md:hidden',
+                      )}
                     >
                       <option value="voucher">Campaign voucher</option>
                       <option value="influencer">Influencer code</option>
                     </select>
 
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                    <div className={clsx('flex flex-col gap-2 sm:flex-row sm:items-stretch', tier && 'max-md:flex-row max-md:items-stretch')}>
                       <div className="min-w-0 w-full sm:flex-1">
                         <Input
                           placeholder={
@@ -2050,7 +2164,7 @@ export default function CheckoutPage() {
                         isLoading={promoKind === 'voucher' ? isApplyingVoucher : isApplyingCoupon}
                         variant="secondary"
                         size="sm"
-                        className="w-full shrink-0 whitespace-nowrap sm:w-auto"
+                        className={clsx('w-full shrink-0 whitespace-nowrap sm:w-auto', tier && 'max-md:w-auto max-md:rounded-full max-md:px-5')}
                         type="button"
                       >
                         Apply
@@ -2107,11 +2221,17 @@ export default function CheckoutPage() {
                     {paymentGateways.map((gateway) => (
                       <label
                         key={gateway.id}
-                        className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                          selectedPayment === gateway.id
-                            ? 'border-primary-600 bg-primary-50'
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
+                        className={clsx(
+                          `flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                            selectedPayment === gateway.id
+                              ? 'border-primary-600 bg-primary-50'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`,
+                          tier && 'max-md:items-center max-md:rounded-xl max-md:border max-md:p-3.5',
+                          tier && (selectedPayment === gateway.id
+                            ? 'max-md:border-transparent max-md:bg-m-primary-container'
+                            : 'max-md:border-m-outline-variant'),
+                        )}
                       >
                         <input
                           type="radio"
@@ -2158,8 +2278,89 @@ export default function CheckoutPage() {
             )}
           </div>
 
+          {tier && (
+            <div className="rounded-2xl bg-m-surface-lowest p-4 text-m-body-m shadow-[0_0_0_1px_rgb(30_26_31/0.07)] md:hidden">
+              <h2 className="mb-2 text-m-title-m text-m-on-surface">Order summary</h2>
+              <div className="flex justify-between py-1">
+                <span className="text-m-on-surface-variant">
+                  Items ({items.reduce((sum: number, item: any) => sum + item.quantity, 0)})
+                </span>
+                <span className="tabular-nums">₦{subtotal.toLocaleString()}</span>
+              </div>
+              {voucherDiscount > 0 && (
+                <div className="flex justify-between py-1 text-m-success">
+                  <span>Product discount</span>
+                  <span className="tabular-nums">-₦{voucherDiscount.toLocaleString()}</span>
+                </div>
+              )}
+              <div className="flex justify-between gap-3 py-1">
+                <span className="text-m-on-surface-variant">Delivery</span>
+                <span className="text-right tabular-nums">
+                  {shippingCost !== null
+                    ? shippingCost === 0
+                      ? 'FREE'
+                      : `₦${shippingCost.toLocaleString()}`
+                    : selectedOption?.methodId === 'jlo_shipping'
+                      ? 'Enter state & city'
+                      : 'Calculated at checkout'}
+                </span>
+              </div>
+              {activeShippingDiscount > 0 && (
+                <div className="flex justify-between py-1 text-m-success">
+                  <span>Delivery discount</span>
+                  <span className="tabular-nums">-₦{activeShippingDiscount.toLocaleString()}</span>
+                </div>
+              )}
+              {taxAmount > 0 && (
+                <div className="flex justify-between py-1">
+                  <span className="text-m-on-surface-variant">Tax ({taxRate}%)</span>
+                  <span className="tabular-nums">₦{taxAmount.toLocaleString()}</span>
+                </div>
+              )}
+              <div className="my-2 h-px bg-m-outline-variant" />
+              <div className="flex justify-between py-1 text-m-title-m text-m-on-surface">
+                <span>Total</span>
+                <span className="tabular-nums">₦{total.toLocaleString()}</span>
+              </div>
+              <div className="mt-3 flex items-start gap-2.5 rounded-xl bg-m-success-container p-3 text-[#0f4a26]">
+                <ShieldCheck className="h-5 w-5 shrink-0" aria-hidden />
+                <span className="text-m-body-s">
+                  JulineMart Protect covers this order if it doesn&apos;t arrive, arrives damaged or is the wrong item.
+                </span>
+              </div>
+              {hasPendingPayment && (
+                <div className="mt-3 space-y-2">
+                  <p className="rounded-lg bg-m-tertiary-container px-3 py-2 text-center text-m-body-s text-m-on-tertiary-container">
+                    Your order was created but payment was not completed.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={cancelPendingOrder}
+                    className="h-10 w-full rounded-full text-m-label-l text-m-primary"
+                  >
+                    Cancel and place a new order instead
+                  </button>
+                </div>
+              )}
+              {!paystackReady && !loading && !hasPendingPayment && (
+                <p className="mt-3 text-center text-m-body-s text-m-on-surface-variant">Preparing secure payment…</p>
+              )}
+              <p className="mt-3 text-center text-m-body-s text-m-on-surface-variant">
+                By placing your order, you agree to our{' '}
+                <Link href="/page/terms-of-service" className="text-m-primary underline">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/page/privacy-policy" className="text-m-primary underline">
+                  Privacy Policy
+                </Link>
+                .
+              </p>
+            </div>
+          )}
+
           {/* Order Summary */}
-          <div className="min-w-0 lg:col-span-1">
+          <div className={clsx('min-w-0 lg:col-span-1', tier && 'max-md:hidden')}>
             <div className="sticky top-4 rounded-2xl bg-white p-4 shadow-sm md:p-5">
               <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-4">Order Summary</h2>
               
@@ -2252,23 +2453,7 @@ export default function CheckoutPage() {
                   <button
                     type="button"
                     className="w-full text-center text-xs text-gray-500 underline hover:text-gray-700"
-                    onClick={async () => {
-                      const orderId = currentOrderRef.current;
-                      if (orderId) {
-                        try {
-                          await fetch(`/api/orders/${orderId}/cancel`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ reason: 'Customer cancelled before completing payment' }),
-                          });
-                        } catch {
-                          // best-effort — don't block the user if cancel call fails
-                        }
-                      }
-                      currentOrderRef.current = null;
-                      pendingPaystackConfigRef.current = null;
-                      setHasPendingPayment(false);
-                    }}
+                    onClick={cancelPendingOrder}
                   >
                     Cancel and place a new order instead
                   </button>
