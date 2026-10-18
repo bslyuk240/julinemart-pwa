@@ -10,6 +10,10 @@ type MobileTopBarProps = {
   title?: ReactNode;
   /** Logical parent, used when the shopper landed here from outside the app. Omit for root tabs. */
   backHref?: string;
+  /** Overrides Back (e.g. step back inside a multi-step flow). Shows the Back button even without backHref. */
+  onBack?: () => void;
+  /** Small line under the title, e.g. "Step 2 of 4". */
+  subtitle?: ReactNode;
   /** Up to two icon buttons, e.g. <TopBarAction />. */
   actions?: ReactNode;
   /**
@@ -20,13 +24,14 @@ type MobileTopBarProps = {
 };
 
 /** Material 3 top app bar. Mobile only (`md:hidden`); desktop keeps the site header. */
-export default function MobileTopBar({ title, backHref, actions, variant = 'small' }: MobileTopBarProps) {
+export default function MobileTopBar({ title, backHref, onBack, subtitle, actions, variant = 'small' }: MobileTopBarProps) {
   const router = useRouter();
   const scrolled = useScrolled(8);
   const solid = variant === 'small' || scrolled;
 
   const goBack = () => {
-    if (hasInAppHistory()) router.back();
+    if (onBack) onBack();
+    else if (hasInAppHistory()) router.back();
     else router.push(backHref ?? '/');
   };
 
@@ -38,21 +43,28 @@ export default function MobileTopBar({ title, backHref, actions, variant = 'smal
         solid ? (scrolled ? 'bg-m-surface-container' : 'bg-m-surface') : 'bg-transparent',
       )}
     >
-      {backHref !== undefined && (
+      {(backHref !== undefined || onBack) && (
         <TopBarAction label="Back" onClick={goBack} onImage={!solid}>
           <ArrowLeft className="h-6 w-6" aria-hidden />
         </TopBarAction>
       )}
-      <h1
+      <div
         className={clsx(
-          'min-w-0 flex-1 truncate pl-1 text-m-on-surface transition-opacity duration-200',
-          variant === 'overlay' ? 'text-lg font-medium' : 'text-m-title-l',
+          'min-w-0 flex-1 pl-1 transition-opacity duration-200',
           !solid && 'opacity-0',
-          backHref === undefined && 'pl-3',
+          backHref === undefined && !onBack && 'pl-3',
         )}
       >
-        {title}
-      </h1>
+        <h1
+          className={clsx(
+            'truncate text-m-on-surface',
+            variant === 'overlay' || subtitle ? 'text-lg font-medium leading-6' : 'text-m-title-l',
+          )}
+        >
+          {title}
+        </h1>
+        {subtitle && <p className="truncate text-m-body-s text-m-on-surface-variant">{subtitle}</p>}
+      </div>
       {actions}
     </header>
   );

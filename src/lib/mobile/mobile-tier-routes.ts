@@ -16,6 +16,8 @@ const ROUTES: MobileTierRoute[] = [
   { pattern: '/search', tabBar: false }, // M2: full-screen search
   { pattern: '/cart', tabBar: true }, // M3
   { pattern: '/checkout', tabBar: false }, // M3: layout only
+  // Wave 2
+  { pattern: '/gifts/build', tabBar: false }, // M4: gift builder flow
 ];
 
 const DEV_ROUTES: MobileTierRoute[] = [{ pattern: '/dev/mobile-shell', tabBar: true }];

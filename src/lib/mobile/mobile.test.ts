@@ -60,6 +60,11 @@ describe('getMobileTierRoute', () => {
     expect(getMobileTierRoute('/categories')).toBeNull();
   });
 
+  it('runs the gift builder full-screen without the tab bar', () => {
+    expect(getMobileTierRoute('/gifts/build')?.tabBar).toBe(false);
+    expect(getMobileTierRoute('/gifts')).toBeNull();
+  });
+
   it('shows the tab bar on the cart but not during checkout', () => {
     expect(getMobileTierRoute('/cart')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/checkout')?.tabBar).toBe(false);

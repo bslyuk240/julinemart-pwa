@@ -18,6 +18,12 @@ import {
   Search,
 } from 'lucide-react';
 import PageHeader from '@/components/layout/page-header';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import StickyActionBar from '@/components/mobile/shell/sticky-action-bar';
+import { pushOverlay } from '@/lib/mobile/back-stack';
+import { haptic } from '@/lib/mobile/haptics';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import PageLoading from '@/components/ui/page-loading';
@@ -125,6 +131,9 @@ async function builderPost(body: Record<string, unknown>) {
 export default function GiftBuildPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  // Mobile tier (docs/mobile-tier-plan.md, M4): layout only. Below md the flow
+  // gets a step top bar and one pinned action bar; same state and handlers.
+  const tier = useMobileTier() !== null;
   const [loading, setLoading] = useState(true);
   const [builder, setBuilder] = useState<GiftBuilderState | null>(null);
   const [pool, setPool] = useState<PoolProduct[]>([]);
@@ -377,6 +386,22 @@ export default function GiftBuildPage() {
   }, [step, builder, grandTotal]);
 
   const canCheckout = builder && builder.items.length > 0 && builder.packaging != null;
+
+  const goToStep = (next: number) => {
+    if (tier) haptic('tap');
+    setStep(next);
+    window.scrollTo({ top: 0 });
+  };
+
+  // In the app, Android Back steps back through the flow (step 3 → 2 → 1)
+  // instead of leaving the builder; on the first step it leaves as usual.
+  useEffect(() => {
+    if (!tier || step === 0) return undefined;
+    return pushOverlay(() => {
+      setStep((current) => Math.max(0, current - 1));
+      window.scrollTo({ top: 0 });
+    });
+  }, [tier, step]);
   const isCheckoutReady =
     Boolean(canCheckout) &&
     Boolean(selectedPayment) &&
@@ -471,20 +496,49 @@ export default function GiftBuildPage() {
 
   if (loading) return <PageLoading />;
 
-  return (
-    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-36 md:pb-28 lg:pb-10">
-      <div className="container-custom py-5 md:py-8">
-        <PageHeader
-          title="Build your own box"
-          subtitle="Pick items, see your total, and send a personalised gift."
-          backHref="/gifts"
-        />
 
-        <p className="mb-5 text-xs text-gray-500">
+  return (
+    <main
+      className={clsx(
+        'min-h-screen overflow-x-hidden bg-gray-50 pb-36 md:pb-28 lg:pb-10',
+        tier && 'max-md:overflow-x-clip max-md:bg-m-surface-low max-md:pb-4',
+      )}
+    >
+      {tier && (
+        <div className="sticky top-0 z-m-header bg-m-surface-low md:hidden">
+          <MobileTopBar
+            title={STEPS[step]}
+            subtitle={`Build your own box · step ${step + 1} of ${STEPS.length}`}
+            backHref="/gifts"
+            onBack={step > 0 ? () => goToStep(step - 1) : undefined}
+          />
+          <div className="flex gap-1 px-4 pb-2" aria-hidden>
+            {STEPS.map((label, i) => (
+              <span
+                key={label}
+                className={clsx(
+                  'h-1 flex-1 rounded-full transition-colors duration-300 ease-m-standard',
+                  i <= step ? 'bg-m-primary' : 'bg-m-surface-high',
+                )}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      <div className={clsx('container-custom py-5 md:py-8', tier && 'max-md:pt-3')}>
+        <div className={clsx(tier && 'max-md:hidden')}>
+          <PageHeader
+            title="Build your own box"
+            subtitle="Pick items, see your total, and send a personalised gift."
+            backHref="/gifts"
+          />
+        </div>
+
+        <p className={clsx('mb-5 text-xs text-gray-500', tier && 'max-md:hidden')}>
           Step {step + 1} of {STEPS.length} · {STEPS[step]}
         </p>
 
-        <div className="mb-6 flex gap-1">
+        <div className={clsx('mb-6 flex gap-1', tier && 'max-md:hidden')}>
           {STEPS.map((_, i) => (
             <div key={STEPS[i]} className="h-1 flex-1 rounded-full bg-gray-200">
               <div
@@ -543,7 +597,11 @@ export default function GiftBuildPage() {
                   />
                 </label>
 
-                <Button className="w-full sm:w-auto sm:min-w-[200px]" onClick={saveContext} disabled={!recipientType}>
+                <Button
+                  className={clsx('w-full sm:w-auto sm:min-w-[200px]', tier && 'max-md:hidden')}
+                  onClick={saveContext}
+                  disabled={!recipientType}
+                >
                   Continue
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -600,6 +658,7 @@ export default function GiftBuildPage() {
                   onNext={() => setStep(2)}
                   nextLabel="Pick items"
                   nextDisabled={!builder.packaging}
+                  className={clsx(tier && 'max-md:hidden')}
                 />
               </section>
             )}
@@ -699,7 +758,13 @@ export default function GiftBuildPage() {
                       {pool.length === 0 ? 'No gift items available right now.' : 'No items match your search.'}
                     </p>
                   ) : (
-                    <div className="grid max-h-[min(520px,60vh)] grid-cols-2 gap-3 overflow-y-auto pr-1 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
+                    <div
+                      className={clsx(
+                        'grid max-h-[min(520px,60vh)] grid-cols-2 gap-3 overflow-y-auto pr-1 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3',
+                        // One scroll on phones: no nested scroller inside the page.
+                        tier && 'max-md:max-h-none max-md:overflow-visible max-md:pr-0',
+                      )}
+                    >
                       {filteredPool.map((p) => (
                         <button
                           key={p.product_id || p.sourced_id || p.name}
@@ -726,6 +791,7 @@ export default function GiftBuildPage() {
                     onNext={() => setStep(3)}
                     nextLabel="Checkout"
                     nextDisabled={!canCheckout}
+                    className={clsx(tier && 'max-md:hidden')}
                   />
                 </section>
               </>
@@ -1004,8 +1070,54 @@ export default function GiftBuildPage() {
         </div>
       </div>
 
+      {tier && (
+        <StickyActionBar className="flex-col items-stretch gap-2.5">
+          {step > 0 && builder && (
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate text-m-body-m text-m-on-surface-variant">
+                {step === 3
+                  ? 'Total with delivery'
+                  : `${builder.totals.item_count}/${maxItems} items${builder.packaging ? ` · ${builder.packaging.name}` : ''}`}
+              </span>
+              <span className="shrink-0 text-lg font-bold tabular-nums text-m-on-surface">
+                {formatPrice(step === 3 ? grandTotal : builder.totals.grand_total)}
+              </span>
+            </div>
+          )}
+          {step === 3 ? (
+            <button
+              type="submit"
+              form="gift-build-checkout"
+              disabled={submitting || !isCheckoutReady}
+              onClick={() => haptic('tap')}
+              className="h-12 w-full rounded-full bg-m-primary text-m-label-l text-m-on-primary shadow-[0_1px_2px_rgb(60_4_69/0.3)] active:opacity-90 disabled:bg-m-surface-high disabled:text-m-on-surface-variant disabled:shadow-none"
+            >
+              {submitting ? 'Paying…' : 'Place order'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={
+                step === 0 ? !recipientType : step === 1 ? !builder?.packaging : !canCheckout
+              }
+              onClick={() => {
+                if (step === 0) {
+                  haptic('tap');
+                  void saveContext();
+                } else {
+                  goToStep(step + 1);
+                }
+              }}
+              className="h-12 w-full rounded-full bg-m-primary text-m-label-l text-m-on-primary shadow-[0_1px_2px_rgb(60_4_69/0.3)] active:opacity-90 disabled:bg-m-surface-high disabled:text-m-on-surface-variant disabled:shadow-none"
+            >
+              {step === 0 ? 'Continue' : step === 1 ? 'Pick items' : 'Checkout'}
+            </button>
+          )}
+        </StickyActionBar>
+      )}
+
       {builder && step === 3 && (
-        <div className="fixed inset-x-0 z-[70] border-t border-gray-200 bg-white p-4 shadow-lg bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] md:bottom-0 lg:hidden">
+        <div className={clsx('fixed inset-x-0 z-[70] border-t border-gray-200 bg-white p-4 shadow-lg bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] md:bottom-0 lg:hidden', tier && 'max-md:hidden')}>
           <div className="container-custom flex items-center gap-3">
             <button
               type="button"
@@ -1031,7 +1143,7 @@ export default function GiftBuildPage() {
       )}
 
       {builder && step >= 1 && step < 3 && (
-        <div className="fixed inset-x-0 z-[70] border-t border-gray-200 bg-white p-4 shadow-lg bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] md:bottom-0 lg:hidden">
+        <div className={clsx('fixed inset-x-0 z-[70] border-t border-gray-200 bg-white p-4 shadow-lg bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] md:bottom-0 lg:hidden', tier && 'max-md:hidden')}>
           <div className="container-custom flex items-center justify-between gap-3">
             <div>
               <p className="text-xs text-gray-500">Running total</p>
@@ -1104,14 +1216,16 @@ function StepNav({
   onNext,
   nextLabel,
   nextDisabled,
+  className,
 }: {
   onBack: () => void;
   onNext: () => void;
   nextLabel: string;
   nextDisabled?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="flex gap-2 border-t border-gray-100 pt-4">
+    <div className={clsx('flex gap-2 border-t border-gray-100 pt-4', className)}>
       <Button type="button" variant="outline" onClick={onBack}>
         <ArrowLeft className="mr-1 h-4 w-4" /> Back
       </Button>

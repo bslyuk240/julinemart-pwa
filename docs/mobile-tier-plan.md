@@ -292,6 +292,20 @@ Deferred to the wave 3 checkout rework, since they need logic changes:
 - per-seller shipment rows
 - moving the install prompt and cookie banner onto the new overlay layering (they still cover the screen)
 
+**M4 status (2026-10-18): gift builder built, not committed.**
+
+`/gifts/build` is on the allowlist (full-screen, no navigation bar). It's layout only and keeps the same state and handlers. Below `md`:
+- a step top bar with the step name, "step n of 4" and a 4-segment progress bar
+- Back steps back through the flow, and the Android Back button does the same
+- one pinned action bar with the running count, box and total, plus Continue / Pick items / Checkout / Place order, replacing the old floating bars that sat 4rem up for the old nav
+- the item picker scrolls with the page instead of in a nested box
+
+Desktop is unchanged.
+
+Not done yet:
+- moving the customise sheet onto the shared `Sheet`
+- the rest of wave 2: the gifts catalogue, account and orders, wishlist, and `/categories`
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---
