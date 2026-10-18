@@ -13,9 +13,11 @@ export default function GlobalPullToRefresh({ children }: GlobalPullToRefreshPro
   const pathname = usePathname();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const vendorPullHandledLocally = pathname.startsWith('/vendor');
+  // Multi-step gift flows: an accidental pull-down must not reload mid-build.
+  const inGiftFlow = pathname.startsWith('/gifts/build') || pathname.startsWith('/gifts/checkout');
 
   const { pullDistance, isRefreshing } = usePullToRefresh({
-    disabled: vendorPullHandledLocally,
+    disabled: vendorPullHandledLocally || inGiftFlow,
     onRefresh: async () => {
       // Force a full page reload to ensure data/state is fresh
       await new Promise((resolve) => setTimeout(resolve, 150));

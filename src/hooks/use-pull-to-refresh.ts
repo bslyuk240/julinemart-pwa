@@ -49,6 +49,9 @@ export function usePullToRefresh({
       if (isRefreshing) return;
       const scrollTop = document.scrollingElement?.scrollTop ?? window.scrollY;
       if (scrollTop > 0) return;
+      // A finger dragging down inside a scrolled inner list (e.g. the gift
+      // builder's item grid) is scrolling that list back up, not pulling the page.
+      if (startsInScrolledContainer(event.target, root)) return;
 
       startYRef.current = event.touches[0].clientY;
       pullingRef.current = true;
@@ -130,4 +133,17 @@ export function usePullToRefresh({
   }, [onRefresh, threshold, maxPull, disabled, isRefreshing, targetRef]);
 
   return { pullDistance, isRefreshing };
+}
+
+/** True when the touch began inside a vertically scrollable element that is not at its top. */
+function startsInScrolledContainer(target: EventTarget | null, boundary: HTMLElement): boolean {
+  let el = target instanceof Element ? target : null;
+  while (el && el !== boundary && el !== document.body && el !== document.documentElement) {
+    if (el instanceof HTMLElement && el.scrollTop > 0) {
+      const overflowY = window.getComputedStyle(el).overflowY;
+      if (overflowY === 'auto' || overflowY === 'scroll') return true;
+    }
+    el = el.parentElement;
+  }
+  return false;
 }

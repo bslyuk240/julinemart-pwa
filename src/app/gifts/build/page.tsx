@@ -36,6 +36,7 @@ import { useLocationLgas } from '@/hooks/use-location-lgas';
 import GiftPromoCode from '@/components/gifts/gift-promo-code';
 import GiftDeliveryScheduleFields from '@/components/gifts/gift-delivery-schedule-fields';
 import GiftBuilderCustomiseSheet from '@/components/gifts/gift-builder-customise-sheet';
+import GiftItemImage from '@/components/gifts/gift-item-image';
 import {
   GiftCheckoutSection,
   GiftPaymentMethodSection,
@@ -53,8 +54,17 @@ import {
 import { getEnabledPaymentGateways, type PaymentGateway } from '@/lib/woocommerce/shipping';
 import type { GiftBuilderState, GiftPackagingOption } from '@/types/gifts';
 import type { GiftVoucherResult } from '@/lib/gifts/voucher';
+import {
+  GIFT_BUILDER_SESSION_KEY,
+  clampGiftBuilderStep,
+  clearGiftBuilderProgress,
+  loadGiftBuilderCheckout,
+  loadGiftBuilderStep,
+  saveGiftBuilderCheckout,
+  saveGiftBuilderStep,
+} from '@/lib/gifts/builder-progress';
 
-const SESSION_KEY = 'julinemart_gift_builder_token';
+const SESSION_KEY = GIFT_BUILDER_SESSION_KEY;
 const STEPS = ['Who & occasion', 'Box size', 'Pick items', 'Checkout'] as const;
 
 const SELECT_CLASS =
@@ -72,6 +82,24 @@ type PoolProduct = {
   customisable?: boolean;
   customisation_schema_id?: string;
 };
+
+const EMPTY_CHECKOUT = {
+  customer_name: '',
+  customer_email: '',
+  customer_phone: '',
+  recipient_name: '',
+  recipient_phone: '',
+  recipient_address: '',
+  recipient_city: '',
+  recipient_state: '',
+  recipient_zone: '',
+  gift_message: '',
+  sender_visible: true,
+  requested_delivery_date: '',
+  occasion_date: '',
+};
+
+type CheckoutForm = typeof EMPTY_CHECKOUT;
 
 declare global {
   interface Window {
@@ -111,21 +139,7 @@ export default function GiftBuildPage() {
   const [paymentGateways, setPaymentGateways] = useState<PaymentGateway[]>([]);
   const [selectedPayment, setSelectedPayment] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(true);
-  const [checkout, setCheckout] = useState({
-    customer_name: '',
-    customer_email: '',
-    customer_phone: '',
-    recipient_name: '',
-    recipient_phone: '',
-    recipient_address: '',
-    recipient_city: '',
-    recipient_state: '',
-    recipient_zone: '',
-    gift_message: '',
-    sender_visible: true,
-    requested_delivery_date: '',
-    occasion_date: '',
-  });
+  const [checkout, setCheckout] = useState<CheckoutForm>(EMPTY_CHECKOUT);
 
   const initSession = useCallback(async () => {
     setLoading(true);
@@ -136,14 +150,24 @@ export default function GiftBuildPage() {
         const res = await fetch(`/api/gifts/builder?session_token=${encodeURIComponent(token)}`);
         const json = await res.json();
         if (json.success && json.data?.session?.status === 'draft') {
-          setBuilder(normalizeBuilder(json.data, token));
+          const resumed = normalizeBuilder(json.data, token);
+          setBuilder(resumed);
           setRecipientType(json.data.session?.recipient_type || '');
           setOccasion(json.data.session?.occasion || '');
           setBudget(json.data.session?.budget_max != null ? String(json.data.session.budget_max) : '');
+          // Put the shopper back where they were; a reload otherwise lands on step 1.
+          setStep(
+            clampGiftBuilderStep(loadGiftBuilderStep(token), {
+              hasPackaging: resumed.packaging != null,
+              itemCount: resumed.items.length,
+            })
+          );
+          const savedCheckout = loadGiftBuilderCheckout<CheckoutForm>(token);
+          if (savedCheckout) setCheckout((prev) => ({ ...prev, ...savedCheckout }));
           trackGiftByoStart({ resumed: true });
           return;
         }
-        localStorage.removeItem(SESSION_KEY);
+        clearGiftBuilderProgress();
       }
 
       const created = await builderPost({ action: 'create', gfc_code: 'warri' });
@@ -197,6 +221,14 @@ export default function GiftBuildPage() {
   }, []);
 
   const token = builder?.session_token;
+
+  useEffect(() => {
+    if (token && !loading) saveGiftBuilderStep(token, step);
+  }, [token, step, loading]);
+
+  useEffect(() => {
+    if (token && !loading) saveGiftBuilderCheckout(token, checkout);
+  }, [token, checkout, loading]);
 
   const saveContext = async () => {
     if (!token) return;
@@ -405,7 +437,7 @@ export default function GiftBuildPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Checkout failed');
 
-      localStorage.removeItem(SESSION_KEY);
+      clearGiftBuilderProgress();
 
       if (selectedPayment !== 'paystack') {
         toast.success('Gift order placed!');
@@ -676,18 +708,10 @@ export default function GiftBuildPage() {
                           disabled={builder.totals.item_count >= maxItems}
                           className="rounded-xl border border-gray-200 bg-white p-2 text-left hover:border-primary-300 disabled:opacity-50"
                         >
-                          {p.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={p.image}
-                              alt=""
-                              className="mb-2 aspect-square w-full rounded-lg object-cover"
-                            />
-                          ) : (
-                            <div className="mb-2 flex aspect-square w-full items-center justify-center rounded-lg bg-gray-100">
-                              <Gift className="h-8 w-8 text-gray-300" />
-                            </div>
-                          )}
+                          <GiftItemImage
+                            src={p.image}
+                            className="mb-2 aspect-square w-full rounded-lg"
+                          />
                           <p className="line-clamp-2 text-xs font-medium text-gray-900">{p.name}</p>
                           <p className="text-xs text-gray-500">
                             {p.customisable ? 'Personalise & add' : 'Tap to add'}
