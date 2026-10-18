@@ -138,7 +138,8 @@ async function fetchShippingSettings(): Promise<ShippingZoneWithMethods[]> {
 
   const payload = (await response.json()) as JloShippingSettingsResponse;
   if (!payload.success || !Array.isArray(payload.data)) {
-    return [];
+    // Treat as a failed load so it is retried, not cached as "no zones".
+    throw new Error('Shipping settings unavailable');
   }
 
   return payload.data;
@@ -193,15 +194,26 @@ export async function getShippingZoneLocations(zoneId: number): Promise<ZoneLoca
   return zones.find((entry) => entry.zone.id === zoneId)?.locations ?? [];
 }
 
+/**
+ * JLO shipping zones + methods, fetched once per page load. A failed fetch is
+ * not cached: the caller gets [] this time and the next call retries, so one
+ * JLO hiccup no longer hides shipping options (and the quote) for the whole visit.
+ */
 export async function getAllShippingMethods(): Promise<ShippingZoneWithMethods[]> {
   if (!shippingMethodsCache) {
-    shippingMethodsCache = fetchShippingSettings().catch((error) => {
-      console.error('Failed to load JLO shipping settings:', error);
-      return [];
+    const request = fetchShippingSettings();
+    shippingMethodsCache = request;
+    request.catch(() => {
+      if (shippingMethodsCache === request) shippingMethodsCache = null;
     });
   }
 
-  return shippingMethodsCache;
+  try {
+    return await shippingMethodsCache;
+  } catch (error) {
+    console.error('Failed to load JLO shipping settings:', error);
+    return [];
+  }
 }
 
 export async function calculateShipping(
