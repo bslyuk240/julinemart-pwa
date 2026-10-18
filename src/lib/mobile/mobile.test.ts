@@ -72,6 +72,8 @@ describe('getMobileTierRoute', () => {
     expect(getMobileTierRoute('/wishlist')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/account')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/account/orders')).toBeNull();
+    expect(getMobileTierRoute('/orders')?.tabBar).toBe(true);
+    expect(getMobileTierRoute('/orders/abc-123')?.tabBar).toBe(true);
   });
 
   it('shows the tab bar on the cart but not during checkout', () => {

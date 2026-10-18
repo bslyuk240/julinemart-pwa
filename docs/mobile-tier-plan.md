@@ -331,6 +331,16 @@ Not verified on screen: the account hub, which needs a signed-in customer.
 
 Still on the old chrome: `/login` and the `/account/*` sub-pages (wave 3).
 
+**M7 status (2026-10-18): orders built, not committed.**
+
+`/orders` and `/orders/*` are on the allowlist with the navigation bar; the Account tab stays lit. Below `md`:
+- **Orders list:** an "Orders · n orders" top bar, status chips built from the statuses actually present (with counts), and one tappable row per order (number, date, total, status pill).
+- **Order detail:** an "Order #n" top bar with "Placed on …" and share. Unpaid orders get a pinned "Complete payment · ₦total" bar calling the existing handler. The tracker, items, actions and returns keep their cards.
+
+Desktop is unchanged.
+
+Not verified on screen: the signed-in views, which need a customer account. The signed-out redirect to /login still works.
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---

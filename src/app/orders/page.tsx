@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Package, Calendar, ArrowRight, ShoppingBag } from 'lucide-react';
+import { Package, Calendar, ArrowRight, ShoppingBag, ChevronRight } from 'lucide-react';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import { haptic } from '@/lib/mobile/haptics';
 import AccountPageHeader from '@/components/account/account-page-header';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
@@ -59,6 +63,14 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const totalOrders = orders.length;
+  // Mobile tier (docs/mobile-tier-plan.md, wave 2): status chips + compact rows below md.
+  const tier = useMobileTier() !== null;
+  const [statusFilter, setStatusFilter] = useState('');
+  const statusCounts = orders.reduce<Record<string, number>>((acc, order) => {
+    acc[order.overall_status] = (acc[order.overall_status] ?? 0) + 1;
+    return acc;
+  }, {});
+  const visibleOrders = statusFilter ? orders.filter((order) => order.overall_status === statusFilter) : orders;
 
   useEffect(() => {
     if (!authLoading) {
@@ -109,8 +121,45 @@ export default function OrdersPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom py-5 md:py-6">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
+      {tier && (
+        <div className="sticky top-0 z-m-header bg-m-surface-low md:hidden">
+          <MobileTopBar
+            title="Orders"
+            subtitle={totalOrders > 0 ? `${totalOrders} ${totalOrders === 1 ? 'order' : 'orders'}` : undefined}
+            backHref="/account"
+          />
+          {Object.keys(statusCounts).length > 1 && (
+            <div className="flex gap-2 overflow-x-auto px-4 pb-3 scrollbar-hide" role="radiogroup" aria-label="Filter by status">
+              {['', ...Object.keys(statusCounts)].map((status) => {
+                const selected = statusFilter === status;
+                return (
+                  <button
+                    key={status || 'all'}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => {
+                      haptic('selection');
+                      setStatusFilter(status);
+                    }}
+                    className={clsx(
+                      "relative inline-flex h-8 shrink-0 items-center rounded-lg px-3 text-[13px] font-semibold before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']",
+                      selected
+                        ? 'bg-m-primary-container text-m-on-primary-container'
+                        : 'bg-m-surface-low text-m-on-surface-variant shadow-[inset_0_0_0_1px_var(--m-outline-variant)]',
+                    )}
+                  >
+                    {status ? `${statusLabels[status] || status} · ${statusCounts[status]}` : 'All'}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+      <div className={clsx('container-custom py-5 md:py-6', tier && 'max-md:pt-1')}>
+        <div className={clsx(tier && 'max-md:hidden')}>
         <AccountPageHeader
           title="My Orders"
           subtitle="Track your recent purchases and order history."
@@ -121,6 +170,7 @@ export default function OrdersPage() {
             </div>
           )}
         />
+        </div>
 
         {orders.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
@@ -141,7 +191,42 @@ export default function OrdersPage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <>
+          {tier && (
+            <div className="overflow-hidden rounded-2xl bg-m-surface-lowest shadow-[0_0_0_1px_rgb(30_26_31/0.07)] md:hidden">
+              {visibleOrders.map((order, index) => {
+                const statusStyle = statusColors[order.overall_status] || statusColors.pending;
+                return (
+                  <Link
+                    key={order.id}
+                    href={`/orders/${order.id}`}
+                    className={clsx(
+                      'flex min-h-[72px] items-center gap-3 px-4 py-3 active:bg-black/5',
+                      index > 0 && 'border-t border-m-outline-variant',
+                    )}
+                  >
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-m-primary-container text-m-primary">
+                      <Package className="h-5 w-5" aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[15px] font-medium leading-5 text-m-on-surface">Order #{order.order_number}</span>
+                      <span className="block text-m-body-s text-m-on-surface-variant">
+                        {new Date(order.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-m-title-s tabular-nums text-m-on-surface">{formatPrice(order.total_amount)}</span>
+                      <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}>
+                        {statusLabels[order.overall_status] || order.overall_status}
+                      </span>
+                    </span>
+                    <ChevronRight className="h-5 w-5 shrink-0 text-m-on-surface-variant" aria-hidden />
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+          <div className={clsx('space-y-4', tier && 'max-md:hidden')}>
             {orders.map((order) => {
               const statusStyle = statusColors[order.overall_status] || statusColors.pending;
 
@@ -183,6 +268,7 @@ export default function OrdersPage() {
               );
             })}
           </div>
+          </>
         )}
       </div>
     </main>

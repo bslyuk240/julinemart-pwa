@@ -5,6 +5,10 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Package, MapPin, CreditCard, Phone, Mail, Share2, Send } from 'lucide-react';
 import PageHeader from '@/components/layout/page-header';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar, { TopBarAction } from '@/components/mobile/shell/mobile-top-bar';
+import StickyActionBar from '@/components/mobile/shell/sticky-action-bar';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import PageLoading from '@/components/ui/page-loading';
@@ -50,6 +54,8 @@ export default function OrderDetailPage() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+  // Mobile tier (docs/mobile-tier-plan.md, wave 2): top bar + pinned "Complete payment" below md.
+  const tier = useMobileTier() !== null;
 
   const activeReturn = useMemo(() => {
     if (!returns.length) return null;
@@ -426,8 +432,23 @@ export default function OrderDetailPage() {
   const reservedUntil = orderMeta('_reserved_until');
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom py-5 md:py-6">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
+      {tier && (
+        <div className="bg-m-surface-low">
+          <MobileTopBar
+            title={`Order #${order.number}`}
+            subtitle={`Placed on ${formatDate(order.date_created)}`}
+            backHref="/orders"
+            actions={
+              <TopBarAction label="Share order" onClick={handleShare}>
+                <Share2 className="h-5 w-5" aria-hidden />
+              </TopBarAction>
+            }
+          />
+        </div>
+      )}
+      <div className={clsx('container-custom py-5 md:py-6', tier && 'max-md:pt-1')}>
+        <div className={clsx(tier && 'max-md:hidden')}>
         <PageHeader
           title={`Order #${order.number}`}
           subtitle={`Placed on ${formatDate(order.date_created)}`}
@@ -444,6 +465,7 @@ export default function OrderDetailPage() {
             </button>
           )}
         />
+        </div>
 
         {fulfillmentMethod === 'reservation' && (
           <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
@@ -483,6 +505,7 @@ export default function OrderDetailPage() {
                 fullWidth
                 isLoading={isPaying}
                 onClick={handleCompletePayment}
+                className={clsx(tier && 'max-md:hidden')}
               >
                 Complete Payment
               </Button>
@@ -826,6 +849,20 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {tier && canCompletePayment && (
+        <StickyActionBar>
+          <button
+            type="button"
+            disabled={isPaying}
+            onClick={handleCompletePayment}
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-m-primary text-m-label-l text-m-on-primary shadow-[0_1px_2px_rgb(60_4_69/0.3)] active:opacity-90 disabled:opacity-60"
+          >
+            <CreditCard className="h-[18px] w-[18px]" aria-hidden />
+            {isPaying ? 'Opening payment…' : <span className="tabular-nums">Complete payment · {formatPrice(order.total, order.currency)}</span>}
+          </button>
+        </StickyActionBar>
+      )}
     </main>
   );
 }

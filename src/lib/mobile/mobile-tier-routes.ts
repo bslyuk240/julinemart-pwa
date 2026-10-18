@@ -25,6 +25,8 @@ const ROUTES: MobileTierRoute[] = [
   { pattern: '/categories', tabBar: true }, // M6: tab roots
   { pattern: '/wishlist', tabBar: true }, // M6
   { pattern: '/account', tabBar: true }, // M6: hub only; sub-pages later
+  { pattern: '/orders', tabBar: true }, // M7: orders list (Account tab stays lit)
+  { pattern: '/orders/*', tabBar: true }, // M7: order detail
 ];
 
 const DEV_ROUTES: MobileTierRoute[] = [{ pattern: '/dev/mobile-shell', tabBar: true }];
