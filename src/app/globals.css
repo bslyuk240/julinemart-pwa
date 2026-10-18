@@ -202,3 +202,37 @@ body {
 #__next {
   min-height: 100%;
 }
+
+/* ── Mobile tier tokens (docs/mobile-tier-plan.md §5, design/mobile-tier/) ──
+   Material 3 colour roles themed from the brand. Only components under
+   src/components/mobile use these; desktop and existing pages are untouched. */
+:root {
+  --m-primary: #77088a;
+  --m-on-primary: #ffffff;
+  --m-primary-container: #f7e6fb;
+  --m-on-primary-container: #3c0445;
+  --m-tertiary: #ff7a29;
+  --m-on-tertiary: #2b1000; /* white on brand orange fails AA */
+  --m-tertiary-container: #ffe3cc;
+  --m-on-tertiary-container: #5a2400;
+  --m-surface: #fffbff;
+  --m-surface-lowest: #ffffff;
+  --m-surface-low: #faf2fa;
+  --m-surface-container: #f4ecf4;
+  --m-surface-high: #eee6ee;
+  --m-on-surface: #1e1a1f;
+  --m-on-surface-variant: #4e4450;
+  --m-outline: #73687a;
+  --m-outline-variant: #d3c6d3;
+  --m-success: #1b6c3a;
+  --m-success-container: #dcf3e2;
+  --m-error: #ba1a1a;
+  --m-scrim: rgb(30 26 31 / 0.42);
+  --m-inverse-surface: #332f34;
+  --m-inverse-on-surface: #f7eef6;
+  --m-inverse-primary: #ecb1ff;
+
+  --m-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --m-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --m-tabbar-h: calc(80px + var(--m-safe-bottom));
+}

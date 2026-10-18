@@ -10,6 +10,7 @@ import PWAStandaloneTracker from '@/components/pwa/pwa-standalone-tracker';
 import GlobalPullToRefresh from '@/components/layout/global-pull-to-refresh';
 import ConditionalChrome from '@/components/layout/ConditionalChrome';
 import { StatusBarManager } from '@/components/native/status-bar-manager';
+import { NativeBackButton } from '@/components/native/native-back-button';
 import PushNotificationManager from '@/components/native/push-notification-manager';
 import WebPushManager from '@/components/pwa/web-push-manager';
 import CookieConsentBanner from '@/components/pwa/cookie-consent-banner';
@@ -90,6 +91,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <VisualViewportBottomSync />
         <PaystackPreloader />
         <StatusBarManager />
+        <NativeBackButton />
         <PWAStandaloneTracker />
         <CustomerAuthProvider>
           <PushNotificationManager />

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { hasOpenOverlay } from '@/lib/mobile/back-stack';
 
 interface PullToRefreshOptions {
   onRefresh: () => Promise<void> | void;
@@ -49,6 +50,8 @@ export function usePullToRefresh({
       if (isRefreshing) return;
       const scrollTop = document.scrollingElement?.scrollTop ?? window.scrollY;
       if (scrollTop > 0) return;
+      // Dragging a bottom sheet down must close the sheet, not reload the page.
+      if (hasOpenOverlay()) return;
       // A finger dragging down inside a scrolled inner list (e.g. the gift
       // builder's item grid) is scrolling that list back up, not pulling the page.
       if (startsInScrolledContainer(event.target, root)) return;

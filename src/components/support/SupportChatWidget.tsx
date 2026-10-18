@@ -402,7 +402,7 @@ export default function SupportChatWidget() {
       {/* Floating action button */}
       <button
         onClick={openWidget}
-        className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px))] right-4 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95 md:bottom-6"
+        className="fixed bottom-[var(--m-float-bottom,calc(5.25rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px)))] right-4 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95 md:bottom-6"
         style={{ backgroundColor: '#77088a' }}
         aria-label="Open support chat"
       >

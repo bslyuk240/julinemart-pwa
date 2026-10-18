@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JulineMart mobile previews</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Mobile tier tokens: Material 3 colour roles themed from JulineMart brand ── */
+:root {
+  --primary: #77088a;            /* brand purple */
+  --on-primary: #ffffff;
+  --primary-container: #f7e6fb;  /* existing primary-50 */
+  --on-primary-container: #3c0445;
+  --tertiary: #ff7a29;           /* brand orange */
+  --on-tertiary: #2b1000;        /* dark on orange: 7:1, white on orange fails AA */
+  --tertiary-container: #ffe3cc;
+  --on-tertiary-container: #5a2400;
+  --surface: #fffbff;
+  --surface-lowest: #ffffff;
+  --surface-low: #faf2fa;
+  --surface-container: #f4ecf4;
+  --surface-high: #eee6ee;
+  --on-surface: #1e1a1f;
+  --on-surface-variant: #4e4450;
+  --outline: #73687a;
+  --outline-variant: #d3c6d3;
+  --success: #1b6c3a;
+  --success-container: #dcf3e2;
+  --error: #ba1a1a;
+  --scrim: rgb(30 26 31 / .42);
+  --inverse-surface: #332f34;
+  --inverse-on-surface: #f7eef6;
+  --inverse-primary: #ecb1ff;
+
+  /* type roles (Material 3 scale, Inter) */
+  --headline-s: 600 24px/32px Inter, system-ui, sans-serif;
+  --title-l: 500 22px/28px Inter, system-ui, sans-serif;
+  --title-m: 600 16px/24px Inter, system-ui, sans-serif;
+  --title-s: 600 14px/20px Inter, system-ui, sans-serif;
+  --body-l: 400 16px/24px Inter, system-ui, sans-serif;
+  --body-m: 400 14px/20px Inter, system-ui, sans-serif;
+  --body-s: 400 12px/16px Inter, system-ui, sans-serif;
+  --label-l: 600 14px/20px Inter, system-ui, sans-serif;
+  --label-m: 600 12px/16px Inter, system-ui, sans-serif;
+  --label-s: 500 11px/16px Inter, system-ui, sans-serif;
+
+  /* motion + shape */
+  --ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --r-chip: 8px; --r-card: 12px; --r-image: 16px; --r-sheet: 28px;
+
+  /* review board */
+  --board: #e9e4ea;
+  --board-ink: #2a242b;
+  --board-muted: #5d555e;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--board); color: var(--board-ink);
+  font: var(--body-m); font-feature-settings: "tnum" 0;
+}
+::selection { background: var(--primary-container); color: var(--on-primary-container); }
+:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+svg.i { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.s20 { width: 20px; height: 20px; }
+svg.i.s18 { width: 18px; height: 18px; }
+svg.i.s16 { width: 16px; height: 16px; }
+svg.i.fill { fill: currentColor; }
+
+/* ── Board ── */
+.board-head { max-width: 1400px; margin: 0 auto; padding: 48px 32px 8px; }
+.board-head h1 { font: 700 30px/36px Inter, sans-serif; letter-spacing: -0.02em; margin: 0 0 8px; }
+.board-head p { margin: 0; max-width: 72ch; color: var(--board-muted); font: var(--body-l); }
+.board-head .legend { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px 20px; font: var(--body-m); color: var(--board-muted); }
+.board-head .legend b { color: var(--board-ink); font-weight: 600; }
+.group { max-width: 1400px; margin: 0 auto; padding: 40px 32px 8px; }
+.group h2 { font: 700 20px/28px Inter, sans-serif; margin: 0 0 4px; letter-spacing: -0.01em; }
+.group > p { margin: 0 0 24px; color: var(--board-muted); max-width: 72ch; }
+.row { display: flex; flex-wrap: wrap; gap: 40px 48px; align-items: flex-start; }
+figure { margin: 0; width: 390px; }
+figcaption { padding: 16px 4px 0; }
+figcaption strong { display: block; font: var(--title-m); color: var(--board-ink); }
+figcaption ul { margin: 6px 0 0; padding-left: 18px; color: var(--board-muted); }
+figcaption li { margin: 3px 0; }
+.board-foot { max-width: 1400px; margin: 0 auto; padding: 48px 32px 64px; color: var(--board-muted); }
+
+/* ── Phone frame ── */
+.phone {
+  position: relative; width: 390px; height: 844px; overflow: hidden;
+  background: var(--surface); color: var(--on-surface);
+  border-radius: 36px; box-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 18px 40px -12px rgb(40 10 50 / .28);
+  outline: 8px solid #1b171c; outline-offset: -1px;
+  isolation: isolate;
+}
+.status {
+  position: absolute; inset: 0 0 auto 0; height: 40px; z-index: 50;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px 0 28px; background: var(--surface-lowest);
+  font: 500 14px/1 Inter, sans-serif; color: var(--on-surface);
+}
+.status .sys { display: flex; gap: 6px; align-items: center; }
+.status.clear { background: transparent; }
+.screen {
+  position: absolute; inset: 40px 0 0 0; overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: none; background: var(--surface);
+}
+.screen::-webkit-scrollbar { display: none; }
+.gesture { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; z-index: 45; display: grid; place-items: center; }
+.gesture::after { content: ""; width: 108px; height: 4px; border-radius: 4px; background: var(--on-surface); opacity: .85; }
+
+/* ── Top app bar ── */
+.appbar {
+  position: sticky; top: 0; z-index: 20; height: 64px;
+  display: flex; align-items: center; gap: 4px; padding: 0 4px;
+  background: var(--surface);
+}
+.appbar.scrolled { background: var(--surface-container); }
+.appbar .title { flex: 1; min-width: 0; font: var(--title-l); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 4px; }
+.appbar .title.small { font: 500 18px/24px Inter, sans-serif; }
+.iconbtn {
+  position: relative; width: 48px; height: 48px; border: 0; border-radius: 24px; padding: 0;
+  display: grid; place-items: center; background: transparent; color: var(--on-surface-variant); cursor: pointer;
+}
+.iconbtn.onimg { background: rgb(255 255 255 / .92); color: var(--on-surface); width: 40px; height: 40px; margin: 4px; box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+.badge {
+  position: absolute; top: 6px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: var(--error); color: #fff; font: 600 11px/16px Inter, sans-serif; text-align: center;
+}
+.iconbtn.onimg .badge { top: 0; right: -2px; }
+
+/* ── Navigation bar (M3) ── */
+.navbar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 40;
+  height: 104px; padding-bottom: 24px; background: var(--surface-container);
+  display: grid; grid-template-columns: repeat(5, 1fr);
+}
+.navbar a { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 12px; text-decoration: none; color: var(--on-surface-variant); font: var(--label-m); }
+.navbar .pill { position: relative; width: 64px; height: 32px; border-radius: 16px; display: grid; place-items: center; }
+.navbar a.on { color: var(--on-surface); }
+.navbar a.on .pill { background: var(--primary-container); color: var(--on-primary-container); }
+.navbar a.on .pill svg { stroke-width: 2.4; }
+.navbar .badge { top: -2px; right: 12px; }
+
+/* ── Buttons ── */
+.btn {
+  height: 48px; border: 0; border-radius: 24px; padding: 0 20px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: var(--label-l); white-space: nowrap;
+}
+.btn.filled { background: var(--primary); color: var(--on-primary); box-shadow: 0 1px 2px rgb(60 4 69 / .3); }
+.btn.orange { background: var(--tertiary); color: var(--on-tertiary); }
+.btn.tonal { background: var(--primary-container); color: var(--on-primary-container); }
+.btn.outlined { background: transparent; color: var(--primary); box-shadow: inset 0 0 0 1px var(--outline); }
+.btn.text { background: transparent; color: var(--primary); padding: 0 12px; height: 40px; }
+.btn.block { width: 100%; }
+
+/* ── Chips ── */
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 0 16px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  height: 32px; padding: 0 12px; border-radius: var(--r-chip); flex: none;
+  display: inline-flex; align-items: center; gap: 6px; font: var(--label-l); font-size: 13px;
+  color: var(--on-surface-variant); background: var(--surface); box-shadow: inset 0 0 0 1px var(--outline-variant);
+  position: relative;
+}
+.chip::before { content: ""; position: absolute; inset: -8px 0; } /* 48dp hit area */
+.chip.sel { background: var(--primary-container); color: var(--on-primary-container); box-shadow: none; }
+.chip.lg { height: 40px; padding: 0 16px; font-size: 14px; }
+
+/* ── Lists & sections ── */
+.section { padding: 16px; }
+.divider { height: 8px; background: var(--surface-low); }
+.hair { height: 1px; background: var(--outline-variant); margin: 0 16px; opacity: .7; }
+.li { display: flex; align-items: center; gap: 16px; min-height: 64px; padding: 8px 16px; color: var(--on-surface); text-decoration: none; }
+.li .lead { width: 40px; height: 40px; border-radius: 20px; display: grid; place-items: center; background: var(--surface-container); color: var(--on-surface-variant); flex: none; }
+.li .lead.green { background: var(--success-container); color: var(--success); }
+.li .lead.purple { background: var(--primary-container); color: var(--primary); }
+.li .body { flex: 1; min-width: 0; }
+.li .h { font: var(--title-s); font-weight: 500; font-size: 15px; }
+.li .s { font: var(--body-m); color: var(--on-surface-variant); }
+.li .trail { color: var(--on-surface-variant); }
+.label { font: var(--title-s); color: var(--on-surface); }
+.muted { color: var(--on-surface-variant); }
+.stars { display: inline-flex; gap: 1px; color: #e8a500; vertical-align: -2px; }
+
+/* ── Product card ── */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 4px 16px 132px; }
+.card { position: relative; display: flex; flex-direction: column; min-width: 0; color: inherit; text-decoration: none; }
+.card .img { position: relative; aspect-ratio: 1; border-radius: var(--r-card); background: var(--surface-lowest); overflow: hidden; box-shadow: inset 0 0 0 1px rgb(30 26 31 / .06); }
+.card .img img { width: 100%; height: 100%; object-fit: contain; padding: 10px; }
+.card .fav { position: absolute; top: 4px; right: 4px; width: 40px; height: 40px; border-radius: 20px; display: grid; place-items: center; background: rgb(255 255 255 / .9); color: var(--on-surface-variant); }
+.card .tag { position: absolute; left: 8px; bottom: 8px; height: 22px; padding: 0 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; font: var(--label-s); background: var(--surface-high); color: var(--on-surface-variant); }
+.card .name { margin-top: 8px; font: var(--body-m); color: var(--on-surface); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 40px; }
+.card .meta { display: flex; align-items: center; gap: 4px; margin-top: 2px; font: var(--body-s); color: var(--on-surface-variant); }
+.card .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+.card .price { font: 700 16px/24px Inter, sans-serif; font-variant-numeric: tabular-nums; }
+.card .add { width: 40px; height: 40px; border-radius: 12px; border: 0; display: grid; place-items: center; background: var(--primary-container); color: var(--on-primary-container); position: relative; }
+.card .add::before { content: ""; position: absolute; inset: -4px; }
+
+/* ── Bottom bars ── */
+.actionbar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 40;
+  padding: 12px 16px 36px; background: var(--surface-lowest);
+  box-shadow: 0 -1px 0 var(--outline-variant), 0 -4px 16px rgb(30 26 31 / .06);
+  display: flex; gap: 8px; align-items: center;
+}
+.actionbar.abovenav { bottom: 104px; padding-bottom: 12px; }
+
+/* ── Sheet ── */
+.scrimmed::after { content: ""; position: absolute; inset: 0; background: var(--scrim); z-index: 60; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 70; max-height: 86%;
+  background: var(--surface-low); border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  display: flex; flex-direction: column; box-shadow: 0 -8px 24px rgb(30 26 31 / .16);
+}
+.sheet .handle { height: 36px; display: grid; place-items: center; flex: none; }
+.sheet .handle::after { content: ""; width: 32px; height: 4px; border-radius: 2px; background: var(--outline); opacity: .6; }
+.sheet .sh-head { display: flex; align-items: center; justify-content: space-between; padding: 0 8px 8px 24px; }
+.sheet .sh-head h3 { margin: 0; font: var(--title-l); }
+.sheet .sh-body { overflow-y: auto; scrollbar-width: none; padding: 0 24px 16px; }
+.sheet .sh-body h4 { margin: 20px 0 10px; font: var(--title-s); }
+.sheet .sh-foot { padding: 12px 24px 36px; border-top: 1px solid var(--outline-variant); display: flex; gap: 12px; }
+
+/* ── Form bits ── */
+.field { position: relative; height: 56px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--outline); display: flex; align-items: center; padding: 0 16px; font: var(--body-l); color: var(--on-surface); background: var(--surface-lowest); }
+.field .fl { position: absolute; top: -9px; left: 12px; padding: 0 4px; background: inherit; font: var(--body-s); color: var(--on-surface-variant); }
+.field.ph { color: var(--outline); }
+.switch { width: 52px; height: 32px; border-radius: 16px; background: var(--primary); position: relative; flex: none; }
+.switch::after { content: ""; position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 12px; background: #fff; }
+.check { width: 18px; height: 18px; border-radius: 2px; box-shadow: inset 0 0 0 2px var(--on-surface-variant); flex: none; display: grid; place-items: center; }
+.check.on { background: var(--primary); box-shadow: none; color: #fff; }
+.radio { width: 20px; height: 20px; border-radius: 10px; box-shadow: inset 0 0 0 2px var(--on-surface-variant); flex: none; position: relative; }
+.radio.on { box-shadow: inset 0 0 0 2px var(--primary); }
+.radio.on::after { content: ""; position: absolute; inset: 5px; border-radius: 5px; background: var(--primary); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; height: 40px; border-radius: 20px; box-shadow: inset 0 0 0 1px var(--outline); overflow: hidden; }
+.seg span { display: flex; align-items: center; justify-content: center; gap: 6px; font: var(--label-l); color: var(--on-surface); }
+.seg span + span { box-shadow: inset 1px 0 0 var(--outline); }
+.seg span.on { background: var(--primary-container); color: var(--on-primary-container); }
+
+.stepper { display: inline-flex; align-items: center; height: 40px; border-radius: 20px; box-shadow: inset 0 0 0 1px var(--outline-variant); }
+.stepper button { width: 44px; height: 40px; border: 0; background: transparent; color: var(--on-surface-variant); display: grid; place-items: center; border-radius: 20px; }
+.stepper span { min-width: 24px; text-align: center; font: var(--title-s); font-variant-numeric: tabular-nums; }
+
+.snackbar {
+  position: absolute; left: 16px; right: 16px; z-index: 45; min-height: 48px; border-radius: 4px;
+  background: var(--inverse-surface); color: var(--inverse-on-surface);
+  display: flex; align-items: center; gap: 12px; padding: 4px 8px 4px 16px; font: var(--body-m);
+  box-shadow: 0 4px 12px rgb(0 0 0 / .2);
+}
+.snackbar .btn.text { color: var(--inverse-primary); }
+
+.sk { background: linear-gradient(90deg, var(--surface-container) 0%, var(--surface-high) 50%, var(--surface-container) 100%); background-size: 200% 100%; border-radius: 6px; animation: sk 1.4s var(--ease-standard) infinite; }
+@keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+
+.card-s { background: var(--surface-lowest); border-radius: 16px; box-shadow: 0 0 0 1px rgb(30 26 31 / .07); margin: 0 16px 12px; }
+.card-s .hd { display: flex; align-items: center; justify-content: space-between; padding: 14px 8px 0 16px; min-height: 48px; }
+.card-s .hd h3 { margin: 0; font: var(--title-m); }
+
+@media (max-width: 480px) {
+  .board-head, .group, .board-foot { padding-left: 16px; padding-right: 16px; }
+  figure { width: 100%; }
+  .phone { width: 100%; max-width: 390px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Icon sprite: Lucide (the icon set the storefront already uses) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98"/><path d="m15.41 6.51-6.82 3.98"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-return" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-store" viewBox="0 0 24 24"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2 2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></symbol>
+    <symbol id="i-sort" viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+    <symbol id="i-fill" viewBox="0 0 24 24"><path d="M7 17V7h10"/><path d="M17 17 7 7"/></symbol>
+    <symbol id="i-plane" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></symbol>
+    <symbol id="i-card" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 8.7 5 8.7-5"/></symbol>
+    <!-- status bar glyphs (filled) -->
+    <symbol id="s-signal" viewBox="0 0 16 16"><path d="M1 14h2.5V11H1zM5 14h2.5V8H5zM9 14h2.5V5H9zM13 14h2.5V2H13z"/></symbol>
+    <symbol id="s-wifi" viewBox="0 0 16 16"><path d="M8 13.5 10.2 11a3.2 3.2 0 0 0-4.4 0zM8 4.5a10 10 0 0 0-7 2.9l1.4 1.5a8 8 0 0 1 11.2 0L15 7.4a10 10 0 0 0-7-2.9zm0 3.4a6.6 6.6 0 0 0-4.6 1.9l1.4 1.5a4.6 4.6 0 0 1 6.4 0l1.4-1.5A6.6 6.6 0 0 0 8 7.9z"/></symbol>
+    <symbol id="s-batt" viewBox="0 0 24 16"><rect x="1" y="3" width="19" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="3" y="5" width="13" height="6" rx="1"/><rect x="21" y="6" width="2" height="4" rx="1"/></symbol>
+  </defs>
+</svg>
+
+<header class="board-head">
+  <h1>JulineMart mobile tier: wave 1 previews</h1>
+  <p>Static phone mockups (390 × 844, Android) of the redesigned product page, category listing and search, cart and checkout. They follow Material 3 structure (top app bars, a navigation bar with an active indicator, chips, bottom sheets, snackbars), themed with JulineMart purple and orange. The homepage is not included: it keeps its current design. Each phone scrolls on its own.</p>
+  <div class="legend">
+    <span><b>Real data:</b> product names, photos, prices, ratings and sellers from the live catalogue</span>
+    <span><b>Illustrative:</b> delivery dates, delivery fees, the customer name and address</span>
+  </div>
+</header>
+
+<!-- ═════════════ PRODUCT PAGE ═════════════ -->
+<section class="group">
+  <h2>Product page</h2>
+  <p>Edge-to-edge photo with the actions floating over it. The buy bar stays pinned, so Add to cart never scrolls away. Colour is picked inline, and delivery, protection and returns are one tap away.</p>
+  <div class="row">
+
+    <figure>
+      <div class="phone">
+        <div class="status"><span class="num">10:24</span><span class="sys"><svg class="i fill s16"><use href="#s-signal"/></svg><svg class="i fill s16"><use href="#s-wifi"/></svg><svg style="width:24px;height:16px;fill:currentColor"><use href="#s-batt"/></svg></span></div>
+        <div class="screen" style="padding-bottom:110px">
+          <div style="position:relative;background:var(--surface-lowest)">
+            <div style="position:absolute;inset:0 0 auto 0;display:flex;justify-content:space-between;padding:8px 8px 0;z-index:2">
+              <button class="iconbtn onimg" aria-label="Back"><svg class="i"><use href="#i-back"/></svg></button>
+              <span style="display:flex">
+                <button class="iconbtn onimg" aria-label="Share"><svg class="i s20"><use href="#i-share"/></svg></button>
+                <button class="iconbtn onimg" aria-label="Cart"><svg class="i s20"><use href="#i-cart"/></svg></button>
+              </span>
+            </div>
+            <img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1780402711235-p41r1.png" alt="Automatic rechargeable water bottle dispenser pump" style="display:block;width:100%;aspect-ratio:1/0.92;object-fit:contain;padding:56px 32px 16px">
+          </div>
+          <div style="padding:16px 16px 4px">
+            <a class="chip" style="height:28px;padding:0 10px;text-decoration:none;font-size:12px"><svg class="i s16"><use href="#i-store"/></svg>Vikuves Household<svg class="i s16"><use href="#i-right"/></svg></a>
+            <h1 style="margin:12px 0 6px;font:var(--title-l);letter-spacing:-0.01em">Automatic Rechargeable Water Bottle Dispenser Pump</h1>
+            <div style="display:flex;align-items:center;gap:8px;font:var(--body-m)" class="muted">
+              <span class="stars"><svg class="i fill s16"><use href="#i-star"/></svg></span><b style="color:var(--on-surface);font-weight:600">5.0</b><span>1 review</span><span aria-hidden="true">·</span><span style="color:var(--success);font-weight:600">In stock</span>
+            </div>
+            <div class="num" style="font:700 28px/36px Inter,sans-serif;letter-spacing:-0.02em;margin-top:12px">₦5,500</div>
+          </div>
+          <div style="padding:12px 16px 4px">
+            <div class="label">Colour: <span style="font-weight:500">Black</span></div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <span class="chip lg sel"><svg class="i s18"><use href="#i-check"/></svg>Black</span>
+              <span class="chip lg">White</span>
+            </div>
+          </div>
+          <div style="height:12px"></div>
+          <div class="hair"></div>
+          <a class="li"><span class="lead"><svg class="i s20"><use href="#i-truck"/></svg></span><span class="body"><span class="h">Delivery to Ikeja, Lagos</span><br><span class="s">Arrives Thu 23 – Sat 25 Oct</span></span><svg class="i s20 trail"><use href="#i-right"/></svg></a>
+          <a class="li"><span class="lead green"><svg class="i s20"><use href="#i-shield"/></svg></span><span class="body"><span class="h">JulineMart Protect</span><br><span class="s">Covered if it doesn't arrive, arrives damaged or is the wrong item</span></span><svg class="i s20 trail"><use href="#i-right"/></svg></a>
+          <a class="li"><span class="lead"><svg class="i s20"><use href="#i-return"/></svg></span><span class="body"><span class="h">3-day returns</span></span><svg class="i s20 trail"><use href="#i-right"/></svg></a>
+          <div class="divider"></div>
+          <div class="section">
+            <div class="label" style="font-size:16px">About this item</div>
+            <p style="margin:8px 0 0;font:var(--body-m)" class="muted">One-touch automatic water dispenser pump with rechargeable battery. Fits most water bottles and gallon jugs.</p>
+          </div>
+        </div>
+        <div class="actionbar">
+          <button class="iconbtn" aria-label="Save to wishlist" style="box-shadow:inset 0 0 0 1px var(--outline);color:var(--on-surface-variant)"><svg class="i s20"><use href="#i-heart"/></svg></button>
+          <button class="btn filled" style="flex:1"><svg class="i s18"><use href="#i-cart"/></svg>Add to cart</button>
+          <button class="btn orange" style="flex:1">Buy now</button>
+        </div>
+        <div class="gesture"></div>
+      </div>
+      <figcaption><strong>1 · Product page, first view</strong>
+        <ul><li>Photo runs edge to edge. Back, share and cart float over it, replacing the full site header and breadcrumb.</li>
+        <li>Price, rating and stock are visible without scrolling.</li>
+        <li>The buy bar replaces the navigation bar. Orange "Buy now" uses dark text so it passes contrast.</li></ul>
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone">
+        <div class="status" style="background:var(--surface-container)"><span class="num">10:24</span><span class="sys"><svg class="i fill s16"><use href="#s-signal"/></svg><svg class="i fill s16"><use href="#s-wifi"/></svg><svg style="width:24px;height:16px;fill:currentColor"><use href="#s-batt"/></svg></span></div>
+        <div class="screen" style="padding-bottom:110px">
+          <div class="appbar scrolled">
+            <button class="iconbtn" aria-label="Back"><svg class="i"><use href="#i-back"/></svg></button>
+            <span class="title small">Water Bottle Dispenser Pump</span>
+            <button class="iconbtn" aria-label="Share"><svg class="i s20"><use href="#i-share"/></svg></button>
+            <button class="iconbtn" aria-label="Cart, 1 item"><svg class="i s20"><use href="#i-cart"/></svg><span class="badge">1</span></button>
+          </div>
+          <div class="section" style="padding-top:20px">
+            <div class="label" style="font-size:16px">About this item</div>
+            <p style="margin:8px 0 0;font:var(--body-m)" class="muted">This automatic water dispenser pump makes hydration effortless. Place it on top of your water bottle or jug and press the button to dispense water into your cup or glass.</p>
+            <ul style="margin:12px 0 0;padding-left:18px;font:var(--body-m)">
+              <li>Automatic one-touch operation</li>
+              <li>Rechargeable lithium battery, USB charging</li>
+              <li>Works with most standard bottles and gallon jugs</li>
+              <li>Available in white or black</li>
+            </ul>
+            <button class="btn text" style="margin:4px 0 0 -12px">Read more<svg class="i s18"><use href="#i-down"/></svg></button>
+          </div>
+          <div class="hair"></div>
+          <a class="li"><span class="lead"><svg class="i s20"><use href="#i-box"/></svg></span><span class="body"><span class="h">What's in the box</span><br><span class="s">Pump, USB cable, tubing and adapters</span></span><svg class="i s20 trail"><use href="#i-right"/></svg></a>
+          <div class="divider"></div>
+          <div class="section">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div class="label" style="font-size:16px">Reviews</div>
+              <button class="btn text" style="margin-right:-12px">See all</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:16px;margin-top:4px">
+              <div><div class="num" style="font:700 36px/44px Inter,sans-serif">5.0</div><div class="muted" style="font:var(--body-s)">1 review</div></div>
+              <div style="flex:1;display:grid;gap:4px;font:var(--body-s)" class="muted">
+                <div style="display:flex;align-items:center;gap:8px">5<span style="flex:1;height:6px;border-radius:3px;background:var(--primary)"></span></div>
+                <div style="display:flex;align-items:center;gap:8px">4<span style="flex:1;height:6px;border-radius:3px;background:var(--surface-high)"></span></div>
+                <div style="display:flex;align-items:center;gap:8px">3<span style="flex:1;height:6px;border-radius:3px;background:var(--surface-high)"></span></div>
+                <div style="display:flex;align-items:center;gap:8px">2<span style="flex:1;height:6px;border-radius:3px;background:var(--surface-high)"></span></div>
+                <div style="display:flex;align-items:center;gap:8px">1<span style="flex:1;height:6px;border-radius:3px;background:var(--surface-high)"></span></div>
+              </div>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <a class="li" style="min-height:72px"><span class="lead purple" style="width:48px;height:48px;border-radius:24px"><svg class="i"><use href="#i-store"/></svg></span><span class="body"><span class="s">Sold by</span><br><span class="h" style="font-weight:600">Vikuves Household</span></span><span class="btn outlined" style="height:40px;padding:0 16px">Visit store</span></a>
+        </div>
+        <div class="snackbar" style="bottom:100px"><span style="flex:1">Added to cart · Black</span><button class="btn text">View cart</button></div>
+        <div class="actionbar">
+          <button class="iconbtn" aria-label="Save to wishlist" style="box-shadow:inset 0 0 0 1px var(--outline);color:var(--on-surface-variant)"><svg class="i s20"><use href="#i-heart"/></svg></button>
+          <button class="btn filled" style="flex:1"><svg class="i s18"><use href="#i-cart"/></svg>Add to cart</button>
+          <button class="btn orange" style="flex:1">Buy now</button>
+        </div>
+        <div class="gesture"></div>
+      </div>
+      <figcaption><strong>2 · Product page, scrolled, just added</strong>
+        <ul><li>Once the photo scrolls off, the top bar turns solid and shows the product name.</li>
+        <li>Adding shows a snackbar with "View cart" and a success haptic in the app, and the cart badge updates. The shopper stays on the page.</li>
+        <li>Long descriptions collapse behind "Read more". The seller card ends the page.</li></ul>
+      </figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ═════════════ LISTING & SEARCH ═════════════ -->
+<section class="group">
+  <h2>Category listing and search</h2>
+  <p>A compact top bar with the category name, then a row of chips for sort and filters. The grid is two even columns with one card shape everywhere. Filters open in a bottom sheet, and Back closes it.</p>
+  <div class="row">
+
+    <figure>
+      <div class="phone">
+        <div class="status"><span class="num">10:24</span><span class="sys"><svg class="i fill s16"><use href="#s-signal"/></svg><svg class="i fill s16"><use href="#s-wifi"/></svg><svg style="width:24px;height:16px;fill:currentColor"><use href="#s-batt"/></svg></span></div>
+        <div class="screen">
+          <div class="appbar">
+            <button class="iconbtn" aria-label="Back"><svg class="i"><use href="#i-back"/></svg></button>
+            <span class="title">Electronics</span>
+            <button class="iconbtn" aria-label="Search"><svg class="i"><use href="#i-search"/></svg></button>
+          </div>
+          <div style="position:sticky;top:64px;z-index:15;background:var(--surface);padding:4px 0 12px">
+            <div class="chips">
+              <span class="chip"><svg class="i s18"><use href="#i-sort"/></svg>Popular<svg class="i s18"><use href="#i-down"/></svg></span>
+              <span class="chip sel"><svg class="i s18"><use href="#i-sliders"/></svg>Filters · 1</span>
+              <span class="chip sel"><svg class="i s18"><use href="#i-check"/></svg>In stock</span>
+              <span class="chip">Under ₦20,000</span>
+              <span class="chip">Ships from Nigeria</span>
+            </div>
+          </div>
+          <div class="grid">
+            <a class="card"><div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1784046475763-k3exf.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+              <div class="name">JD Jindian 16-Inch Solar Standing Fan with Rechargeable Battery &amp; LED Light</div>
+              <div class="meta">Vikuves Household</div>
+              <div class="foot"><span class="price">₦61,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div></a>
+            <a class="card"><div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1780399781294-du5t9.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+              <div class="name">2-in-1 Rechargeable Electric Mosquito Swatter with LED Trap Lamp</div>
+              <div class="meta"><span class="stars"><svg class="i fill s16" style="width:14px;height:14px"><use href="#i-star"/></svg></span>4.6 · Vikuves Household</div>
+              <div class="foot"><span class="price">₦11,500</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div></a>
+            <a class="card"><div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1783692432060-nfycs.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+              <div class="name">Rechargeable Portable LED Light with 7-Speed Mini Fan, JM-5588</div>
+              <div class="meta">Vikuves Household</div>
+              <div class="foot"><span class="price">₦20,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div></a>
+            <a class="card"><div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1780402711235-p41r1.png" alt=""><span class="fav" style="color:var(--primary)"><svg class="i s20 fill"><use href="#i-heart"/></svg></span></div>
+              <div class="name">Automatic Rechargeable Water Bottle Dispenser Pump</div>
+              <div class="meta"><span class="stars"><svg class="i fill s16" style="width:14px;height:14px"><use href="#i-star"/></svg></span>5.0 · Vikuves Household</div>
+              <div class="foot"><span class="price">₦5,500</span><button class="add" aria-label="Choose colour"><svg class="i s20"><use href="#i-plus"/></svg></button></div></a>
+            <a class="card"><div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1783691325244-z6rqy.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+              <div class="name">K9 Dual Wireless Lavalier Microphone Kit for Android &amp; Type-C</div>
+              <div class="meta">Vikuves Household</div>
+              <div class="foot"><span class="price">₦11,500</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div></a>
+            <a class="card"><div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782899898477-3poez.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+              <div class="name">ZYRE 1600W Electric Steam Iron with Teflon Soleplate</div>
+              <div class="meta">Vikuves Household</div>
+              <div class="foot"><span class="price">₦16,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div></a>
+          </div>
+        </div>
+        <nav class="navbar" aria-label="Main">
+          <a><span class="pill"><svg class="i"><use href="#i-home"/></svg></span>Home</a>
+          <a class="on"><span class="pill"><svg class="i"><use href="#i-grid"/></svg></span>Categories</a>
+          <a><span class="pill"><svg class="i"><use href="#i-cart"/></svg><span class="badge">4</span></span>Cart</a>
+          <a><span class="pill"><svg class="i"><use href="#i-heart"/></svg></span>Wishlist</a>
+          <a><span class="pill"><svg class="i"><use href="#i-user"/></svg></span>Account</a>
+        </nav>
+        <div class="gesture"></div>
+      </div>
+      <figcaption><strong>3 · Category listing</strong>
+        <ul><li>The chips stay pinned under the title. Active filters are filled, so it's always clear what is applied.</li>
+        <li>Every card has the same shape: photo, two-line name, seller or rating, price, and a 40px add button inside a 48px tap area. On items with options (the pump) the button opens a small colour sheet first.</li>
+        <li>Cart lives in the navigation bar on these screens, so the top bar carries only search.</li>
+        <li>The Material navigation bar highlights the active tab with a pill. "Categories" stays lit on every category page.</li></ul>
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone scrimmed">
+        <div class="status"><span class="num">10:24</span><span class="sys"><svg class="i fill s16"><use href="#s-signal"/></svg><svg class="i fill s16"><use href="#s-wifi"/></svg><svg style="width:24px;height:16px;fill:currentColor"><use href="#s-batt"/></svg></span></div>
+        <div class="screen">
+          <div class="appbar">
+            <button class="iconbtn"><svg class="i"><use href="#i-back"/></svg></button>
+            <span class="title">Electronics</span>
+            <button class="iconbtn"><svg class="i"><use href="#i-search"/></svg></button>
+          </div>
+          <div class="chips" style="padding-top:4px"><span class="chip"><svg class="i s18"><use href="#i-sort"/></svg>Popular</span><span class="chip sel">Filters · 1</span><span class="chip sel">In stock</span></div>
+          <div class="grid" style="padding-top:16px">
+            <div class="card"><div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1784046475763-k3exf.png" alt=""></div></div>
+            <div class="card"><div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1780399781294-du5t9.png" alt=""></div></div>
+          </div>
+        </div>
+        <div class="sheet" role="dialog" aria-label="Filters">
+          <div class="handle"></div>
+          <div class="sh-head"><h3>Filters</h3><button class="btn text">Clear all</button></div>
+          <div class="sh-body">
+            <h4 style="margin-top:4px">Price</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="field ph" style="background:var(--surface-low)"><span class="fl">Min</span>₦ 0</div>
+              <div class="field" style="background:var(--surface-low)"><span class="fl">Max</span>₦ 20,000</div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+              <span class="chip">Under ₦10,000</span><span class="chip sel">Under ₦20,000</span><span class="chip">₦20,000 – ₦50,000</span><span class="chip">Over ₦50,000</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;min-height:56px;margin-top:12px">
+              <span><span class="label">In stock only</span></span><span class="switch" role="switch" aria-checked="true"></span>
+            </div>
+            <h4 style="margin-top:8px">Sold by</h4>
+            <div style="display:flex;align-items:center;gap:16px;min-height:48px"><span class="check"></span><span style="font:var(--body-l)">JulineMart Official Store</span></div>
+            <div style="display:flex;align-items:center;gap:16px;min-height:48px"><span class="check on"><svg class="i" style="width:14px;height:14px;stroke-width:3"><use href="#i-check"/></svg></span><span style="font:var(--body-l)">Vikuves Household</span></div>
+          </div>
+          <div class="sh-foot"><button class="btn filled block">Show results</button></div>
+        </div>
+        <div class="gesture" style="z-index:80"></div>
+      </div>
+      <figcaption><strong>4 · Filter sheet</strong>
+        <ul><li>A bottom sheet with a drag handle, and every option within thumb reach. Swipe down, tap outside or press Back to close it.</li>
+        <li>Quick price chips cover the common budgets, and the Min/Max fields cover the rest.</li>
+        <li>One clear exit: "Show results". "Clear all" sits up with the title, away from the thumb.</li>
+        <li>Sort has its own chip ("Popular") with a short sheet of its own, so this sheet holds filters only.</li></ul>
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone">
+        <div class="status"><span class="num">10:24</span><span class="sys"><svg class="i fill s16"><use href="#s-signal"/></svg><svg class="i fill s16"><use href="#s-wifi"/></svg><svg style="width:24px;height:16px;fill:currentColor"><use href="#s-batt"/></svg></span></div>
+        <div class="screen" style="background:var(--surface-lowest)">
+          <div style="display:flex;align-items:center;gap:4px;height:64px;padding:0 4px;box-shadow:0 1px 0 var(--outline-variant)">
+            <button class="iconbtn" aria-label="Back"><svg class="i"><use href="#i-back"/></svg></button>
+            <div style="flex:1;font:var(--body-l)">solar f<span style="display:inline-block;width:2px;height:20px;background:var(--primary);vertical-align:-4px"></span></div>
+            <button class="iconbtn" aria-label="Clear"><svg class="i"><use href="#i-x"/></svg></button>
+          </div>
+          <div style="padding:8px 0">
+            <a class="li" style="min-height:56px"><svg class="i s20 muted"><use href="#i-search"/></svg><span class="body" style="font:var(--body-l)">solar f<b>an</b></span><svg class="i s20 trail"><use href="#i-fill"/></svg></a>
+            <a class="li" style="min-height:56px"><svg class="i s20 muted"><use href="#i-search"/></svg><span class="body" style="font:var(--body-l)">solar f<b>an with battery</b></span><svg class="i s20 trail"><use href="#i-fill"/></svg></a>
+            <a class="li" style="min-height:56px"><svg class="i s20 muted"><use href="#i-history"/></svg><span class="body" style="font:var(--body-l)">solar f<b>lood light</b></span><svg class="i s20 trail"><use href="#i-fill"/></svg></a>
+          </div>
+          <div class="divider"></div>
+          <div style="padding:16px 16px 4px" class="label">Products</div>
+          <a class="li" style="min-height:80px"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1784046475763-k3exf.png" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:8px;box-shadow:inset 0 0 0 1px var(--outline-variant);padding:4px;background:#fff"><span class="body"><span class="h" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">JD Jindian 16-Inch Solar Standing Fan with Rechargeable Battery</span><span class="num" style="font:var(--title-s)">₦61,000</span></span></a>
+          <a class="li" style="min-height:80px"><img src="https://cf.cjdropshipping.com/20200731/2633726495618.jpg" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:8px;box-shadow:inset 0 0 0 1px var(--outline-variant);padding:4px;background:#fff"><span class="body"><span class="h" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">36LED Solar Motion Sensor Wall Light with Adjustable Arm</span><span class="num" style="font:var(--title-s)">₦24,793.79</span></span></a>
+          <a class="li" style="min-height:80px"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1783692432060-nfycs.png" alt="" style="width:56px;height:56px;object-fit:contain;border-radius:8px;box-shadow:inset 0 0 0 1px var(--outline-variant);padding:4px;background:#fff"><span class="body"><span class="h" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Rechargeable Portable LED Light with 7-Speed Mini Fan</span><span class="num" style="font:var(--title-s)">₦20,000</span></span></a>
+          <div style="padding:8px 16px 24px"><button class="btn tonal block">See all results for "solar f"</button></div>
+          <div class="divider"></div>
+          <div style="padding:16px 16px 8px" class="label">Recent searches</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 24px">
+            <span class="chip"><svg class="i s16"><use href="#i-history"/></svg>gift box</span><span class="chip"><svg class="i s16"><use href="#i-history"/></svg>steam iron</span><span class="chip"><svg class="i s16"><use href="#i-history"/></svg>mosquito</span>
+          </div>
+        </div>
+        <div class="gesture"></div>
+      </div>
+      <figcaption><strong>5 · Search</strong>
+        <ul><li>A full-screen search view. The keyboard opens straight away (hidden here so the results show).</li>
+        <li>Suggestions bold the part you haven't typed yet, and the arrow drops the suggestion into the box. Recent searches come back as chips.</li>
+        <li>Matching products show with photo and price, so a shopper can jump straight to the item.</li></ul>
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone">
+        <div class="status"><span class="num">10:24</span><span class="sys"><svg class="i fill s16"><use href="#s-signal"/></svg><svg class="i fill s16"><use href="#s-wifi"/></svg><svg style="width:24px;height:16px;fill:currentColor"><use href="#s-batt"/></svg></span></div>
+        <div class="screen">
+          <div class="appbar">
+            <button class="iconbtn" aria-label="Back"><svg class="i"><use href="#i-back"/></svg></button>
+            <span class="title">Electronics</span>
+            <button class="iconbtn"><svg class="i"><use href="#i-search"/></svg></button>
+          </div>
+          <div class="chips" style="padding-top:4px;padding-bottom:12px"><span class="sk" style="width:104px;height:32px;border-radius:8px;flex:none"></span><span class="sk" style="width:88px;height:32px;border-radius:8px;flex:none"></span><span class="sk" style="width:96px;height:32px;border-radius:8px;flex:none"></span><span class="sk" style="width:80px;height:32px;border-radius:8px;flex:none"></span></div>
+          <div class="grid">
+            <div><div class="sk" style="aspect-ratio:1;border-radius:12px"></div><div class="sk" style="height:12px;margin-top:12px"></div><div class="sk" style="height:12px;width:70%;margin-top:8px"></div><div class="sk" style="height:18px;width:45%;margin-top:12px"></div></div>
+            <div><div class="sk" style="aspect-ratio:1;border-radius:12px"></div><div class="sk" style="height:12px;margin-top:12px"></div><div class="sk" style="height:12px;width:70%;margin-top:8px"></div><div class="sk" style="height:18px;width:45%;margin-top:12px"></div></div>
+            <div><div class="sk" style="aspect-ratio:1;border-radius:12px"></div><div class="sk" style="height:12px;margin-top:12px"></div><div class="sk" style="height:12px;width:70%;margin-top:8px"></div><div class="sk" style="height:18px;width:45%;margin-top:12px"></div></div>
+            <div><div class="sk" style="aspect-ratio:1;border-radius:12px"></div><div class="sk" style="height:12px;margin-top:12px"></div><div class="sk" style="height:12px;width:70%;margin-top:8px"></div><div class="sk" style="height:18px;width:45%;margin-top:12px"></div></div>
+          </div>
+        </div>
+        <nav class="navbar" aria-label="Main">
+          <a><span class="pill"><svg class="i"><use href="#i-home"/></svg></span>Home</a>
+          <a class="on"><span class="pill"><svg class="i"><use href="#i-grid"/></svg></span>Categories</a>
+          <a><span class="pill"><svg class="i"><use href="#i-cart"/></svg></span>Cart</a>
+          <a><span class="pill"><svg class="i"><use href="#i-heart"/></svg></span>Wishlist</a>
+          <a><span class="pill"><svg class="i"><use href="#i-user"/></svg></span>Account</a>
+        </nav>
+        <div class="gesture"></div>
+      </div>
+      <figcaption><strong>6 · Listing while loading</strong>
+        <ul><li>Replaces today's full-screen "Loading products..." spinner. The title and bars show at once, and the grid is drawn in its final shape.</li>
+        <li>Nothing jumps when the products arrive. The shimmer stops when the phone is set to reduce motion.</li></ul>
+      </figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ═════════════ CART & CHECKOUT ═════════════ -->
+<section class="group">
+  <h2>Cart and checkout</h2>
+  <p>The cart groups items by seller, because each seller ships separately. Checkout is one calm page of cards with a pinned "Pay" button showing the exact total. The navigation bar is hidden during checkout so nothing pulls the shopper away.</p>
+  <div class="row">
+
+    <figure>
+      <div class="phone">
+        <div class="status"><span class="num">10:24</span><span class="sys"><svg class="i fill s16"><use href="#s-signal"/></svg><svg class="i fill s16"><use href="#s-wifi"/></svg><svg style="width:24px;height:16px;fill:currentColor"><use href="#s-batt"/></svg></span></div>
+        <div class="screen" style="padding-bottom:196px;background:var(--surface-low)">
+          <div class="appbar" style="background:var(--surface-low)">
+            <span class="title" style="padding-left:12px">Cart <span class="muted" style="font-weight:400">· 4 items</span></span>
+          </div>
+          <div style="margin:4px 16px 16px;padding:12px 16px;border-radius:12px;background:var(--tertiary-container);color:var(--on-tertiary-container)">
+            <div style="display:flex;align-items:center;gap:10px;font:var(--body-m)"><svg class="i s20"><use href="#i-truck"/></svg><span>Add <b class="num">₦63,289.33</b> more for free delivery</span></div>
+            <div style="height:6px;border-radius:3px;background:rgb(90 36 0 / .14);margin-top:10px"><div style="width:37%;height:100%;border-radius:3px;background:var(--tertiary)"></div></div>
+          </div>
+
+          <div class="card-s">
+            <div class="hd"><h3 style="display:flex;align-items:center;gap:8px"><svg class="i s20 muted"><use href="#i-store"/></svg>Vikuves Household</h3></div>
+            <div style="display:flex;gap:12px;padding:12px 16px">
+              <img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1780402711235-p41r1.png" alt="" style="width:80px;height:80px;border-radius:12px;object-fit:contain;padding:6px;background:#fff;box-shadow:inset 0 0 0 1px var(--outline-variant)">
+              <div style="flex:1;min-width:0">
+                <div style="font:var(--body-m);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Automatic Rechargeable Water Bottle Dispenser Pump</div>
+                <div class="muted" style="font:var(--body-s);margin-top:2px">Colour: Black</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+                  <span class="num" style="font:var(--title-m)">₦11,000</span>
+                  <span class="stepper"><button aria-label="Decrease"><svg class="i s18"><use href="#i-minus"/></svg></button><span>2</span><button aria-label="Increase"><svg class="i s18"><use href="#i-plus"/></svg></button></span>
+                </div>
+              </div>
+            </div>
+            <div class="hair"></div>
+            <div style="display:flex;gap:12px;padding:12px 16px 16px">
+              <img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1780399781294-du5t9.png" alt="" style="width:80px;height:80px;border-radius:12px;object-fit:contain;padding:6px;background:#fff;box-shadow:inset 0 0 0 1px var(--outline-variant)">
+              <div style="flex:1;min-width:0">
+                <div style="font:var(--body-m);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">2-in-1 Rechargeable Electric Mosquito Swatter with LED Trap Lamp</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:26px">
+                  <span class="num" style="font:var(--title-m)">₦11,500</span>
+                  <span class="stepper"><button aria-label="Remove"><svg class="i s18"><use href="#i-trash"/></svg></button><span>1</span><button aria-label="Increase"><svg class="i s18"><use href="#i-plus"/></svg></button></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-s">
+            <div class="hd"><h3 style="display:flex;align-items:center;gap:8px"><svg class="i s20 muted"><use href="#i-store"/></svg>JulineMart Official Store</h3></div>
+            <div style="display:flex;gap:12px;padding:12px 16px 16px">
+              <img src="https://oss-cf.cjdropshipping.com/product/2024/08/07/07/8303bf7f-239d-4b77-ba35-2799fecf04c2_trans.jpeg" alt="" style="width:80px;height:80px;border-radius:12px;object-fit:contain;padding:6px;background:#fff;box-shadow:inset 0 0 0 1px var(--outline-variant)">
+              <div style="flex:1;min-width:0">
+                <div style="font:var(--body-m);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Peak Wireless Neckband Headphones, HiFi Stereo, 100-Hour Battery</div>
+                <div style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;font:var(--label-s);color:var(--on-surface-variant)"><svg class="i s16" style="width:14px;height:14px"><use href="#i-plane"/></svg>Ships from abroad</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+                  <span class="num" style="font:var(--title-m)">₦14,210.67</span>
+                  <span class="stepper"><button aria-label="Remove"><svg class="i s18"><use href="#i-trash"/></svg></button><span>1</span><button aria-label="Increase"><svg class="i s18"><use href="#i-plus"/></svg></button></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="actionbar abovenav" style="flex-direction:column;align-items:stretch;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="muted" style="font:var(--body-m)">Subtotal · delivery at checkout</span><span class="num" style="font:700 18px/24px Inter,sans-serif">₦36,710.67</span></div>
+          <button class="btn filled block">Checkout</button>
+        </div>
+        <nav class="navbar" aria-label="Main">
+          <a><span class="pill"><svg class="i"><use href="#i-home"/></svg></span>Home</a>
+          <a><span class="pill"><svg class="i"><use href="#i-grid"/></svg></span>Categories</a>
+          <a class="on"><span class="pill"><svg class="i"><use href="#i-cart"/></svg><span class="badge">4</span></span>Cart</a>
+          <a><span class="pill"><svg class="i"><use href="#i-heart"/></svg></span>Wishlist</a>
+          <a><span class="pill"><svg class="i"><use href="#i-user"/></svg></span>Account</a>
+        </nav>
+        <div class="gesture"></div>
+      </div>
+      <figcaption><strong>7 · Cart</strong>
+        <ul><li>Items are grouped by seller, the way they'll actually ship. "Ships from abroad" is flagged on the item.</li>
+        <li>The stepper turns "−" into a bin at quantity 1, so removing an item is the same gesture as reducing it.</li>
+        <li>The free-delivery bar appears only while JLO has a live offer, in line with the current header rule.</li></ul>
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone">
+        <div class="status" style="background:var(--surface-low)"><span class="num">10:24</span><span class="sys"><svg class="i fill s16"><use href="#s-signal"/></svg><svg class="i fill s16"><use href="#s-wifi"/></svg><svg style="width:24px;height:16px;fill:currentColor"><use href="#s-batt"/></svg></span></div>
+        <div class="screen" style="padding-bottom:132px;background:var(--surface-low)">
+          <div class="appbar" style="background:var(--surface-low)">
+            <button class="iconbtn" aria-label="Back to cart"><svg class="i"><use href="#i-back"/></svg></button>
+            <span class="title">Checkout</span>
+            <span style="display:inline-flex;align-items:center;gap:6px;padding:0 16px;font:var(--label-m);color:var(--success)"><svg class="i s16"><use href="#i-lock"/></svg>Secure</span>
+          </div>
+
+          <div style="padding:0 16px 12px"><div class="seg" role="radiogroup" aria-label="How to get your order"><span class="on"><svg class="i s18"><use href="#i-check"/></svg>Delivery</span><span>Store pickup</span></div></div>
+
+          <div class="card-s">
+            <div class="hd"><h3>Deliver to</h3><button class="btn text">Change</button></div>
+            <div style="display:flex;gap:12px;padding:4px 16px 16px">
+              <svg class="i s20 muted" style="margin-top:2px"><use href="#i-pin"/></svg>
+              <div style="font:var(--body-m)"><b style="font-weight:600">Adaeze Okafor</b> · <span class="num">0803 *** 4412</span><br><span class="muted">14 Admiralty Way, Lekki Phase 1, Lagos</span></div>
+            </div>
+          </div>
+
+          <div class="card-s">
+            <div class="hd"><h3>Delivery · 2 shipments</h3></div>
+            <div style="padding:8px 16px 4px;display:flex;justify-content:space-between;gap:12px">
+              <div style="font:var(--body-m)"><b style="font-weight:600">Vikuves Household</b> · 3 items<br><span class="muted">Arrives Thu 23 – Sat 25 Oct</span></div>
+              <span class="num" style="font:var(--title-s)">₦2,500</span>
+            </div>
+            <div class="hair" style="margin-top:8px"></div>
+            <div style="padding:12px 16px 16px;display:flex;justify-content:space-between;gap:12px">
+              <div style="font:var(--body-m)"><b style="font-weight:600">JulineMart Official Store</b> · 1 item<br><span class="muted">Ships from abroad · arrives 4 – 11 Nov</span></div>
+              <span class="num" style="font:var(--title-s)">₦4,000</span>
+            </div>
+          </div>
+
+          <div class="card-s">
+            <div class="hd"><h3>Payment</h3></div>
+            <div style="display:flex;align-items:center;gap:16px;padding:8px 16px 16px">
+              <span class="radio on"></span>
+              <div style="flex:1;font:var(--body-m)"><b style="font-weight:600">Pay with Paystack</b><br><span class="muted">Card, bank transfer or USSD</span></div>
+              <svg class="i s20 muted"><use href="#i-card"/></svg>
+            </div>
+          </div>
+
+          <div class="card-s" style="padding:16px">
+            <div style="display:flex;gap:8px">
+              <div class="field ph" style="flex:1;height:48px;font-size:15px"><svg class="i s18" style="margin-right:8px"><use href="#i-tag"/></svg>Promo or influencer code</div>
+              <button class="btn outlined" style="height:48px">Apply</button>
+            </div>
+          </div>
+
+          <div class="card-s" style="padding:16px;font:var(--body-m)">
+            <div style="display:flex;justify-content:space-between;padding:4px 0"><span class="muted">Items (4)</span><span class="num">₦36,710.67</span></div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0"><span class="muted">Delivery</span><span class="num">₦6,500</span></div>
+            <div style="height:1px;background:var(--outline-variant);margin:8px 0"></div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;font:var(--title-m)"><span>Total</span><span class="num">₦43,210.67</span></div>
+            <div style="display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px;border-radius:12px;background:var(--success-container);color:#0f4a26">
+              <svg class="i s20" style="flex:none"><use href="#i-shield"/></svg><span style="font:var(--body-s)">JulineMart Protect covers this order if it doesn't arrive, arrives damaged or is the wrong item.</span>
+            </div>
+          </div>
+        </div>
+        <div class="actionbar" style="flex-direction:column;align-items:stretch;gap:8px">
+          <button class="btn filled block"><svg class="i s18"><use href="#i-lock"/></svg>Pay <span class="num">₦43,210.67</span></button>
+        </div>
+        <div class="gesture"></div>
+      </div>
+      <figcaption><strong>8 · Checkout</strong>
+        <ul><li>One page of cards: how you get it, where, the delivery for each seller's shipment, payment, promo code and the total.</li>
+        <li>The "Pay ₦43,210.67" button repeats the exact amount, so there's no surprise when Paystack opens.</li>
+        <li>"Store pickup" shows only when every item is eligible, as today.</li>
+        <li>Same form and logic as today, only laid out for the phone. Splitting it into steps is planned for wave 3.</li></ul>
+      </figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<footer class="board-foot">
+  <p>Design system used here: Material 3 colour roles from brand purple <span class="num">#77088a</span> and orange <span class="num">#ff7a29</span>; Inter on the Material type scale (body 16/24, title 22/28, label 14/20); 16px screen margin on a 4px grid; touch targets of at least 48px; 12px card and 28px sheet corners; standard easing <span class="num">cubic-bezier(.2,0,0,1)</span>.</p>
+</footer>
+
+</body>
+</html>
