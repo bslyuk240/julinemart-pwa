@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Search, Menu, ShoppingCart } from 'lucide-react';
 import MobileMenu from '@/components/layout/mobile-menu';
 import { useCart } from '@/hooks/use-cart';
+import { useFreeShipping } from '@/hooks/use-free-shipping';
 import { Product } from '@/types/product';
 import { useRouter } from 'next/navigation';
 import { filterActiveVendorProducts } from '@/lib/utils/vendor-filters';
@@ -16,6 +17,15 @@ interface BannerData {
   text: string;
   background_color: string;
   text_color: string;
+  link: string;
+}
+
+// Same-site paths or http(s) URLs only; anything else (e.g. javascript:) is dropped.
+function safeBannerLink(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const link = value.trim();
+  if (link.startsWith('/') && !link.startsWith('//')) return link;
+  return /^https?:\/\//i.test(link) ? link : '';
 }
 
 const DEFAULT_LOGO = '/images/logo.png';
@@ -38,11 +48,21 @@ export default function Header() {
   // ==================== BANNER STATE (NEW!) ====================
   const [banner, setBanner] = useState<BannerData>({
     enabled: true,
-    text: 'Free Shipping on Orders Over ₦100,000 🎉',
+    text: '',
     background_color: '#77088a',
     text_color: '#ffffff',
+    link: '',
   });
   const [bannerLoading, setBannerLoading] = useState(true);
+  const { threshold: freeShippingMin, loading: freeShippingLoading } = useFreeShipping();
+  // Without admin banner text, advertise the live JLO free-shipping offer, if any.
+  const bannerText =
+    banner.text ||
+    (freeShippingMin === null
+      ? ''
+      : freeShippingMin > 0
+        ? `Free Shipping on Orders Over ₦${freeShippingMin.toLocaleString()} 🎉`
+        : 'Free Shipping on Every Order 🎉');
   // =============================================================
 
   useEffect(() => {
@@ -67,9 +87,11 @@ export default function Header() {
             console.log('Banner loaded:', data.banner);
             setBanner({
               enabled: data.banner.enabled ?? true,
-              text: data.banner.text || 'Free Shipping on Orders Over ₦100,000 🎉',
-              background_color: data.banner.background_color || '#77088a',
+              text: data.banner.text || '',
+              // JLO admin (Homepage Content > Announcement Bar) saves bg_color and link.
+              background_color: data.banner.bg_color || data.banner.background_color || '#77088a',
               text_color: data.banner.text_color || '#ffffff',
+              link: safeBannerLink(data.banner.link),
             });
           } else {
             console.log('No banner found, using default');
@@ -136,7 +158,7 @@ export default function Header() {
   return (
     <header className="safe-top sticky top-0 z-50 bg-white shadow-sm">
       {/* ==================== TOP BAR - NOW DYNAMIC (UPDATED!) ==================== */}
-      {!bannerLoading && banner.enabled && (
+      {!bannerLoading && !freeShippingLoading && banner.enabled && bannerText && (
         <div 
           className="py-2 px-4 text-center text-sm"
           style={{
@@ -144,7 +166,19 @@ export default function Header() {
             color: banner.text_color,
           }}
         >
-          <p>{banner.text}</p>
+          {banner.link ? (
+            banner.link.startsWith('/') ? (
+              <Link href={banner.link} className="hover:underline">
+                {bannerText}
+              </Link>
+            ) : (
+              <a href={banner.link} className="hover:underline" target="_blank" rel="noopener noreferrer">
+                {bannerText}
+              </a>
+            )
+          ) : (
+            <p>{bannerText}</p>
+          )}
         </div>
       )}
       {/* ========================================================================== */}

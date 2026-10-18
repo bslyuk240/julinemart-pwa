@@ -1,68 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Shield, RotateCcw, Truck } from 'lucide-react';
-import { getReturnPolicyDays, getFreeShippingThreshold } from '@/lib/woocommerce/policies';
+import { useFreeShipping } from '@/hooks/use-free-shipping';
 
 interface ProductFeaturesProps {
   className?: string;
 }
 
+// Return window shown on product pages; matches the store return policy.
+const RETURN_DAYS = 3;
+
 export default function ProductFeatures({ className = '' }: ProductFeaturesProps) {
-  const [returnDays, setReturnDays] = useState(3); // Default
-  const [freeShippingMin, setFreeShippingMin] = useState(100000); // Default
-  const [loading, setLoading] = useState(true);
-  const [bannerThreshold, setBannerThreshold] = useState<number | null>(null);
-
-  useEffect(() => {
-    const fetchPolicies = async () => {
-      try {
-        const [days, threshold] = await Promise.all([
-          getReturnPolicyDays(),
-          getFreeShippingThreshold(),
-        ]);
-
-        // Keep the configured default return window.
-        setReturnDays(3);
-
-        setFreeShippingMin(threshold);
-
-        // Pull banner text to derive free shipping min if present
-        const bannerRes = await fetch('/api/pwa-settings');
-        if (bannerRes.ok) {
-          const data = await bannerRes.json();
-          const text: string | undefined = data?.banner?.text;
-          if (text) {
-            const match = text.replace(/,/g, '').match(/(\d+(\.\d+)?)/);
-            if (match) {
-              const amt = parseFloat(match[1]);
-              if (!isNaN(amt)) {
-                setBannerThreshold(amt);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching policies:', error);
-        // Keep defaults
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPolicies();
-  }, []);
+  const { threshold, loading } = useFreeShipping();
 
   const formatPrice = (price: number) => `₦${price.toLocaleString()}`;
-  const effectiveFreeShipping = bannerThreshold ?? freeShippingMin;
+  // Only advertise free delivery while JLO has a live offer; 0 means every order qualifies.
+  const hasOffer = threshold !== null;
 
   return (
     <div className={`grid grid-cols-3 gap-3 md:gap-4 ${className}`}>
       <div className="text-center">
         <Truck className="w-5 h-5 md:w-7 md:h-7 text-primary-600 mx-auto mb-1" />
-        <p className="text-xs md:text-sm font-medium text-gray-900">Free Delivery</p>
+        <p className="text-xs md:text-sm font-medium text-gray-900">
+          {hasOffer ? 'Free Delivery' : 'Nationwide Delivery'}
+        </p>
         <p className="text-[11px] md:text-xs text-gray-500">
-          {loading ? 'Loading...' : `On orders over ${formatPrice(effectiveFreeShipping)}`}
+          {loading
+            ? 'Loading...'
+            : !hasOffer
+              ? 'Calculated at checkout'
+              : threshold > 0
+                ? `On orders over ${formatPrice(threshold)}`
+                : 'On every order'}
         </p>
       </div>
       
@@ -76,7 +45,7 @@ export default function ProductFeatures({ className = '' }: ProductFeaturesProps
         <RotateCcw className="w-5 h-5 md:w-7 md:h-7 text-primary-600 mx-auto mb-1" />
         <p className="text-xs md:text-sm font-medium text-gray-900">Easy Returns</p>
         <p className="text-[11px] md:text-xs text-gray-500">
-          {loading ? 'Loading...' : `${returnDays}-day return`}
+          {`${RETURN_DAYS}-day return`}
         </p>
       </div>
     </div>

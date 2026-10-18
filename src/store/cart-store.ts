@@ -413,11 +413,9 @@ const hubName = hubNameMeta ? String(hubNameMeta.value) : null;
                     firstMethod.settings?.cost?.value || '0';
                   shipping = parseFloat(costSetting);
 
-                  const minAmount = firstMethod.settings?.min_amount?.value;
-                  if (
-                    minAmount &&
-                    discountedSubtotal >= parseFloat(minAmount)
-                  ) {
+                  // A threshold of 0 means none is configured, not "free for everyone".
+                  const minAmount = parseFloat(firstMethod.settings?.min_amount?.value || '0');
+                  if (minAmount > 0 && discountedSubtotal >= minAmount) {
                     shipping = 0;
                   }
                 }
