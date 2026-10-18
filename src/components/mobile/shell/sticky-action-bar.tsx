@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 type StickyActionBarProps = {
   children: ReactNode;
@@ -55,9 +56,11 @@ export default function StickyActionBar({ children, aboveTabBar = false, classNa
       <div aria-hidden className="md:hidden" style={{ height }} />
       <div
         ref={ref}
-        className={clsx(
-          'fixed inset-x-0 z-m-bar flex items-center gap-2 bg-m-surface-lowest px-4 pt-3 shadow-[0_-1px_0_var(--m-outline-variant),0_-4px_16px_rgb(30_26_31/0.06)] md:hidden',
-          className,
+        className={twMerge(
+          clsx(
+            'fixed inset-x-0 z-m-bar flex items-center gap-2 bg-m-surface-lowest px-4 pt-3 shadow-[0_-1px_0_var(--m-outline-variant),0_-4px_16px_rgb(30_26_31/0.06)] md:hidden',
+            className,
+          ),
         )}
         style={{
           bottom: aboveTabBar

@@ -60,6 +60,11 @@ describe('getMobileTierRoute', () => {
     expect(getMobileTierRoute('/categories')).toBeNull();
   });
 
+  it('shows the tab bar on the cart but not during checkout', () => {
+    expect(getMobileTierRoute('/cart')?.tabBar).toBe(true);
+    expect(getMobileTierRoute('/checkout')?.tabBar).toBe(false);
+  });
+
   it('puts product pages in the mobile tier without the tab bar', () => {
     expect(getMobileTierRoute('/product/water-pump')).toEqual({ pattern: '/product/*', tabBar: false });
   });

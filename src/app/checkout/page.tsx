@@ -3,7 +3,12 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Truck, Package, MapPin, Tag, Store } from 'lucide-react';
+import { CreditCard, Truck, Package, MapPin, Tag, Store, Lock } from 'lucide-react';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import StickyActionBar from '@/components/mobile/shell/sticky-action-bar';
+import { haptic } from '@/lib/mobile/haptics';
 import PageHeader from '@/components/layout/page-header';
 import { useCart } from '@/hooks/use-cart';
 import { useCustomerAuth } from '@/context/customer-auth-context';
@@ -106,6 +111,10 @@ declare global {
 
 export default function CheckoutPage() {
   const router = useRouter();
+  // Mobile tier (docs/mobile-tier-plan.md, M3): layout only. Same form and
+  // logic; below md the page gets a top bar and a pinned Pay button that calls
+  // the same handlers with the same readiness checks. Desktop is unchanged.
+  const tier = useMobileTier() !== null;
   const { items, subtotal, clearCart } = useCart();
   const { user, customer, isAuthenticated, refreshCustomer } = useCustomerAuth();
   const customerId = user?.id ?? null;
@@ -1528,16 +1537,49 @@ export default function CheckoutPage() {
     shippingReady &&
     !shippingError &&
     !isProcessing;
+  const placeOrderDisabled =
+    !isCheckoutReady ||
+    (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null);
+
+  const retryPendingPayment = async () => {
+    if (pendingPaystackConfigRef.current) {
+      setIsProcessing(true);
+      toast.loading('Opening payment window...', { id: 'paystack-open', duration: 15000 });
+      await initializePaystackPayment(pendingPaystackConfigRef.current);
+      toast.dismiss('paystack-open');
+    }
+  };
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom min-w-0 py-5 md:py-6">
-        <PageHeader
-          title="Checkout"
-          subtitle="Review your details and place your order"
-          backHref="/cart"
-          backLabel="Back to cart"
-        />
+    <main
+      className={clsx(
+        'min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8',
+        tier && 'max-md:overflow-x-clip max-md:bg-m-surface-low max-md:pb-4',
+      )}
+    >
+      {tier && (
+        <div className="bg-m-surface-low">
+          <MobileTopBar
+            title="Checkout"
+            backHref="/cart"
+            actions={
+              <span className="inline-flex items-center gap-1.5 px-4 text-m-label-m text-m-success">
+                <Lock className="h-4 w-4" aria-hidden />
+                Secure
+              </span>
+            }
+          />
+        </div>
+      )}
+      <div className={clsx('container-custom min-w-0 py-5 md:py-6', tier && 'max-md:pt-1')}>
+        <div className={clsx(tier && 'max-md:hidden')}>
+          <PageHeader
+            title="Checkout"
+            subtitle="Review your details and place your order"
+            backHref="/cart"
+            backLabel="Back to cart"
+          />
+        </div>
 
         {loading && (
           <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -2202,14 +2244,8 @@ export default function CheckoutPage() {
                     size="sm"
                     fullWidth
                     isLoading={isProcessing}
-                    onClick={async () => {
-                      if (pendingPaystackConfigRef.current) {
-                        setIsProcessing(true);
-                        toast.loading('Opening payment window...', { id: 'paystack-open', duration: 15000 });
-                        await initializePaystackPayment(pendingPaystackConfigRef.current);
-                        toast.dismiss('paystack-open');
-                      }
-                    }}
+                    onClick={retryPendingPayment}
+                    className={clsx(tier && 'max-md:hidden')}
                   >
                     {isProcessing ? 'Processing...' : 'Retry Payment'}
                   </Button>
@@ -2244,10 +2280,8 @@ export default function CheckoutPage() {
                   fullWidth
                   isLoading={isProcessing}
                   onClick={handlePlaceOrder}
-                  disabled={
-                    !isCheckoutReady ||
-                    (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null)
-                  }
+                  disabled={placeOrderDisabled}
+                  className={clsx(tier && 'max-md:hidden')}
                 >
                   {isProcessing
                     ? 'Processing...'
@@ -2277,6 +2311,31 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {tier && (
+        <StickyActionBar>
+          <button
+            type="button"
+            disabled={hasPendingPayment ? isProcessing : placeOrderDisabled || isProcessing}
+            onClick={() => {
+              haptic('tap');
+              void (hasPendingPayment ? retryPendingPayment() : handlePlaceOrder());
+            }}
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-m-primary text-m-label-l text-m-on-primary shadow-[0_1px_2px_rgb(60_4_69/0.3)] active:opacity-90 disabled:bg-m-surface-high disabled:text-m-on-surface-variant disabled:shadow-none"
+          >
+            <Lock className="h-[18px] w-[18px]" aria-hidden />
+            {isProcessing
+              ? 'Processing...'
+              : hasPendingPayment
+                ? 'Retry payment'
+                : loading
+                  ? 'Loading checkout options...'
+                  : isPaystackGateway
+                    ? <span className="tabular-nums">Pay ₦{total.toLocaleString()}</span>
+                    : <span className="tabular-nums">Place order · ₦{total.toLocaleString()}</span>}
+          </button>
+        </StickyActionBar>
+      )}
     </main>
   );
 }

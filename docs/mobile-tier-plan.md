@@ -272,6 +272,26 @@ Follow-ups:
 - The catalog API ignores `min_price` / `max_price` / `stock_status`, so filters run client-side over up to 5 loaded pages. Real server-side filtering belongs in JLO's catalog-products.
 - `/products` and `/categories` are not on the tier yet. Moving between tier and non-tier pages switches between the new and old navigation bars (open question 6).
 
+**M3 status (2026-10-18): built, not committed.**
+
+`/cart` (with the navigation bar) and `/checkout` (without it) are on the allowlist.
+
+Cart below `md`:
+- a "Cart · n items" top bar
+- free-delivery progress, shown only while JLO has a live offer with a minimum
+- items grouped by seller with Material steppers; − turns into a bin at quantity 1, with haptics
+- a sticky "Subtotal · Checkout" bar above the navigation bar
+
+Checkout is **layout only**. It keeps the same form, handlers and readiness checks, and adds a top bar with "Secure" and a pinned "Pay ₦total" (or "Retry payment") button that calls the same `handlePlaceOrder` / retry path. The summary card's own buttons are hidden on phones. Desktop is unchanged on both pages.
+
+Still to verify by hand: a real Paystack test payment end to end, in a browser and in the Android app. That needs a filled form, a working JLO shipping quote and Paystack test keys.
+
+Deferred to the wave 3 checkout rework, since they need logic changes:
+- the mockup's delivery/pickup segmented switch
+- the "Deliver to" summary card
+- per-seller shipment rows
+- moving the install prompt and cookie banner onto the new overlay layering (they still cover the screen)
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---
