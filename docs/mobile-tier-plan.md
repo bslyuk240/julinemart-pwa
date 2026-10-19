@@ -405,6 +405,12 @@ The local catalogue returned no brands, so only the brands empty state was check
 - Desktop keeps its own grid, Filters panel and Load More, and doesn't depend on phone filters.
 - Open for the business: whether Sponsored should be a shopper-facing collection (it's empty now), whether Best sellers and Top sellers should merge, and whether collection filters should move to the server so counts cover the whole catalog.
 
+**M15 status (2026-10-19): pull-to-refresh without page reloads, not committed.** `pullRefreshMode()` in `src/lib/mobile/soft-refresh.ts` decides what a pull does:
+- **Off** on forms and flows: checkout, sign-in and sign-up, contact, search, the gift builder, address and settings forms, return and refund requests, add-tracking, sign-in callbacks, account deletion and the vendor pages.
+- **Server refresh** (`router.refresh()`, which keeps scroll and client state such as a chosen variant): categories, brands, policy pages, product pages and the cart.
+- **Soft** everywhere else. A screen registers its own refetch with `useSoftRefresh`, and the list stays on screen until fresh data lands (category listings, `/products`, orders). Screens without one still do a full reload, as before.
+- Tier screens get a Material circular indicator: it slides from under the top bar, turns solid with a haptic tick once letting go will refresh, and spins for the length of the real fetch. Screen readers hear "Refreshing" and then "Updated".
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---

@@ -12,6 +12,7 @@ import AccountPageHeader from '@/components/account/account-page-header';
 import { Button } from '@/components/ui/button';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { getCustomerOrders } from '@/lib/supabase/customers';
+import { useSoftRefresh } from '@/hooks/use-soft-refresh';
 import PageLoading from '@/components/ui/page-loading';
 import { toast } from 'sonner';
 
@@ -81,6 +82,16 @@ export default function OrdersPage() {
       }
     }
   }, [authLoading, isAuthenticated, user]);
+
+  // Pull-to-refresh (M15): refetch in place, keeping the list on screen.
+  useSoftRefresh(async () => {
+    if (!user?.email) return;
+    try {
+      setOrders((await getCustomerOrders(user.email)) ?? []);
+    } catch {
+      toast.error('Could not refresh your orders');
+    }
+  });
 
   const loadOrders = async () => {
     if (!user?.email) {

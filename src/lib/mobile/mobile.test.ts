@@ -3,6 +3,7 @@ import { closeTopOverlay, hasOpenOverlay, pushOverlay } from './back-stack';
 import { getMobileTierRoute, matchesPattern } from './mobile-tier-routes';
 import { activeTab } from './tabs';
 import { hasInAppHistory, recordNavigation, resetNavigationTrail } from './nav-history';
+import { pullRefreshMode, registerSoftRefresh, runSoftRefresh } from './soft-refresh';
 
 describe('nav history', () => {
   it('has no in-app history on a cold landing', () => {
@@ -146,5 +147,40 @@ describe('back stack', () => {
     popFirst();
     expect(hasOpenOverlay()).toBe(false);
     expect(closeTopOverlay()).toBe(false);
+  });
+});
+
+describe('pull to refresh', () => {
+  it('stays off on forms and multi-step flows', () => {
+    for (const path of ['/checkout', '/login', '/signup', '/contact', '/search', '/gifts/build', '/account/orders/12/return', '/account/orders/12/refund', '/returns/r-1/add-tracking', '/auth/google/callback', '/account-deletion', '/vendor/10', '/vendors']) {
+      expect(pullRefreshMode(path)).toBe('off');
+    }
+  });
+
+  it('re-renders server pages in place and soft-refreshes everything else', () => {
+    expect(pullRefreshMode('/categories')).toBe('server');
+    expect(pullRefreshMode('/brand/philips')).toBe('server');
+    expect(pullRefreshMode('/page/privacy-policy')).toBe('server');
+    expect(pullRefreshMode('/product/water-pump')).toBe('server');
+    expect(pullRefreshMode('/cart')).toBe('server');
+    expect(pullRefreshMode('/account/orders/12')).toBe('soft');
+    expect(pullRefreshMode('/returns/r-1/track')).toBe('soft');
+    expect(pullRefreshMode('/')).toBe('soft');
+    expect(pullRefreshMode('/orders')).toBe('soft');
+    expect(pullRefreshMode('/checkouts')).toBe('soft');
+  });
+
+  it('runs the most recent registered refetch and reports when none exists', async () => {
+    expect(await runSoftRefresh()).toBe(false);
+    const first = vi.fn();
+    const second = vi.fn();
+    const offFirst = registerSoftRefresh(first);
+    const offSecond = registerSoftRefresh(second);
+    expect(await runSoftRefresh()).toBe(true);
+    expect(second).toHaveBeenCalledOnce();
+    expect(first).not.toHaveBeenCalled();
+    offSecond();
+    offFirst();
+    expect(await runSoftRefresh()).toBe(false);
   });
 });

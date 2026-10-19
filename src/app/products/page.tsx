@@ -11,6 +11,7 @@ import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import MobileTopBar, { TopBarAction } from '@/components/mobile/shell/mobile-top-bar';
 import ListingToolbar from '@/components/mobile/listing/listing-toolbar';
 import ListingSkeleton from '@/components/mobile/listing/listing-skeleton';
+import { useSoftRefresh } from '@/hooks/use-soft-refresh';
 import {
   EMPTY_LISTING_FILTERS,
   applyListingFilters,
@@ -84,6 +85,7 @@ function ProductsContent() {
   const [nextPageToLoad, setNextPageToLoad] = useState(1);
 
   const BATCH_SIZE = 100;
+
 
   const sectionMeta = useMemo(() => {
     const map: Record<string, { title: string; description: string }> = {
@@ -198,6 +200,20 @@ function ProductsContent() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchKey]);
+
+  // Pull-to-refresh (M15): refetch the first batch in place; the current list stays on screen until it lands.
+  useSoftRefresh(async () => {
+    try {
+      const { products: fresh, total } = await fetchFromApi(buildFetchUrl(1));
+      const t = typeof total === 'number' && total >= 0 ? total : fresh.length;
+      setProducts(fresh);
+      setTotalProducts(t);
+      setTotalPages(t > 0 ? Math.max(1, Math.ceil(t / BATCH_SIZE)) : 1);
+      setNextPageToLoad(2);
+    } catch (error) {
+      console.error('Error refreshing products:', error);
+    }
+  });
 
   useEffect(() => {
     const timer = window.setTimeout(() => setShowShell(true), 120);

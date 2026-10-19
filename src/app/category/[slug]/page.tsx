@@ -11,6 +11,7 @@ import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import MobileTopBar, { TopBarAction } from '@/components/mobile/shell/mobile-top-bar';
 import ListingToolbar from '@/components/mobile/listing/listing-toolbar';
 import ListingSkeleton from '@/components/mobile/listing/listing-skeleton';
+import { useSoftRefresh } from '@/hooks/use-soft-refresh';
 import {
   EMPTY_LISTING_FILTERS,
   applyListingFilters,
@@ -117,6 +118,20 @@ export default function CategoryPage() {
     return () => ac.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, sortBy]);
+
+  // Pull-to-refresh (M15): refetch the first page in place; the current grid stays on screen until it lands.
+  useSoftRefresh(async () => {
+    try {
+      const { products: fresh, total: count, totalPages: pages } = await fetchFromApi(buildUrl(sortBy, 1));
+      setProducts(fresh);
+      setTotal(count);
+      setTotalPages(Math.max(1, pages));
+      setApiPage(1);
+      setVisibleCount(VISIBLE_PAGE_SIZE);
+    } catch (error) {
+      console.error('Error refreshing category products:', error);
+    }
+  });
 
   const filteredProducts = useMemo(() => applyListingFilters(products, filters), [products, filters]);
   const visibleProducts = useMemo(() => filteredProducts.slice(0, visibleCount), [filteredProducts, visibleCount]);
