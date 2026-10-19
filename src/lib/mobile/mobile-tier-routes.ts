@@ -47,6 +47,8 @@ const ROUTES: MobileTierRoute[] = [
   { pattern: '/brand/*', tabBar: true }, // M10
   { pattern: '/vendors', tabBar: true }, // M10
   { pattern: '/vendor/*', tabBar: true }, // M10: public store page
+  { pattern: '/account/orders/*', tabBar: false }, // M11: return request flow (other children just redirect)
+  { pattern: '/returns/*', tabBar: false }, // M11: track return / add tracking
 ];
 
 const DEV_ROUTES: MobileTierRoute[] = [{ pattern: '/dev/mobile-shell', tabBar: true }];

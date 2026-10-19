@@ -1,5 +1,8 @@
 'use client';
 
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -28,6 +31,8 @@ const parseTrackingResponse = (raw: any) => {
 };
 
 export default function AddTrackingPage() {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 3): top bar and pinned actions below md.
+  const tier = useMobileTier() !== null;
   const params = useParams();
   const router = useRouter();
   const returnId = params?.returnId as string;
@@ -109,9 +114,14 @@ export default function AddTrackingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
       <div className="container mx-auto px-4 py-6 max-w-xl space-y-6">
-        <div className="flex items-center gap-4">
+        {tier && (
+          <div className="sticky top-0 z-m-header -mx-4 -mt-6 bg-m-surface-low md:hidden">
+            <MobileTopBar title="Add tracking number" backHref={`/returns/${returnId}/track`} />
+          </div>
+        )}
+        <div className={clsx('flex items-center gap-4', tier && 'max-md:hidden')}>
           <Link href={`/returns/${returnId}/track`} className="text-gray-600 hover:text-primary-600">
             <ArrowLeft className="w-6 h-6" />
           </Link>

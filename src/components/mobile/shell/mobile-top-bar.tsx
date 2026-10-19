@@ -40,7 +40,8 @@ export default function MobileTopBar({ title, backHref, onBack, subtitle, action
       className={clsx(
         'sticky top-0 z-m-header flex h-16 items-center gap-1 px-1 transition-colors duration-200 ease-m-standard md:hidden',
         variant === 'overlay' && '-mb-16',
-        solid ? (scrolled ? 'bg-m-surface-container' : 'bg-m-surface') : 'bg-transparent',
+        // At rest the bar takes the page's own surface (white or tinted); once content scrolls under it, it tints.
+        solid ? (scrolled ? 'bg-m-surface-container' : 'bg-inherit') : 'bg-transparent',
       )}
     >
       {(backHref !== undefined || onBack) && (

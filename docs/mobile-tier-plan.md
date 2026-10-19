@@ -378,6 +378,14 @@ Desktop and lint are unchanged.
 
 The local catalogue returned no brands, so only the brands empty state was checked on screen.
 
+**M11 status (2026-10-19): return flow built, not committed.** `/account/orders/*` and `/returns/*` join the tier without the tab bar.
+- Request form (ReturnRequestForm): sticky top bar (order number and date), compact item rows with a stepper, Order Summary hidden on phones, pinned bar with the estimated value and a submit that stays disabled until an item is picked. Phone order is problem → photos → method → pickup/office details; fields are 48px/16px with visible labels; the Fez office list is flat and full width; photo remove buttons are 36px with an "n of 5" count.
+- Status view: stacked return code with full-width 48px buttons, humanized reason, en-NG date; duplicate rows and "Back to Order" hidden on phones.
+- Track / add-tracking: top bar with Refresh as an action, pinned "Track on Fez" when a link exists, borderless timeline.
+- MobileTopBar now inherits the page surface at rest (no colour band on tinted pages).
+- Open for the business: who pays the Fez waybill on drop-off, refund timing copy, and the hard-coded JulineMart Warri Hub address in the status steps. Desktop submit still allows a ₦0 return (unchanged).
+- Not verified: the form and status view need a signed-in order; the track and add-tracking pages are checked signed out at phone and desktop widths.
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---

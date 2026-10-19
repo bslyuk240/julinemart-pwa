@@ -1,5 +1,9 @@
 'use client';
 
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar, { TopBarAction } from '@/components/mobile/shell/mobile-top-bar';
+import StickyActionBar from '@/components/mobile/shell/sticky-action-bar';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -31,6 +35,8 @@ type TrackingPayload = {
 };
 
 export default function TrackReturnPage() {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 3): top bar and pinned actions below md.
+  const tier = useMobileTier() !== null;
   const params = useParams();
   const router = useRouter();
   const returnId = params?.returnId as string;
@@ -110,9 +116,23 @@ export default function TrackReturnPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
       <div className="container mx-auto px-4 py-6 max-w-3xl space-y-6">
-        <div className="flex items-center gap-4">
+        {tier && (
+          <div className="sticky top-0 z-m-header -mx-4 -mt-6 bg-m-surface-low md:hidden">
+            <MobileTopBar
+              title="Track return"
+              subtitle={returnCode ? `Return code ${returnCode}` : undefined}
+              backHref="/account/returns"
+              actions={
+                <TopBarAction label="Refresh tracking" onClick={loadTracking}>
+                  {loading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : <RefreshCw className="h-5 w-5" aria-hidden />}
+                </TopBarAction>
+              }
+            />
+          </div>
+        )}
+        <div className={clsx('flex items-center gap-4', tier && 'max-md:hidden')}>
           <button onClick={() => router.back()} className="text-gray-600 hover:text-primary-600" aria-label="Back">
             <ArrowLeft className="w-6 h-6" />
           </button>
@@ -123,8 +143,8 @@ export default function TrackReturnPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className={clsx('bg-white rounded-xl shadow-sm p-6 space-y-4', tier && 'max-md:flex max-md:flex-col max-md:gap-3 max-md:space-y-0 max-md:rounded-2xl max-md:p-4 max-md:shadow-[0_0_0_1px_rgb(30_26_31/0.07)]')}>
+          <div className={clsx('flex flex-wrap items-center gap-4', tier && 'max-md:order-2 max-md:grid max-md:grid-cols-2')}>
             <div>
               <p className="text-xs uppercase text-gray-500">Return code</p>
               <p className="text-lg font-semibold text-gray-900">{returnCode || '--'}</p>
@@ -133,7 +153,7 @@ export default function TrackReturnPage() {
               <p className="text-xs uppercase text-gray-500">Tracking number</p>
               <p className="text-lg font-semibold text-gray-900">{trackingNumber || 'Awaiting tracking'}</p>
             </div>
-            <div className="ml-auto flex items-center gap-2 text-sm text-gray-700">
+            <div className={clsx('ml-auto flex items-center gap-2 text-sm text-gray-700', tier && 'max-md:hidden')}>
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               <button onClick={loadTracking} className="underline font-medium">
                 Refresh
@@ -150,8 +170,8 @@ export default function TrackReturnPage() {
               ) : null}
             </div>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-800">
-            <Truck className="w-4 h-4 text-primary-600" />
+          <div className={clsx('flex items-center gap-2 text-sm text-gray-800', tier && 'max-md:order-1 max-md:text-m-title-m max-md:text-m-on-surface')}>
+            <Truck className={clsx('w-4 h-4 text-primary-600', tier && 'max-md:h-5 max-md:w-5')} />
             <span className="font-semibold">{statusLabel}</span>
             {/* Hide raw status code with underscores */}
           </div>
@@ -172,7 +192,7 @@ export default function TrackReturnPage() {
           ) : events.length ? (
             <ul className="space-y-3">
               {events.map((ev, idx) => (
-                <li key={idx} className="border border-gray-200 rounded-lg p-3">
+                <li key={idx} className={clsx('border border-gray-200 rounded-lg p-3', tier && 'max-md:relative max-md:rounded-none max-md:border-0 max-md:border-l-2 max-md:border-m-outline-variant max-md:py-1 max-md:pl-4')}>
                   <p className="text-sm font-semibold text-gray-900">{ev.status || ev.description || 'Update'}</p>
                   {ev.description ? <p className="text-sm text-gray-700">{ev.description}</p> : null}
                   {ev.location ? <p className="text-xs text-gray-600">Location: {ev.location}</p> : null}
@@ -188,6 +208,19 @@ export default function TrackReturnPage() {
         </div>
 
       </div>
+      {tier && fezTrackingUrl && (
+        <StickyActionBar>
+          <a
+            href={fezTrackingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-m-primary text-m-label-l text-m-on-primary shadow-[0_1px_2px_rgb(60_4_69/0.3)] active:opacity-90"
+          >
+            <Truck className="h-[18px] w-[18px]" aria-hidden />
+            Track on Fez
+          </a>
+        </StickyActionBar>
+      )}
     </main>
   );
 }

@@ -4,11 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowLeft, Package, AlertCircle, Loader2, MapPin, Image, Info } from 'lucide-react';
+import { ArrowLeft, Package, AlertCircle, Loader2, MapPin, Image, Info, Minus, Plus, X, ExternalLink } from 'lucide-react';
 import { Order } from '@/types/order';
 import { formatPrice } from '@/lib/utils/format-price';
 import { JloReturn, JloReturnShipment, formatJloRefundStatus, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
 import { getAuthHeader } from '@/lib/supabase/client';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import StickyActionBar from '@/components/mobile/shell/sticky-action-bar';
 
 interface ReturnRequestFormProps {
   orderId: number;
@@ -108,6 +112,8 @@ function extractHubId(order: Order | null) {
 }
 
 export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 3): top bar and pinned actions below md.
+  const tier = useMobileTier() !== null;
   const router = useRouter();
   const searchParams = useSearchParams();
   const [order, setOrder] = useState<Order | null>(null);
@@ -427,40 +433,59 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
     const refundDisplay = formatJloRefundStatus(activeReturn.refund_status || 'none');
 
     return (
-      <main className="min-h-screen bg-gray-50 pb-24">
+      <main className={clsx('min-h-screen bg-gray-50 pb-24', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
         <div className="container mx-auto px-4 py-6 max-w-2xl">
-          <div className="flex items-center gap-4 mb-6">
+          {tier && (
+            <div className="sticky top-0 z-m-header -mx-4 -mt-6 mb-3 bg-m-surface-low md:hidden">
+              <MobileTopBar title="Return status" subtitle={`Order #${order.number}`} backHref={`/orders/${orderId}`} />
+            </div>
+          )}
+          <div className={clsx('flex items-center gap-4 mb-6', tier && 'max-md:hidden')}>
             <Link href={`/orders/${orderId}`} className="text-gray-600 hover:text-primary-600">
               <ArrowLeft className="w-6 h-6" />
             </Link>
             <h1 className="text-xl font-bold text-gray-900">Return Status</h1>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6 space-y-5">
-            <div className="flex items-center gap-4">
+          <div className={clsx('bg-white rounded-xl shadow-sm p-6 space-y-5', tier && 'max-md:rounded-2xl max-md:p-4 max-md:shadow-[0_0_0_1px_rgb(30_26_31/0.07)]')}>
+            <div className={clsx('flex items-center gap-4', tier && 'max-md:flex-col max-md:items-start max-md:gap-1.5')}>
               <span
                 className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${statusDisplay.bgColor} ${statusDisplay.color}`}
               >
                 {statusDisplay.label}
               </span>
-              <span className="text-gray-600 text-sm">
+              <span className={clsx('text-gray-600 text-sm', tier && 'max-md:hidden')}>
                 Requested {activeReturn.created_at ? new Date(activeReturn.created_at).toLocaleString() : ''}
               </span>
+              {tier && activeReturn.created_at && (
+                <span className="text-m-body-s text-m-on-surface-variant md:hidden">
+                  Requested {new Date(activeReturn.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              )}
             </div>
 
             <div className="grid gap-3 text-sm text-gray-700">
-              <div className="flex justify-between">
+              <div className={clsx('flex justify-between', tier && 'max-md:hidden')}>
                 <span className="text-gray-600">Order</span>
                 <span className="font-semibold">#{order.number}</span>
               </div>
-              <div className="flex justify-between">
+              <div className={clsx('flex justify-between', tier && 'max-md:hidden')}>
                 <span className="text-gray-600">Resolution</span>
                 <span className="font-semibold capitalize">{activeReturn.preferred_resolution || 'refund'}</span>
               </div>
               {activeReturn.reason_code ? (
                 <div className="flex justify-between">
                   <span className="text-gray-600">Reason</span>
-                  <span className="font-semibold">{activeReturn.reason_code}</span>
+                  <span className={clsx('font-semibold', tier && 'max-md:capitalize')}>
+                    {tier ? (
+                      <>
+                        <span className="md:hidden">{activeReturn.reason_code.replace(/_/g, ' ')}</span>
+                        <span className="max-md:hidden">{activeReturn.reason_code}</span>
+                      </>
+                    ) : (
+                      activeReturn.reason_code
+                    )}
+                  </span>
                 </div>
               ) : null}
               {activeReturn.reason_note ? (
@@ -474,13 +499,19 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
             {renderShipment(activeShipment)}
 
             <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className={clsx('flex items-center justify-between', tier && 'max-md:flex-col max-md:items-stretch max-md:gap-3')}>
                 <div>
                   <p className="text-sm text-indigo-800">Return Code</p>
-                  <p className="text-xl font-bold text-indigo-900">{returnCode}</p>
+                  <p className={clsx('text-xl font-bold text-indigo-900', tier && 'max-md:text-2xl max-md:tracking-wide')}>{returnCode}</p>
                 </div>
                 {returnId ? (
-                  <div className="flex gap-2">
+                  <div
+                    className={clsx(
+                      'flex gap-2',
+                      // Full-width 48px buttons on phones, stacked.
+                      tier && 'max-md:flex-col max-md:[&>*]:flex max-md:[&>*]:h-12 max-md:[&>*]:items-center max-md:[&>*]:justify-center max-md:[&>*]:rounded-full max-md:[&>*]:text-[15px]',
+                    )}
+                  >
                     {activeReturn.method !== 'pickup' ? (
                       <Link
                         href={`/returns/${returnId}/add-tracking`}
@@ -612,7 +643,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
             <Link
               href={`/orders/${orderId}`}
-              className="block w-full text-center py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold"
+              className={clsx('block w-full text-center py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold', tier && 'max-md:hidden')}
             >
               Back to Order
             </Link>
@@ -624,9 +655,14 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
   if (!eligible) {
     return (
-      <main className="min-h-screen bg-gray-50 pb-24">
+      <main className={clsx('min-h-screen bg-gray-50 pb-24', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
         <div className="container mx-auto px-4 py-6 max-w-2xl">
-          <div className="flex items-center gap-4 mb-6">
+          {tier && (
+            <div className="sticky top-0 z-m-header -mx-4 -mt-6 mb-3 bg-m-surface-low md:hidden">
+              <MobileTopBar title="Request a return" subtitle={order ? `Order #${order.number}` : undefined} backHref={`/orders/${orderId}`} />
+            </div>
+          )}
+          <div className={clsx('flex items-center gap-4 mb-6', tier && 'max-md:hidden')}>
             <Link href={`/orders/${orderId}`} className="text-gray-600 hover:text-primary-600">
               <ArrowLeft className="w-6 h-6" />
             </Link>
@@ -652,16 +688,25 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
       <div className="container mx-auto px-4 py-6 max-w-2xl">
-        <div className="flex items-center gap-4 mb-6">
+          {tier && (
+            <div className="sticky top-0 z-m-header -mx-4 -mt-6 mb-3 bg-m-surface-low md:hidden">
+              <MobileTopBar
+                title="Request a return"
+                subtitle={`Order #${order.number} · ${new Date(order.date_created).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                backHref={`/orders/${orderId}`}
+              />
+            </div>
+          )}
+        <div className={clsx('flex items-center gap-4 mb-6', tier && 'max-md:hidden')}>
           <Link href={`/orders/${orderId}`} className="text-gray-600 hover:text-primary-600">
             <ArrowLeft className="w-6 h-6" />
           </Link>
           <h1 className="text-xl font-bold text-gray-900">Request Return</h1>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className={clsx('bg-white rounded-xl shadow-sm p-6 mb-6', tier && 'max-md:hidden')}>
           <h2 className="font-semibold text-gray-900 mb-4">Order Summary</h2>
           <div className="space-y-3">
             <div className="flex justify-between">
@@ -675,23 +720,31 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Select items to return</h2>
-          <div className="space-y-4">
+        <div className={clsx('bg-white rounded-xl shadow-sm p-6 mb-6', tier && 'max-md:mb-3 max-md:rounded-2xl max-md:p-4 max-md:shadow-[0_0_0_1px_rgb(30_26_31/0.07)]')}>
+          <h2 className={clsx('font-semibold text-gray-900 mb-4', tier && 'max-md:mb-1 max-md:text-m-title-m')}>Select items to return</h2>
+          <div className={clsx('space-y-4', tier && 'max-md:space-y-0 max-md:divide-y max-md:divide-m-outline-variant')}>
             {order.line_items.map((item) => {
               const selectedQty = selectedItems[item.id] || 0;
               const unitPrice = item.quantity ? Number(item.total) / item.quantity : 0;
               return (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-600">Ordered qty: {item.quantity}</p>
+                <div
+                  key={item.id}
+                  className={clsx('border border-gray-200 rounded-lg p-4', tier && 'max-md:flex max-md:items-center max-md:gap-3 max-md:rounded-none max-md:border-0 max-md:px-0 max-md:py-3')}
+                >
+                  <div className={clsx('flex justify-between items-start mb-3', tier && 'max-md:mb-0 max-md:min-w-0 max-md:flex-1')}>
+                    <div className={clsx(tier && 'max-md:min-w-0')}>
+                      <p className={clsx('font-medium text-gray-900', tier && 'max-md:line-clamp-2 max-md:text-m-body-m max-md:font-normal')}>{item.name}</p>
+                      <p className={clsx('text-sm text-gray-600', tier && 'max-md:hidden')}>Ordered qty: {item.quantity}</p>
+                      {tier && (
+                        <p className="text-m-body-s text-m-on-surface-variant md:hidden">
+                          {formatPrice(unitPrice, currency)} each · you bought {item.quantity}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-600">{formatPrice(unitPrice, currency)} each</p>
+                    <p className={clsx('text-sm text-gray-600', tier && 'max-md:hidden')}>{formatPrice(unitPrice, currency)} each</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <label className="text-sm text-gray-700">Return qty</label>
+                    <label className={clsx('text-sm text-gray-700', tier && 'max-md:hidden')}>Return qty</label>
                     <input
                       type="number"
                       min={0}
@@ -701,92 +754,158 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                         const value = Math.min(Math.max(parseInt(e.target.value, 10) || 0, 0), item.quantity);
                         setSelectedItems((prev) => ({ ...prev, [item.id]: value }));
                       }}
-                      className="w-24 border border-gray-300 rounded-lg px-3 py-2"
+                      className={clsx('w-24 border border-gray-300 rounded-lg px-3 py-2', tier && 'max-md:hidden')}
                     />
-                    <span className="text-sm text-gray-700">Value: {formatPrice(unitPrice * selectedQty, currency)}</span>
+                    {tier && (
+                      <span className="inline-flex h-10 items-center rounded-full shadow-[inset_0_0_0_1px_var(--m-outline-variant)] md:hidden">
+                        <button
+                          type="button"
+                          aria-label={`Return one less ${item.name}`}
+                          disabled={selectedQty <= 0}
+                          onClick={() => setSelectedItems((prev) => ({ ...prev, [item.id]: Math.max(0, (prev[item.id] || 0) - 1) }))}
+                          className="grid h-10 w-11 place-items-center rounded-full text-m-on-surface-variant disabled:opacity-30"
+                        >
+                          <Minus className="h-[18px] w-[18px]" aria-hidden />
+                        </button>
+                        <span className="min-w-6 text-center text-m-title-s tabular-nums text-m-on-surface" aria-live="polite">{selectedQty}</span>
+                        <button
+                          type="button"
+                          aria-label={`Return one more ${item.name}`}
+                          disabled={selectedQty >= item.quantity}
+                          onClick={() => setSelectedItems((prev) => ({ ...prev, [item.id]: Math.min(item.quantity, (prev[item.id] || 0) + 1) }))}
+                          className="grid h-10 w-11 place-items-center rounded-full text-m-on-surface-variant disabled:opacity-30"
+                        >
+                          <Plus className="h-[18px] w-[18px]" aria-hidden />
+                        </button>
+                      </span>
+                    )}
+                    <span className={clsx('text-sm text-gray-700', tier && 'max-md:hidden')}>Value: {formatPrice(unitPrice * selectedQty, currency)}</span>
                   </div>
                 </div>
               );
             })}
           </div>
-          <div className="mt-4 flex justify-between text-sm text-gray-700">
+          <div className={clsx('mt-4 flex justify-between text-sm text-gray-700', tier && 'max-md:hidden')}>
             <span>Estimated value</span>
             <span className="font-semibold">{formatPrice(selectedAmount, currency)}</span>
           </div>
         </div>
 
-        <form className="bg-white rounded-xl shadow-sm p-6 space-y-5" onSubmit={handleSubmit}>
-          <div>
-            <h2 className="font-semibold text-gray-900 mb-3">Return method</h2>
-            <div className="grid grid-cols-1 gap-3">
+        <form
+          id="return-request-form"
+          className={clsx(
+            'bg-white rounded-xl shadow-sm p-6 space-y-5',
+            // Phones: one column in decision order — problem, photos, then how it comes back.
+            tier && 'max-md:flex max-md:flex-col max-md:gap-6 max-md:space-y-0 max-md:rounded-2xl max-md:p-4 max-md:shadow-[0_0_0_1px_rgb(30_26_31/0.07)]',
+          )}
+          onSubmit={handleSubmit}
+        >
+          <div className={clsx(tier && 'max-md:order-3')}>
+            <h2 className={clsx('font-semibold text-gray-900 mb-3', tier && 'max-md:text-m-title-m')}>Return method</h2>
+            {tier && !pickupEnabled && (
+              <div className="flex items-start gap-3 rounded-xl bg-m-surface-low p-3 md:hidden">
+                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-m-primary" aria-hidden />
+                <p className="text-m-body-m text-m-on-surface">
+                  Drop it at any Fez Delivery office near you. You&apos;ll get a tracking number for your return.
+                </p>
+              </div>
+            )}
+            <div className={clsx('grid grid-cols-1 gap-3', tier && !pickupEnabled && 'max-md:hidden')}>
               <label
-                className={`border rounded-lg p-3 cursor-pointer ${
-                  method === 'dropoff' ? 'bg-primary-50 border-primary-600' : 'border-gray-200 bg-white'
-                }`}
+                className={clsx(
+                  `border rounded-lg p-3 cursor-pointer ${
+                    method === 'dropoff' ? 'bg-primary-50 border-primary-600' : 'border-gray-200 bg-white'
+                  }`,
+                  tier && 'max-md:flex max-md:items-start max-md:gap-3 max-md:rounded-xl',
+                )}
               >
                 <input type="radio" name="return_method" className="sr-only" checked={method === 'dropoff'} onChange={() => setMethod('dropoff')} />
-                <p className="font-semibold text-gray-900">Drop off at a Fez location (free)</p>
-                <p className="text-xs text-gray-600">Take your item to any Fez Delivery location near you.</p>
-                <p className="text-xs text-gray-700 mt-2">You'll get a tracking number to monitor your return.</p>
+                {tier && <RadioDot selected={method === 'dropoff'} />}
+                <div>
+                  <p className="font-semibold text-gray-900">Drop off at a Fez location (free)</p>
+                  <p className="text-xs text-gray-600">Take your item to any Fez Delivery location near you.</p>
+                  <p className="text-xs text-gray-700 mt-2">You'll get a tracking number to monitor your return.</p>
+                </div>
               </label>
               {pickupEnabled ? (
                 <label
-                  className={`border rounded-lg p-3 cursor-pointer ${
-                    method === 'pickup' ? 'bg-primary-50 border-primary-600' : 'border-gray-200 bg-white'
-                  }`}
+                  className={clsx(
+                    `border rounded-lg p-3 cursor-pointer ${
+                      method === 'pickup' ? 'bg-primary-50 border-primary-600' : 'border-gray-200 bg-white'
+                    }`,
+                    tier && 'max-md:flex max-md:items-start max-md:gap-3 max-md:rounded-xl',
+                  )}
                 >
                   <input type="radio" name="return_method" className="sr-only" checked={method === 'pickup'} onChange={() => setMethod('pickup')} />
-                  <p className="font-semibold text-gray-900">We collect it from you</p>
-                  <p className="text-xs text-gray-600">A rider or courier picks the item up from your address.</p>
-                  <p className="text-xs text-gray-700 mt-2">
-                    Free when the problem is on our side. Otherwise a pickup fee is taken off your refund.
-                  </p>
+                  {tier && <RadioDot selected={method === 'pickup'} />}
+                  <div>
+                    <p className="font-semibold text-gray-900">We collect it from you</p>
+                    <p className="text-xs text-gray-600">A rider or courier picks the item up from your address.</p>
+                    <p className="text-xs text-gray-700 mt-2">
+                      Free when the problem is on our side. Otherwise a pickup fee is taken off your refund.
+                    </p>
+                  </div>
                 </label>
               ) : null}
             </div>
           </div>
 
           {method === 'pickup' ? (
-            <div className="rounded-xl border border-gray-100 p-4 space-y-3">
-              <h2 className="font-semibold text-gray-900">Pickup details</h2>
+            <div className={clsx('rounded-xl border border-gray-100 p-4 space-y-3', tier && 'max-md:order-4 max-md:border-0 max-md:p-0')}>
+              <h2 className={clsx('font-semibold text-gray-900', tier && 'max-md:text-m-title-m')}>Pickup details</h2>
               <p className="text-sm text-gray-600">Where should we collect the item from?</p>
               <div className="grid gap-3 sm:grid-cols-2">
-                <input
+<label className="block">
+                  <span className={clsx('sr-only', tier && 'max-md:not-sr-only max-md:mb-1 max-md:block max-md:text-m-body-s max-md:font-medium max-md:text-m-on-surface-variant')}>Contact name</span>
+                  <input
                   value={pickup.name}
                   onChange={(e) => setPickup((p) => ({ ...p, name: e.target.value }))}
                   placeholder="Contact name"
                   autoComplete="name"
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className={clsx('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm', tier && 'max-md:h-12 max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:text-base')}
                 />
-                <input
+                </label>
+                <label className="block">
+                  <span className={clsx('sr-only', tier && 'max-md:not-sr-only max-md:mb-1 max-md:block max-md:text-m-body-s max-md:font-medium max-md:text-m-on-surface-variant')}>Phone number</span>
+                  <input
                   value={pickup.phone}
                   onChange={(e) => setPickup((p) => ({ ...p, phone: e.target.value }))}
                   placeholder="Phone (08012345678)"
                   autoComplete="tel"
                   inputMode="tel"
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className={clsx('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm', tier && 'max-md:h-12 max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:text-base')}
                 />
+                </label>
               </div>
-              <input
-                value={pickup.address}
-                onChange={(e) => setPickup((p) => ({ ...p, address: e.target.value }))}
-                placeholder="Street address"
-                autoComplete="street-address"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              />
+<label className="block">
+                  <span className={clsx('sr-only', tier && 'max-md:not-sr-only max-md:mb-1 max-md:block max-md:text-m-body-s max-md:font-medium max-md:text-m-on-surface-variant')}>Street address</span>
+                  <input
+                  value={pickup.address}
+                  onChange={(e) => setPickup((p) => ({ ...p, address: e.target.value }))}
+                  placeholder="Street address"
+                  autoComplete="street-address"
+                  className={clsx('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm', tier && 'max-md:h-12 max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:text-base')}
+                />
+                </label>
               <div className="grid gap-3 sm:grid-cols-2">
-                <input
+<label className="block">
+                  <span className={clsx('sr-only', tier && 'max-md:not-sr-only max-md:mb-1 max-md:block max-md:text-m-body-s max-md:font-medium max-md:text-m-on-surface-variant')}>Town / city</span>
+                  <input
                   value={pickup.city}
                   onChange={(e) => setPickup((p) => ({ ...p, city: e.target.value }))}
                   placeholder="Town / city"
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className={clsx('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm', tier && 'max-md:h-12 max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:text-base')}
                 />
-                <input
+                </label>
+                <label className="block">
+                  <span className={clsx('sr-only', tier && 'max-md:not-sr-only max-md:mb-1 max-md:block max-md:text-m-body-s max-md:font-medium max-md:text-m-on-surface-variant')}>State</span>
+                  <input
                   value={pickup.state}
                   onChange={(e) => setPickup((p) => ({ ...p, state: e.target.value }))}
                   placeholder="State"
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className={clsx('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm', tier && 'max-md:h-12 max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:text-base')}
                 />
+                </label>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="text-xs text-gray-600">
@@ -796,7 +915,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                     value={pickup.preferred_date}
                     min={new Date().toISOString().slice(0, 10)}
                     onChange={(e) => setPickup((p) => ({ ...p, preferred_date: e.target.value }))}
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    className={clsx('mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm', tier && 'max-md:h-12 max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:text-base')}
                   />
                 </label>
                 <label className="text-xs text-gray-600">
@@ -806,7 +925,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                     onChange={(e) => setPickup((p) => ({ ...p, notes: e.target.value }))}
                     maxLength={300}
                     placeholder="Gate code, landmark…"
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    className={clsx('mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm', tier && 'max-md:h-12 max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:text-base')}
                   />
                 </label>
               </div>
@@ -843,29 +962,50 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           ) : null}
 
           {method === 'dropoff' ? (
-          <div className="bg-white rounded-xl shadow-sm p-6 space-y-3 border border-gray-100">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold text-gray-900">Nearby Fez Hubs</h2>
+          <div className={clsx('bg-white rounded-xl shadow-sm p-6 space-y-3 border border-gray-100', tier && 'max-md:order-4 max-md:rounded-none max-md:border-0 max-md:p-0 max-md:shadow-none')}>
+            <div className={clsx('flex items-center justify-between gap-3', tier && 'max-md:flex-col max-md:items-stretch')}>
+              <h2 className={clsx('font-semibold text-gray-900', tier && 'max-md:text-m-title-m')}>
+                {tier ? (
+                  <>
+                    <span className="md:hidden">Find a Fez office near you</span>
+                    <span className="max-md:hidden">Nearby Fez Hubs</span>
+                  </>
+                ) : (
+                  'Nearby Fez Hubs'
+                )}
+              </h2>
               <input
                 value={hubSearch}
                 onChange={(e) => setHubSearch(e.target.value)}
                 placeholder="Search city/state"
-                className="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className={clsx('w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm', tier && 'max-md:w-full ' + 'max-md:h-12 max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:text-base')}
               />
             </div>
-            <p className="text-sm text-gray-600">Find the closest drop-off hub. Tap a hub to view on map.</p>
-            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+            <p className={clsx('text-sm text-gray-600', tier && 'max-md:hidden')}>Find the closest drop-off hub. Tap a hub to view on map.</p>
+            {tier && (
+              <p className="text-m-body-s text-m-on-surface-variant md:hidden">
+                Any office works — you don&apos;t need to pick one here. Tap an office to open it in Maps.
+              </p>
+            )}
+            <div className={clsx('space-y-3 max-h-64 overflow-y-auto pr-1', tier && 'max-md:max-h-none max-md:space-y-0 max-md:divide-y max-md:divide-m-outline-variant max-md:overflow-visible max-md:pr-0')}>
               {filteredHubs.map((hub, idx) => (
                 <a
                   key={`${hub.name}-${idx}`}
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${hub.name}, ${hub.address}`)}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="block border border-gray-200 rounded-lg p-3 hover:border-primary-300 hover:bg-primary-50/40 transition"
+                  className={clsx(
+                    'block border border-gray-200 rounded-lg p-3 hover:border-primary-300 hover:bg-primary-50/40 transition',
+                    tier && 'max-md:flex max-md:min-h-16 max-md:items-center max-md:gap-3 max-md:rounded-none max-md:border-0 max-md:px-0 max-md:py-3',
+                  )}
                 >
-                  <p className="font-semibold text-gray-900">{hub.name}</p>
-                  <p className="text-sm text-gray-700">{hub.address}</p>
-                  {hub.contact ? <p className="text-xs text-gray-600 mt-1">Contact: {hub.contact}</p> : null}
+                  {tier && <MapPin className="h-5 w-5 shrink-0 text-m-primary md:hidden" aria-hidden />}
+                  <span className={clsx('block', tier && 'max-md:min-w-0 max-md:flex-1')}>
+                    <span className="block font-semibold text-gray-900">{hub.name}</span>
+                    <span className="block text-sm text-gray-700">{hub.address}</span>
+                    {hub.contact ? <span className="mt-1 block text-xs text-gray-600">Contact: {hub.contact}</span> : null}
+                  </span>
+                  {tier && <ExternalLink className="h-4 w-4 shrink-0 text-m-on-surface-variant md:hidden" aria-hidden />}
                 </a>
               ))}
               {filteredHubs.length === 0 ? <p className="text-sm text-gray-500">No hubs match your search.</p> : null}
@@ -873,17 +1013,29 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           </div>
           ) : null}
 
-          <div>
-            <h2 className="font-semibold text-gray-900 mb-3">Report a problem</h2>
+          <div className={clsx(tier && 'max-md:order-1')}>
+            <h2 className={clsx('font-semibold text-gray-900 mb-3', tier && 'max-md:text-m-title-m')}>
+              {tier ? (
+                <>
+                  <span className="md:hidden">What&apos;s wrong?</span>
+                  <span className="max-md:hidden">Report a problem</span>
+                </>
+              ) : (
+                'Report a problem'
+              )}
+            </h2>
             <div className="space-y-2">
               {COMPLAINT_TYPES.map((item) => (
                 <label
                   key={item.value}
-                  className={`flex items-center gap-3 rounded-xl border px-3 py-3 cursor-pointer transition ${
-                    complaintType === item.value
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 bg-white active:bg-gray-50'
-                  }`}
+                  className={clsx(
+                    `flex items-center gap-3 rounded-xl border px-3 py-3 cursor-pointer transition ${
+                      complaintType === item.value
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 bg-white active:bg-gray-50'
+                    }`,
+                    tier && 'max-md:min-h-14 max-md:[&>span]:text-base',
+                  )}
                 >
                   <input
                     type="radio"
@@ -891,7 +1043,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                     value={item.value}
                     checked={complaintType === item.value}
                     onChange={() => setComplaintType(item.value)}
-                    className="h-4 w-4 text-primary-600"
+                    className={clsx('h-4 w-4 text-primary-600', tier && 'max-md:h-5 max-md:w-5 max-md:accent-[var(--m-primary)]')}
                   />
                   <span className="text-sm text-gray-900">{item.label}</span>
                 </label>
@@ -899,18 +1051,23 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
               <textarea
                 value={reasonNote}
                 onChange={(e) => setReasonNote(e.target.value)}
-                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm"
+                className={clsx('w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm', tier && 'max-md:border-m-outline max-md:px-4 max-md:text-base')}
                 rows={3}
-                placeholder="Add more details or upload photos below"
+                placeholder={complaintType === 'other' ? 'Tell us what happened (required)' : 'Add more details or upload photos below'}
                 required={complaintType === 'other'}
               />
             </div>
           </div>
 
-          <div>
-            <h2 className="font-semibold text-gray-900 mb-3">Photos (optional)</h2>
+          <div className={clsx(tier && 'max-md:order-2')}>
+            <h2 className={clsx('font-semibold text-gray-900 mb-3', tier && 'max-md:text-m-title-m')}>
+              Photos (optional)
+              {tier && uploadedImages.length > 0 && (
+                <span className="ml-2 font-normal text-m-on-surface-variant md:hidden">{uploadedImages.length} of 5</span>
+              )}
+            </h2>
             <div className="space-y-3">
-              <label className="flex items-center gap-3 border border-dashed border-gray-300 rounded-lg p-3 cursor-pointer hover:border-primary-500 transition">
+              <label className={clsx('flex items-center gap-3 border border-dashed border-gray-300 rounded-lg p-3 cursor-pointer hover:border-primary-500 transition', tier && 'max-md:min-h-[72px] max-md:rounded-xl max-md:border-m-outline')}>
                 <Image className="w-5 h-5 text-gray-500" />
                 <div>
                   <p className="text-sm font-medium text-gray-900">Upload photos</p>
@@ -927,17 +1084,24 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                       <button
                         type="button"
                         onClick={() => removeUploadedImage(idx)}
-                        className="absolute top-1 right-1 bg-white/80 text-xs px-2 py-1 rounded hover:bg-white"
+                        className={clsx('absolute top-1 right-1 bg-white/80 text-xs px-2 py-1 rounded hover:bg-white', tier && 'max-md:grid max-md:h-9 max-md:w-9 max-md:place-items-center max-md:rounded-full max-md:p-0')}
                         aria-label="Remove image"
                       >
-                        Remove
+                        {tier ? (
+                          <>
+                            <X className="h-4 w-4 md:hidden" aria-hidden />
+                            <span className="max-md:hidden">Remove</span>
+                          </>
+                        ) : (
+                          'Remove'
+                        )}
                       </button>
                     </div>
                   ))}
                 </div>
               )}
 
-              <div className="flex items-start gap-3">
+              <div className={clsx('flex items-start gap-3', tier && 'max-md:hidden')}>
                 <Image className="w-5 h-5 text-gray-500 mt-1" />
                 <textarea
                   value={imageUrls}
@@ -953,12 +1117,44 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold disabled:opacity-60"
+            className={clsx('w-full py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold disabled:opacity-60', tier && 'max-md:order-5 max-md:hidden')}
           >
             {submitting ? 'Submitting...' : 'Submit Return Request'}
           </button>
         </form>
       </div>
+
+      {tier && (
+        <StickyActionBar className="flex-col items-stretch gap-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-m-body-m text-m-on-surface-variant">Estimated return value</span>
+            <span className="text-lg font-bold tabular-nums text-m-on-surface">{formatPrice(selectedAmount, currency)}</span>
+          </div>
+          <button
+            type="submit"
+            form="return-request-form"
+            disabled={submitting || selectedAmount <= 0}
+            className="h-12 w-full rounded-full bg-m-primary text-m-label-l text-m-on-primary shadow-[0_1px_2px_rgb(60_4_69/0.3)] active:opacity-90 disabled:bg-m-surface-high disabled:text-m-on-surface-variant disabled:shadow-none"
+          >
+            {submitting ? 'Submitting…' : selectedAmount <= 0 ? 'Select an item to return' : 'Submit return request'}
+          </button>
+        </StickyActionBar>
+      )}
     </main>
+  );
+}
+
+/** Visible Material radio for the mobile return-method rows (the real input stays sr-only). */
+function RadioDot({ selected }: { selected: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={clsx(
+        'relative mt-0.5 h-5 w-5 shrink-0 rounded-full md:hidden',
+        selected ? 'shadow-[inset_0_0_0_2px_var(--m-primary)]' : 'shadow-[inset_0_0_0_2px_var(--m-on-surface-variant)]',
+      )}
+    >
+      {selected && <span className="absolute inset-[5px] rounded-full bg-m-primary" />}
+    </span>
   );
 }
