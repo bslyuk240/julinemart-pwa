@@ -5,6 +5,7 @@ import { Mail, Phone, MapPin, Send, CheckCircle, MessageCircle, Store, ChevronRi
 import { clsx } from 'clsx';
 import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import Spinner from '@/components/ui/spinner';
 
 const JLO_API = process.env.NEXT_PUBLIC_JLO_CATALOG_URL || 'https://jlo.julinemart.com';
 
@@ -265,7 +266,7 @@ export default function ContactPage() {
                   >
                     {submitting ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <Spinner size="sm" tone="current" />
                         Sending…
                       </>
                     ) : (

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { X, Send, Headphones, User, Bot, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useCustomerAuth } from '@/context/customer-auth-context';
+import Spinner from '@/components/ui/spinner';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -518,7 +519,7 @@ export default function SupportChatWidget() {
                 {/* Session loading indicator */}
                 {sessionLoading && (
                   <div className="flex items-center justify-center gap-2 py-6 text-gray-400 text-sm">
-                    <span className="w-4 h-4 border-2 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+                    <Spinner size="sm" />
                     Connecting…
                   </div>
                 )}

@@ -12,6 +12,7 @@ import { clsx } from 'clsx';
 import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import MobileSearchView from '@/components/mobile/listing/mobile-search-view';
 import ListingSkeleton from '@/components/mobile/listing/listing-skeleton';
+import Spinner from '@/components/ui/spinner';
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -81,8 +82,8 @@ function SearchContent() {
         {loading && tier && <ListingSkeleton />}
         {loading && (
           <div className={clsx('bg-white rounded-2xl shadow-sm p-8 text-center', tier && 'max-md:hidden')}>
-            <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-600">Searching products...</p>
+            <Spinner size="lg" className="mx-auto mb-3 block" />
+            <p className="text-sm text-gray-500">Searching products...</p>
           </div>
         )}
 
@@ -137,8 +138,8 @@ function SearchFallback() {
     <main className="min-h-screen bg-gray-50 pb-24 md:pb-12">
       <div className="container-custom py-6">
         <div className="bg-white rounded-lg shadow-sm p-10 text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading search...</p>
+          <Spinner size="lg" className="mx-auto mb-3 block" />
+          <p className="text-sm text-gray-500">Loading search...</p>
         </div>
       </div>
     </main>

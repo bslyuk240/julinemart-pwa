@@ -7,9 +7,10 @@ import StickyActionBar from '@/components/mobile/shell/sticky-action-bar';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, MapPin, RefreshCw, Truck } from 'lucide-react';
+import { ArrowLeft, MapPin, RefreshCw, Truck } from 'lucide-react';
 import { buildFezTrackingUrl } from '@/lib/jlo/returns';
 import { getAuthHeader } from '@/lib/supabase/client';
+import Spinner from '@/components/ui/spinner';
 
 type TrackingEvent = {
   status?: string;
@@ -126,7 +127,7 @@ export default function TrackReturnPage() {
               backHref="/account/returns"
               actions={
                 <TopBarAction label="Refresh tracking" onClick={loadTracking}>
-                  {loading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : <RefreshCw className="h-5 w-5" aria-hidden />}
+                  {loading ? <Spinner size="md" tone="current" /> : <RefreshCw className="h-5 w-5" aria-hidden />}
                 </TopBarAction>
               }
             />
@@ -154,7 +155,7 @@ export default function TrackReturnPage() {
               <p className="text-lg font-semibold text-gray-900">{trackingNumber || 'Awaiting tracking'}</p>
             </div>
             <div className={clsx('ml-auto flex items-center gap-2 text-sm text-gray-700', tier && 'max-md:hidden')}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              {loading ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
               <button onClick={loadTracking} className="underline font-medium">
                 Refresh
               </button>
@@ -184,7 +185,7 @@ export default function TrackReturnPage() {
           </div>
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Spinner size="sm" />
               Loading tracking...
             </div>
           ) : error ? (

@@ -16,6 +16,7 @@ import { SellerTrustPanel } from '@/components/trust/SellerTrustBadge';
 import { VendorStoreInlineActions, VendorStoreQrPanel } from '@/components/vendor/VendorStoreHeroActions';
 import VendorMeetSection from '@/components/vendor/VendorMeetSection';
 import type { VendorTrustResponse } from '@/lib/trust/get-vendor-trust';
+import Spinner from '@/components/ui/spinner';
 
 type VendorSortOption = 'date' | 'popularity' | 'price' | 'price-desc';
 /** API route caps per_page at 100 and caches the underlying JLO fetch for 300s. */
@@ -194,9 +195,9 @@ export default function VendorStorePage() {
       <main className={clsx('min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8', tier && 'max-md:pb-4')}>
         {mobileTopBar('Store')}
         <div className="container-custom min-w-0 py-6">
-          <div className="text-center py-20">
-            <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4" />
-            <p className="text-gray-600">Loading store...</p>
+          <div role="status" className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+            <Spinner size="lg" className="mx-auto mb-3 block" />
+            <p className="text-sm text-gray-500">Loading store...</p>
           </div>
         </div>
       </main>

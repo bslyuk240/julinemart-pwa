@@ -5,7 +5,7 @@ import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Loader2, Package } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AccountPageHeader from '@/components/account/account-page-header';
 import { useCustomerAuth } from '@/context/customer-auth-context';
@@ -14,6 +14,7 @@ import RefundTimeline from '@/components/return/RefundTimeline';
 import { formatPrice } from '@/lib/utils/format-price';
 import { toast } from 'sonner';
 import { getAuthHeader } from '@/lib/supabase/client';
+import PageLoading from '@/components/ui/page-loading';
 
 export default function ReturnsPage() {
   // Mobile tier (docs/mobile-tier-plan.md, wave 2): account sub-pages use the
@@ -112,9 +113,7 @@ export default function ReturnsPage() {
 
   if (isLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
+      <PageLoading text="Loading returns..." />
     );
   }
 

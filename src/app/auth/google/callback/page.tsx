@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { logger } from '@/lib/logger';
+import PageLoading from '@/components/ui/page-loading';
+import Spinner from '@/components/ui/spinner';
 
 export default function GoogleCallbackPage() {
   const router = useRouter();
@@ -136,21 +138,15 @@ export default function GoogleCallbackPage() {
 
   if (!mounted) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
-          <p className="text-lg font-medium text-gray-900">Loading...</p>
-        </div>
-      </div>
+      <PageLoading />
     );
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-green-600 border-r-transparent"></div>
-        <p className="text-lg font-medium text-gray-900">Completing sign in...</p>
-        <p className="mt-2 text-sm text-gray-600">Processing OAuth callback</p>
+      <div role="status" className="flex flex-col items-center gap-3">
+        <Spinner size="lg" />
+        <p className="text-sm text-gray-500">Completing sign in...</p>
       </div>
     </div>
   );

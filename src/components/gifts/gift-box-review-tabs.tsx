@@ -5,6 +5,7 @@ import { Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { getGiftBoxReviews, createGiftBoxReview, type GiftBoxReview } from '@/lib/gifts/reviews';
+import Spinner from '@/components/ui/spinner';
 
 type Props = {
   giftBoxId: string;
@@ -135,7 +136,7 @@ export default function GiftBoxReviewTabs({ giftBoxId, slug, description, averag
             )}
             {loadingReviews ? (
               <div className="flex items-center justify-center py-12 text-gray-600">
-                <div className="animate-spin w-6 h-6 border-4 border-primary-600 border-t-transparent rounded-full mr-3" />
+                <Spinner size="md" className="mr-3" />
                 Loading reviews...
               </div>
             ) : reviews.length > 0 ? (

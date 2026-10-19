@@ -7,8 +7,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { ArrowLeft, Hash, Loader2 } from 'lucide-react';
+import { ArrowLeft, Hash } from 'lucide-react';
 import { getAuthHeader } from '@/lib/supabase/client';
+import Spinner from '@/components/ui/spinner';
 
 const extractShipmentId = (candidate: any): string | null => {
   if (!candidate) return null;
@@ -143,7 +144,7 @@ export default function AddTrackingPage() {
 
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Spinner size="sm" />
               Loading current tracking...
             </div>
           ) : currentTracking ? (

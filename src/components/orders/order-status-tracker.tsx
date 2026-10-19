@@ -422,9 +422,9 @@ export default function OrderStatusTracker({
                   
                   {/* Current status indicator */}
                   {isCurrent && (
-                    <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full">
-                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse" />
-                      <span className="text-xs font-medium text-blue-700">
+                    <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-primary-50 border border-primary-200 rounded-full">
+                      <div className="w-2 h-2 bg-primary-600 rounded-full animate-pulse" />
+                      <span className="text-xs font-medium text-primary-700">
                         In Progress
                       </span>
                     </div>

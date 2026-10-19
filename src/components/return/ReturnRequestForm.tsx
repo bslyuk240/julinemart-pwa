@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowLeft, Package, AlertCircle, Loader2, MapPin, Image, Info, Minus, Plus, X, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Package, AlertCircle, MapPin, Image, Info, Minus, Plus, X, ExternalLink } from 'lucide-react';
 import { Order } from '@/types/order';
 import { formatPrice } from '@/lib/utils/format-price';
 import { JloReturn, JloReturnShipment, formatJloRefundStatus, formatJloReturnStatus, buildFezTrackingUrl } from '@/lib/jlo/returns';
@@ -13,6 +13,7 @@ import { clsx } from 'clsx';
 import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
 import StickyActionBar from '@/components/mobile/shell/sticky-action-bar';
+import PageLoading from '@/components/ui/page-loading';
 
 interface ReturnRequestFormProps {
   orderId: number;
@@ -403,9 +404,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
+      <PageLoading text="Loading your order..." />
     );
   }
 

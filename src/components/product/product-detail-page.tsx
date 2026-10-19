@@ -40,6 +40,7 @@ import StickyActionBar from '@/components/mobile/shell/sticky-action-bar';
 import ActionSheet from '@/components/mobile/primitives/action-sheet';
 import { useCart } from '@/hooks/use-cart';
 import { haptic } from '@/lib/mobile/haptics';
+import Spinner from '@/components/ui/spinner';
 
 // Badge configuration helper
 const getBadgeConfig = (tagSlug: string) => {
@@ -1355,7 +1356,7 @@ export default function ProductDetailPage({ initialProduct }: ProductDetailPageP
               <div className="md:col-span-3 space-y-4">
                 {loadingReviews ? (
                   <div className="flex items-center justify-center py-12 text-gray-600">
-                    <div className="animate-spin w-6 h-6 border-4 border-primary-600 border-t-transparent rounded-full mr-3"></div>
+                    <Spinner size="md" className="mr-3" />
                     Loading reviews...
                   </div>
                 ) : reviews.length > 0 ? (

@@ -19,6 +19,7 @@ import {
   sellerOptions,
   type ListingFilters,
 } from '@/lib/mobile/listing-filters';
+import Spinner from '@/components/ui/spinner';
 
 type ProductsSort = 'date' | 'popularity' | 'rating' | 'price' | 'price-desc';
 
@@ -389,9 +390,9 @@ function ProductsContent() {
               ))}
             </div>
           ) : (
-            <div className="py-20 text-center">
-              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
-              <p className="text-gray-600">Loading products...</p>
+            <div role="status" className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+              <Spinner size="lg" className="mx-auto mb-3 block" />
+              <p className="text-sm text-gray-500">Loading products...</p>
             </div>
           )}
           </div>
@@ -463,7 +464,7 @@ function ProductsContent() {
             </select>
             {loading ? (
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+                <Spinner size="sm" />
               </div>
             ) : (
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2" />
@@ -572,7 +573,7 @@ function ProductsContent() {
             {tier && hasMore && (
               <div ref={sentinelRef} className="grid h-16 place-items-center md:hidden" aria-hidden={!loadingMore}>
                 {loadingMore && (
-                  <span className="h-6 w-6 animate-spin rounded-full border-[3px] border-m-primary border-t-transparent" />
+                  <Spinner size="md" tone="m-primary" />
                 )}
               </div>
             )}
@@ -631,9 +632,9 @@ export default function AllProductsPage() {
       fallback={
         <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
           <div className="container-custom min-w-0 py-6">
-            <div className="py-20 text-center">
-              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
-              <p className="text-gray-600">Loading products...</p>
+            <div role="status" className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+              <Spinner size="lg" className="mx-auto mb-3 block" />
+              <p className="text-sm text-gray-500">Loading products...</p>
             </div>
           </div>
         </main>

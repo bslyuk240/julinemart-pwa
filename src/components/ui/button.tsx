@@ -43,11 +43,14 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || isLoading}
+        aria-busy={isLoading || undefined}
         className={clsx(
           baseStyles,
           variants[variant],
           sizes[size],
           fullWidth && 'w-full',
+          // Busy, not disabled: keep full colour so the spinner and label stay legible.
+          isLoading && 'disabled:cursor-wait disabled:opacity-100',
           className
         )}
         {...props}

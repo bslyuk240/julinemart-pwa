@@ -19,6 +19,7 @@ import {
   sellerOptions,
   type ListingFilters,
 } from '@/lib/mobile/listing-filters';
+import Spinner from '@/components/ui/spinner';
 
 type CategorySortOption = 'date' | 'popularity' | 'rating' | 'price' | 'price-desc';
 
@@ -225,9 +226,9 @@ export default function CategoryPage() {
         {mobileTopBar}
         <div className={clsx('container-custom min-w-0 py-6', tier && 'max-md:pt-0')}>
           {tier && <ListingSkeleton />}
-          <div className={clsx('py-20 text-center', tier && 'max-md:hidden')}>
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
-            <p className="text-gray-600">Loading products...</p>
+          <div role="status" className={clsx('flex min-h-[60vh] flex-col items-center justify-center text-center', tier && 'max-md:hidden')}>
+            <Spinner size="lg" className="mx-auto mb-3 block" />
+            <p className="text-sm text-gray-500">Loading products...</p>
           </div>
         </div>
       </main>
@@ -337,7 +338,7 @@ export default function CategoryPage() {
             {tier && hasMore && (
               <div ref={sentinelRef} className="grid h-16 place-items-center md:hidden" aria-hidden={!loadingMore}>
                 {loadingMore && (
-                  <span className="h-6 w-6 animate-spin rounded-full border-[3px] border-m-primary border-t-transparent" />
+                  <Spinner size="md" tone="m-primary" />
                 )}
               </div>
             )}
