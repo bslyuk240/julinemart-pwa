@@ -58,6 +58,7 @@ describe('getMobileTierRoute', () => {
     expect(getMobileTierRoute('/category/electronics')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/search')?.tabBar).toBe(false);
     expect(getMobileTierRoute('/categories')?.tabBar).toBe(true);
+    expect(getMobileTierRoute('/products')?.tabBar).toBe(true);
   });
 
   it('runs gift flows full-screen and gift catalogues with the tab bar', () => {

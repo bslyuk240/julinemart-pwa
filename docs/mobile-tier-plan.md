@@ -399,6 +399,12 @@ The local catalogue returned no brands, so only the brands empty state was check
 - Autofill hints on every contact and address field. The support button is hidden on phone checkout.
 - Not done: a real Paystack test payment (manual, on device). Collapsing the Pay step for single-gateway stores, and Collect skipping the Delivery step, are business calls.
 
+**M14 status (2026-10-19): `/products` on the tier, not committed.** The page has the tab bar (Categories stays lit).
+- Top bar shows the collection name and product count, with Search. Collections (All, Flash sale, Deals and so on) are a scrollable row of Material secondary tabs; the selected one scrolls into view, and switching clears phone filters.
+- Uses the same sticky sort/filter chips, Material grid with infinite scroll, skeleton and empty states as category listings. Phone filters run on the loaded batches (up to 3 × 100); while filtering, the subtitle says how many loaded products match.
+- Desktop keeps its own grid, Filters panel and Load More, and doesn't depend on phone filters.
+- Open for the business: whether Sponsored should be a shopper-facing collection (it's empty now), whether Best sellers and Top sellers should merge, and whether collection filters should move to the server so counts cover the whole catalog.
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---

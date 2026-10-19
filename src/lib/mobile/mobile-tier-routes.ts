@@ -51,6 +51,7 @@ const ROUTES: MobileTierRoute[] = [
   { pattern: '/returns/*', tabBar: false }, // M11: track return / add tracking
   { pattern: '/contact', tabBar: true }, // M12: info pages
   { pattern: '/page/*', tabBar: true }, // M12: policies and about pages
+  { pattern: '/products', tabBar: true }, // M14: all products and tagged collections
 ];
 
 const DEV_ROUTES: MobileTierRoute[] = [{ pattern: '/dev/mobile-shell', tabBar: true }];

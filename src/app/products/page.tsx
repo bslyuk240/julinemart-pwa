@@ -1,11 +1,48 @@
 'use client';
 
-import { Suspense, useState, useEffect, useMemo } from 'react';
+import { Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ProductGrid from '@/components/product/product-grid';
-import { Filter, ChevronDown } from 'lucide-react';
+import { Filter, ChevronDown, Search } from 'lucide-react';
+import { clsx } from 'clsx';
 import { Product } from '@/types/product';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar, { TopBarAction } from '@/components/mobile/shell/mobile-top-bar';
+import ListingToolbar from '@/components/mobile/listing/listing-toolbar';
+import ListingSkeleton from '@/components/mobile/listing/listing-skeleton';
+import {
+  EMPTY_LISTING_FILTERS,
+  applyListingFilters,
+  countActiveFilters,
+  sellerOptions,
+  type ListingFilters,
+} from '@/lib/mobile/listing-filters';
+
+type ProductsSort = 'date' | 'popularity' | 'rating' | 'price' | 'price-desc';
+
+/** Mobile tier (M14): same sort labels as category listings. */
+const SORT_OPTIONS: { value: ProductsSort; label: string }[] = [
+  { value: 'date', label: 'Latest' },
+  { value: 'popularity', label: 'Popular' },
+  { value: 'rating', label: 'Top rated' },
+  { value: 'price', label: 'Price: low to high' },
+  { value: 'price-desc', label: 'Price: high to low' },
+];
+
+/** Collections offered as chips on phones (the desktop Filters panel lists the same tags). */
+const COLLECTIONS: { tag: string | null; label: string }[] = [
+  { tag: null, label: 'All' },
+  { tag: 'flash-sale', label: 'Flash sale' },
+  { tag: 'deal', label: 'Deals' },
+  { tag: 'best-seller', label: 'Best sellers' },
+  { tag: 'top-seller', label: 'Top sellers' },
+  { tag: 'sponsored', label: 'Sponsored' },
+  { tag: 'launching-deal', label: 'Launching deals' },
+];
+
+/** The API ignores price/stock filters, so phone filters run client-side over up to this many batches. */
+const MAX_FILTER_BATCHES = 3;
 
 const sortFromParam = (value: string | null): 'date' | 'popularity' | 'rating' | 'price' | 'price-desc' | null => {
   if (!value) return null;
@@ -25,6 +62,13 @@ function dedupeKey(product: Product): string {
 function ProductsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Mobile tier (docs/mobile-tier-plan.md, M14): phone pieces are gated on `tier` plus md:hidden / max-md:.
+  const tier = useMobileTier() !== null;
+  const [filters, setFilters] = useState<ListingFilters>(EMPTY_LISTING_FILTERS);
+  const filtersActive = countActiveFilters(filters) > 0;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const collectionsRef = useRef<HTMLElement>(null);
 
   const sortBy = sortFromParam(searchParams.get('sort')) || 'date';
   const tagFilter = searchParams.get('tag');
@@ -212,10 +256,101 @@ function ProductsContent() {
     router.replace(qs ? `/products?${qs}` : '/products', { scroll: false });
   };
 
+  const filteredProducts = useMemo(() => applyListingFilters(products, filters), [products, filters]);
+
+  // Phones: keep the selected collection tab on screen (later tabs start past the right edge).
+  useEffect(() => {
+    collectionsRef.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }, [tagFilter]);
+  const sellers = useMemo(() => sellerOptions(products), [products]);
+
+  // While a phone filter is on, pull a few more batches so results aren't limited to the first 100.
+  useEffect(() => {
+    if (!tier || !filtersActive || loading || loadingMore || !hasMore) return;
+    if (nextPageToLoad > MAX_FILTER_BATCHES) return;
+    const fill = async () => {
+      await loadMore();
+    };
+    void fill();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tier, filtersActive, loading, loadingMore, hasMore, nextPageToLoad]);
+
+  // Phones: infinite scroll instead of the "Load More Products" button.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!tier || !sentinel || !hasMore || loadingMore) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadMore();
+      },
+      { rootMargin: '600px 0px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tier, hasMore, loadingMore, products.length]);
+
+  const activeCollection = COLLECTIONS.find((collection) => collection.tag === (tagFilter ?? null));
+  const collectionTitle = activeCollection?.tag ? activeCollection.label : 'All products';
+
+  const mobileTopBar = tier && (
+    <MobileTopBar
+      title={collectionTitle}
+      subtitle={
+        loading
+          ? 'Loading…'
+          : filtersActive
+            ? `${filteredProducts.length.toLocaleString()} of ${products.length.toLocaleString()} loaded match`
+            : `${totalProducts.toLocaleString()} ${totalProducts === 1 ? 'product' : 'products'}`
+      }
+      backHref="/"
+      actions={
+        <TopBarAction label="Search" onClick={() => router.push('/search')}>
+          <Search className="h-6 w-6" aria-hidden />
+        </TopBarAction>
+      }
+    />
+  );
+
+  const mobileCollections = tier && (
+    <nav ref={collectionsRef} aria-label="Collections" className="-mx-4 overflow-x-auto border-b border-m-outline-variant scrollbar-hide md:hidden">
+      <div className="flex w-max px-2">
+        {COLLECTIONS.map((collection) => {
+          const selected = (collection.tag ?? null) === (tagFilter ?? null);
+          return (
+            <Link
+              key={collection.label}
+              href={buildProductsHref(collection.tag ?? undefined)}
+              replace
+              scroll={false}
+              onClick={() => setFilters(EMPTY_LISTING_FILTERS)}
+              aria-current={selected ? 'page' : undefined}
+              className={clsx(
+                // Material secondary tabs: 48px tall, underline on the selected collection.
+                'relative inline-flex h-12 items-center px-3 text-m-label-l',
+                selected
+                  ? "text-m-primary after:absolute after:inset-x-3 after:bottom-0 after:h-[3px] after:rounded-t-full after:bg-m-primary after:content-['']"
+                  : 'text-m-on-surface-variant active:bg-black/5',
+              )}
+            >
+              {collection.label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+
   if (loading && products.length === 0) {
     return (
-      <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
-        <div className="container-custom min-w-0 py-6">
+      <main className={clsx('min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8', tier && 'max-md:overflow-x-clip max-md:bg-m-surface max-md:pb-6')}>
+        {mobileTopBar}
+        <div className={clsx('container-custom min-w-0 py-6', tier && 'max-md:pt-0')}>
+          {mobileCollections}
+          {tier && <ListingSkeleton />}
+          <div className={clsx(tier && 'max-md:hidden')}>
           <div className="mb-6">
             <div className="mb-2 h-8 w-48 animate-pulse rounded bg-gray-100" />
             <div className="h-4 w-72 animate-pulse rounded bg-gray-100" />
@@ -243,20 +378,37 @@ function ProductsContent() {
               <p className="text-gray-600">Loading products...</p>
             </div>
           )}
+          </div>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom min-w-0 py-6">
-        <div className="mb-6">
+    <main className={clsx('min-h-screen overflow-x-hidden bg-gray-50 pb-24 md:pb-8', tier && 'max-md:overflow-x-clip max-md:bg-m-surface max-md:pb-6')}>
+      {mobileTopBar}
+      <div className={clsx('container-custom min-w-0 py-6', tier && 'max-md:pt-0')}>
+        {mobileCollections}
+        {tier && products.length > 0 && (
+          <ListingToolbar
+            sort={sortBy}
+            sortOptions={SORT_OPTIONS}
+            onSortChange={setSortInUrl}
+            filters={filters}
+            onFiltersChange={(next) => {
+              setFilters(next);
+              window.scrollTo({ top: 0 });
+            }}
+            sellers={sellers}
+            countFor={(draft) => applyListingFilters(products, draft).length}
+          />
+        )}
+        <div className={clsx('mb-6', tier && 'max-md:hidden')}>
           <h1 className="mb-1 text-xl font-bold text-gray-900 md:text-3xl">{sectionMeta.title}</h1>
           <p className="text-sm text-gray-600 md:text-base">{sectionMeta.description}</p>
         </div>
 
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-3 shadow-sm md:p-4">
+        <div className={clsx('mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-3 shadow-sm md:p-4', tier && 'max-md:hidden')}>
           <div className="flex items-center gap-3 md:gap-4">
             <button
               type="button"
@@ -304,7 +456,7 @@ function ProductsContent() {
         </div>
 
         {showFilters && (
-          <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className={clsx('mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm', tier && 'max-md:hidden')}>
             <h3 className="mb-3 font-semibold text-gray-900">Filter by Category</h3>
             <div className="flex flex-wrap gap-2">
               <Link
@@ -379,10 +531,38 @@ function ProductsContent() {
 
         {products.length > 0 ? (
           <>
-            <ProductGrid products={products} columns={6} />
+            {/* Phone filters apply below md only; desktop always gets the full list. */}
+            <div className={clsx(tier && 'max-md:hidden')}>
+              <ProductGrid products={products} columns={6} />
+            </div>
+            {tier && filteredProducts.length > 0 && (
+              <div className="md:hidden">
+                <ProductGrid products={filteredProducts} columns={6} mobileTier />
+              </div>
+            )}
+            {tier && filtersActive && filteredProducts.length === 0 && (
+              <div className="px-6 py-16 text-center md:hidden">
+                <h2 className="text-m-title-m text-m-on-surface">No products match these filters</h2>
+                <p className="mt-1 text-m-body-m text-m-on-surface-variant">Try a wider price range or fewer filters.</p>
+                <button
+                  type="button"
+                  onClick={() => setFilters(EMPTY_LISTING_FILTERS)}
+                  className="mt-5 h-10 rounded-full bg-m-primary-container px-5 text-m-label-l text-m-on-primary-container"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+            {tier && hasMore && (
+              <div ref={sentinelRef} className="grid h-16 place-items-center md:hidden" aria-hidden={!loadingMore}>
+                {loadingMore && (
+                  <span className="h-6 w-6 animate-spin rounded-full border-[3px] border-m-primary border-t-transparent" />
+                )}
+              </div>
+            )}
 
             {hasMore && (
-              <div className="mt-8 text-center">
+              <div className={clsx('mt-8 text-center', tier && 'max-md:hidden')}>
                 <button
                   type="button"
                   onClick={() => void loadMore()}
@@ -395,15 +575,34 @@ function ProductsContent() {
             )}
 
             {!hasMore && totalProducts > BATCH_SIZE && (
-              <div className="mt-8 text-center">
+              <div className={clsx('mt-8 text-center', tier && 'max-md:mt-4 max-md:text-m-body-s')}>
                 <p className="text-gray-600">You&apos;ve reached the end of the catalog</p>
               </div>
             )}
           </>
         ) : (
-          <div className="rounded-lg bg-white py-16 text-center">
-            <p className="text-lg text-gray-600">No products found</p>
-          </div>
+          <>
+            <div className={clsx('rounded-lg bg-white py-16 text-center', tier && 'max-md:hidden')}>
+              <p className="text-lg text-gray-600">No products found</p>
+            </div>
+            {tier && (
+              <div className="px-6 py-16 text-center md:hidden">
+                <h2 className="text-m-title-m text-m-on-surface">
+                  {activeCollection?.tag ? `Nothing in ${activeCollection.label} right now` : 'No products right now'}
+                </h2>
+                <p className="mt-1 text-m-body-m text-m-on-surface-variant">Check back soon, or browse everything we have.</p>
+                {activeCollection?.tag && (
+                  <Link
+                    href={buildProductsHref()}
+                    replace
+                    className="mt-5 inline-flex h-10 items-center rounded-full bg-m-primary-container px-5 text-m-label-l text-m-on-primary-container"
+                  >
+                    See all products
+                  </Link>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>
