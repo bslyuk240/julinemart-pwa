@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Truck, Package, MapPin, Tag, Store, Lock, Check, ShieldCheck } from 'lucide-react';
+import { CreditCard, Truck, Package, MapPin, Tag, Store, Lock, Check, ShieldCheck, ArrowRight, ChevronDown } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
@@ -65,6 +65,9 @@ interface ShippingOption {
 }
 
 type FulfillmentMethod = 'delivery' | 'store_pickup' | 'reservation';
+
+/** Phone checkout steps (mobile tier, M13). */
+const PHONE_STEPS = ['Details', 'Delivery', 'Pay'] as const;
 
 function isLocalCollectionMethod(method: FulfillmentMethod): boolean {
   return method === 'store_pickup' || method === 'reservation';
@@ -266,6 +269,34 @@ export default function CheckoutPage() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Mobile tier (M13): phones walk through Details → Delivery → Pay, one step per screen.
+  // Layout only — every section stays mounted (CSS hides the others), so form state,
+  // shipping quotes and the Paystack flow are exactly the desktop ones.
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  // An order already created and awaiting payment always lands on Pay.
+  const phoneStep = hasPendingPayment ? 3 : step;
+  // Steps are browser-history entries (?step=2, ?step=3), so browser Back and Android Back
+  // (native-back-button → history.back) step backwards before leaving checkout.
+  useEffect(() => {
+    if (!tier) return;
+    const readStep = () => {
+      const n = Number(new URLSearchParams(window.location.search).get('step'));
+      return n === 2 || n === 3 ? n : 1;
+    };
+    // A reload or deep link lands on Details: earlier steps' answers aren't kept.
+    if (readStep() !== 1) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('step');
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+    }
+    const onPopState = () => {
+      setStep(readStep());
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [tier]);
 
   // Optional LGA picker: only appears when the typed city matches a
   // hub-serviced location (Vendor Locations admin page). Picking the right
@@ -1551,6 +1582,60 @@ export default function CheckoutPage() {
     !isCheckoutReady ||
     (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null);
 
+  const goToStep = (next: 1 | 2 | 3) => {
+    if (next < phoneStep) {
+      // Going back pops the step entries so history and the screen stay in sync (popstate sets the step).
+      window.history.go(next - phoneStep);
+      return;
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.set('step', String(next));
+    window.history.pushState(null, '', url.pathname + url.search + url.hash);
+    setStep(next);
+    window.scrollTo(0, 0);
+    // Screen readers hear the new step via the top bar title.
+    window.setTimeout(() => (document.querySelector('main header h1') as HTMLElement | null)?.focus({ preventScroll: true }), 0);
+  };
+
+  // Continue checks only what the current step asked for; Pay still runs the full handlePlaceOrder checks.
+  const continuePhoneStep = () => {
+    if (phoneStep === 1) {
+      if (!validateForm()) {
+        haptic('warning');
+        // Errors render inline on the next paint; bring the first one into view.
+        window.setTimeout(() => {
+          const firstError = document.querySelector('[data-checkout-step="1"] p.text-red-600');
+          const field = firstError?.parentElement?.querySelector('input, select, textarea') as HTMLElement | null;
+          firstError?.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          field?.focus({ preventScroll: true });
+        }, 50);
+        return;
+      }
+      haptic('tap');
+      goToStep(2);
+      return;
+    }
+    if (!isLocalCollection) {
+      if (shippingError) {
+        haptic('warning');
+        toast.error(shippingError);
+        return;
+      }
+      if (!selectedShipping) {
+        haptic('warning');
+        toast.error(loading ? 'Delivery options are still loading.' : 'Choose a delivery option');
+        return;
+      }
+      if (selectedOption?.methodId === 'jlo_shipping' && shippingCost === null) {
+        haptic('warning');
+        toast.error('Still working out your delivery cost — one moment.');
+        return;
+      }
+    }
+    haptic('tap');
+    goToStep(3);
+  };
+
   const cancelPendingOrder = async () => {
     const orderId = currentOrderRef.current;
     if (orderId) {
@@ -1589,7 +1674,9 @@ export default function CheckoutPage() {
         <div className="bg-m-surface-low">
           <MobileTopBar
             title="Checkout"
+            subtitle={`Step ${phoneStep} of 3 · ${PHONE_STEPS[phoneStep - 1]}`}
             backHref="/cart"
+            onBack={phoneStep > 1 && !hasPendingPayment ? () => goToStep((phoneStep - 1) as 1 | 2) : undefined}
             actions={
               <span className="inline-flex items-center gap-1.5 px-4 text-m-label-m text-m-success">
                 <Lock className="h-4 w-4" aria-hidden />
@@ -1597,6 +1684,14 @@ export default function CheckoutPage() {
               </span>
             }
           />
+          <div className="flex gap-1 px-4 pb-2 md:hidden" aria-hidden>
+            {PHONE_STEPS.map((label, i) => (
+              <span
+                key={label}
+                className={clsx('h-1 flex-1 rounded-full transition-colors duration-200', i < phoneStep ? 'bg-m-primary' : 'bg-m-surface-high')}
+              />
+            ))}
+          </div>
         </div>
       )}
       <div className={clsx('container-custom min-w-0 py-5 md:py-6', tier && 'max-md:pt-1')}>
@@ -1617,9 +1712,9 @@ export default function CheckoutPage() {
 
         <div className="grid min-w-0 gap-6 lg:grid-cols-3">
           {/* Checkout Form */}
-          <div className="min-w-0 space-y-6 lg:col-span-2">
+          <div className={clsx('min-w-0 space-y-6 lg:col-span-2', tier && 'max-md:flex max-md:flex-col max-md:gap-4 max-md:space-y-0')}>
             {tier && storePickupEligible && (
-              <div className="md:hidden">
+              <div className={clsx('md:hidden', tier && phoneStep !== 1 && 'max-md:hidden')}>
                 <div
                   role="radiogroup"
                   aria-label="How to get your order"
@@ -1664,7 +1759,7 @@ export default function CheckoutPage() {
             )}
 
             {/* Customer Information */}
-            <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
+            <div data-checkout-step="1" className={clsx('rounded-2xl bg-white p-4 shadow-sm md:p-5', tier && phoneStep !== 1 && 'max-md:hidden')}>
               <div className="flex items-center gap-3 mb-4">
                 <MapPin className="w-5 h-5 text-primary-600" />
                 <h2 className="text-sm md:text-base font-semibold text-gray-900">Contact Information</h2>
@@ -1675,6 +1770,7 @@ export default function CheckoutPage() {
                   <Input
                     label="First Name *"
                     name="firstName"
+                    autoComplete="given-name"
                     value={formData.firstName}
                     onChange={handleInputChange}
                     error={errors.firstName}
@@ -1684,6 +1780,7 @@ export default function CheckoutPage() {
                   <Input
                     label="Last Name *"
                     name="lastName"
+                    autoComplete="family-name"
                     value={formData.lastName}
                     onChange={handleInputChange}
                     error={errors.lastName}
@@ -1695,6 +1792,7 @@ export default function CheckoutPage() {
                 <Input
                   label="Email Address *"
                   name="email"
+                    autoComplete="email"
                   type="email"
                   value={formData.email}
                   onChange={handleInputChange}
@@ -1705,6 +1803,7 @@ export default function CheckoutPage() {
                 <Input
                   label="Phone Number *"
                   name="phone"
+                    autoComplete="tel"
                   type="tel"
                   value={formData.phone}
                   onChange={handleInputChange}
@@ -1716,7 +1815,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* Delivery Information */}
-            <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
+            <div data-checkout-step="1" className={clsx('rounded-2xl bg-white p-4 shadow-sm md:p-5', tier && phoneStep !== 1 && 'max-md:hidden')}>
               <div className="flex items-center gap-3 mb-4">
                 <Truck className="w-6 h-6 text-primary-600" />
                 <h2 className="text-sm md:text-base font-semibold text-gray-900">Delivery Address</h2>
@@ -1758,6 +1857,7 @@ export default function CheckoutPage() {
                   <Input
                     label="Street Address *"
                     name="address1"
+                    autoComplete="address-line1"
                     value={formData.address1}
                     onChange={handleInputChange}
                     error={errors.address1}
@@ -1767,6 +1867,7 @@ export default function CheckoutPage() {
                   <Input
                     label="Apartment, suite, etc. (optional)"
                     name="address2"
+                    autoComplete="address-line2"
                     value={formData.address2}
                     onChange={handleInputChange}
                     fullWidth
@@ -1776,6 +1877,7 @@ export default function CheckoutPage() {
                     <Input
                       label="City / town *"
                       name="city"
+                    autoComplete="address-level2"
                       value={formData.city}
                       onChange={handleInputChange}
                       error={errors.city}
@@ -1790,6 +1892,7 @@ export default function CheckoutPage() {
                       </label>
                       <select
                         name="state"
+                        autoComplete="address-level1"
                         value={formData.state}
                         onChange={handleInputChange}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -1866,6 +1969,7 @@ export default function CheckoutPage() {
                   <Input
                     label="Postal Code (optional)"
                     name="postcode"
+                    autoComplete="postal-code"
                     value={formData.postcode}
                     onChange={handleInputChange}
                     fullWidth
@@ -1990,7 +2094,7 @@ export default function CheckoutPage() {
 
             {/* Shipping Method */}
             {fulfillmentMethod === 'delivery' && (loading || shippingOptions.length > 0) && (
-              <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
+              <div className={clsx('rounded-2xl bg-white p-4 shadow-sm md:p-5', tier && phoneStep !== 2 && 'max-md:hidden')}>
                 <div className="flex items-center gap-3 mb-4">
                   <Truck className="w-6 h-6 text-primary-600" />
                   <h2 className="text-sm md:text-base font-semibold text-gray-900">Shipping Method</h2>
@@ -2058,9 +2162,43 @@ export default function CheckoutPage() {
               </div>
             )}
 
+            {tier && phoneStep === 2 && fulfillmentMethod === 'delivery' && !loading && shippingOptions.length === 0 && (
+              <div className="rounded-2xl bg-m-surface-lowest p-4 shadow-[0_0_0_1px_rgb(30_26_31/0.07)] md:hidden">
+                <p className="text-m-title-s text-m-on-surface">No delivery options for this address</p>
+                <p className="mt-1 text-m-body-m text-m-on-surface-variant">
+                  {shippingError || 'Check the state and town, or contact us and we will help you get it delivered.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => goToStep(1)}
+                  className="mt-3 h-10 rounded-full px-4 text-m-label-l text-m-primary shadow-[inset_0_0_0_1px_var(--m-outline)] active:bg-black/5"
+                >
+                  Change address
+                </button>
+              </div>
+            )}
+
+            {tier && phoneStep === 2 && isLocalCollection && (
+              <div className="flex items-start gap-3 rounded-2xl bg-m-surface-lowest p-4 shadow-[0_0_0_1px_rgb(30_26_31/0.07)] md:hidden">
+                <Store className="mt-0.5 h-5 w-5 shrink-0 text-m-primary" aria-hidden />
+                <div className="min-w-0">
+                  <p className="text-m-title-s text-m-on-surface">
+                    {fulfillmentMethod === 'reservation' ? 'Reserve & collect' : 'Collect from store'} · free
+                  </p>
+                  <p className="text-m-body-m text-m-on-surface-variant">
+                    {storePickupStore?.storeName || "The seller's store"}
+                    {storePickupStore?.area ? ` — ${storePickupStore.area}, ${storePickupStore.city}` : ''}
+                  </p>
+                  {fulfillmentMethod === 'reservation' && (
+                    <p className="mt-1 text-m-body-s text-m-on-surface-variant">You pay now; the seller holds your items for 48 hours.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Promo code — single voucher / influencer entry */}
             {shippingCost !== null && (
-              <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
+              <div className={clsx('rounded-2xl bg-white p-4 shadow-sm md:p-5', tier && 'max-md:order-1', tier && phoneStep !== 3 && 'max-md:hidden')}>
                 <div className="mb-4 flex items-center gap-3">
                   <Tag className="h-6 w-6 text-primary-600" />
                   <h2 className="text-sm font-semibold text-gray-900 md:text-base">Have a promo code?</h2>
@@ -2179,9 +2317,56 @@ export default function CheckoutPage() {
               </div>
             )}
 
+            {tier && phoneStep === 3 && (
+              <section aria-label="Your details" className="divide-y divide-m-outline-variant rounded-2xl bg-m-surface-lowest shadow-[0_0_0_1px_rgb(30_26_31/0.07)] md:hidden">
+                {[
+                  {
+                    label: 'Contact',
+                    value: [`${formData.firstName} ${formData.lastName}`.trim(), formData.phone].filter(Boolean).join(' · '),
+                    detail: formData.email,
+                    edit: 1 as const,
+                  },
+                  {
+                    label: isLocalCollection ? 'Collect from' : 'Deliver to',
+                    value: isLocalCollection
+                      ? storePickupStore?.storeName || "The seller's store"
+                      : [formData.address1, formData.city, formData.state].filter(Boolean).join(', '),
+                    edit: 1 as const,
+                  },
+                  ...(isLocalCollection
+                    ? []
+                    : [{
+                        label: 'Delivery',
+                        value: [selectedOption?.title, shippingCost !== null ? (shippingCost === 0 ? 'FREE' : `₦${shippingCost.toLocaleString()}`) : null]
+                          .filter(Boolean)
+                          .join(' · '),
+                        edit: 2 as const,
+                      }]),
+                ].map((row) => (
+                  <div key={row.label} className="flex min-h-14 items-center gap-3 px-4 py-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-m-body-s text-m-on-surface-variant">{row.label}</p>
+                      <p className="truncate text-m-body-m text-m-on-surface">{row.value || '—'}</p>
+                      {'detail' in row && row.detail && <p className="truncate text-m-body-s text-m-on-surface-variant">{row.detail}</p>}
+                    </div>
+                    {!hasPendingPayment && (
+                      <button
+                        type="button"
+                        onClick={() => goToStep(row.edit)}
+                        aria-label={`Change ${row.label.toLowerCase()}`}
+                        className="h-10 shrink-0 rounded-full px-3 text-m-label-l text-m-primary active:bg-black/5"
+                      >
+                        Change
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </section>
+            )}
+
             {/* Payment Method */}
             {(loading || paymentGateways.length > 0) && (
-              <div className="rounded-2xl bg-white p-4 shadow-sm md:p-5">
+              <div className={clsx('rounded-2xl bg-white p-4 shadow-sm md:p-5', tier && phoneStep !== 3 && 'max-md:hidden')}>
                 <div className="flex items-center gap-3 mb-4">
                   <CreditCard className="w-6 h-6 text-primary-600" />
                   <h2 className="text-sm md:text-base font-semibold text-gray-900">Payment Method</h2>
@@ -2279,14 +2464,27 @@ export default function CheckoutPage() {
           </div>
 
           {tier && (
-            <div className="rounded-2xl bg-m-surface-lowest p-4 text-m-body-m shadow-[0_0_0_1px_rgb(30_26_31/0.07)] md:hidden">
+            <div className={clsx('rounded-2xl bg-m-surface-lowest p-4 text-m-body-m shadow-[0_0_0_1px_rgb(30_26_31/0.07)] md:hidden', tier && phoneStep !== 3 && 'max-md:hidden')}>
               <h2 className="mb-2 text-m-title-m text-m-on-surface">Order summary</h2>
-              <div className="flex justify-between py-1">
-                <span className="text-m-on-surface-variant">
-                  Items ({items.reduce((sum: number, item: any) => sum + item.quantity, 0)})
-                </span>
-                <span className="tabular-nums">₦{subtotal.toLocaleString()}</span>
-              </div>
+              <details className="group py-1">
+                <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+                  <span className="inline-flex items-center gap-1 text-m-on-surface-variant">
+                    Items ({items.reduce((sum: number, item: any) => sum + item.quantity, 0)})
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
+                  </span>
+                  <span className="tabular-nums">₦{subtotal.toLocaleString()}</span>
+                </summary>
+                <ul className="mt-1 space-y-2 border-l-2 border-m-outline-variant pl-3">
+                  {items.map((item: any) => (
+                    <li key={item.id} className="flex justify-between gap-3 text-m-body-s">
+                      <span className="min-w-0 text-m-on-surface-variant">
+                        <span className="line-clamp-2">{item.name}</span> × {item.quantity}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-m-on-surface">₦{(item.price * item.quantity).toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
               {voucherDiscount > 0 && (
                 <div className="flex justify-between py-1 text-m-success">
                   <span>Product discount</span>
@@ -2497,7 +2695,27 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {tier && (
+      {tier && phoneStep < 3 && (
+        <StickyActionBar className="flex-col items-stretch gap-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-m-body-m text-m-on-surface-variant">
+              {shippingCost === null ? 'Subtotal · delivery calculated next' : 'Total'}
+            </span>
+            <span className="text-lg font-bold tabular-nums text-m-on-surface">
+              ₦{(shippingCost === null ? subtotal : total).toLocaleString()}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={continuePhoneStep}
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-m-primary text-m-label-l text-m-on-primary shadow-[0_1px_2px_rgb(60_4_69/0.3)] active:opacity-90"
+          >
+            {phoneStep === 1 ? (isLocalCollection ? 'Continue to collection' : 'Continue to delivery') : 'Continue to payment'}
+            <ArrowRight className="h-[18px] w-[18px]" aria-hidden />
+          </button>
+        </StickyActionBar>
+      )}
+      {tier && phoneStep === 3 && (
         <StickyActionBar>
           <button
             type="button"

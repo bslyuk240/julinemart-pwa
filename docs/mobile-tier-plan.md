@@ -392,6 +392,13 @@ The local catalogue returned no brands, so only the brands empty state was check
 - Phones have no site footer on tier routes, so the account hub gets a "Help & info" group and the phone sign-in screen gets help/policy links.
 - Follow-up: there's no Tailwind typography plugin, so the `prose` classes do nothing and desktop policy pages render as unstyled, crammed text (this predates M12).
 
+**M13 status (2026-10-19): checkout split into steps on phones, not committed.** Details → Delivery → Pay, layout and navigation only. Every section stays mounted and is hidden with `max-md:hidden`; `handlePlaceOrder`, validation, shipping quotes and Paystack are unchanged.
+- Steps are browser-history entries (`?step=2|3`), so browser Back and Android Back step backwards. A reload lands on Details. A pending payment pins the screen to Pay.
+- Continue runs the existing `validateForm` on Details and focuses the first error. On Delivery it checks for a selected option and a finished quote. If no options come back, the screen says so and offers "Change address".
+- Pay shows recap rows with Change, the payment method, the promo code (moved here from Delivery), and an order summary with an expandable item list.
+- Autofill hints on every contact and address field. The support button is hidden on phone checkout.
+- Not done: a real Paystack test payment (manual, on device). Collapsing the Pay step for single-gateway stores, and Collect skipping the Delivery step, are business calls.
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---
