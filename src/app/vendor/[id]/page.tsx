@@ -58,10 +58,10 @@ const sortProducts = (items: Product[], sortBy: VendorSortOption) => {
 export default function VendorStorePage() {
   // Mobile tier (docs/mobile-tier-plan.md, wave 3): top bar and mobile product cards below md.
   const tier = useMobileTier() !== null;
-  const mobileTopBar = (title: string) =>
+  const mobileTopBar = (title: string, actions?: React.ReactNode) =>
     tier && (
       <div className="sticky top-0 z-m-header md:hidden">
-        <MobileTopBar title={title} backHref="/vendors" />
+        <MobileTopBar title={title} backHref="/vendors" actions={actions} />
       </div>
     );
   const params    = useParams();
@@ -276,7 +276,10 @@ export default function VendorStorePage() {
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <main className={clsx('min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8', tier && 'max-md:pb-4')}>
-      {mobileTopBar(vendorName)}
+      {mobileTopBar(
+        vendorName,
+        <VendorStoreInlineActions vendorId={vendorId} vendorName={vendorName} className="pr-3" />,
+      )}
       <div className={clsx('container-custom min-w-0 py-6', tier && 'max-md:pt-2')}>
 
         {/* Pull-to-refresh indicator */}
@@ -306,7 +309,7 @@ export default function VendorStorePage() {
         )}
 
         {trust && (
-          <div className="mb-6">
+          <div className={clsx('mb-6', tier && 'max-md:mb-3 max-md:empty:hidden')}>
             <SellerTrustPanel
               level={trust.level}
               verifications={trust.verifications}
@@ -327,9 +330,40 @@ export default function VendorStorePage() {
         )}
 
         {/* Vendor Header Card */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-8">
+        <div
+          className={clsx(
+            'bg-white rounded-2xl shadow-sm overflow-hidden mb-8',
+            // Mobile tier: a flush profile row under the top bar, not a card.
+            tier && 'max-md:mb-3 max-md:overflow-visible max-md:rounded-none max-md:bg-transparent max-md:shadow-none',
+          )}
+        >
+          {tier && (
+            <div className="flex items-center gap-3 pb-1 pt-1 md:hidden">
+              <div
+                className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-m-outline-variant ${vendorAvatar ? 'bg-white' : 'bg-gradient-to-br from-primary-500 to-primary-700'}`}
+              >
+                {vendorAvatar
+                  ? <img src={vendorAvatar} alt="" className="h-full w-full object-cover" />
+                  : <Store className="h-7 w-7 text-white" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} className={`h-3.5 w-3.5 ${ratingValue > i ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-200 text-gray-200'}`} />
+                  ))}
+                  <span className="ml-1 text-m-body-s text-m-on-surface-variant">
+                    {ratingAvg ? `${ratingAvg}${reviewCount > 0 ? ` · ${reviewCount} reviews` : ''}` : 'No ratings yet'}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-m-body-s text-m-on-surface-variant">
+                  <span className="font-semibold tabular-nums text-m-on-surface">{total ?? products.length}</span> products
+                </p>
+                <VendorStoreQrPanel vendorId={vendorId} vendorName={vendorName} className="-mt-0.5" />
+              </div>
+            </div>
+          )}
           {/* Mobile */}
-          <div className="md:hidden">
+          <div className={clsx('md:hidden', tier && 'hidden')}>
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-start gap-3">
                 <div className={`w-14 h-14 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-gray-100 flex-shrink-0 ${vendorAvatar ? 'bg-white' : 'bg-gradient-to-br from-primary-500 to-primary-700'}`}>
@@ -409,7 +443,7 @@ export default function VendorStorePage() {
 
         {/* Products */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className={clsx('flex items-center justify-between mb-4', tier && 'max-md:mb-3')}>
             <h2 className={clsx('text-2xl font-bold text-gray-900', tier && 'max-md:text-m-title-m')}>
               All Products ({total ?? products.length})
             </h2>
