@@ -177,6 +177,21 @@ function LoginContent() {
           </div>
         </div>
 
+        {tier && (
+          <nav aria-label="Help" className="flex flex-wrap items-center justify-center gap-x-1 text-m-body-s text-m-on-surface-variant md:hidden">
+            {[
+              { href: '/contact', label: 'Contact us' },
+              { href: '/page/refund_returns', label: 'Returns policy' },
+              { href: '/page/terms-of-service', label: 'Terms' },
+              { href: '/page/privacy-policy', label: 'Privacy' },
+            ].map((link) => (
+              <Link key={link.href} href={link.href} className="inline-flex min-h-12 items-center px-2 active:text-m-on-surface">
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        )}
+
         <div className={clsx('text-center', tier && 'max-md:hidden')}>
           <Link href="/" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900">
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

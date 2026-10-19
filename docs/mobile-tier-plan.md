@@ -386,6 +386,12 @@ The local catalogue returned no brands, so only the brands empty state was check
 - Open for the business: who pays the Fez waybill on drop-off, refund timing copy, and the hard-coded JulineMart Warri Hub address in the status steps. Desktop submit still allows a ₦0 return (unchanged).
 - Not verified: the form and status view need a signed-in order; the track and add-tracking pages are checked signed out at phone and desktop widths.
 
+**M12 status (2026-10-19): contact and info pages built, not committed.** `/contact` and `/page/*` join the tier with the tab bar (Account stays lit).
+- Contact: "Reach us" list (WhatsApp, call, email, maps), the form with 48px/16px fields and a pill submit, then a "Sell on JulineMart" row. External rows show an external-link icon.
+- Policy pages: top bar with title and updated date, edge-to-edge article with phone-only `.m-article` styles. WordPress `<p><strong>` section titles become `<h2>` server-side, which looks the same on desktop.
+- Phones have no site footer on tier routes, so the account hub gets a "Help & info" group and the phone sign-in screen gets help/policy links.
+- Follow-up: there's no Tailwind typography plugin, so the `prose` classes do nothing and desktop policy pages render as unstyled, crammed text (this predates M12).
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---

@@ -91,6 +91,12 @@ describe('getMobileTierRoute', () => {
     }
   });
 
+  it('puts contact and info pages in the mobile tier with the tab bar', () => {
+    expect(getMobileTierRoute('/contact')?.tabBar).toBe(true);
+    expect(getMobileTierRoute('/page/refund_returns')?.tabBar).toBe(true);
+    expect(getMobileTierRoute('/page')).toBeNull();
+  });
+
   it('shows the tab bar on the cart but not during checkout', () => {
     expect(getMobileTierRoute('/cart')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/checkout')?.tabBar).toBe(false);
@@ -113,6 +119,8 @@ describe('activeTab', () => {
     expect(activeTab('/account/orders')).toBe('account');
     expect(activeTab('/orders/123')).toBe('account');
     expect(activeTab('/account/wishlist')).toBe('wishlist');
+    expect(activeTab('/contact')).toBe('account');
+    expect(activeTab('/page/privacy-policy')).toBe('account');
   });
 
   it('does not treat lookalike prefixes as children', () => {

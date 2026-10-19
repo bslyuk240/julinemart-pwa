@@ -14,7 +14,7 @@ const TAB_PREFIXES: Record<TabId, string[]> = {
   categories: ['/categories', '/category/', '/products', '/search', '/brand/', '/brands'],
   cart: ['/cart'],
   wishlist: ['/wishlist', '/account/wishlist'],
-  account: ['/account', '/orders'],
+  account: ['/account', '/orders', '/contact', '/page/'],
 };
 
 /** Which tab is lit for a path, or null when none should be (e.g. /gifts). */

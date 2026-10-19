@@ -19,6 +19,10 @@ import {
   RefreshCw,
   CheckCircle2,
   Store,
+  MessageCircle,
+  RotateCcw,
+  FileText,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clsx } from 'clsx';
@@ -258,6 +262,17 @@ export default function AccountPage() {
       .map((href) => accountMenuItems.find((item) => item.href === href))
       .filter((item): item is (typeof accountMenuItems)[number] => Boolean(item)),
   }));
+  // Phones on the mobile tier have no site footer, so help and policies live here.
+  menuGroups.push({
+    title: 'Help & info',
+    items: [
+      { icon: MessageCircle, title: 'Contact us', description: 'WhatsApp, call or email support', href: '/contact', color: 'text-primary-600', bgColor: 'bg-primary-50' },
+      { icon: RotateCcw, title: 'Returns & refunds policy', description: 'What you can return and when', href: '/page/refund_returns', color: 'text-gray-600', bgColor: 'bg-gray-100' },
+      { icon: FileText, title: 'Terms of service', description: 'Rules for using JulineMart', href: '/page/terms-of-service', color: 'text-gray-600', bgColor: 'bg-gray-100' },
+      { icon: Shield, title: 'Privacy policy', description: 'How we handle your data', href: '/page/privacy-policy', color: 'text-gray-600', bgColor: 'bg-gray-100' },
+      { icon: Info, title: 'About JulineMart', description: 'Who we are', href: '/page/about', color: 'text-gray-600', bgColor: 'bg-gray-100' },
+    ],
+  });
 
   return (
     <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>

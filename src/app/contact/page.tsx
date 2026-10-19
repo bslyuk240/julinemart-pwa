@@ -1,11 +1,30 @@
 'use client';
 
 import { useState } from 'react';
-import { Mail, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, CheckCircle, MessageCircle, Store, ChevronRight, ExternalLink } from 'lucide-react';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
 
 const JLO_API = process.env.NEXT_PUBLIC_JLO_CATALOG_URL || 'https://jlo.julinemart.com';
 
+// Quick ways to reach us, shown as a list on phones (same details as the desktop card).
+const REACH_US = [
+  { icon: MessageCircle, title: 'Chat on WhatsApp', detail: '+234 707 582 5761 · available 24/7', href: 'https://wa.me/2347075825761', external: true },
+  { icon: Phone, title: 'Call us', detail: '+234 707 582 5761', href: 'tel:+2347075825761', external: false },
+  { icon: Mail, title: 'Email support', detail: 'support@julinemart.com', href: 'mailto:support@julinemart.com', external: false },
+  {
+    icon: MapPin,
+    title: 'Visit us',
+    detail: 'No. 9 Jesus Is Lord Street, off Refinery Road, Effurun, Warri',
+    href: 'https://maps.google.com/?q=No.+9+Jesus+Is+Lord+Street,+Effurun,+Warri,+Delta+State',
+    external: true,
+  },
+];
+
 export default function ContactPage() {
+  // Mobile tier (docs/mobile-tier-plan.md, M12): contact rows first, then the form, below md.
+  const tier = useMobileTier() !== null;
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
@@ -38,21 +57,58 @@ export default function ContactPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-5xl mx-auto">
+    <main className={clsx('min-h-screen bg-gray-50 py-12 px-4', tier && 'max-md:bg-m-surface-low max-md:px-0 max-md:pb-24 max-md:pt-0')}>
+      {tier && (
+        <div className="sticky top-0 z-m-header bg-m-surface-low md:hidden">
+          <MobileTopBar title="Contact us" backHref="/" />
+        </div>
+      )}
+      <div className={clsx('max-w-5xl mx-auto', tier && 'max-md:space-y-3 max-md:px-4')}>
+
+        {tier && (
+          <section aria-label="Reach us" className="rounded-2xl bg-m-surface-lowest shadow-[0_0_0_1px_rgb(30_26_31/0.07)] md:hidden">
+            <h2 className="px-4 pb-1 pt-3 text-m-title-s text-m-on-surface-variant">Reach us</h2>
+            {REACH_US.map((item) => (
+              <a
+                key={item.title}
+                href={item.href}
+                {...(item.external ? { target: '_blank', rel: 'noreferrer' } : {})}
+                className="flex min-h-14 items-center gap-4 px-4 py-2 active:bg-black/5"
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-m-primary-container">
+                  <item.icon className="h-5 w-5 text-m-on-primary-container" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-medium leading-5 text-m-on-surface">{item.title}</span>
+                  <span className={clsx('block text-m-body-s text-m-on-surface-variant', item.icon === MapPin ? 'line-clamp-2' : 'truncate')}>
+                    {item.detail}
+                  </span>
+                </span>
+                {item.external ? (
+                  <ExternalLink className="h-[18px] w-[18px] shrink-0 text-m-on-surface-variant" aria-hidden />
+                ) : (
+                  <ChevronRight className="h-5 w-5 shrink-0 text-m-on-surface-variant" aria-hidden />
+                )}
+              </a>
+            ))}
+            <p className="border-t border-m-outline-variant px-4 py-3 text-m-body-s text-m-on-surface-variant">
+              Payment or delivery problems: reply within 2 hours. Other questions: within 24 hours. Complex cases: within 48 hours.
+            </p>
+          </section>
+        )}
 
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className={clsx('text-center mb-12', tier && 'max-md:hidden')}>
           <h1 className="text-3xl font-bold text-gray-900">Contact Us</h1>
           <p className="text-gray-500 mt-3 max-w-xl mx-auto">
             Have a question, feedback, or need help with your order? We&apos;d love to hear from you.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <div className={clsx('grid grid-cols-1 lg:grid-cols-5 gap-8', tier && 'max-md:gap-3')}>
 
           {/* Contact info */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className={clsx('lg:col-span-2 space-y-6', tier && 'max-md:hidden')}>
             <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
               <h2 className="font-semibold text-gray-800 text-lg">Get in touch</h2>
 
@@ -118,8 +174,8 @@ export default function ContactPage() {
           </div>
 
           {/* Form */}
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 sm:p-8">
+          <div className={clsx('lg:col-span-3', tier && 'max-md:space-y-3')}>
+            <div className={clsx('bg-white rounded-2xl border border-gray-100 p-6 sm:p-8', tier && 'max-md:border-0 max-md:bg-m-surface-lowest max-md:p-4 max-md:shadow-[0_0_0_1px_rgb(30_26_31/0.07)]')}>
               {sent ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
@@ -131,14 +187,14 @@ export default function ContactPage() {
                   </p>
                   <button
                     onClick={() => setSent(false)}
-                    className="mt-6 text-sm text-purple-600 hover:underline"
+                    className={clsx('mt-6 text-sm text-purple-600 hover:underline', tier && 'max-md:min-h-12 max-md:px-4 max-md:text-m-label-l max-md:text-m-primary')}
                   >
                     Send another message
                   </button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">
-                  <h2 className="text-lg font-semibold text-gray-800 mb-1">Send us a message</h2>
+                  <h2 className={clsx('text-lg font-semibold text-gray-800 mb-1', tier && 'max-md:text-m-title-m max-md:text-m-on-surface')}>Send us a message</h2>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -151,7 +207,8 @@ export default function ContactPage() {
                         value={form.name}
                         onChange={(e) => set('name', e.target.value)}
                         placeholder="Jane Doe"
-                        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+                        autoComplete="name"
+                        className={clsx('w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400', tier && 'max-md:h-12 max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:text-base')}
                       />
                     </div>
                     <div>
@@ -164,7 +221,8 @@ export default function ContactPage() {
                         value={form.email}
                         onChange={(e) => set('email', e.target.value)}
                         placeholder="jane@example.com"
-                        className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+                        autoComplete="email"
+                        className={clsx('w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400', tier && 'max-md:h-12 max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:text-base')}
                       />
                     </div>
                   </div>
@@ -178,7 +236,7 @@ export default function ContactPage() {
                       value={form.subject}
                       onChange={(e) => set('subject', e.target.value)}
                       placeholder="Order issue, product question…"
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+                      className={clsx('w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400', tier && 'max-md:h-12 max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:text-base')}
                     />
                   </div>
 
@@ -192,7 +250,7 @@ export default function ContactPage() {
                       value={form.message}
                       onChange={(e) => set('message', e.target.value)}
                       placeholder="Tell us how we can help…"
-                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400 resize-none"
+                      className={clsx('w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400 resize-none', tier && 'max-md:rounded-lg max-md:border-m-outline max-md:px-4 max-md:py-3 max-md:text-base')}
                     />
                   </div>
 
@@ -203,7 +261,7 @@ export default function ContactPage() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+                    className={clsx('w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors text-sm', tier && 'max-md:h-12 max-md:rounded-full max-md:bg-m-primary max-md:py-0 max-md:text-m-label-l max-md:text-m-on-primary')}
                   >
                     {submitting ? (
                       <>
@@ -220,6 +278,22 @@ export default function ContactPage() {
                 </form>
               )}
             </div>
+
+            {tier && (
+              <a
+                href="https://vendors.julinemart.com"
+                className="flex min-h-16 items-center gap-4 rounded-2xl bg-m-surface-lowest px-4 py-2 shadow-[0_0_0_1px_rgb(30_26_31/0.07)] active:bg-black/5 md:hidden"
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-m-primary-container">
+                  <Store className="h-5 w-5 text-m-on-primary-container" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-medium leading-5 text-m-on-surface">Sell on JulineMart</span>
+                  <span className="block text-m-body-s text-m-on-surface-variant">Apply as a vendor and reach shoppers across Nigeria</span>
+                </span>
+                <ExternalLink className="h-[18px] w-[18px] shrink-0 text-m-on-surface-variant" aria-hidden />
+              </a>
+            )}
           </div>
 
         </div>
