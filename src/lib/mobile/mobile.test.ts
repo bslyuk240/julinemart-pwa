@@ -84,6 +84,12 @@ describe('getMobileTierRoute', () => {
     }
   });
 
+  it('puts brand and store pages in the mobile tier with the tab bar', () => {
+    for (const path of ['/brands', '/brand/philips', '/vendors', '/vendor/12']) {
+      expect(getMobileTierRoute(path)?.tabBar).toBe(true);
+    }
+  });
+
   it('shows the tab bar on the cart but not during checkout', () => {
     expect(getMobileTierRoute('/cart')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/checkout')?.tabBar).toBe(false);

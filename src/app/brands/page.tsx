@@ -2,6 +2,9 @@ import { getBrands } from '@/lib/catalog/brands';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Store, ArrowLeft } from 'lucide-react';
+import { clsx } from 'clsx';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import { getMobileTierRoute } from '@/lib/mobile/mobile-tier-routes';
 
 export const revalidate = 300; // Revalidate every 5 minutes
 
@@ -13,20 +16,28 @@ export default async function BrandsPage() {
     order: 'asc',
   });
 
+  // Mobile tier (docs/mobile-tier-plan.md, wave 3): top bar replaces the back link and heading below md.
+  const tier = getMobileTierRoute('/brands') !== null;
+
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom py-6">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface max-md:pb-4')}>
+      {tier && (
+        <div className="sticky top-0 z-m-header md:hidden">
+          <MobileTopBar title="Brands" subtitle={`${brands.length} brands`} backHref="/categories" />
+        </div>
+      )}
+      <div className={clsx('container-custom py-6', tier && 'max-md:pt-2')}>
         {/* Back Button */}
-        <Link 
+        <Link
           href="/"
-          className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium mb-6 group"
+          className={clsx('inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium mb-6 group', tier && 'max-md:hidden')}
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           Back to Home
         </Link>
 
         {/* Header */}
-        <div className="mb-8">
+        <div className={clsx('mb-8', tier && 'max-md:hidden')}>
           <div className="flex items-center gap-3 mb-3">
             <div className="bg-gradient-to-br from-primary-600 to-primary-700 p-2 rounded-lg shadow-md">
               <Store className="w-6 h-6 text-white" />

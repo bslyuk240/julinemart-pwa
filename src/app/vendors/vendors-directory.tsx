@@ -1,6 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { clsx } from 'clsx';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import Link from 'next/link';
 import { ArrowLeft, Store } from 'lucide-react';
 import AreaFilterBar, { type AreaFilters } from '@/components/local/AreaFilterBar';
@@ -35,6 +38,8 @@ function colorFor(name: string) {
 }
 
 export default function VendorsDirectory() {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 3): top bar replaces the back link and heading below md.
+  const tier = useMobileTier() !== null;
   const [filters, setFilters] = useState<AreaFilters>({
     state: '',
     city: '',
@@ -77,18 +82,23 @@ export default function VendorsDirectory() {
   }, [loadVendors]);
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container mx-auto max-w-6xl px-4 py-6">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:pb-4')}>
+      {tier && (
+        <div className="sticky top-0 z-m-header md:hidden">
+          <MobileTopBar title="Local stores" subtitle="Trusted businesses near you" backHref="/" />
+        </div>
+      )}
+      <div className={clsx('container mx-auto max-w-6xl px-4 py-6', tier && 'max-md:pt-2')}>
         <Link
           href="/"
-          className="group mb-6 inline-flex items-center gap-2 font-medium text-primary-600 hover:text-primary-700"
+          className={clsx('group mb-6 inline-flex items-center gap-2 font-medium text-primary-600 hover:text-primary-700', tier && 'max-md:hidden')}
         >
           <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
           Back to Home
         </Link>
 
         <div className="mb-6">
-          <div className="mb-2 flex items-center gap-3">
+          <div className={clsx('mb-2 flex items-center gap-3', tier && 'max-md:hidden')}>
             <div className="rounded-lg bg-primary-600 p-2">
               <Store className="h-5 w-5 text-white" />
             </div>

@@ -3,6 +3,9 @@ import ProductCard from '@/components/product/product-card';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Store } from 'lucide-react';
+import { clsx } from 'clsx';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import { getMobileTierRoute } from '@/lib/mobile/mobile-tier-routes';
 
 export const revalidate = 300; // Revalidate every 5 minutes
 
@@ -14,6 +17,8 @@ interface BrandPageProps {
 
 export default async function BrandPage({ params }: BrandPageProps) {
   const { slug } = await params;
+  // Mobile tier (docs/mobile-tier-plan.md, wave 3): same allowlist switch as the client chrome.
+  const tier = getMobileTierRoute(`/brand/${slug}`) !== null;
   const brand = await getBrandBySlug(slug).catch(() => null);
   const products = brand
     ? await getProductsByBrand(slug, { per_page: 24 }).catch(() => [])
@@ -37,10 +42,15 @@ export default async function BrandPage({ params }: BrandPageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom py-6">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface max-md:pb-4')}>
+      {tier && (
+        <div className="sticky top-0 z-m-header md:hidden">
+          <MobileTopBar title={brand.name} subtitle={`${brand.count || 0} ${brand.count === 1 ? 'product' : 'products'}`} backHref="/brands" />
+        </div>
+      )}
+      <div className={clsx('container-custom py-6', tier && 'max-md:pt-2')}>
         {/* Breadcrumb */}
-        <nav className="text-sm text-gray-600 mb-6">
+        <nav className={clsx('text-sm text-gray-600 mb-6', tier && 'max-md:hidden')}>
           <Link href="/" className="hover:text-primary-600">Home</Link>
           <span className="mx-2">/</span>
           <Link href="/brands" className="hover:text-primary-600">Brands</Link>
@@ -49,11 +59,11 @@ export default async function BrandPage({ params }: BrandPageProps) {
         </nav>
 
         {/* Brand Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 md:p-8 mb-6">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+        <div className={clsx('bg-white rounded-lg shadow-sm p-6 md:p-8 mb-6', tier && 'max-md:mb-4 max-md:rounded-2xl max-md:p-4 max-md:shadow-[0_0_0_1px_rgb(30_26_31/0.07)]')}>
+          <div className={clsx('flex flex-col md:flex-row items-start md:items-center gap-6', tier && 'max-md:flex-row max-md:items-center max-md:gap-4')}>
             {/* Brand Logo */}
             {brand.image?.src ? (
-              <div className="relative w-24 h-24 md:w-32 md:h-32 flex-shrink-0 bg-gray-50 rounded-lg p-2">
+              <div className={clsx('relative w-24 h-24 md:w-32 md:h-32 flex-shrink-0 bg-gray-50 rounded-lg p-2', tier && 'max-md:h-16 max-md:w-16')}>
                 <Image
                   src={brand.image.src}
                   alt={brand.name}
@@ -63,7 +73,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
                 />
               </div>
             ) : (
-              <div className="w-24 h-24 md:w-32 md:h-32 flex-shrink-0 bg-gradient-to-br from-primary-100 to-purple-100 rounded-lg flex items-center justify-center">
+              <div className={clsx('w-24 h-24 md:w-32 md:h-32 flex-shrink-0 bg-gradient-to-br from-primary-100 to-purple-100 rounded-lg flex items-center justify-center', tier && 'max-md:h-16 max-md:w-16')}>
                 <span className="text-4xl md:text-5xl font-bold text-primary-600">
                   {brand.name.charAt(0).toUpperCase()}
                 </span>
@@ -72,7 +82,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
 
             {/* Brand Info */}
             <div className="flex-1">
-              <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2">
+              <h1 className={clsx('text-2xl md:text-4xl font-bold text-gray-900 mb-2', tier && 'max-md:mb-1 max-md:text-m-title-l max-md:font-semibold')}>
                 {brand.name}
               </h1>
 
@@ -104,7 +114,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
         {/* Back Button (Mobile) */}
         <Link
           href="/brands"
-          className="md:hidden inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium mb-6 group"
+          className={clsx('md:hidden inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium mb-6 group', tier && 'max-md:hidden')}
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           All Brands
@@ -113,12 +123,12 @@ export default async function BrandPage({ params }: BrandPageProps) {
         {/* Products Grid */}
         {products.length > 0 ? (
           <>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">
+            <h2 className={clsx('text-xl md:text-2xl font-bold text-gray-900 mb-4', tier && 'max-md:mb-3 max-md:text-m-title-m')}>
               Products from {brand.name}
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+            <div className={clsx('grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4', tier && 'max-md:grid-cols-2 max-md:gap-x-3 max-md:gap-y-5')}>
               {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} mobileTier={tier} />
               ))}
             </div>
           </>

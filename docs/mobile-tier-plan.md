@@ -367,6 +367,17 @@ The return-request flow (`/account/orders/[id]/return…`) stays on the old chro
 
 Desktop and lint are unchanged.
 
+**M10 status (2026-10-19): brand and store pages built, not committed.**
+
+`/brands`, `/brand/*`, `/vendors` and `/vendor/*` (public store pages) are on the allowlist with the navigation bar. Below `md`:
+- **Brands index and local stores:** a top bar replaces the back link and page heading.
+- **Brand page:** a top bar with the product count, a compact logo + name row, and Material product cards.
+- **Vendor store:** a top bar with the store name and Material product cards, keeping its own follow/share header and local pull-to-refresh. The breadcrumb is hidden.
+
+Desktop and lint are unchanged.
+
+The local catalogue returned no brands, so only the brands empty state was checked on screen.
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---

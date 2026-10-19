@@ -43,6 +43,10 @@ const ROUTES: MobileTierRoute[] = [
   { pattern: '/forgot-password', tabBar: false }, // M9
   { pattern: '/reset-password', tabBar: false }, // M9
   { pattern: '/order-success', tabBar: false }, // M9: pinned next-step bar
+  { pattern: '/brands', tabBar: true }, // M10: brand and store pages
+  { pattern: '/brand/*', tabBar: true }, // M10
+  { pattern: '/vendors', tabBar: true }, // M10
+  { pattern: '/vendor/*', tabBar: true }, // M10: public store page
 ];
 
 const DEV_ROUTES: MobileTierRoute[] = [{ pattern: '/dev/mobile-shell', tabBar: true }];

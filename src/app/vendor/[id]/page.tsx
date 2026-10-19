@@ -5,6 +5,9 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Store, Star } from 'lucide-react';
 import ProductGrid from '@/components/product/product-grid';
+import { clsx } from 'clsx';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import { Product } from '@/types/product';
 import { getStorePolicies, StorePolicies } from '@/lib/woocommerce/policies';
 import { formatPrice } from '@/lib/utils/format-price';
@@ -53,6 +56,14 @@ const sortProducts = (items: Product[], sortBy: VendorSortOption) => {
 };
 
 export default function VendorStorePage() {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 3): top bar and mobile product cards below md.
+  const tier = useMobileTier() !== null;
+  const mobileTopBar = (title: string) =>
+    tier && (
+      <div className="sticky top-0 z-m-header md:hidden">
+        <MobileTopBar title={title} backHref="/vendors" />
+      </div>
+    );
   const params    = useParams();
   const vendorId  = params.id as string;
 
@@ -180,7 +191,8 @@ export default function VendorStorePage() {
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <main className="min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8">
+      <main className={clsx('min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8', tier && 'max-md:pb-4')}>
+        {mobileTopBar('Store')}
         <div className="container-custom min-w-0 py-6">
           <div className="text-center py-20">
             <div className="animate-spin w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4" />
@@ -263,8 +275,9 @@ export default function VendorStorePage() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <main className="min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom min-w-0 py-6">
+    <main className={clsx('min-h-screen overflow-x-clip bg-gray-50 pb-24 md:pb-8', tier && 'max-md:pb-4')}>
+      {mobileTopBar(vendorName)}
+      <div className={clsx('container-custom min-w-0 py-6', tier && 'max-md:pt-2')}>
 
         {/* Pull-to-refresh indicator */}
         {(pullDistance > 0 || isRefreshing || refreshing) && (
@@ -278,7 +291,7 @@ export default function VendorStorePage() {
         )}
 
         {/* Breadcrumb */}
-        <nav className="text-sm text-gray-600 mb-6">
+        <nav className={clsx('text-sm text-gray-600 mb-6', tier && 'max-md:hidden')}>
           <a href="/" className="hover:text-primary-600">Home</a>
           <span className="mx-2">/</span>
           <span className="text-gray-900">Store: {vendorName}</span>
@@ -397,7 +410,7 @@ export default function VendorStorePage() {
         {/* Products */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className={clsx('text-2xl font-bold text-gray-900', tier && 'max-md:text-m-title-m')}>
               All Products ({total ?? products.length})
             </h2>
             <select value={sortBy} onChange={e => handleSortChange(e.target.value as VendorSortOption)}
@@ -411,7 +424,7 @@ export default function VendorStorePage() {
 
           {products.length > 0 ? (
             <>
-              <ProductGrid products={products} columns={6} />
+              <ProductGrid products={products} columns={6} mobileTier={tier} />
               {(total ?? 0) > products.length && (
                 <div className="mt-6 flex justify-center">
                   <button
