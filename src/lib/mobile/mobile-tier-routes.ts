@@ -37,6 +37,12 @@ const ROUTES: MobileTierRoute[] = [
   ].map((page) => ({ pattern: `/account/${page}`, tabBar: true })), // M8: account sub-pages
   { pattern: '/orders', tabBar: true }, // M7: orders list (Account tab stays lit)
   { pattern: '/orders/*', tabBar: true }, // M7: order detail
+  // Wave 3
+  { pattern: '/login', tabBar: false }, // M9: full-screen auth
+  { pattern: '/signup', tabBar: false }, // M9
+  { pattern: '/forgot-password', tabBar: false }, // M9
+  { pattern: '/reset-password', tabBar: false }, // M9
+  { pattern: '/order-success', tabBar: false }, // M9: pinned next-step bar
 ];
 
 const DEV_ROUTES: MobileTierRoute[] = [{ pattern: '/dev/mobile-shell', tabBar: true }];

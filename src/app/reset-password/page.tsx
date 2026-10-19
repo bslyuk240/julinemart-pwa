@@ -1,5 +1,8 @@
 'use client';
 
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -110,14 +113,18 @@ function ResetPasswordContent() {
 }
 
 export default function ResetPasswordPage() {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 3): full-screen sign-in below md —
+  // top bar with back, left-aligned title, form without the card frame.
+  const tier = useMobileTier() !== null;
   return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Reset password</h2>
+    <main className={clsx('min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4', tier && 'max-md:block max-md:min-h-0 max-md:bg-m-surface max-md:px-0 max-md:pb-10 max-md:pt-0')}>
+      {tier && <MobileTopBar title="" backHref="/login" />}
+      <div className={clsx('max-w-md w-full space-y-8', tier && 'max-md:space-y-6 max-md:px-6')}>
+        <div className={clsx('text-center', tier && 'max-md:text-left')}>
+          <h2 className={clsx('text-3xl font-bold text-gray-900', tier && 'max-md:mt-5 max-md:text-[28px] max-md:font-semibold max-md:leading-9 max-md:text-m-on-surface')}>Reset password</h2>
           <p className="mt-2 text-sm text-gray-600">Enter your new password below</p>
         </div>
-        <div className="bg-white rounded-lg shadow-md p-8">
+        <div className={clsx('bg-white rounded-lg shadow-md p-8', tier && 'max-md:bg-transparent max-md:p-0 max-md:shadow-none')}>
           <Suspense fallback={<PageLoading text="Loading..." />}>
             <ResetPasswordContent />
           </Suspense>

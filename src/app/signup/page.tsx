@@ -1,5 +1,8 @@
 'use client';
 
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -13,6 +16,9 @@ import GoogleSignInButton from '@/components/auth/google-sign-in-button';
 import { trackSignupSuccess } from '@/lib/gtag';
 
 export default function SignupPage() {
+  // Mobile tier (docs/mobile-tier-plan.md, wave 3): full-screen sign-in below md —
+  // top bar with back, left-aligned title, form without the card frame.
+  const tier = useMobileTier() !== null;
   const router = useRouter();
 
   const [formData, setFormData] = useState({
@@ -154,17 +160,18 @@ export default function SignupPage() {
   const logoSrc = process.env.NEXT_PUBLIC_LOGO_URL || '/images/logo.png';
 
   return (
-    <main className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-md w-full mx-auto space-y-8">
-        <div className="text-center">
+    <main className={clsx('min-h-screen bg-gray-50 py-12 px-4', tier && 'max-md:block max-md:min-h-0 max-md:bg-m-surface max-md:px-0 max-md:pb-10 max-md:pt-0')}>
+      {tier && <MobileTopBar title="" backHref="/" />}
+      <div className={clsx('max-w-md w-full mx-auto space-y-8', tier && 'max-md:space-y-6 max-md:px-6')}>
+        <div className={clsx('text-center', tier && 'max-md:text-left')}>
           <Link href="/" className="inline-block">
-            <Image src={logoSrc} alt="JulineMart" width={60} height={60} className="mx-auto" />
+            <Image src={logoSrc} alt="JulineMart" width={60} height={60} className={clsx('mx-auto', tier && 'max-md:mx-0 max-md:mt-2')} />
           </Link>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">Create your account</h2>
+          <h2 className={clsx('mt-6 text-3xl font-bold text-gray-900', tier && 'max-md:mt-5 max-md:text-[28px] max-md:font-semibold max-md:leading-9 max-md:text-m-on-surface')}>Create your account</h2>
           <p className="mt-2 text-sm text-gray-600">Join thousands of happy shoppers</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-8">
+        <div className={clsx('bg-white rounded-lg shadow-md p-8', tier && 'max-md:bg-transparent max-md:p-0 max-md:shadow-none')}>
           <div className="mb-6">
             <GoogleSignInButton text="signup" redirectTo="/account" />
           </div>
@@ -256,7 +263,7 @@ export default function SignupPage() {
           </div>
         </div>
 
-        <div className="text-center">
+        <div className={clsx('text-center', tier && 'max-md:hidden')}>
           <Link href="/" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900">
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />

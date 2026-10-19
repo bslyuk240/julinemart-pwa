@@ -359,6 +359,14 @@ Not checked yet: the signed-in sub-pages.
 
 The return-request flow (`/account/orders/[id]/return…`) stays on the old chrome until wave 3.
 
+**M9 status (2026-10-19): auth and order success built, not committed.**
+
+`/login`, `/signup`, `/forgot-password`, `/reset-password` and `/order-success` are on the allowlist, full-screen with no navigation bar. Below `md`:
+- **Auth screens:** a top bar with back (to `/` for login and sign-up, to `/login` for password pages), the logo, and a large left-aligned title over a flat full-width form. The card frame and the "Back to home" link are hidden.
+- **Order success:** a success haptic on arrival, and a pinned "View my orders" + "Continue shopping" bar in place of the inline buttons.
+
+Desktop and lint are unchanged.
+
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 
 ---

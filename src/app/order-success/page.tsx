@@ -1,6 +1,10 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
+import { clsx } from 'clsx';
+import { useMobileTier } from '@/components/mobile/mobile-tier-context';
+import StickyActionBar from '@/components/mobile/shell/sticky-action-bar';
+import { haptic } from '@/lib/mobile/haptics';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle, Package, Truck, ArrowRight } from 'lucide-react';
@@ -17,10 +21,15 @@ function OrderSuccessContent() {
   // Determine display label — if it's a plain number show #1042, else show as-is
   const isNumeric = ref && /^\d+$/.test(ref);
   const orderLabel = ref ? (isNumeric ? `#${ref}` : ref) : null;
+  // Mobile tier (wave 3): success haptic on arrival and a pinned next-step bar below md.
+  const tier = useMobileTier() !== null;
+  useEffect(() => {
+    if (tier && window.matchMedia('(max-width: 767px)').matches) haptic('success');
+  }, [tier]);
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
-      <div className="container-custom py-5 md:py-12">
+    <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-0')}>
+      <div className={clsx('container-custom py-5 md:py-12', tier && 'max-md:pt-10')}>
         <div className="max-w-2xl mx-auto">
 
           {/* Success Icon + Heading */}
@@ -73,7 +82,7 @@ function OrderSuccessContent() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <div className={clsx('flex flex-col sm:flex-row gap-2 sm:gap-3', tier && 'max-md:hidden')}>
             <Link href="/" className="flex-1">
               <Button variant="outline" size="sm" className="w-full">
                 Continue Shopping
@@ -99,6 +108,24 @@ function OrderSuccessContent() {
 
         </div>
       </div>
+
+      {tier && (
+        <StickyActionBar className="flex-col items-stretch gap-2">
+          <Link
+            href="/orders"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-m-primary text-m-label-l text-m-on-primary shadow-[0_1px_2px_rgb(60_4_69/0.3)] active:opacity-90"
+          >
+            <Package className="h-[18px] w-[18px]" aria-hidden />
+            View my orders
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex h-12 w-full items-center justify-center rounded-full text-m-label-l text-m-primary active:bg-m-primary-container"
+          >
+            Continue shopping
+          </Link>
+        </StickyActionBar>
+      )}
     </main>
   );
 }

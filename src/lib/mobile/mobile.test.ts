@@ -78,6 +78,12 @@ describe('getMobileTierRoute', () => {
     expect(getMobileTierRoute('/orders/abc-123')?.tabBar).toBe(true);
   });
 
+  it('runs auth and order success full-screen without the tab bar', () => {
+    for (const path of ['/login', '/signup', '/forgot-password', '/reset-password', '/order-success']) {
+      expect(getMobileTierRoute(path)?.tabBar).toBe(false);
+    }
+  });
+
   it('shows the tab bar on the cart but not during checkout', () => {
     expect(getMobileTierRoute('/cart')?.tabBar).toBe(true);
     expect(getMobileTierRoute('/checkout')?.tabBar).toBe(false);
