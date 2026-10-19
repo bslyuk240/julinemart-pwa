@@ -547,6 +547,8 @@ export default function CheckoutPage() {
 
   const handlePaymentSuccess = async (response: any) => {
     console.log('✅ Paystack payment successful:', response);
+    // The popup is done; make sure its "Opening payment window…" spinner can't outlive it.
+    toast.dismiss('paystack-open');
     
     try {
       if (!currentOrderRef.current) {

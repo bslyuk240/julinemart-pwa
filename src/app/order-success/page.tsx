@@ -9,6 +9,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle, Package, Truck, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import PageLoading from '@/components/ui/page-loading';
 
 function OrderSuccessContent() {
@@ -26,6 +27,10 @@ function OrderSuccessContent() {
   useEffect(() => {
     if (tier && window.matchMedia('(max-width: 767px)').matches) haptic('success');
   }, [tier]);
+  // Payment is finished: no checkout spinner toast should follow the shopper here.
+  useEffect(() => {
+    toast.dismiss('paystack-open');
+  }, []);
 
   return (
     <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-0')}>

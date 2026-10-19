@@ -163,6 +163,15 @@ export default function OrderDetailPage() {
     const amount = typeof price === 'string' ? parseFloat(price) : price;
     if (isNaN(amount)) return `${currency} 0`;
     if (currency === 'NGN') {
+      // Mobile tier shows ₦ like the rest of the phone app; desktop keeps NGN.
+      if (tier) {
+        return (
+          <>
+            <span className="md:hidden">₦{amount.toLocaleString()}</span>
+            <span className="max-md:hidden">NGN {amount.toLocaleString()}</span>
+          </>
+        );
+      }
       return `NGN ${amount.toLocaleString()}`;
     }
     return `${currency} ${amount.toLocaleString()}`;
