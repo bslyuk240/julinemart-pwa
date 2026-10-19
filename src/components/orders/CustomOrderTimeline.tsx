@@ -55,8 +55,8 @@ export default function CustomOrderTimeline({ orderId, customerEmail, supabaseOr
       `/api/custom-order?order_id=${encodeURIComponent(targetId)}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    const json = await res.json();
-    if (json.success) {
+    const json = res.ok ? await res.json().catch(() => null) : null;
+    if (json?.success) {
       setSpecs(json.data.specs || []);
       setMessages(json.data.messages || []);
     }

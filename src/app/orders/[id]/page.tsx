@@ -530,7 +530,7 @@ export default function OrderDetailPage() {
             />
 
             {customerEmail && (
-              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 [&:not(:has(>:nth-child(2)))]:hidden">
                 <h2 className="text-base md:text-xl font-semibold text-gray-900 mb-3 md:mb-4">
                   Gift progress
                 </h2>
@@ -542,7 +542,7 @@ export default function OrderDetailPage() {
             )}
 
             {customerEmail && (
-              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 [&:not(:has(>:nth-child(2)))]:hidden">
                 <h2 className="text-base md:text-xl font-semibold text-gray-900 mb-3 md:mb-4">
                   Custom order progress
                 </h2>

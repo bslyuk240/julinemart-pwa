@@ -53,8 +53,8 @@ export default function GiftOrderTimeline({ orderId, supabaseOrderId }: Props) {
         `/api/gifts/track?order_id=${encodeURIComponent(targetId)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      const json = await res.json();
-      if (json.success && json.data) setGift(json.data);
+      const json = res.ok ? await res.json().catch(() => null) : null;
+      if (json?.success && json.data) setGift(json.data);
       setLoading(false);
     })();
   }, [orderId, supabaseOrderId]);

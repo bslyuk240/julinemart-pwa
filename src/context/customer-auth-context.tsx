@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import type { CustomerProfile } from '@/types/customer';
@@ -27,6 +27,8 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<User | null>(null);
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // The signed-in user's id, so routine auth events for the same user don't re-trigger loading.
+  const currentUserIdRef = useRef<string | null>(null);
 
   const loadProfile = async (u: User) => {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -49,6 +51,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
+        currentUserIdRef.current = session.user.id;
         setUser(session.user);
         loadProfile(session.user).finally(() => setIsLoading(false));
       } else {
@@ -59,10 +62,18 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
     // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        // Token refreshes and repeat SIGNED_IN events for the same user (e.g. another component calling
+        // getSession) must not flip isLoading: pages that wait on it would unmount and refetch in a loop.
+        if (currentUserIdRef.current === session.user.id) {
+          setUser(session.user);
+          return;
+        }
+        currentUserIdRef.current = session.user.id;
         setUser(session.user);
         setIsLoading(true);
         loadProfile(session.user).finally(() => setIsLoading(false));
       } else {
+        currentUserIdRef.current = null;
         setUser(null);
         setCustomer(null);
         setIsLoading(false);

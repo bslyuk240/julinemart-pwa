@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteUserFromRequest } from '@/lib/supabase/route-auth';
 
-const JLO_BASE = (process.env.JLO_API_URL || process.env.NEXT_PUBLIC_JLO_API_URL || '').replace(
+const JLO_BASE = (
+  process.env.JLO_API_URL ||
+  process.env.NEXT_PUBLIC_JLO_API_URL ||
+  process.env.JLO_API_BASE_URL ||
+  ''
+).replace(
   /\/$/,
   ''
 );
@@ -28,10 +33,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Sign in required' }, { status: 401 });
   }
 
+  if (!JLO_BASE) {
+    return NextResponse.json({ success: false, error: 'Custom orders unavailable' }, { status: 503 });
+  }
   const url = `${JLO_BASE}/.netlify/functions/customer-custom-order?order_id=${encodeURIComponent(orderId)}`;
-  const res = await fetch(url, { cache: 'no-store', headers });
-  const data = await res.json();
-  return NextResponse.json(data, { status: res.status });
+  try {
+    const res = await fetch(url, { cache: 'no-store', headers });
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch {
+    return NextResponse.json({ success: false, error: 'Custom orders unavailable' }, { status: 502 });
+  }
 }
 
 export async function PATCH(req: NextRequest) {
@@ -45,12 +57,19 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Sign in required' }, { status: 401 });
   }
 
+  if (!JLO_BASE) {
+    return NextResponse.json({ success: false, error: 'Custom orders unavailable' }, { status: 503 });
+  }
   const body = await req.json();
-  const res = await fetch(`${JLO_BASE}/.netlify/functions/customer-custom-order`, {
-    method: 'PATCH',
-    headers,
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  return NextResponse.json(data, { status: res.status });
+  try {
+    const res = await fetch(`${JLO_BASE}/.netlify/functions/customer-custom-order`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch {
+    return NextResponse.json({ success: false, error: 'Custom orders unavailable' }, { status: 502 });
+  }
 }
