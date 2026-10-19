@@ -390,7 +390,7 @@ The local catalogue returned no brands, so only the brands empty state was check
 - Contact: "Reach us" list (WhatsApp, call, email, maps), the form with 48px/16px fields and a pill submit, then a "Sell on JulineMart" row. External rows show an external-link icon.
 - Policy pages: top bar with title and updated date, edge-to-edge article with phone-only `.m-article` styles. WordPress `<p><strong>` section titles become `<h2>` server-side, which looks the same on desktop.
 - Phones have no site footer on tier routes, so the account hub gets a "Help & info" group and the phone sign-in screen gets help/policy links.
-- Follow-up: there's no Tailwind typography plugin, so the `prose` classes do nothing and desktop policy pages render as unstyled, crammed text (this predates M12).
+- ~~Follow-up: desktop policy pages render as unstyled text (no typography plugin).~~ Fixed in M16.
 
 **M13 status (2026-10-19): checkout split into steps on phones, not committed.** Details → Delivery → Pay, layout and navigation only. Every section stays mounted and is hidden with `max-md:hidden`; `handlePlaceOrder`, validation, shipping quotes and Paystack are unchanged.
 - Steps are browser-history entries (`?step=2|3`), so browser Back and Android Back step backwards. A reload lands on Details. A pending payment pins the screen to Pay.
@@ -410,6 +410,10 @@ The local catalogue returned no brands, so only the brands empty state was check
 - **Server refresh** (`router.refresh()`, which keeps scroll and client state such as a chosen variant): categories, brands, policy pages, product pages and the cart.
 - **Soft** everywhere else. A screen registers its own refetch with `useSoftRefresh`, and the list stays on screen until fresh data lands (category listings, `/products`, orders). Screens without one still do a full reload, as before.
 - Tier screens get a Material circular indicator: it slides from under the top bar, turns solid with a haptic tick once letting go will refresh, and spins for the length of the real fetch. Screen readers hear "Refreshing" and then "Updated".
+
+**M16 status (2026-10-19): readable policy pages on desktop, not committed.** The phone-only `.m-article` styles are now `.cms-article`, which applies at every width, with phone tokens below md.
+- I didn't install `@tailwindcss/typography`, because it would also restyle vendor product descriptions that carry `prose` classes.
+- Numbered sub-sections ("3.1 …") become `<h3>` server-side, and section titles become `<h2>`. The unused `prose` classes are gone from the policy page.
 
 **Performance budgets (mobile, per route):** no more than +15KB gzipped JS over today's route, no more than +10% HTML size, CLS ≤ 0.05, LCP on a mid-range Android over 4G no worse than the current baseline (measure it in M0).
 

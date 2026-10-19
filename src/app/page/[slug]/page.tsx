@@ -67,6 +67,8 @@ export default async function DynamicPage({ params }: PageProps) {
 
   // WordPress section titles arrive as <p><strong>Title</strong></p>. Promote them to <h2> so screen readers can jump
   // between sections; the inner <strong> keeps the look identical where no heading styles apply.
+  // Numbered sub-sections ("3.1 Defective items") become <h3> so they sit under their section.
+  normalizedContent = normalizedContent.replace(/<p>\s*(<strong>\s*\d+\.\d+[^<]*<\/strong>)\s*<\/p>/gi, '<h3>$1</h3>');
   normalizedContent = normalizedContent.replace(/<p>\s*(<strong>[^<]+<\/strong>)\s*<\/p>/gi, '<h2>$1</h2>');
 
   // Strip job links entirely to avoid showing internal job pages
@@ -124,7 +126,7 @@ export default async function DynamicPage({ params }: PageProps) {
           </header>
 
           <div
-            className={clsx('prose prose-gray max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline prose-ul:list-disc prose-li:marker:text-primary-500', tier && 'm-article')}
+            className="cms-article"
             dangerouslySetInnerHTML={{ __html: normalizedContent }}
           />
         </article>
