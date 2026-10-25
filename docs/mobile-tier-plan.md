@@ -179,7 +179,7 @@ Screen gutter is always 16px. Horizontal carousels bleed to the edge, with the f
 
 ### Wave 1: core shopping funnel
 
-**Home is out of scope.** You're happy with the current homepage, so its content and layout stay exactly as they are. The only thing it shares with the mobile tier is the site-wide bottom navigation bar (see open question 6).
+**Home (M17, added later).** Home was first left out. In M17 it joined the mobile tier on phones: a logo and search top bar, a swipeable 16:9 hero, the campaign row right under it, the announcement bar as a tonal strip, categories in their own colours, gifts, product rails with cues (flash, deals), "New" and rank tags, a small carousel of the desktop side-panel ads between Today's deals and Trending, stores, curated reviews and help rows in place of the footer. The campaign pop-up becomes a bottom sheet on phones. Desktop is unchanged except that each side panel can now hold several ads that slide.
 
 | # | Page(s) | Why it's first | Mobile-tier changes |
 |---|---|---|---|

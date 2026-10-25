@@ -11,9 +11,14 @@ import LocalMakersSection from '@/components/home/local-makers-section';
 import CategoryProductsSection from '@/components/home/category-products-section';
 import type { HomepageSectionsData } from '@/lib/homepage-sections';
 import GenericProductSection from '@/components/home/generic-product-section';
+import MobileHomeRail, { MobileHomeRailSkeleton } from '@/components/home/mobile-home-rail';
+import HomeAdCarousel from '@/components/home/home-ad-carousel';
+import type { HeroAd } from '@/lib/home/pwa-settings';
 
 interface HomeSectionsProps {
   initialSections: HomepageSectionsData;
+  /** Every desktop side-panel ad; phones show them mid-page in one small carousel. */
+  phoneAds?: HeroAd[];
 }
 
 const EMPTY_SECTIONS: HomepageSectionsData = {
@@ -93,7 +98,7 @@ function SectionSkeleton() {
   );
 }
 
-export default function HomeSections({ initialSections }: HomeSectionsProps) {
+export default function HomeSections({ initialSections, phoneAds = [] }: HomeSectionsProps) {
   // Hydration-safe: SSR and first client render must agree. Reading localStorage
   // inside useState() breaks that (server = skeletons, client = cached products → #418).
   const initialFromServer = initialSections ?? EMPTY_SECTIONS;
@@ -153,65 +158,94 @@ export default function HomeSections({ initialSections }: HomeSectionsProps) {
   if (loading) {
     return (
       <>
-        <SectionSkeleton />
-        <SectionSkeleton />
-        <SectionSkeleton />
+        <div className="max-md:hidden">
+          <SectionSkeleton />
+          <SectionSkeleton />
+          <SectionSkeleton />
+        </div>
+        <MobileHomeRailSkeleton />
+        <MobileHomeRailSkeleton />
       </>
     );
   }
 
   return (
     <>
-      {flashSaleProducts.length > 0 && <FlashSales products={flashSaleProducts} />}
+      {/* Desktop and tablet: today's sections. */}
+      <div className="max-md:hidden">
+        {flashSaleProducts.length > 0 && <FlashSales products={flashSaleProducts} />}
 
-      {launchingProducts.length > 0 && <LaunchingDeals products={launchingProducts} />}
+        {launchingProducts.length > 0 && <LaunchingDeals products={launchingProducts} />}
 
-      {sponsoredProducts.length > 0 && (
-        <SponsoredProducts products={sponsoredProducts} />
-      )}
+        {sponsoredProducts.length > 0 && (
+          <SponsoredProducts products={sponsoredProducts} />
+        )}
 
-      {topSellerProducts.length > 0 && <TopSellers products={topSellerProducts} />}
+        {topSellerProducts.length > 0 && <TopSellers products={topSellerProducts} />}
 
-      {localMakersProducts.length > 0 && (
-        <LocalMakersSection products={localMakersProducts} />
-      )}
+        {localMakersProducts.length > 0 && (
+          <LocalMakersSection products={localMakersProducts} />
+        )}
 
-      {dealProducts.length > 0 && <DealsSection products={dealProducts} />}
+        {dealProducts.length > 0 && <DealsSection products={dealProducts} />}
 
-      {trendingProducts.length > 0 && <TrendingSection products={trendingProducts} />}
+        {trendingProducts.length > 0 && <TrendingSection products={trendingProducts} />}
 
-      {electronicsProducts.length > 0 && (
-        <CategoryProductsSection
-          products={electronicsProducts}
-          title="Electronics"
-          subtitle="Shop electronics"
-          href="/category/electronics"
-          sectionClassName="bg-gradient-to-br from-blue-50 via-cyan-50 to-white"
-          accentClassName="bg-gradient-to-br from-blue-600 to-cyan-500"
-          linkClassName="text-blue-600 hover:text-blue-700"
-        />
-      )}
+        {electronicsProducts.length > 0 && (
+          <CategoryProductsSection
+            products={electronicsProducts}
+            title="Electronics"
+            subtitle="Shop electronics"
+            href="/category/electronics"
+            sectionClassName="bg-gradient-to-br from-blue-50 via-cyan-50 to-white"
+            accentClassName="bg-gradient-to-br from-blue-600 to-cyan-500"
+            linkClassName="text-blue-600 hover:text-blue-700"
+          />
+        )}
 
-      {fashionProducts.length > 0 && (
-        <CategoryProductsSection
-          products={fashionProducts}
-          title="Fashion & Accessories"
-          subtitle="Shop fashion"
-          href="/category/fashion-accessories"
-          sectionClassName="bg-gradient-to-br from-rose-50 via-pink-50 to-white"
-          accentClassName="bg-gradient-to-br from-rose-600 to-pink-500"
-          linkClassName="text-rose-600 hover:text-rose-700"
-        />
-      )}
+        {fashionProducts.length > 0 && (
+          <CategoryProductsSection
+            products={fashionProducts}
+            title="Fashion & Accessories"
+            subtitle="Shop fashion"
+            href="/category/fashion-accessories"
+            sectionClassName="bg-gradient-to-br from-rose-50 via-pink-50 to-white"
+            accentClassName="bg-gradient-to-br from-rose-600 to-pink-500"
+            linkClassName="text-rose-600 hover:text-rose-700"
+          />
+        )}
 
-      {(extraSections ?? []).map((s) =>
-        s.products.length > 0 ? (
-          <GenericProductSection key={s.key} title={s.title} products={s.products} />
-        ) : null
-      )}
+        {(extraSections ?? []).map((s) =>
+          s.products.length > 0 ? (
+            <GenericProductSection key={s.key} title={s.title} products={s.products} />
+          ) : null
+        )}
+      </div>
+
+      {/* Phones (mobile tier): the same rows as sideways rails, with the side-panel ads mid-page. */}
+      <MobileHomeRail title="Flash sale" href="/products?tag=flash-sale" products={flashSaleProducts} cue="flash" />
+      <MobileHomeRail title="Launching deals" href="/products?tag=launching-deal" products={launchingProducts} tag="new" />
+      <MobileHomeRail title="Sponsored" href="/products?tag=sponsored" products={sponsoredProducts} />
+      <MobileHomeRail title="Local makers" href="/products?tag=handmade" products={localMakersProducts} />
+      <MobileHomeRail title="Today's deals" href="/products?tag=deal" products={dealProducts} cue="deals" />
+      <HomeAdCarousel ads={phoneAds} />
+      {/* Top sellers is merged into Best sellers (owner, 2026-10-25), so phones show them in one ranked row. */}
+      <MobileHomeRail
+        title="Trending now"
+        href="/products?tag=best-seller"
+        products={[...trendingProducts, ...topSellerProducts].filter(
+          (p, i, all) => all.findIndex((other) => other.id === p.id) === i,
+        )}
+        tag="rank"
+      />
+      <MobileHomeRail title="Electronics" href="/category/electronics" products={electronicsProducts} />
+      <MobileHomeRail title="Fashion & accessories" href="/category/fashion-accessories" products={fashionProducts} />
+      {(extraSections ?? []).map((s) => (
+        <MobileHomeRail key={s.key} title={s.title} products={s.products} />
+      ))}
 
       {!hasData(sections) && (
-        <div className="container-custom py-12 text-center">
+        <div className="container-custom py-12 text-center max-md:hidden">
           <p className="mb-4 text-gray-600">
             No featured products yet. Add tags to your products to display them here.
           </p>

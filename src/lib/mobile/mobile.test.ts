@@ -51,8 +51,8 @@ describe('getMobileTierRoute', () => {
     expect(getMobileTierRoute(null, routes)).toBeNull();
   });
 
-  it('keeps Home out of the mobile tier', () => {
-    expect(getMobileTierRoute('/')).toBeNull();
+  it('puts Home in the mobile tier with the tab bar', () => {
+    expect(getMobileTierRoute('/')?.tabBar).toBe(true);
   });
 
   it('puts category listings in the mobile tier with the tab bar, search without', () => {

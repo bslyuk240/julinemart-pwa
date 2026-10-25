@@ -25,6 +25,11 @@ interface ProductCardProps {
    * button). md and up, and every caller that omits it, are unchanged.
    */
   mobileTier?: boolean;
+  /**
+   * Mobile tier only: a tag on the photo's top-left corner (e.g. "New", "#1").
+   * Passing it, even as null, hides the product's own tag badges below md.
+   */
+  tierTag?: React.ReactNode;
 }
 
 export default function ProductCard({ 
@@ -33,6 +38,7 @@ export default function ProductCard({
   fullWidth = false,
   floatingBadge,
   mobileTier = false,
+  tierTag,
 }: ProductCardProps) {
   const isRemoteImage = (src: string) => /^https?:\/\//i.test(src);
   const decodedName = decodeHtmlEntities(product.name);
@@ -153,7 +159,7 @@ export default function ProductCard({
         )}
       >
         {/* Badges Section - Top of Image */}
-        <div className="absolute top-2 left-2 right-2 z-10 flex flex-col gap-1">
+        <div className={clsx('absolute top-2 left-2 right-2 z-10 flex flex-col gap-1', mobileTier && tierTag !== undefined && 'max-md:hidden')}>
           {/* Official Store Badge */}
           {isOfficialStore && (
             <div className="inline-flex items-center gap-1 bg-blue-600 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-md shadow-lg w-fit">
@@ -194,7 +200,8 @@ export default function ProductCard({
           onClick={handleWishlistToggle}
           className={clsx(
             'absolute top-2 right-2 z-20 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-red-50 transition-colors',
-            mobileTier && 'max-md:right-1 max-md:top-1 max-md:h-10 max-md:w-10 max-md:bg-white/90 max-md:shadow-none',
+            mobileTier &&
+              "max-md:right-1 max-md:top-1 max-md:h-10 max-md:w-10 max-md:bg-white/90 max-md:shadow-none max-md:before:absolute max-md:before:-inset-1 max-md:before:content-['']",
           )}
           aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
         >
@@ -225,6 +232,7 @@ export default function ProductCard({
             )}
             unoptimized={isRemoteImage(product.images[0]?.src || '')}
           />
+          {mobileTier && tierTag && <span className="absolute left-2 top-2 z-10 md:hidden">{tierTag}</span>}
           {mobileTier && hasShipsFromAbroadTag && (
             <span className="absolute bottom-2 left-2 inline-flex h-[22px] items-center gap-1 rounded-md bg-m-surface-high px-2 text-m-label-s text-m-on-surface-variant md:hidden">
               <Plane className="h-3 w-3" aria-hidden />

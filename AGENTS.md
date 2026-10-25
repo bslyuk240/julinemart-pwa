@@ -36,6 +36,16 @@ Keep this section current. It sits outside the Next.js block above, which `next 
 | Payments | Paystack inline popup | The storefront holds the public key. JLO verifies with the secret key. Both must be the same account and mode (test or live). |
 | Delivery and return couriers | Fez Delivery, booked by JLO | JLO books Fez shipments automatically when an order is paid. |
 
+## The JLO backend repo
+
+JLO (JulineMart Logistics Orchestrator) is this storefront's backend and its admin. When a storefront change needs a backend or admin change, make it there.
+
+- **Local checkout:** `C:\Users\user\julinemart-logistics-orchestrator`. GitHub: `bslyuk240/julinemart-logistics`. It works on its own branches, so check `git branch` before editing and don't switch branches there unasked.
+- **API:** about 200 Netlify functions in `netlify/functions/`, e.g. `create-order`, `verify-payment`, `calc-shipping`, `customer-orders`, `fez-*`, `catalog-*` (including `catalog-homepage`), `admin-*`. The storefront calls them through `JLO_API_BASE_URL`, and the catalog through `NEXT_PUBLIC_JLO_CATALOG_URL`.
+- **Admin and portals:** the JLO admin (Vite and React, in `src/dashboard/`) is where products, banners, hero ads, campaigns, returns and gift boxes are managed. Homepage sliders and hero ads are edited in `src/dashboard/pages/HomepageContent.tsx`. `vendor-portal/`, `rider-app/`, `customer-portal/` and `influencer-portal/` live there too.
+- **Docs:** `SYSTEM_DOCUMENTATION.md`, `API-DOCUMENTATION.md` and `COURIER_INTEGRATION_GUIDE.md` at its root. Its `wordpress-plugins/` and `woocommerce-webhook-setup.php` are retired leftovers.
+- **Running it locally:** run `netlify dev` in that folder; it serves on port 8888. Its `.env.local` overrides `.env`, and the Paystack keys there must match the storefront's mode (see below).
+
 ## Local development warnings
 
 - Local dev points at the **live** Supabase project. A local test checkout creates a real order row, and once paid, JLO books real Fez shipments. Cancel test orders and their shipments in admin afterwards.
@@ -52,5 +62,6 @@ Keep this section current. It sits outside the Next.js block above, which `next 
 ## UI rules
 
 - Phones get a native-style "mobile tier" UI; see `docs/mobile-tier-plan.md`. Desktop must stay desktop-standard and must not show a phone layout.
-- Gate phone-only UI with `max-md:` / `md:hidden` classes, not JavaScript width checks. The homepage, `/campaigns/*` and the vendor portal are intentionally outside the mobile tier.
+- Gate phone-only UI with `max-md:` / `md:hidden` classes, not JavaScript width checks. The homepage joined the mobile tier in M17 (its desktop layout is unchanged). `/campaigns/*` and the vendor portal are intentionally outside it.
+- Homepage hero slides, the announcement bar and the side-panel ads are read on the server by `getPwaSettings()` (`src/lib/home/pwa-settings.ts`). Each side panel (`hero_ads.left` / `.right`) may hold one ad object or an array; arrays slide on desktop, and phones show every ad in one carousel mid-page.
 - Use `src/components/ui/spinner.tsx` (or `PageLoading`) for loaders, and skeletons where the content's layout is known.

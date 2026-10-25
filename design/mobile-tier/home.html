@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JulineMart homepage on phones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Mobile tier tokens: Material 3 colour roles themed from JulineMart brand ── */
+:root {
+  --primary: #77088a;            /* brand purple */
+  --on-primary: #ffffff;
+  --primary-container: #f7e6fb;  /* existing primary-50 */
+  --on-primary-container: #3c0445;
+  --tertiary: #ff7a29;           /* brand orange */
+  --on-tertiary: #2b1000;        /* dark on orange: 7:1, white on orange fails AA */
+  --tertiary-container: #ffe3cc;
+  --on-tertiary-container: #5a2400;
+  --surface: #fffbff;
+  --surface-lowest: #ffffff;
+  --surface-low: #faf2fa;
+  --surface-container: #f4ecf4;
+  --surface-high: #eee6ee;
+  --on-surface: #1e1a1f;
+  --on-surface-variant: #4e4450;
+  --outline: #73687a;
+  --outline-variant: #d3c6d3;
+  --success: #1b6c3a;
+  --success-container: #dcf3e2;
+  --error: #ba1a1a;
+  --scrim: rgb(30 26 31 / .42);
+  --inverse-surface: #332f34;
+  --inverse-on-surface: #f7eef6;
+  --inverse-primary: #ecb1ff;
+
+  /* type roles (Material 3 scale, Inter) */
+  --headline-s: 600 24px/32px Inter, system-ui, sans-serif;
+  --title-l: 500 22px/28px Inter, system-ui, sans-serif;
+  --title-m: 600 16px/24px Inter, system-ui, sans-serif;
+  --title-s: 600 14px/20px Inter, system-ui, sans-serif;
+  --body-l: 400 16px/24px Inter, system-ui, sans-serif;
+  --body-m: 400 14px/20px Inter, system-ui, sans-serif;
+  --body-s: 400 12px/16px Inter, system-ui, sans-serif;
+  --label-l: 600 14px/20px Inter, system-ui, sans-serif;
+  --label-m: 600 12px/16px Inter, system-ui, sans-serif;
+  --label-s: 500 11px/16px Inter, system-ui, sans-serif;
+
+  /* motion + shape */
+  --ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --r-chip: 8px; --r-card: 12px; --r-image: 16px; --r-sheet: 28px;
+
+  /* review board */
+  --board: #e9e4ea;
+  --board-ink: #2a242b;
+  --board-muted: #5d555e;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--board); color: var(--board-ink);
+  font: var(--body-m); font-feature-settings: "tnum" 0;
+}
+::selection { background: var(--primary-container); color: var(--on-primary-container); }
+:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+svg.i { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.s20 { width: 20px; height: 20px; }
+svg.i.s18 { width: 18px; height: 18px; }
+svg.i.s16 { width: 16px; height: 16px; }
+svg.i.fill { fill: currentColor; }
+
+/* ── Board ── */
+.board-head { max-width: 1400px; margin: 0 auto; padding: 48px 32px 8px; }
+.board-head h1 { font: 700 30px/36px Inter, sans-serif; letter-spacing: -0.02em; margin: 0 0 8px; }
+.board-head p { margin: 0; max-width: 72ch; color: var(--board-muted); font: var(--body-l); }
+.board-head .legend { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px 20px; font: var(--body-m); color: var(--board-muted); }
+.board-head .legend b { color: var(--board-ink); font-weight: 600; }
+.group { max-width: 1400px; margin: 0 auto; padding: 40px 32px 8px; }
+.group h2 { font: 700 20px/28px Inter, sans-serif; margin: 0 0 4px; letter-spacing: -0.01em; }
+.group > p { margin: 0 0 24px; color: var(--board-muted); max-width: 72ch; }
+.row { display: flex; flex-wrap: wrap; gap: 40px 48px; align-items: flex-start; }
+figure { margin: 0; width: 390px; }
+figcaption { padding: 16px 4px 0; }
+figcaption strong { display: block; font: var(--title-m); color: var(--board-ink); }
+figcaption ul { margin: 6px 0 0; padding-left: 18px; color: var(--board-muted); }
+figcaption li { margin: 3px 0; }
+.board-foot { max-width: 1400px; margin: 0 auto; padding: 48px 32px 64px; color: var(--board-muted); }
+
+/* ── Phone frame ── */
+.phone {
+  position: relative; width: 390px; height: 844px; overflow: hidden;
+  background: var(--surface); color: var(--on-surface);
+  border-radius: 36px; box-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 18px 40px -12px rgb(40 10 50 / .28);
+  outline: 8px solid #1b171c; outline-offset: -1px;
+  isolation: isolate;
+}
+.status {
+  position: absolute; inset: 0 0 auto 0; height: 40px; z-index: 50;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px 0 28px; background: var(--surface-lowest);
+  font: 500 14px/1 Inter, sans-serif; color: var(--on-surface);
+}
+.status .sys { display: flex; gap: 6px; align-items: center; }
+.status.clear { background: transparent; }
+.screen {
+  position: absolute; inset: 40px 0 0 0; overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: none; background: var(--surface);
+}
+.screen::-webkit-scrollbar { display: none; }
+.gesture { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; z-index: 45; display: grid; place-items: center; }
+.gesture::after { content: ""; width: 108px; height: 4px; border-radius: 4px; background: var(--on-surface); opacity: .85; }
+
+/* ── Top app bar ── */
+.appbar {
+  position: sticky; top: 0; z-index: 20; height: 64px;
+  display: flex; align-items: center; gap: 4px; padding: 0 4px;
+  background: var(--surface);
+}
+.appbar.scrolled { background: var(--surface-container); }
+.appbar .title { flex: 1; min-width: 0; font: var(--title-l); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 4px; }
+.appbar .title.small { font: 500 18px/24px Inter, sans-serif; }
+.iconbtn {
+  position: relative; width: 48px; height: 48px; border: 0; border-radius: 24px; padding: 0;
+  display: grid; place-items: center; background: transparent; color: var(--on-surface-variant); cursor: pointer;
+}
+.iconbtn.onimg { background: rgb(255 255 255 / .92); color: var(--on-surface); width: 40px; height: 40px; margin: 4px; box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+.badge {
+  position: absolute; top: 6px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: var(--error); color: #fff; font: 600 11px/16px Inter, sans-serif; text-align: center;
+}
+.iconbtn.onimg .badge { top: 0; right: -2px; }
+
+/* ── Navigation bar (M3) ── */
+.navbar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 40;
+  height: 104px; padding-bottom: 24px; background: var(--surface-container);
+  display: grid; grid-template-columns: repeat(5, 1fr);
+}
+.navbar a { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 12px; text-decoration: none; color: var(--on-surface-variant); font: var(--label-m); }
+.navbar .pill { position: relative; width: 64px; height: 32px; border-radius: 16px; display: grid; place-items: center; }
+.navbar a.on { color: var(--on-surface); }
+.navbar a.on .pill { background: var(--primary-container); color: var(--on-primary-container); }
+.navbar a.on .pill svg { stroke-width: 2.4; }
+.navbar .badge { top: -2px; right: 12px; }
+
+/* ── Buttons ── */
+.btn {
+  height: 48px; border: 0; border-radius: 24px; padding: 0 20px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: var(--label-l); white-space: nowrap;
+}
+.btn.filled { background: var(--primary); color: var(--on-primary); box-shadow: 0 1px 2px rgb(60 4 69 / .3); }
+.btn.orange { background: var(--tertiary); color: var(--on-tertiary); }
+.btn.tonal { background: var(--primary-container); color: var(--on-primary-container); }
+.btn.outlined { background: transparent; color: var(--primary); box-shadow: inset 0 0 0 1px var(--outline); }
+.btn.text { background: transparent; color: var(--primary); padding: 0 12px; height: 40px; }
+.btn.block { width: 100%; }
+
+/* ── Chips ── */
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 0 16px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  height: 32px; padding: 0 12px; border-radius: var(--r-chip); flex: none;
+  display: inline-flex; align-items: center; gap: 6px; font: var(--label-l); font-size: 13px;
+  color: var(--on-surface-variant); background: var(--surface); box-shadow: inset 0 0 0 1px var(--outline-variant);
+  position: relative;
+}
+.chip::before { content: ""; position: absolute; inset: -8px 0; } /* 48dp hit area */
+.chip.sel { background: var(--primary-container); color: var(--on-primary-container); box-shadow: none; }
+.chip.lg { height: 40px; padding: 0 16px; font-size: 14px; }
+
+/* ── Lists & sections ── */
+.section { padding: 16px; }
+.divider { height: 8px; background: var(--surface-low); }
+.hair { height: 1px; background: var(--outline-variant); margin: 0 16px; opacity: .7; }
+.li { display: flex; align-items: center; gap: 16px; min-height: 64px; padding: 8px 16px; color: var(--on-surface); text-decoration: none; }
+.li .lead { width: 40px; height: 40px; border-radius: 20px; display: grid; place-items: center; background: var(--surface-container); color: var(--on-surface-variant); flex: none; }
+.li .lead.green { background: var(--success-container); color: var(--success); }
+.li .lead.purple { background: var(--primary-container); color: var(--primary); }
+.li .body { flex: 1; min-width: 0; }
+.li .h { font: var(--title-s); font-weight: 500; font-size: 15px; }
+.li .s { font: var(--body-m); color: var(--on-surface-variant); }
+.li .trail { color: var(--on-surface-variant); }
+.label { font: var(--title-s); color: var(--on-surface); }
+.muted { color: var(--on-surface-variant); }
+.stars { display: inline-flex; gap: 1px; color: #e8a500; vertical-align: -2px; }
+
+/* ── Product card ── */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 4px 16px 132px; }
+.card { position: relative; display: flex; flex-direction: column; min-width: 0; color: inherit; text-decoration: none; }
+.card .img { position: relative; aspect-ratio: 1; border-radius: var(--r-card); background: var(--surface-lowest); overflow: hidden; box-shadow: inset 0 0 0 1px rgb(30 26 31 / .06); }
+.card .img img { width: 100%; height: 100%; object-fit: contain; padding: 10px; }
+.card .fav { position: absolute; top: 4px; right: 4px; width: 40px; height: 40px; border-radius: 20px; display: grid; place-items: center; background: rgb(255 255 255 / .9); color: var(--on-surface-variant); }
+.card .tag { position: absolute; left: 8px; bottom: 8px; height: 22px; padding: 0 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; font: var(--label-s); background: var(--surface-high); color: var(--on-surface-variant); }
+.card .name { margin-top: 8px; font: var(--body-m); color: var(--on-surface); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 40px; }
+.card .meta { display: flex; align-items: center; gap: 4px; margin-top: 2px; font: var(--body-s); color: var(--on-surface-variant); }
+.card .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+.card .price { font: 700 16px/24px Inter, sans-serif; font-variant-numeric: tabular-nums; }
+.card .add { width: 40px; height: 40px; border-radius: 12px; border: 0; display: grid; place-items: center; background: var(--primary-container); color: var(--on-primary-container); position: relative; }
+.card .add::before { content: ""; position: absolute; inset: -4px; }
+
+/* ── Bottom bars ── */
+.actionbar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 40;
+  padding: 12px 16px 36px; background: var(--surface-lowest);
+  box-shadow: 0 -1px 0 var(--outline-variant), 0 -4px 16px rgb(30 26 31 / .06);
+  display: flex; gap: 8px; align-items: center;
+}
+.actionbar.abovenav { bottom: 104px; padding-bottom: 12px; }
+
+/* ── Sheet ── */
+.scrimmed::after { content: ""; position: absolute; inset: 0; background: var(--scrim); z-index: 60; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 70; max-height: 86%;
+  background: var(--surface-low); border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  display: flex; flex-direction: column; box-shadow: 0 -8px 24px rgb(30 26 31 / .16);
+}
+.sheet .handle { height: 36px; display: grid; place-items: center; flex: none; }
+.sheet .handle::after { content: ""; width: 32px; height: 4px; border-radius: 2px; background: var(--outline); opacity: .6; }
+.sheet .sh-head { display: flex; align-items: center; justify-content: space-between; padding: 0 8px 8px 24px; }
+.sheet .sh-head h3 { margin: 0; font: var(--title-l); }
+.sheet .sh-body { overflow-y: auto; scrollbar-width: none; padding: 0 24px 16px; }
+.sheet .sh-body h4 { margin: 20px 0 10px; font: var(--title-s); }
+.sheet .sh-foot { padding: 12px 24px 36px; border-top: 1px solid var(--outline-variant); display: flex; gap: 12px; }
+
+/* ── Form bits ── */
+.field { position: relative; height: 56px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--outline); display: flex; align-items: center; padding: 0 16px; font: var(--body-l); color: var(--on-surface); background: var(--surface-lowest); }
+.field .fl { position: absolute; top: -9px; left: 12px; padding: 0 4px; background: inherit; font: var(--body-s); color: var(--on-surface-variant); }
+.field.ph { color: var(--outline); }
+.switch { width: 52px; height: 32px; border-radius: 16px; background: var(--primary); position: relative; flex: none; }
+.switch::after { content: ""; position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 12px; background: #fff; }
+.check { width: 18px; height: 18px; border-radius: 2px; box-shadow: inset 0 0 0 2px var(--on-surface-variant); flex: none; display: grid; place-items: center; }
+.check.on { background: var(--primary); box-shadow: none; color: #fff; }
+.radio { width: 20px; height: 20px; border-radius: 10px; box-shadow: inset 0 0 0 2px var(--on-surface-variant); flex: none; position: relative; }
+.radio.on { box-shadow: inset 0 0 0 2px var(--primary); }
+.radio.on::after { content: ""; position: absolute; inset: 5px; border-radius: 5px; background: var(--primary); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; height: 40px; border-radius: 20px; box-shadow: inset 0 0 0 1px var(--outline); overflow: hidden; }
+.seg span { display: flex; align-items: center; justify-content: center; gap: 6px; font: var(--label-l); color: var(--on-surface); }
+.seg span + span { box-shadow: inset 1px 0 0 var(--outline); }
+.seg span.on { background: var(--primary-container); color: var(--on-primary-container); }
+
+.stepper { display: inline-flex; align-items: center; height: 40px; border-radius: 20px; box-shadow: inset 0 0 0 1px var(--outline-variant); }
+.stepper button { width: 44px; height: 40px; border: 0; background: transparent; color: var(--on-surface-variant); display: grid; place-items: center; border-radius: 20px; }
+.stepper span { min-width: 24px; text-align: center; font: var(--title-s); font-variant-numeric: tabular-nums; }
+
+.snackbar {
+  position: absolute; left: 16px; right: 16px; z-index: 45; min-height: 48px; border-radius: 4px;
+  background: var(--inverse-surface); color: var(--inverse-on-surface);
+  display: flex; align-items: center; gap: 12px; padding: 4px 8px 4px 16px; font: var(--body-m);
+  box-shadow: 0 4px 12px rgb(0 0 0 / .2);
+}
+.snackbar .btn.text { color: var(--inverse-primary); }
+
+.sk { background: linear-gradient(90deg, var(--surface-container) 0%, var(--surface-high) 50%, var(--surface-container) 100%); background-size: 200% 100%; border-radius: 6px; animation: sk 1.4s var(--ease-standard) infinite; }
+@keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+
+.card-s { background: var(--surface-lowest); border-radius: 16px; box-shadow: 0 0 0 1px rgb(30 26 31 / .07); margin: 0 16px 12px; }
+.card-s .hd { display: flex; align-items: center; justify-content: space-between; padding: 14px 8px 0 16px; min-height: 48px; }
+.card-s .hd h3 { margin: 0; font: var(--title-m); }
+
+@media (max-width: 480px) {
+  .board-head, .group, .board-foot { padding-left: 16px; padding-right: 16px; }
+  figure { width: 100%; }
+  .phone { width: 100%; max-width: 390px; }
+}
+
+/* ── Homepage additions (reuse the approved tokens above) ── */
+.homebar { gap: 8px; padding: 0 12px 0 8px; height: 64px; }
+.homebar .logo { width: 40px; height: 40px; border-radius: 20px; overflow: hidden; flex: none; background: #fff; box-shadow: 0 0 0 1px var(--outline-variant); display: grid; place-items: center; }
+.homebar .logo img { width: 36px; height: 36px; object-fit: contain; }
+.searchbar { flex: 1; min-width: 0; height: 48px; border-radius: 24px; background: var(--surface-container); color: var(--on-surface-variant); display: flex; align-items: center; gap: 12px; padding: 0 16px; text-decoration: none; font: var(--body-l); }
+.searchbar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.heroA { padding: 4px 16px 0; }
+.heroA .slide { border-radius: var(--r-image); overflow: hidden; aspect-ratio: 2.35 / 1; background: var(--surface-container); }
+.heroA .slide img, .heroB .slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.heroB { padding-top: 4px; }
+.heroB .htrack { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 0 16px; }
+.heroB .htrack::-webkit-scrollbar { display: none; }
+.heroB .slide { flex: none; width: 86%; scroll-snap-align: center; border-radius: var(--r-image); overflow: hidden; aspect-ratio: 2 / 1; background: var(--surface-container); }
+.dots { display: flex; justify-content: center; gap: 6px; padding: 10px 0 4px; }
+.dots span { width: 6px; height: 6px; border-radius: 3px; background: var(--outline-variant); }
+.dots span.on { width: 18px; background: var(--primary); }
+.promo { margin: 8px 16px 0; min-height: 40px; border-radius: var(--r-card); background: var(--primary-container); color: var(--on-primary-container); display: flex; align-items: center; gap: 12px; padding: 0 12px 0 16px; text-decoration: none; font: var(--body-m); }
+.promo span { flex: 1; }
+.rh { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 4px 0 16px; }
+.rh h3 { margin: 0; font: var(--title-m); font-size: 18px; letter-spacing: -0.01em; color: var(--on-surface); }
+.rh .see { margin-left: auto; display: inline-flex; align-items: center; height: 40px; padding: 0 8px 0 12px; border-radius: 20px; color: var(--primary); font: var(--label-l); text-decoration: none; }
+.cats { padding-top: 12px; }
+.cat-track { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 0 12px; }
+.cat-track::-webkit-scrollbar { display: none; }
+.cat { flex: none; width: 76px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-decoration: none; color: var(--on-surface); font: var(--label-s); text-align: center; padding: 4px 0; }
+.cic { width: 56px; height: 56px; border-radius: 28px; display: grid; place-items: center; }
+.cic svg { width: 24px; height: 24px; }
+.cic.c1 { background: #fde2ef; color: #8a1550; } .cic.c2 { background: #fde3e1; color: #8c1d14; } .cic.c3 { background: #e0ecff; color: #1d4a8f; }
+.cic.c4 { background: #ddf2e4; color: #1b5e34; } .cic.c5 { background: #ffe8d1; color: #7a3a06; } .cic.c6 { background: var(--surface-container); color: var(--on-surface-variant); }
+.gifts { margin-top: 12px; padding: 4px 0 16px; background: var(--surface-low); }
+.gchips { padding-bottom: 12px; }
+.gtrack { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; padding: 0 16px; }
+.gtrack::-webkit-scrollbar { display: none; }
+.gcard { flex: none; width: 156px; border-radius: var(--r-card); background: var(--surface-lowest); box-shadow: 0 0 0 1px rgb(30 26 31 / .06); text-decoration: none; color: var(--on-surface); display: flex; flex-direction: column; overflow: hidden; }
+.gcard img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--surface-container); }
+.gcard strong { font: var(--title-s); padding: 10px 12px 0; }
+.gcard .gprice { font: 700 15px/22px Inter, sans-serif; padding: 2px 12px 12px; }
+.gcard .gprice.muted { font: var(--body-s); }
+.gcard.diy { background: var(--primary-container); color: var(--on-primary-container); padding: 14px 12px 12px; gap: 6px; box-shadow: none; }
+.gcard.diy strong { padding: 0; font: 600 16px/22px Inter, sans-serif; }
+.gcard.diy > span:not(.gk):not(.gbtn) { font: var(--body-s); color: var(--on-surface-variant); }
+.gcard.diy .gk { width: 40px; height: 40px; border-radius: 20px; background: var(--surface-lowest); color: var(--primary); display: grid; place-items: center; }
+.gcard.diy .gbtn { margin-top: auto; height: 40px; border-radius: 20px; background: var(--primary); color: var(--on-primary); display: inline-flex; align-items: center; justify-content: center; gap: 4px; font: var(--label-m); }
+.rail { padding-top: 12px; }
+.track { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; padding: 0 16px 4px; scroll-padding: 16px; }
+.track::-webkit-scrollbar { display: none; }
+.track .card { flex: none; }
+.card .tag.rank { background: var(--inverse-surface); color: var(--inverse-on-surface); font: 700 11px/22px Inter, sans-serif; }
+.g4 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
+.deadline { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px; border-radius: 13px; background: var(--tertiary-container); color: var(--on-tertiary-container); font: var(--label-m); }
+.stores { padding-top: 16px; }
+.st-track { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 0 12px; }
+.st-track::-webkit-scrollbar { display: none; }
+.st { flex: none; width: 84px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-decoration: none; color: var(--on-surface); font: var(--label-s); text-align: center; }
+.st .av { width: 56px; height: 56px; border-radius: 28px; background: var(--primary-container); color: var(--on-primary-container); display: grid; place-items: center; font: 700 16px/1 Inter, sans-serif; }
+.st > span:last-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.revs { padding-top: 16px; }
+.rv-track { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; padding: 0 16px 4px; }
+.rv-track::-webkit-scrollbar { display: none; }
+.rv { flex: none; width: 272px; margin: 0; padding: 16px; border-radius: var(--r-card); background: var(--surface-low); display: flex; flex-direction: column; gap: 8px; }
+.rv blockquote { margin: 0; font: var(--body-l); color: var(--on-surface); }
+.rv figcaption { padding: 0; font: var(--body-s); }
+.rv .rp { display: block; margin-top: 2px; color: var(--on-surface-variant); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.help { margin-top: 20px; padding: 8px 0 0; border-top: 8px solid var(--surface-low); }
+.help .li .h, .help .li .s { display: block; }
+.legal { margin: 8px 16px 0; font: var(--body-s); color: var(--on-surface-variant); }
+.legal a { color: var(--on-surface-variant); }
+figure.v { width: 390px; }
+.sideads { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px 16px 4px; }
+.sad { position: relative; display: block; border-radius: var(--r-image); overflow: hidden; aspect-ratio: 3 / 4; background: var(--surface-container); box-shadow: 0 1px 2px rgb(30 26 31 / .08); }
+.sad img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+.sad .appnote { position: absolute; left: 8px; bottom: 8px; height: 22px; padding: 0 8px; border-radius: 6px; background: rgb(30 26 31 / .72); color: #fff; font: var(--label-s); display: inline-flex; align-items: center; }
+.htrackA, .adtrack, .dtrack { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
+.htrackA::-webkit-scrollbar, .adtrack::-webkit-scrollbar, .dtrack::-webkit-scrollbar { display: none; }
+.heroA .htrackA { gap: 8px; border-radius: var(--r-image); }
+.heroA .htrackA .slide { flex: none; width: 100%; scroll-snap-align: start; }
+.adcar { padding-top: 20px; }
+.adtrack { gap: 8px; padding: 0 16px; scroll-padding: 16px; }
+.adslide { flex: none; width: 80%; aspect-ratio: 2.5 / 1; border-radius: var(--r-card); overflow: hidden; scroll-snap-align: start; position: relative; display: flex; text-decoration: none; }
+.adslide.vend { background: linear-gradient(120deg, #fff4ea 0%, #ffe3cc 100%); color: #2a0631; }
+.adslide.app { background: linear-gradient(120deg, #3c0445 0%, #5a0a69 100%); color: #fff; }
+.adtext { position: relative; z-index: 1; flex: 1; min-width: 0; padding: 10px 0 10px 14px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.adk { font: 700 9px/12px Inter, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #e8620f; }
+.adslide.app .adk { color: #ffb37a; }
+.adtext strong { font: 800 15px/18px Inter, sans-serif; letter-spacing: -0.01em; }
+.adtext em { font-style: normal; color: #77088a; }
+.adslide.app .adtext em { color: #ffb37a; }
+.adbtn { align-self: flex-start; margin-top: 4px; height: 26px; padding: 0 10px; border-radius: 13px; background: #ff7a29; color: #2b1000; font: 700 11px/26px Inter, sans-serif; display: inline-flex; align-items: center; gap: 2px; }
+.adbtn.gp { background: #000; color: #fff; border: 1px solid #555; }
+.adimg { width: 42%; flex: none; background-size: 165% auto; background-position: 50% 100%; background-repeat: no-repeat; }
+.adslide.full { width: 28%; border-radius: 10px; aspect-ratio: 880 / 1484; background: var(--surface-container); box-shadow: 0 1px 2px rgb(30 26 31 / .1); }
+.adslide.full img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.adslide.full.more { padding: 0 8px; font: 500 10px/14px Inter, sans-serif; }
+.adslide.more { background: var(--surface-lowest); box-shadow: inset 0 0 0 1.5px var(--outline-variant); border: 0; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--on-surface-variant); text-align: center; padding: 0 20px; font: var(--body-s); }
+.adslide.more > span:first-child { width: 32px; height: 32px; border-radius: 16px; background: var(--surface-container); display: grid; place-items: center; }
+.adslide.more b { font: var(--label-m); color: var(--on-surface); }
+.addots { padding-top: 8px; }
+.desk { display: grid; grid-template-columns: 1fr 3fr 1fr; gap: 8px; max-width: 1100px; padding: 16px; border-radius: 16px; background: #fff; box-shadow: 0 18px 40px -12px rgb(40 10 50 / .2); }
+.dpanel, .dhero { position: relative; min-width: 0; }
+.dpanel .dtrack { border-radius: 12px; aspect-ratio: 880 / 1484; max-height: 380px; }
+.dhero .dtrack { border-radius: 12px; aspect-ratio: 16 / 9; }
+.desk .dtrack img { flex: none; width: 100%; height: 100%; object-fit: cover; scroll-snap-align: start; display: block; }
+.desk .dots { padding-top: 6px; }
+.dlabel { display: block; text-align: center; font: var(--label-m); color: var(--board-muted); }
+.camp { padding-top: 16px; }
+.camp .rh h3 { white-space: nowrap; }
+.camp .rh .deadline { margin-left: 2px; white-space: nowrap; }
+.camp .rh .see { margin-left: auto; white-space: nowrap; }
+.ctrack { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding: 0 16px; }
+.cc { flex: none; width: 236px; display: flex; gap: 10px; padding: 8px; border-radius: var(--r-card); background: var(--surface-lowest); box-shadow: inset 0 0 0 1px var(--outline-variant); text-decoration: none; color: var(--on-surface); }
+.cthumb { position: relative; width: 64px; height: 64px; flex: none; border-radius: 10px; overflow: hidden; background: var(--surface-container); }
+.cthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ctime { position: absolute; left: 0; right: 0; bottom: 0; background: rgb(28 10 32 / .72); color: #fff; font: 600 10px/16px Inter, sans-serif; text-align: center; }
+.cbody { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cbadge { align-self: flex-start; padding: 0 6px; border-radius: 6px; background: var(--tertiary-container); color: var(--on-tertiary-container); font: 700 11px/20px Inter, sans-serif; }
+.ct { font: var(--body-s); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.co { font: var(--label-s, 500 11px/16px Inter, sans-serif); color: var(--on-surface-variant); }
+.scrim { position: absolute; inset: 0; background: rgb(20 6 24 / .42); z-index: 40; border-radius: inherit; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 41; background: var(--surface-lowest); border-radius: 28px 28px 0 0; padding: 8px 16px 32px; display: flex; flex-direction: column; gap: 12px; }
+.sheet .grab { align-self: center; width: 32px; height: 4px; border-radius: 2px; background: var(--outline-variant); margin-bottom: 4px; }
+.sh-head { display: flex; gap: 12px; align-items: center; }
+.sh-head > span:last-child { display: flex; flex-direction: column; font: var(--body-s); }
+.sh-head b { font: var(--title-m, 600 16px/24px Inter, sans-serif); }
+.sh-list { display: flex; flex-direction: column; gap: 8px; }
+.sh-list .cc { width: auto; }
+.sh-btn { height: 48px; border-radius: 24px; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; text-decoration: none; font: var(--label-l, 600 14px/20px Inter, sans-serif); }
+.sh-later { text-align: center; color: var(--primary); text-decoration: none; font: var(--label-l, 600 14px/20px Inter, sans-serif); }
+.cic.tonal { background: var(--primary-container); color: var(--primary); }
+.cue { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none; }
+.cue.orange { background: var(--tertiary-container); color: var(--on-tertiary-container); }
+.cue.purple { background: var(--primary-container); color: var(--primary); }
+.card .tag.new { background: var(--success-container); color: var(--success); font: 700 11px/22px Inter, sans-serif; }
+.card .img { background: var(--surface-container) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d3c6d3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/%3E%3Cpath d='M12 22V12'/%3E%3Cpath d='m3.3 7 8.7 5 8.7-5'/%3E%3C/svg%3E") center / 36px no-repeat; }
+.card .img img { position: relative; background: var(--surface-lowest); }
+.st .av.t1 { background: #efe3f5; color: #4a1a5c; } .st .av.t2 { background: #fbe9f3; color: #6b1846; }
+.tagline { display: inline-block; margin-bottom: 8px; font: var(--label-m); color: var(--board-muted); }
+</style>
+</head>
+<body>
+<!-- Icon sprite: Lucide (the icon set the storefront already uses) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98"/><path d="m15.41 6.51-6.82 3.98"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-return" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-store" viewBox="0 0 24 24"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2 2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></symbol>
+    <symbol id="i-sort" viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+    <symbol id="i-fill" viewBox="0 0 24 24"><path d="M7 17V7h10"/><path d="M17 17 7 7"/></symbol>
+    <symbol id="i-plane" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></symbol>
+    <symbol id="i-card" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 8.7 5 8.7-5"/></symbol>
+    <!-- status bar glyphs (filled) -->
+    <symbol id="s-signal" viewBox="0 0 16 16"><path d="M1 14h2.5V11H1zM5 14h2.5V8H5zM9 14h2.5V5H9zM13 14h2.5V2H13z"/></symbol>
+    <symbol id="s-wifi" viewBox="0 0 16 16"><path d="M8 13.5 10.2 11a3.2 3.2 0 0 0-4.4 0zM8 4.5a10 10 0 0 0-7 2.9l1.4 1.5a8 8 0 0 1 11.2 0L15 7.4a10 10 0 0 0-7-2.9zm0 3.4a6.6 6.6 0 0 0-4.6 1.9l1.4 1.5a4.6 4.6 0 0 1 6.4 0l1.4-1.5A6.6 6.6 0 0 0 8 7.9z"/></symbol>
+    <symbol id="s-batt" viewBox="0 0 24 16"><rect x="1" y="3" width="19" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="3" y="5" width="13" height="6" rx="1"/><rect x="21" y="6" width="2" height="4" rx="1"/></symbol>
+
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></symbol>
+    <symbol id="i-shirt" viewBox="0 0 24 24"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></symbol>
+    <symbol id="i-car" viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></symbol>
+    <symbol id="i-sofa" viewBox="0 0 24 24"><path d="M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3"/><path d="M2 16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z"/><path d="M4 18v2"/><path d="M20 18v2"/></symbol>
+    <symbol id="i-basket" viewBox="0 0 24 24"><path d="m15 11-1 9"/><path d="m19 11-4-7"/><path d="M2 11h20"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/><path d="M4.5 15.5h15"/><path d="m5 11 4-7"/><path d="m9 11 1 9"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.14 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z"/></symbol>
+    <symbol id="i-msg" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></symbol>
+    <symbol id="i-quote" viewBox="0 0 24 24"><path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  </defs>
+</svg>
+
+<header class="board-head">
+  <h1>Homepage on phones: preview</h1>
+  <p>The homepage keeps its look and its order: hero, categories, gifts, product rows, stores, reviews. What changes is that it joins the rest of the phone app: the same top bar and bottom tab bar as every other page, the same product cards, calmer section headings, and a short help area instead of the desktop footer. Desktop is not changing. Each phone scrolls on its own.</p>
+  <div class="legend">
+    <span><b>Real:</b> hero banners, categories, gift boxes, products, prices, stores and reviews from the live site</span>
+    <span><b>Illustrative:</b> the cart badge, and the flash-sale countdown on phone C (your products have no sale end time yet)</span>
+  </div>
+</header>
+
+<section class="group">
+  <h2>Top of the page: two options</h2>
+  <p>Both use the new top bar (logo and a big search field that opens the full-screen search) and the five-tab bar. They differ in two places you choose between.</p>
+  <div class="row">
+    <figure class="v"><div class="phone"><div class="status"><span class="num">9:41</span><span class="sys"><svg width="16" height="16" fill="currentColor"><use href="#s-signal"/></svg><svg width="16" height="16" fill="currentColor"><use href="#s-wifi"/></svg><svg width="24" height="16" fill="currentColor"><use href="#s-batt"/></svg></span></div><div class="screen"><div class="appbar homebar">
+      <span class="logo"><img src="https://julinemart.com/images/logo.png" alt="JulineMart"></span>
+      <a class="searchbar" href="#"><svg class="i s20"><use href="#i-search"/></svg><span>Search JulineMart</span></a>
+    </div><section class="heroA" data-hero aria-label="Featured">
+      <div class="htrackA" data-auto="5000" data-delay="0"><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338802387-ftv4t.jpg" alt=""></div><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338810461-5wx67.jpg" alt=""></div><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338818153-xmxvh.jpg" alt=""></div></div>
+      <div class="dots"><span class="on"></span><span></span><span></span></div>
+    </section><a class="promo" href="#"><svg class="i s20"><use href="#i-truck"/></svg><span><b>Free delivery</b> on orders over ₦100,000</span><svg class="i s18"><use href="#i-right"/></svg></a><section class="cats" aria-label="Shop by category"><div class="rh"><h3>Shop by category</h3></div><div class="cat-track"><a class="cat" href="#"><span class="cic c1"><svg class="i "><use href="#i-shirt"/></svg></span><span>Fashion &amp; Accessories</span></a><a class="cat" href="#"><span class="cic c2"><svg class="i "><use href="#i-car"/></svg></span><span>Automotive</span></a><a class="cat" href="#"><span class="cic c3"><svg class="i "><use href="#i-monitor"/></svg></span><span>Electronics</span></a><a class="cat" href="#"><span class="cic c4"><svg class="i "><use href="#i-sofa"/></svg></span><span>Home &amp; Living</span></a><a class="cat" href="#"><span class="cic c5"><svg class="i "><use href="#i-basket"/></svg></span><span>Grocery &amp; Foodstuff</span></a><a class="cat" href="#"><span class="cic c6"><svg class="i "><use href="#i-grid"/></svg></span><span>All categories</span></a></div></section><section class="gifts">
+      <div class="rh"><h3>Gifts for every moment</h3><a class="see" href="#">Shop gifts<svg class="i s18"><use href="#i-right"/></svg></a></div>
+      <div class="chips gchips"><span class="chip">Birthday</span><span class="chip">Romantic</span><span class="chip">Mother's Day</span><span class="chip">Father's Day</span><span class="chip">Back to school</span></div>
+      <div class="gtrack">
+        <a class="gcard diy" href="#"><span class="gk"><svg class="i s20"><use href="#i-box"/></svg></span><strong>Build your own box</strong><span>You pick, we wrap</span><span class="gbtn">Start building <svg class="i s16"><use href="#i-right"/></svg></span></a>
+        <a class="gcard" href="#"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/gifts/1790598579146-zxjvf.png" alt=""><strong>Anniversary gift for him</strong><span class="gprice num">₦47,150</span></a>
+        <a class="gcard" href="#"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/gifts/1790596390982-meb3u.png" alt=""><strong>Birthday surprise box</strong><span class="gprice muted">From the gift shop</span></a>
+      </div>
+    </section><section class="rail"><div class="rh"><span class="cue orange"><svg class="i s18"><use href="#i-zap"/></svg></span><h3>Flash sale</h3><a class="see" href="#">See all<svg class="i s18"><use href="#i-right"/></svg></a></div><div class="track"><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/0e753a2c-3ab5-42cd-8439-99377d9615ea.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">X99 Mini-ITX DDR4 Motherboard LGA2011-3 with NVME M.2 Support</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦80,140.08</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://oss-cf.cjdropshipping.com/product/2024/09/05/05/37ddf1c6-6a51-486b-8af0-b351996d6984_trans.jpeg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">USB 3.0 Video Capture Card with Dual Interface (USB &amp; Type-C)</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦22,894.79</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/20200826/1574528875217.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Gold Geometric Crystal Drop Earrings with Blue Faceted Stone</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦32,635.48</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/15227136/1907055018242.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">H80 4G LTE Portable WiFi Router with Display</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦26,957.57</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a></div></section><section class="rail"><div class="rh"><h3>Launching deals</h3><a class="see" href="#">See all<svg class="i s18"><use href="#i-right"/></svg></a></div><div class="track"><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/1616049895014.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag new">New</span></div>
+      <div class="name">Vintage Chinese Fan Asymmetric Pearl Earrings</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦7,309.68</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/287635fc-a9f7-4503-81d5-65e088c52615.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag new">New</span></div>
+      <div class="name">Abstract Thick Knife Colorful Floral Oil Painting</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦28,356.24</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/quick/product/922080a0-2c74-466b-a92e-d2ac49b72948.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag new">New</span></div>
+      <div class="name">Electric Eyelash Curler with 4-Temperature Digital Display</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦15,585.11</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://oss-cf.cjdropshipping.com/product/2024/08/13/05/019a4c51-5e4f-4ace-ba54-c237329e4432_trans.jpeg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag new">New</span></div>
+      <div class="name">Electric Makeup Puff - Wet &amp; Dry Foundation Beauty Tool</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦57,528.36</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/quick/product/911b98b7-decd-4ab9-bb75-5618f6feda3f.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag new">New</span></div>
+      <div class="name">40-Piece Complete Beauty Tools Set with Brushes, Sponges &amp; Applicators</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦18,898.61</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/5d1319a7-97d3-4093-9241-70f95f404c70.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag new">New</span></div>
+      <div class="name">30-Piece Nail Drill Bit Set – Diamond &amp; Wool Polishing Heads</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦9,407.68</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a></div></section><section class="rail"><div class="rh"><span class="cue purple"><svg class="i s18"><use href="#i-tag"/></svg></span><h3>Today's deals</h3><a class="see" href="#">See all<svg class="i s18"><use href="#i-right"/></svg></a></div><div class="track"><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782117536739-dz39g.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Silver Crest Commercial Blender </div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦42,100</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782119587115-aj0xw.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Multi-Function Clip Fan with Rechargeable Battery</div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦16,500</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/bc67a865-2677-4e60-b057-4da041428a50.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Amber Resin Hoop Stud Earrings with Gold Accents - Vintage Style Button Earrings</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦13,237.35</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/dc2667e9-ec7b-40f1-8b5e-fcd88a94d3fa.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Amber Resin Stud Earrings with Gold-Tone Accents - Vintage Button Style</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦12,804.43</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782118237362-e3hjk.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Kinelco Nonstick Frying Pan </div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦21,100</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/1622006898398.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Purple Pearl Elastic Bangle Bracelet with Gold-Tone Wire Wrap</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦41,077.41</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a></div></section><section class="adcar" aria-label="From JulineMart" aria-roledescription="carousel">
+      <div class="adtrack" data-auto="6500" data-delay="3000">
+        <a class="adslide full" href="#"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338827376-tqnjd.jpg" alt="Sell on JulineMart. Got something to sell? Open your store. Apply as a vendor."></a>
+        <a class="adslide full" href="#"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338834575-wdyj5.jpg" alt="The JulineMart app. Shop faster in the app. Get it on Google Play."></a>
+        <span class="adslide full more"><span><svg class="i s20"><use href="#i-plus"/></svg></span><b>More ads</b><span>Added in admin</span></span>
+      </div>
+      <div class="dots addots"><span class="on"></span><span></span><span></span></div>
+    </section><section class="rail"><div class="rh"><h3>Trending now</h3><a class="see" href="#">See all<svg class="i s18"><use href="#i-right"/></svg></a></div><div class="track"><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1783011284708-enpwe.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag rank">#1</span></div>
+      <div class="name">Natural Yaki Straight Human Hair Wig - 26 Inches</div>
+      <div class="meta">Berry Choice Collection</div>
+      <div class="foot"><span class="price">₦282,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1783010247916-v3rjm.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag rank">#2</span></div>
+      <div class="name">Premium Deep Wave Human Hair Wig - Long Length</div>
+      <div class="meta">Berry Choice Collection</div>
+      <div class="foot"><span class="price">₦88,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1783013276545-celas.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag rank">#3</span></div>
+      <div class="name">100% Human Hair Ginger Deep Wave Wig</div>
+      <div class="meta">Berry Choice Collection</div>
+      <div class="foot"><span class="price">₦86,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782899465473-i9s1b.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag rank">#4</span></div>
+      <div class="name">ZYRE Dry Iron with Teflon Soleplate – 1200W</div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦14,500</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1786442148788-ggkdr.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag rank">#5</span></div>
+      <div class="name">SDD Pixy Natural Hair Closure - 5x5 and 13x4 Lace Bundle</div>
+      <div class="meta">Berry Choice Collection</div>
+      <div class="foot"><span class="price">₦118,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1783012860123-n6jk2.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag rank">#6</span></div>
+      <div class="name">Burgundy Jerry Curl Human Hair Wig 14 Inches</div>
+      <div class="meta">Berry Choice Collection</div>
+      <div class="foot"><span class="price">₦74,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a></div></section><div style="height:120px"></div></div><nav class="navbar">
+      <a class="on" href="#"><span class="pill"><svg class="i s20"><use href="#i-home"/></svg></span>Home</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-grid"/></svg></span>Categories</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-cart"/></svg><span class="badge num">2</span></span>Cart</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-heart"/></svg></span>Wishlist</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-user"/></svg></span>Account</a>
+    </nav><div class="gesture"></div></div>
+      <figcaption><strong>Option A: close to today</strong><ul>
+        <li>One hero banner at a time with dots, like now.</li>
+        <li>Product rows scroll sideways, showing about two and a half cards.</li>
+        <li>Free-delivery note sits under the hero instead of the purple bar at the very top.</li>
+        <li>Category circles keep today's colours.</li>
+        <li>In the middle of the page, between Today's deals and Trending, a small ad carousel holds every desktop side-panel ad ("Sell on JulineMart", "Get the app", and any you add), shown whole at their own shape, just smaller: no cropping and no extra images to make. About three and a half ads show at once; it slides on its own every 6.5 seconds, offset from the hero, and stops when touched.</li>
+      </ul></figcaption>
+    </figure>
+    <figure class="v"><div class="phone"><div class="status"><span class="num">9:41</span><span class="sys"><svg width="16" height="16" fill="currentColor"><use href="#s-signal"/></svg><svg width="16" height="16" fill="currentColor"><use href="#s-wifi"/></svg><svg width="24" height="16" fill="currentColor"><use href="#s-batt"/></svg></span></div><div class="screen"><div class="appbar homebar">
+      <span class="logo"><img src="https://julinemart.com/images/logo.png" alt="JulineMart"></span>
+      <a class="searchbar" href="#"><svg class="i s20"><use href="#i-search"/></svg><span>Search JulineMart</span></a>
+    </div><section class="heroB" aria-label="Featured">
+      <div class="htrack"><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338802387-ftv4t.jpg" alt=""></div><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338810461-5wx67.jpg" alt=""></div><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338818153-xmxvh.jpg" alt=""></div></div>
+      <div class="dots"><span class="on"></span><span></span><span></span></div>
+    </section><a class="promo" href="#"><svg class="i s20"><use href="#i-truck"/></svg><span><b>Free delivery</b> on orders over ₦100,000</span><svg class="i s18"><use href="#i-right"/></svg></a><section class="cats" aria-label="Shop by category"><div class="rh"><h3>Shop by category</h3></div><div class="cat-track"><a class="cat" href="#"><span class="cic tonal"><svg class="i "><use href="#i-shirt"/></svg></span><span>Fashion &amp; Accessories</span></a><a class="cat" href="#"><span class="cic tonal"><svg class="i "><use href="#i-car"/></svg></span><span>Automotive</span></a><a class="cat" href="#"><span class="cic tonal"><svg class="i "><use href="#i-monitor"/></svg></span><span>Electronics</span></a><a class="cat" href="#"><span class="cic tonal"><svg class="i "><use href="#i-sofa"/></svg></span><span>Home &amp; Living</span></a><a class="cat" href="#"><span class="cic tonal"><svg class="i "><use href="#i-basket"/></svg></span><span>Grocery &amp; Foodstuff</span></a><a class="cat" href="#"><span class="cic tonal"><svg class="i "><use href="#i-grid"/></svg></span><span>All categories</span></a></div></section><section class="gifts">
+      <div class="rh"><h3>Gifts for every moment</h3><a class="see" href="#">Shop gifts<svg class="i s18"><use href="#i-right"/></svg></a></div>
+      <div class="chips gchips"><span class="chip">Birthday</span><span class="chip">Romantic</span><span class="chip">Mother's Day</span><span class="chip">Father's Day</span><span class="chip">Back to school</span></div>
+      <div class="gtrack">
+        <a class="gcard diy" href="#"><span class="gk"><svg class="i s20"><use href="#i-box"/></svg></span><strong>Build your own box</strong><span>You pick, we wrap</span><span class="gbtn">Start building <svg class="i s16"><use href="#i-right"/></svg></span></a>
+        <a class="gcard" href="#"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/gifts/1790598579146-zxjvf.png" alt=""><strong>Anniversary gift for him</strong><span class="gprice num">₦47,150</span></a>
+        <a class="gcard" href="#"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/gifts/1790596390982-meb3u.png" alt=""><strong>Birthday surprise box</strong><span class="gprice muted">From the gift shop</span></a>
+      </div>
+    </section><section class="rail"><div class="rh"><span class="cue orange"><svg class="i s18"><use href="#i-zap"/></svg></span><h3>Flash sale</h3><a class="see" href="#">See all 12<svg class="i s18"><use href="#i-right"/></svg></a></div><div class="g4"><a class="card" href="#">
+      <div class="img"><img src="https://cf.cjdropshipping.com/0e753a2c-3ab5-42cd-8439-99377d9615ea.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">X99 Mini-ITX DDR4 Motherboard LGA2011-3 with NVME M.2 Support</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦80,140.08</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#">
+      <div class="img"><img src="https://oss-cf.cjdropshipping.com/product/2024/09/05/05/37ddf1c6-6a51-486b-8af0-b351996d6984_trans.jpeg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">USB 3.0 Video Capture Card with Dual Interface (USB &amp; Type-C)</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦22,894.79</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#">
+      <div class="img"><img src="https://cf.cjdropshipping.com/20200826/1574528875217.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Gold Geometric Crystal Drop Earrings with Blue Faceted Stone</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦32,635.48</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#">
+      <div class="img"><img src="https://cf.cjdropshipping.com/15227136/1907055018242.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">H80 4G LTE Portable WiFi Router with Display</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦26,957.57</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a></div></section><section class="rail"><div class="rh"><h3>Launching deals</h3><a class="see" href="#">See all 12<svg class="i s18"><use href="#i-right"/></svg></a></div><div class="g4"><a class="card" href="#">
+      <div class="img"><img src="https://cf.cjdropshipping.com/1616049895014.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag new">New</span></div>
+      <div class="name">Vintage Chinese Fan Asymmetric Pearl Earrings</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦7,309.68</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#">
+      <div class="img"><img src="https://cf.cjdropshipping.com/287635fc-a9f7-4503-81d5-65e088c52615.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag new">New</span></div>
+      <div class="name">Abstract Thick Knife Colorful Floral Oil Painting</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦28,356.24</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#">
+      <div class="img"><img src="https://cf.cjdropshipping.com/quick/product/922080a0-2c74-466b-a92e-d2ac49b72948.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag new">New</span></div>
+      <div class="name">Electric Eyelash Curler with 4-Temperature Digital Display</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦15,585.11</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#">
+      <div class="img"><img src="https://oss-cf.cjdropshipping.com/product/2024/08/13/05/019a4c51-5e4f-4ace-ba54-c237329e4432_trans.jpeg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span><span class="tag new">New</span></div>
+      <div class="name">Electric Makeup Puff - Wet &amp; Dry Foundation Beauty Tool</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦57,528.36</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a></div></section><section class="rail"><div class="rh"><span class="cue purple"><svg class="i s18"><use href="#i-tag"/></svg></span><h3>Today's deals</h3><a class="see" href="#">See all 12<svg class="i s18"><use href="#i-right"/></svg></a></div><div class="g4"><a class="card" href="#">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782117536739-dz39g.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Silver Crest Commercial Blender </div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦42,100</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782119587115-aj0xw.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Multi-Function Clip Fan with Rechargeable Battery</div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦16,500</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#">
+      <div class="img"><img src="https://cf.cjdropshipping.com/bc67a865-2677-4e60-b057-4da041428a50.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Amber Resin Hoop Stud Earrings with Gold Accents - Vintage Style Button Earrings</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦13,237.35</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#">
+      <div class="img"><img src="https://cf.cjdropshipping.com/dc2667e9-ec7b-40f1-8b5e-fcd88a94d3fa.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Amber Resin Stud Earrings with Gold-Tone Accents - Vintage Button Style</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦12,804.43</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a></div></section><div style="height:120px"></div></div><nav class="navbar">
+      <a class="on" href="#"><span class="pill"><svg class="i s20"><use href="#i-home"/></svg></span>Home</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-grid"/></svg></span>Categories</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-cart"/></svg><span class="badge num">2</span></span>Cart</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-heart"/></svg></span>Wishlist</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-user"/></svg></span>Account</a>
+    </nav><div class="gesture"></div></div>
+      <figcaption><strong>Option B: more at a glance</strong><ul>
+        <li>The next banner peeks in from the side, so people see there is more to swipe.</li>
+        <li>Each row shows four products in a 2 × 2 grid, with "See all 12" to open the full list.</li>
+        <li>Fewer sideways swipes; the page gets longer instead.</li>
+        <li>Category circles in one purple family instead of five colours.</li>
+
+      </ul></figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="group">
+  <h2>When a campaign is running</h2>
+  <p>Campaigns only show while one is live, which is why they were missing above (none is running today). The campaign name, offers and timings below are illustrative; the products are real.</p>
+  <div class="row">
+    <figure class="v"><div class="phone"><div class="status"><span class="num">9:41</span><span class="sys"><svg width="16" height="16" fill="currentColor"><use href="#s-signal"/></svg><svg width="16" height="16" fill="currentColor"><use href="#s-wifi"/></svg><svg width="24" height="16" fill="currentColor"><use href="#s-batt"/></svg></span></div><div class="screen"><div class="appbar homebar">
+      <span class="logo"><img src="https://julinemart.com/images/logo.png" alt="JulineMart"></span>
+      <a class="searchbar" href="#"><svg class="i s20"><use href="#i-search"/></svg><span>Search JulineMart</span></a>
+    </div><section class="heroA" data-hero aria-label="Featured">
+      <div class="htrackA" data-auto="5000" data-delay="0"><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338802387-ftv4t.jpg" alt=""></div><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338810461-5wx67.jpg" alt=""></div><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338818153-xmxvh.jpg" alt=""></div></div>
+      <div class="dots"><span class="on"></span><span></span><span></span></div>
+    </section><section class="camp" aria-label="Kitchen Week">
+      <div class="rh"><span class="cue orange"><svg class="i s18"><use href="#i-zap"/></svg></span><h3>Kitchen Week</h3><span class="deadline"><svg class="i s16"><use href="#i-clock"/></svg><span class="num">2d 4h left</span></span><a class="see" href="#">See all<svg class="i s18"><use href="#i-right"/></svg></a></div>
+      <div class="ctrack"><a class="cc" href="#"><span class="cthumb"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782117536739-dz39g.png" alt=""><span class="ctime num">2d 4h</span></span>
+      <span class="cbody"><span class="cbadge">-20%</span><span class="ct">Silver Crest Commercial Blender </span><span class="co">Kitchen Week offer</span></span></a><a class="cc" href="#"><span class="cthumb"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782118237362-e3hjk.png" alt=""><span class="ctime num">2d 4h</span></span>
+      <span class="cbody"><span class="cbadge">-15%</span><span class="ct">Kinelco Nonstick Frying Pan </span><span class="co">Kitchen Week offer</span></span></a><a class="cc" href="#"><span class="cthumb"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1784847686855-b4ugv.jpg" alt=""><span class="ctime num">2d 4h</span></span>
+      <span class="cbody"><span class="cbadge">Free gift</span><span class="ct">Geepas Stainless Steel Electric Juice Extractor with Pulp Separator</span><span class="co">Kitchen Week offer</span></span></a><a class="cc" href="#"><span class="cthumb"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782120158579-bmx5s.png" alt=""><span class="ctime num">2d 4h</span></span>
+      <span class="cbody"><span class="cbadge">-10%</span><span class="ct">Kinelco Diamond Stainless Steel Electric Kettle 2.2L</span><span class="co">Kitchen Week offer</span></span></a></div>
+    </section><a class="promo" href="#"><svg class="i s20"><use href="#i-truck"/></svg><span><b>Free delivery</b> on orders over ₦100,000</span><svg class="i s18"><use href="#i-right"/></svg></a><section class="cats" aria-label="Shop by category"><div class="rh"><h3>Shop by category</h3></div><div class="cat-track"><a class="cat" href="#"><span class="cic c1"><svg class="i "><use href="#i-shirt"/></svg></span><span>Fashion &amp; Accessories</span></a><a class="cat" href="#"><span class="cic c2"><svg class="i "><use href="#i-car"/></svg></span><span>Automotive</span></a><a class="cat" href="#"><span class="cic c3"><svg class="i "><use href="#i-monitor"/></svg></span><span>Electronics</span></a><a class="cat" href="#"><span class="cic c4"><svg class="i "><use href="#i-sofa"/></svg></span><span>Home &amp; Living</span></a><a class="cat" href="#"><span class="cic c5"><svg class="i "><use href="#i-basket"/></svg></span><span>Grocery &amp; Foodstuff</span></a><a class="cat" href="#"><span class="cic c6"><svg class="i "><use href="#i-grid"/></svg></span><span>All categories</span></a></div></section><section class="gifts">
+      <div class="rh"><h3>Gifts for every moment</h3><a class="see" href="#">Shop gifts<svg class="i s18"><use href="#i-right"/></svg></a></div>
+      <div class="chips gchips"><span class="chip">Birthday</span><span class="chip">Romantic</span><span class="chip">Mother's Day</span><span class="chip">Father's Day</span><span class="chip">Back to school</span></div>
+      <div class="gtrack">
+        <a class="gcard diy" href="#"><span class="gk"><svg class="i s20"><use href="#i-box"/></svg></span><strong>Build your own box</strong><span>You pick, we wrap</span><span class="gbtn">Start building <svg class="i s16"><use href="#i-right"/></svg></span></a>
+        <a class="gcard" href="#"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/gifts/1790598579146-zxjvf.png" alt=""><strong>Anniversary gift for him</strong><span class="gprice num">₦47,150</span></a>
+        <a class="gcard" href="#"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/gifts/1790596390982-meb3u.png" alt=""><strong>Birthday surprise box</strong><span class="gprice muted">From the gift shop</span></a>
+      </div>
+    </section><div style="height:120px"></div></div><nav class="navbar">
+      <a class="on" href="#"><span class="pill"><svg class="i s20"><use href="#i-home"/></svg></span>Home</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-grid"/></svg></span>Categories</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-cart"/></svg><span class="badge num">2</span></span>Cart</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-heart"/></svg></span>Wishlist</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-user"/></svg></span>Account</a>
+    </nav><div class="gesture"></div></div>
+      <figcaption><strong>Campaign row, right under the hero</strong><ul>
+        <li>The same place as today on desktop: first thing after the hero, before the free-delivery note and categories.</li>
+        <li>Campaign name, an "Ends in" chip and See all, then its offers as small cards that scroll sideways: photo with time left, the deal (e.g. -20%), the product and the offer name.</li>
+        <li>Two campaigns at once means two rows, newest first. No campaign means no row and no gap.</li>
+      </ul></figcaption>
+    </figure>
+    <figure class="v"><div class="phone"><div class="status"><span class="num">9:41</span><span class="sys"><svg width="16" height="16" fill="currentColor"><use href="#s-signal"/></svg><svg width="16" height="16" fill="currentColor"><use href="#s-wifi"/></svg><svg width="24" height="16" fill="currentColor"><use href="#s-batt"/></svg></span></div><div class="screen"><div class="appbar homebar">
+      <span class="logo"><img src="https://julinemart.com/images/logo.png" alt="JulineMart"></span>
+      <a class="searchbar" href="#"><svg class="i s20"><use href="#i-search"/></svg><span>Search JulineMart</span></a>
+    </div><section class="heroA" data-hero aria-label="Featured">
+      <div class="htrackA" data-auto="5000" data-delay="0"><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338802387-ftv4t.jpg" alt=""></div><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338810461-5wx67.jpg" alt=""></div><div class="slide"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338818153-xmxvh.jpg" alt=""></div></div>
+      <div class="dots"><span class="on"></span><span></span><span></span></div>
+    </section><section class="camp" aria-label="Kitchen Week">
+      <div class="rh"><span class="cue orange"><svg class="i s18"><use href="#i-zap"/></svg></span><h3>Kitchen Week</h3><span class="deadline"><svg class="i s16"><use href="#i-clock"/></svg><span class="num">2d 4h left</span></span><a class="see" href="#">See all<svg class="i s18"><use href="#i-right"/></svg></a></div>
+      <div class="ctrack"><a class="cc" href="#"><span class="cthumb"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782117536739-dz39g.png" alt=""><span class="ctime num">2d 4h</span></span>
+      <span class="cbody"><span class="cbadge">-20%</span><span class="ct">Silver Crest Commercial Blender </span><span class="co">Kitchen Week offer</span></span></a><a class="cc" href="#"><span class="cthumb"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782118237362-e3hjk.png" alt=""><span class="ctime num">2d 4h</span></span>
+      <span class="cbody"><span class="cbadge">-15%</span><span class="ct">Kinelco Nonstick Frying Pan </span><span class="co">Kitchen Week offer</span></span></a><a class="cc" href="#"><span class="cthumb"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1784847686855-b4ugv.jpg" alt=""><span class="ctime num">2d 4h</span></span>
+      <span class="cbody"><span class="cbadge">Free gift</span><span class="ct">Geepas Stainless Steel Electric Juice Extractor with Pulp Separator</span><span class="co">Kitchen Week offer</span></span></a><a class="cc" href="#"><span class="cthumb"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782120158579-bmx5s.png" alt=""><span class="ctime num">2d 4h</span></span>
+      <span class="cbody"><span class="cbadge">-10%</span><span class="ct">Kinelco Diamond Stainless Steel Electric Kettle 2.2L</span><span class="co">Kitchen Week offer</span></span></a></div>
+    </section><a class="promo" href="#"><svg class="i s20"><use href="#i-truck"/></svg><span><b>Free delivery</b> on orders over ₦100,000</span><svg class="i s18"><use href="#i-right"/></svg></a><section class="cats" aria-label="Shop by category"><div class="rh"><h3>Shop by category</h3></div><div class="cat-track"><a class="cat" href="#"><span class="cic c1"><svg class="i "><use href="#i-shirt"/></svg></span><span>Fashion &amp; Accessories</span></a><a class="cat" href="#"><span class="cic c2"><svg class="i "><use href="#i-car"/></svg></span><span>Automotive</span></a><a class="cat" href="#"><span class="cic c3"><svg class="i "><use href="#i-monitor"/></svg></span><span>Electronics</span></a><a class="cat" href="#"><span class="cic c4"><svg class="i "><use href="#i-sofa"/></svg></span><span>Home &amp; Living</span></a><a class="cat" href="#"><span class="cic c5"><svg class="i "><use href="#i-basket"/></svg></span><span>Grocery &amp; Foodstuff</span></a><a class="cat" href="#"><span class="cic c6"><svg class="i "><use href="#i-grid"/></svg></span><span>All categories</span></a></div></section><div style="height:120px"></div></div><nav class="navbar">
+      <a class="on" href="#"><span class="pill"><svg class="i s20"><use href="#i-home"/></svg></span>Home</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-grid"/></svg></span>Categories</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-cart"/></svg><span class="badge num">2</span></span>Cart</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-heart"/></svg></span>Wishlist</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-user"/></svg></span>Account</a>
+    </nav><div class="scrim"></div><div class="sheet" role="dialog" aria-label="Kitchen Week">
+      <span class="grab"></span>
+      <div class="sh-head"><span class="cue orange"><svg class="i s18"><use href="#i-zap"/></svg></span><span><b>Kitchen Week is on</b><span class="muted">Up to 20% off kitchen appliances · ends in 2d 4h</span></span></div>
+      <div class="sh-list"><a class="cc" href="#"><span class="cthumb"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782117536739-dz39g.png" alt=""><span class="ctime num">2d 4h</span></span>
+      <span class="cbody"><span class="cbadge">-20%</span><span class="ct">Silver Crest Commercial Blender </span><span class="co">Kitchen Week offer</span></span></a><a class="cc" href="#"><span class="cthumb"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782118237362-e3hjk.png" alt=""><span class="ctime num">2d 4h</span></span>
+      <span class="cbody"><span class="cbadge">-15%</span><span class="ct">Kinelco Nonstick Frying Pan </span><span class="co">Kitchen Week offer</span></span></a></div>
+      <a class="sh-btn" href="#">Shop the sale</a><a class="sh-later" href="#">Not now</a>
+    </div><div class="gesture"></div></div>
+      <figcaption><strong>The campaign pop-up becomes a bottom sheet</strong><ul>
+        <li>Today a centred pop-up opens on the homepage about a second after it loads. On phones it slides up from the bottom instead, and a swipe down or tap outside closes it.</li>
+        <li>It still shows once a day at most, and the campaign row stays on the page after it closes.</li>
+        <li>Desktop keeps today's centred pop-up.</li>
+      </ul></figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="group">
+  <h2>Further down</h2>
+  <p>The lower half: category rows, stores, reviews you can trust, and help. Shown with the Option A rows.</p>
+  <div class="row">
+    <figure class="v"><div class="phone"><div class="status"><span class="num">9:41</span><span class="sys"><svg width="16" height="16" fill="currentColor"><use href="#s-signal"/></svg><svg width="16" height="16" fill="currentColor"><use href="#s-wifi"/></svg><svg width="24" height="16" fill="currentColor"><use href="#s-batt"/></svg></span></div><div class="screen"><div class="appbar homebar">
+      <span class="logo"><img src="https://julinemart.com/images/logo.png" alt="JulineMart"></span>
+      <a class="searchbar" href="#"><svg class="i s20"><use href="#i-search"/></svg><span>Search JulineMart</span></a>
+    </div><section class="rail"><div class="rh"><span class="cue orange"><svg class="i s18"><use href="#i-zap"/></svg></span><h3>Flash sale</h3><span class="deadline"><svg class="i s16"><use href="#i-clock"/></svg><span class="num">Ends in 05:12:40</span></span><a class="see" href="#">See all<svg class="i s18"><use href="#i-right"/></svg></a></div><div class="track"><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/0e753a2c-3ab5-42cd-8439-99377d9615ea.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">X99 Mini-ITX DDR4 Motherboard LGA2011-3 with NVME M.2 Support</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦80,140.08</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://oss-cf.cjdropshipping.com/product/2024/09/05/05/37ddf1c6-6a51-486b-8af0-b351996d6984_trans.jpeg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">USB 3.0 Video Capture Card with Dual Interface (USB &amp; Type-C)</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦22,894.79</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/20200826/1574528875217.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Gold Geometric Crystal Drop Earrings with Blue Faceted Stone</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦32,635.48</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://cf.cjdropshipping.com/15227136/1907055018242.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">H80 4G LTE Portable WiFi Router with Display</div>
+      <div class="meta">JulineMart Official Store</div>
+      <div class="foot"><span class="price">₦26,957.57</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a></div></section><section class="rail"><div class="rh"><h3>Electronics</h3><a class="see" href="#">See all<svg class="i s18"><use href="#i-right"/></svg></a></div><div class="track"><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1784046475763-k3exf.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">JD Jindian 16-Inch Solar Standing Fan with Rechargeable Battery &amp; LED Light (JD-FG)</div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦61,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1783692432060-nfycs.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Rechargeable Portable LED Light with 7-Speed Mini Fan - Model JM-5588</div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦20,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1783691325244-z6rqy.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">K9 Dual Wireless Lavalier Microphone Kit for Android &amp; Type-C Devices</div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦11,500</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782901399024-cqfs4.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">C08 Selfie Stick Tripod with Bluetooth Remote Control</div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦27,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782899898477-3poez.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">ZYRE 1600W Electric Steam Iron with Teflon Soleplate</div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦16,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1782899465473-i9s1b.png" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">ZYRE Dry Iron with Teflon Soleplate – 1200W</div>
+      <div class="meta">Vikuves Household</div>
+      <div class="foot"><span class="price">₦14,500</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a></div></section><section class="rail"><div class="rh"><h3>Fashion &amp; accessories</h3><a class="see" href="#">See all<svg class="i s18"><use href="#i-right"/></svg></a></div><div class="track"><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1792914335266-b3y0u.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Luxury Customize Press-On Nails – Almond Stiletto Leopard &amp; Cherry Design</div>
+      <div class="meta">Beautify By Mira</div>
+      <div class="foot"><span class="price">₦12,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1792914137526-hvp27.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Luxury Red Almond Press-On Nails</div>
+      <div class="meta">Beautify By Mira</div>
+      <div class="foot"><span class="price">₦7,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1792913591400-6glym.jpg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Luxury Cute Press On Nails - Nude &amp; Yellow Design Set</div>
+      <div class="meta">Beautify By Mira</div>
+      <div class="foot"><span class="price">₦7,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1792525240232-jrfrs.jpeg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Glitter Ombre Almond Press-On Nails – Turquoise &amp; Pink Gradient</div>
+      <div class="meta">Beautify By Mira</div>
+      <div class="foot"><span class="price">₦7,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1792525021569-btavt.jpeg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Stiletto Press-On Nails - Red &amp; Pink Marble Design</div>
+      <div class="meta">Beautify By Mira</div>
+      <div class="foot"><span class="price">₦7,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a><a class="card" href="#" style="width:148px">
+      <div class="img"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/products/1792524859871-sjfin.jpeg" alt=""><span class="fav"><svg class="i s20"><use href="#i-heart"/></svg></span></div>
+      <div class="name">Luxury Customize Press On Nails with Floral Designs</div>
+      <div class="meta">Beautify By Mira</div>
+      <div class="foot"><span class="price">₦4,000</span><button class="add" aria-label="Add to cart"><svg class="i s20"><use href="#i-plus"/></svg></button></div>
+    </a></div></section><section class="stores"><div class="rh"><h3>Our stores</h3><a class="see" href="#">See all<svg class="i s18"><use href="#i-right"/></svg></a></div><div class="st-track"><a class="st" href="#"><span class="av t0">2E</span><span>2Classy Enterprises</span></a><a class="st" href="#"><span class="av t1">AK</span><span>A4 kiddies world</span></a><a class="st" href="#"><span class="av t2">A</span><span>Adafe</span></a><a class="st" href="#"><span class="av t0">BB</span><span>Beautify By Mira</span></a><a class="st" href="#"><span class="av t1">BC</span><span>Berry Choice Collection</span></a><a class="st" href="#"><span class="av t2">VH</span><span>Vikuves Household</span></a></div></section><section class="revs"><div class="rh"><h3>What shoppers say</h3></div><div class="rv-track"><figure class="rv"><span class="stars"><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg></span><blockquote>I love this, it&#x27;s very educative, especially for a child learning to read and write.</blockquote>
+      <figcaption><b>Temi Layo</b><span class="muted"> · Verified purchase</span><span class="rp">Children’s Early Education English Learning Card Machine</span></figcaption></figure><figure class="rv"><span class="stars"><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg></span><blockquote>This is amazing, seriously it amazing.</blockquote>
+      <figcaption><b>Mary Joseph</b><span class="muted"> · Verified purchase</span><span class="rp">Abstract Thick Knife Colorful Floral Oil Painting</span></figcaption></figure><figure class="rv"><span class="stars"><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg><svg class="i s16 fill"><use href="#i-star"/></svg></span><blockquote>It is affordable and good.</blockquote>
+      <figcaption><b>Abdurrahmon Olayemi</b><span class="muted"> · Verified purchase</span><span class="rp">ROCKBROS 400LM USB Rechargeable Front Bicycle Light</span></figcaption></figure></div></section><section class="help">
+      <a class="li" href="#"><span class="lead purple"><svg class="i s20"><use href="#i-msg"/></svg></span><span class="body"><span class="h">Help &amp; contact</span><span class="s">WhatsApp, call or email support</span></span><svg class="i s20 trail"><use href="#i-right"/></svg></a>
+      <a class="li" href="#"><span class="lead"><svg class="i s20"><use href="#i-return"/></svg></span><span class="body"><span class="h">Returns &amp; refunds</span><span class="s">Refunds within 7 days of approval</span></span><svg class="i s20 trail"><use href="#i-right"/></svg></a>
+      <a class="li" href="#"><span class="lead"><svg class="i s20"><use href="#i-store"/></svg></span><span class="body"><span class="h">Sell on JulineMart</span><span class="s">Open a store and reach shoppers nationwide</span></span><svg class="i s20 trail"><use href="#i-right"/></svg></a>
+      <p class="legal">Delivery by Fez · <a href="#">Terms</a> · <a href="#">Privacy</a> · © 2026 JulineMart</p>
+    </section><div style="height:120px"></div></div><nav class="navbar">
+      <a class="on" href="#"><span class="pill"><svg class="i s20"><use href="#i-home"/></svg></span>Home</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-grid"/></svg></span>Categories</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-cart"/></svg><span class="badge num">2</span></span>Cart</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-heart"/></svg></span>Wishlist</a>
+      <a href="#"><span class="pill"><svg class="i s20"><use href="#i-user"/></svg></span>Account</a>
+    </nav><div class="gesture"></div></div>
+      <figcaption><strong>Lower half</strong><ul>
+        <li>Flash sale with a countdown chip, shown only when a sale has an end time.</li>
+        <li>Stores row stays. Reviews show only real product reviews with something to say, and the product they are about.</li>
+        <li>The desktop footer is replaced by three help rows and one line of links.</li>
+      </ul></figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="group">
+  <h2>Desktop: side panels that slide</h2>
+  <p>Today each side panel shows one image. With this change each panel holds a list and slides through it on its own, at a different moment from the main hero. The same ads feed the phone carousel above.</p>
+  <div class="desk">
+    <div class="dpanel"><div class="dtrack" data-auto="7000" data-delay="1500"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338827376-tqnjd.jpg" alt=""><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338834575-wdyj5.jpg" alt=""></div><div class="dots"><span class="on"></span><span></span></div><span class="dlabel">Left panel · 2 ads</span></div>
+    <div class="dhero"><div class="dtrack" data-auto="5000" data-delay="0"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338802387-ftv4t.jpg" alt=""><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338810461-5wx67.jpg" alt=""><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338818153-xmxvh.jpg" alt=""></div><div class="dots"><span class="on"></span><span></span><span></span></div></div>
+    <div class="dpanel"><div class="dtrack" data-auto="7000" data-delay="4500"><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338834575-wdyj5.jpg" alt=""><img src="https://gfikkrwhsedhwmkxybzm.supabase.co/storage/v1/object/public/product-images/homepage/1792338827376-tqnjd.jpg" alt=""></div><div class="dots"><span class="on"></span><span></span></div><span class="dlabel">Right panel · 2 ads</span></div>
+  </div>
+</section>
+
+<section class="group">
+  <h2>What you decide</h2>
+  <ol style="margin:0;padding-left:20px;max-width:72ch;color:var(--board-muted);line-height:1.7">
+    <li><b style="color:var(--board-ink)">Option A or B</b> for the hero and the product rows. Recommended: A (closest to today, lighter on mobile data), optionally with B's peeking hero.</li>
+    <li><b style="color:var(--board-ink)">Side-panel ads:</b> each desktop side panel takes several ads and slides; on phones all of them play in one small carousel in the middle of the homepage. Phones show the same tall images you already upload, scaled down, so nothing extra is needed. At this size the strip is about 180px tall and the headlines stay readable. "Get the app" is hidden inside the Android app.</li>
+    <li><b style="color:var(--board-ink)">Campaigns:</b> a row right under the hero while a campaign is live, and the pop-up turns into a bottom sheet on phones (desktop unchanged).</li>
+    <li><b style="color:var(--board-ink)">Category colours:</b> today's five colours (A) or one purple family (B).</li>
+    <li><b style="color:var(--board-ink)">Flash sale countdown and discount tags:</b> your products have no sale end time or "was" price yet, so these only appear once that data is added in admin.</li>
+    <li><b style="color:var(--board-ink)">Broken flash-sale photos:</b> 8 of the 12 flash-sale products still load images from the old WordPress site, so they show blank today. They need new photos in admin either way.</li>
+  </ol>
+</section>
+
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.querySelectorAll('[data-auto]').forEach((track) => {
+    const dots = track.parentElement.querySelectorAll('.dots span');
+    const slides = [...track.children];
+    let i = 0, pausedUntil = 0;
+    const go = (n) => {
+      i = (n + slides.length) % slides.length;
+      track.scrollTo({ left: slides[i].offsetLeft - slides[0].offsetLeft, behavior: 'smooth' });
+      dots.forEach((d, k) => d.classList.toggle('on', k === i));
+    };
+    track.addEventListener('pointerdown', () => { pausedUntil = Date.now() + 10000; });
+    track.addEventListener('scroll', () => {
+      const x = track.scrollLeft; let best = 0;
+      const o = slides[0].offsetLeft; slides.forEach((s, k) => { if (Math.abs(s.offsetLeft - o - x) < Math.abs(slides[best].offsetLeft - o - x)) best = k; });
+      i = best; dots.forEach((d, k) => d.classList.toggle('on', k === i));
+    }, { passive: true });
+    if (reduce) return;
+    setTimeout(() => setInterval(() => { if (Date.now() > pausedUntil) go(i + 1); }, +track.dataset.auto), +track.dataset.delay);
+  });
+})();
+</script>
+
+<footer class="board-foot">Static preview built from the approved phone design (design/mobile-tier/index.html). Nothing on the live site changes until you approve a direction.</footer>
+</body>
+</html>

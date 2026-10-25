@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Store } from 'lucide-react';
+import { ChevronRight, Store } from 'lucide-react';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 const AVATAR_COLORS = [
@@ -46,18 +46,24 @@ export default async function VendorStrip() {
   if (vendors.length === 0) return null;
 
   return (
-    <section className="bg-gray-50 border-t border-b border-gray-200 py-6 md:py-8">
-      <div className="container mx-auto px-4 max-w-6xl">
-        <div className="flex items-center justify-between mb-4">
+    // Phones (mobile tier, max-md:): no band, Material header, larger tinted initials.
+    <section className="bg-gray-50 border-t border-b border-gray-200 py-6 max-md:border-0 max-md:bg-transparent max-md:pb-0 max-md:pt-3 md:py-8">
+      <div className="container mx-auto px-4 max-w-6xl max-md:!px-4">
+        <div className="flex items-center justify-between mb-4 max-md:-mr-3 max-md:mb-1 max-md:min-h-12">
           <div className="flex items-center gap-2">
-            <Store className="w-4 h-4 text-primary-600" aria-hidden="true" />
-            <h2 className="text-sm font-semibold text-gray-900">Our Stores</h2>
+            <Store className="w-4 h-4 text-primary-600 max-md:hidden" aria-hidden="true" />
+            <h2 className="text-sm font-semibold text-gray-900 max-md:text-m-title-m max-md:text-m-on-surface">
+              <span className="md:hidden">Our stores</span>
+              <span className="max-md:hidden">Our Stores</span>
+            </h2>
           </div>
           <Link
             href="/vendors"
-            className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+            className="text-xs text-primary-600 hover:text-primary-700 font-medium max-md:flex max-md:h-12 max-md:items-center max-md:gap-0.5 max-md:px-3 max-md:text-m-label-l max-md:text-m-primary"
           >
-            View all →
+            <span className="md:hidden">See all</span>
+            <ChevronRight className="h-[18px] w-[18px] md:hidden" aria-hidden />
+            <span className="max-md:hidden">View all →</span>
           </Link>
         </div>
 
@@ -72,22 +78,22 @@ export default async function VendorStrip() {
                 <Link
                   key={v.id}
                   href={`/vendor/${encodeURIComponent(routeKey)}`}
-                  className="group flex w-[72px] shrink-0 flex-col items-center gap-1.5 text-center md:w-20"
+                  className="group flex w-[72px] shrink-0 flex-col items-center gap-1.5 text-center max-md:gap-2 md:w-20"
                 >
                   {v.logo_url ? (
                     <img
                       src={v.logo_url}
                       alt={v.store_name || ''}
-                      className="h-10 w-10 rounded-full border border-gray-100 object-cover transition-colors group-hover:border-primary-300 md:h-11 md:w-11"
+                      className="h-10 w-10 rounded-full border border-gray-100 object-cover transition-colors group-hover:border-primary-300 max-md:h-14 max-md:w-14 max-md:border-m-outline-variant md:h-11 md:w-11"
                     />
                   ) : (
                     <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold transition-all group-hover:ring-2 group-hover:ring-primary-200 md:h-11 md:w-11 ${color.bg} ${color.text}`}
+                      className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold transition-all group-hover:ring-2 group-hover:ring-primary-200 max-md:h-14 max-md:w-14 max-md:text-m-title-s md:h-11 md:w-11 ${color.bg} ${color.text}`}
                     >
                       {abbr}
                     </div>
                   )}
-                  <span className="line-clamp-2 w-full px-0.5 text-xs leading-tight text-gray-600 transition-colors group-hover:text-primary-600">
+                  <span className="line-clamp-2 w-full px-0.5 text-xs leading-tight text-gray-600 transition-colors group-hover:text-primary-600 max-md:text-m-label-s max-md:text-m-on-surface-variant">
                     {v.store_name}
                   </span>
                 </Link>
