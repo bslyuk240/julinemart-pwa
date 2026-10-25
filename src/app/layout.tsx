@@ -17,6 +17,7 @@ import CookieConsentBanner from '@/components/pwa/cookie-consent-banner';
 import GoogleAnalytics from '@/components/pwa/google-analytics';
 import VisualViewportBottomSync from '@/components/layout/visual-viewport-bottom-sync';
 import PaystackPreloader from '@/components/payments/paystack-preloader';
+import LaunchSplash from '@/components/pwa/launch-splash';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -88,6 +89,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
       </head>
       <body className={`${inter.className} min-h-0 overflow-x-clip`}>
+        {/* First in <body> so its inline script runs before anything paints. */}
+        <LaunchSplash />
         <VisualViewportBottomSync />
         <PaystackPreloader />
         <StatusBarManager />

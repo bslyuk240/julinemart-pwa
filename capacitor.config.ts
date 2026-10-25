@@ -10,6 +10,11 @@ const config: CapacitorConfig = {
     cleartext: true,
     androidScheme: 'https'
   },
+  android: {
+    // Shown while the site loads, between the native splash and the web launch
+    // animation, so that gap is brand purple instead of white.
+    backgroundColor: '#77088a',
+  },
   plugins: {
     SystemBars: {
       insetsHandling: 'css',

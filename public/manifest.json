@@ -4,7 +4,7 @@
   "description": "Shop the best deals on phones, electronics, fashion and more",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#77088a",
   "theme_color": "#77088a",
   "orientation": "portrait-primary",
   "scope": "/",

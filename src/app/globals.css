@@ -273,3 +273,142 @@ body {
   .cms-article h3, .cms-article h4 { font-size: 17px; margin-top: 20px; }
   .cms-article td, .cms-article th { border-color: var(--m-outline-variant); }
 }
+
+/* Launch splash (src/components/pwa/launch-splash.tsx). Hidden unless the inline
+   script sets data-play on an app launch. Phones only: desktop never shows it.
+   Frame one matches Chrome's PWA splash (flat manifest background_color, the full
+   logo at about OS-icon size). Timeline: logo settles (0-0.44s), ripple (0.3s),
+   lifts as the tagline appears (0.42-1s), shine (0.62s), the logo's wave rises
+   from the bottom with orange sparks (0.12-1.4s), fade out at 1.45s. */
+.jm-launch {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #fff;
+  background: #77088a;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.jm-launch::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 75% at 50% 46%, #8c14a3 0%, transparent 48%, rgb(0 0 0 / 0.18) 100%);
+  animation: jm-fade-in 500ms ease-out both;
+}
+.jm-launch[data-play] {
+  display: flex;
+  animation: jm-launch-out 300ms cubic-bezier(0.4, 0, 0.2, 1) 1450ms forwards;
+}
+.jm-launch[data-play][data-skip] { animation: jm-launch-out-skip 200ms ease-out forwards; }
+@media (min-width: 768px) {
+  .jm-launch[data-play] { display: none; }
+}
+
+.jm-launch__lockup {
+  position: relative;
+  display: grid;
+  place-items: center;
+  animation:
+    jm-lift 560ms cubic-bezier(0.22, 1, 0.36, 1) 420ms both,
+    jm-lockup-out 300ms cubic-bezier(0.4, 0, 0.2, 1) 1450ms forwards;
+}
+.jm-launch__logo {
+  position: relative;
+  width: 136px;
+  height: 136px;
+  border-radius: 9999px;
+  overflow: hidden;
+  box-shadow: 0 14px 36px rgb(40 0 50 / 0.38);
+  animation: jm-logo-in 440ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+.jm-launch__logo img { display: block; width: 100%; height: 100%; }
+.jm-launch__shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.55) 50%, transparent 65%);
+  transform: translateX(-110%);
+  animation: jm-shine 700ms ease-in-out 620ms both;
+}
+.jm-launch__halo {
+  position: absolute;
+  width: 136px;
+  height: 136px;
+  border-radius: 9999px;
+  border: 2px solid rgb(255 255 255 / 0.55);
+  opacity: 0;
+  animation: jm-halo 900ms cubic-bezier(0.2, 0.7, 0.3, 1) 300ms both;
+}
+.jm-launch__tagline {
+  position: absolute;
+  top: calc(100% + 20px);
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgb(255 255 255 / 0.9);
+  animation: jm-fade-up 420ms ease-out 640ms both;
+}
+.jm-launch__waves {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 30%;
+  pointer-events: none;
+  animation: jm-wave-rise 760ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+}
+.jm-launch__wave {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 200%;
+  height: 100%;
+}
+.jm-launch__wave--back {
+  fill: rgb(255 255 255 / 0.08);
+  translate: 0 -14%;
+  animation: jm-wave-sway 1800ms ease-in-out both reverse;
+}
+/* The deep indigo of the logo's wave. */
+.jm-launch__wave--front { fill: #3d0a7a; animation: jm-wave-sway 1800ms ease-in-out both; }
+.jm-launch__spark {
+  position: absolute;
+  border-radius: 9999px;
+  background: #ff8c4a;
+  box-shadow: 0 0 10px rgb(255 140 74 / 0.7);
+  animation: jm-spark 1000ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@keyframes jm-launch-out { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+@keyframes jm-launch-out-skip { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+@keyframes jm-fade-in { from { opacity: 0; } }
+/* lift and exit animate the separate translate and scale properties so they compose. */
+@keyframes jm-lift { to { translate: 0 -22px; } }
+@keyframes jm-lockup-out { to { scale: 1.06; } }
+/* Starts at about the size of the logo on the native/OS splash, then settles into place. */
+@keyframes jm-logo-in { from { transform: scale(1.1); } }
+@keyframes jm-shine { from { transform: translateX(-110%); } to { transform: translateX(110%); } }
+@keyframes jm-halo {
+  from { opacity: 0.8; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.7); }
+}
+@keyframes jm-fade-up { from { opacity: 0; transform: translateY(6px); } }
+@keyframes jm-wave-rise { from { translate: 0 100%; } }
+@keyframes jm-wave-sway { from { transform: translateX(0); } to { transform: translateX(-18%); } }
+@keyframes jm-spark {
+  from { opacity: 0; transform: translateY(24px) scale(0.6); }
+  40% { opacity: 1; }
+  to { opacity: 0; transform: translateY(-90px) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jm-launch[data-play] { animation-delay: 600ms; }
+  .jm-launch::before, .jm-launch__lockup, .jm-launch__logo, .jm-launch__tagline { animation: none; }
+  .jm-launch__shine, .jm-launch__halo { display: none; }
+  .jm-launch__waves, .jm-launch__wave { animation: none; }
+  .jm-launch__spark { display: none; }
+}

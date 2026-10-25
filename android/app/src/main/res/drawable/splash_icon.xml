@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android masks the splash icon to a circle two-thirds of its canvas, so the
+     round logo is inset 24% per side (about 150dp, the size the web launch animation
+     starts at) so it shows whole, ring included. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/splash_logo"
+    android:inset="24%" />

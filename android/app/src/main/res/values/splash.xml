@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the PWA manifest background_color and the web launch screen. -->
+    <color name="splash_background">#77088a</color>
+</resources>

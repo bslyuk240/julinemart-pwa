@@ -23,7 +23,11 @@ export function StatusBarManager() {
             themeColorMeta.setAttribute('content', '#ffffff');
           }
 
-          await SystemBars.setStyle({ style: SystemBarsStyle.Light });
+          // While the launch animation plays it owns the bar style, and sets
+          // Light itself when it ends (inline script in src/components/pwa/launch-splash.tsx).
+          if (!document.querySelector('#jm-launch[data-play]')) {
+            await SystemBars.setStyle({ style: SystemBarsStyle.Light });
+          }
           await SystemBars.show();
         }
       } catch {
