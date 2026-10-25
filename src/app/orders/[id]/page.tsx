@@ -741,7 +741,7 @@ export default function OrderDetailPage() {
                     <p className="text-sm font-medium text-red-800">Cancel this order?</p>
                     {isPaid && (
                       <p className="text-xs text-red-700">
-                        Your payment will be refunded within 5–10 business days.
+                        Your payment will be refunded within 7 days.
                       </p>
                     )}
                     <div className="flex gap-2">

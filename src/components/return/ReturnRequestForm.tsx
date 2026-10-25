@@ -30,6 +30,16 @@ const COMPLAINT_TYPES = [
   { value: 'other', label: 'Other' },
 ] as const;
 
+// Returns caused by us or the vendor: JulineMart covers the Fez waybill (prepaid return code).
+// Customer reasons (changed mind): the customer pays Fez at drop-off. See Refund & Returns Policy §7.
+const OUR_FAULT_REASONS = new Set(['wrong_product', 'damaged', 'not_as_described', 'missing_items', 'suspected_counterfeit', 'not_received']);
+
+function dropoffCostNote(reason: string | null | undefined): string {
+  if (reason && OUR_FAULT_REASONS.has(reason)) return 'Free: the problem is on our side, so your return code is prepaid. Nothing to pay at the counter.';
+  if (reason === 'changed_mind') return 'You pay Fez at drop-off (usually ₦1,000–₦3,000, depending on location).';
+  return 'Free when the problem is on our side. Otherwise you pay Fez at drop-off.';
+}
+
 type PickupQuote = {
   enabled: boolean;
   available: boolean;
@@ -601,6 +611,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                 <div>
                   <p className="font-semibold">3) Get a tracking number from Fez</p>
                   <p>They&apos;ll share it on the waybill/receipt.</p>
+                  <p className="mt-1">{dropoffCostNote(activeReturn.reason_code)}</p>
                 </div>
                 <div>
                   <p className="font-semibold">4) Enter the tracking number</p>
@@ -623,6 +634,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
 
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-2">
               <p className="text-sm font-semibold text-emerald-900">Refund Status</p>
+              <p className="text-xs text-emerald-800">Refunds are paid within 7 days once your return is approved.</p>
               <span
                 className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${refundDisplay.bgColor} ${refundDisplay.color}`}
               >
@@ -806,6 +818,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                 <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-m-primary" aria-hidden />
                 <p className="text-m-body-m text-m-on-surface">
                   Drop it at any Fez Delivery office near you. You&apos;ll get a tracking number for your return.
+                  <span className="mt-1 block text-m-body-s text-m-on-surface-variant">{dropoffCostNote(complaintType)}</span>
                 </p>
               </div>
             )}
@@ -821,9 +834,9 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
                 <input type="radio" name="return_method" className="sr-only" checked={method === 'dropoff'} onChange={() => setMethod('dropoff')} />
                 {tier && <RadioDot selected={method === 'dropoff'} />}
                 <div>
-                  <p className="font-semibold text-gray-900">Drop off at a Fez location (free)</p>
+                  <p className="font-semibold text-gray-900">Drop off at a Fez location</p>
                   <p className="text-xs text-gray-600">Take your item to any Fez Delivery location near you.</p>
-                  <p className="text-xs text-gray-700 mt-2">You'll get a tracking number to monitor your return.</p>
+                  <p className="text-xs text-gray-700 mt-2">{dropoffCostNote(complaintType)}</p>
                 </div>
               </label>
               {pickupEnabled ? (
@@ -944,7 +957,7 @@ export default function ReturnRequestForm({ orderId }: ReturnRequestFormProps) {
               ) : quote ? (
                 <div className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
                   <p>
-                    Pickup costs <strong>{formatPrice(quote.fee, currency)}</strong>. It&apos;s taken off your refund. Drop-off is free.
+                    Pickup costs <strong>{formatPrice(quote.fee, currency)}</strong>. It&apos;s taken off your refund. Or drop it at a Fez office and pay Fez there instead.
                   </p>
                   <label className="flex items-start gap-2">
                     <input

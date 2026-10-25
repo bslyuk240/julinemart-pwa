@@ -91,7 +91,7 @@ export async function getStorePolicies(forceRefresh = false): Promise<StorePolic
     refundPolicy: {
       enabled: true,
       days: 3,
-      description: 'Refunds are processed within 5-10 business days after we receive your returned item (requests accepted within 3 days).',
+      description: 'Refunds are paid within 7 days once your return is approved (requests accepted within 3 days of delivery).',
       conditions: [
         'Item must meet return policy conditions',
         'Refunds are issued to the original payment method',

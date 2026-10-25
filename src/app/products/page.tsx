@@ -38,7 +38,6 @@ const COLLECTIONS: { tag: string | null; label: string }[] = [
   { tag: 'flash-sale', label: 'Flash sale' },
   { tag: 'deal', label: 'Deals' },
   { tag: 'best-seller', label: 'Best sellers' },
-  { tag: 'top-seller', label: 'Top sellers' },
   { tag: 'sponsored', label: 'Sponsored' },
   { tag: 'launching-deal', label: 'Launching deals' },
 ];
@@ -73,7 +72,9 @@ function ProductsContent() {
   const collectionsRef = useRef<HTMLElement>(null);
 
   const sortBy = sortFromParam(searchParams.get('sort')) || 'date';
-  const tagFilter = searchParams.get('tag');
+  // "Top sellers" was merged into "Best sellers"; old links (e.g. the homepage section) still work.
+  const rawTag = searchParams.get('tag');
+  const tagFilter = rawTag === 'top-seller' ? 'best-seller' : rawTag;
   const searchKey = searchParams.toString();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -99,12 +100,8 @@ function ProductsContent() {
         description: 'Handpicked discounts curated for you',
       },
       'best-seller': {
-        title: 'Trending Products',
-        description: 'Most popular items right now',
-      },
-      'top-seller': {
-        title: 'Top Sellers',
-        description: 'Best selling products this month',
+        title: 'Best Sellers',
+        description: 'Our most popular products right now',
       },
       sponsored: {
         title: 'Sponsored Products',
@@ -511,16 +508,6 @@ function ProductsContent() {
                 }`}
               >
                 Best Sellers
-              </Link>
-              <Link
-                href={buildProductsHref('top-seller')}
-                className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
-                  tagFilter === 'top-seller'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Top Sellers
               </Link>
               <Link
                 href={buildProductsHref('sponsored')}
