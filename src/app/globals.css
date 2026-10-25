@@ -238,7 +238,7 @@ body {
 }
 
 /* CMS article body (policy and info pages, src/app/page/[slug]). There is no typography plugin,
-   and preflight strips list and heading styles, so these give the WordPress HTML its structure.
+   and preflight strips list and heading styles, so these give the static_pages HTML (Supabase) its structure.
    Scoped to this class only: product descriptions keep their own rendering. */
 .cms-article { font-size: 16px; line-height: 1.7; color: #374151; overflow-wrap: anywhere; }
 .cms-article p, .cms-article ul, .cms-article ol { margin: 0 0 16px; }

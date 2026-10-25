@@ -73,7 +73,7 @@ export default function Header() {
     setLogoSrc(envLogo || DEFAULT_LOGO);
   }, [envLogo]);
 
-  // ==================== FETCH BANNER FROM WORDPRESS (NEW!) ====================
+  // ==================== FETCH BANNER (Supabase, via /api/pwa-settings) ====================
   useEffect(() => {
     async function fetchBanner() {
       try {

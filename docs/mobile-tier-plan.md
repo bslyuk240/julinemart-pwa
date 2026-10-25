@@ -388,7 +388,7 @@ The local catalogue returned no brands, so only the brands empty state was check
 
 **M12 status (2026-10-19): contact and info pages built, not committed.** `/contact` and `/page/*` join the tier with the tab bar (Account stays lit).
 - Contact: "Reach us" list (WhatsApp, call, email, maps), the form with 48px/16px fields and a pill submit, then a "Sell on JulineMart" row. External rows show an external-link icon.
-- Policy pages: top bar with title and updated date, edge-to-edge article with phone-only `.m-article` styles. WordPress `<p><strong>` section titles become `<h2>` server-side, which looks the same on desktop.
+- Policy pages: top bar with title and updated date, edge-to-edge article with phone-only `.m-article` styles. `<p><strong>` section titles in the `static_pages` HTML become `<h2>` server-side, which looks the same on desktop.
 - Phones have no site footer on tier routes, so the account hub gets a "Help & info" group and the phone sign-in screen gets help/policy links.
 - ~~Follow-up: desktop policy pages render as unstyled text (no typography plugin).~~ Fixed in M16.
 

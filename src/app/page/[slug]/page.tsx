@@ -35,6 +35,8 @@ export default async function DynamicPage({ params }: PageProps) {
   }
 
   // Normalize internal links to open within this app (only rewrite /page/ links)
+  // Legacy: WordPress is retired, but some static_pages HTML still holds absolute links to the old WP site.
+  // NEXT_PUBLIC_WP_URL (set only in .env.production) lets us rewrite those to in-app /page/ links.
   const wpBase = process.env.NEXT_PUBLIC_WP_URL?.replace(/\/+$/, '');
   let normalizedContent = page.content;
   if (wpBase) {
@@ -65,7 +67,7 @@ export default async function DynamicPage({ params }: PageProps) {
     }
   }
 
-  // WordPress section titles arrive as <p><strong>Title</strong></p>. Promote them to <h2> so screen readers can jump
+  // Section titles in the static_pages HTML arrive as <p><strong>Title</strong></p>. Promote them to <h2> so screen readers can jump
   // between sections; the inner <strong> keeps the look identical where no heading styles apply.
   // Numbered sub-sections ("3.1 Defective items") become <h3> so they sit under their section.
   normalizedContent = normalizedContent.replace(/<p>\s*(<strong>\s*\d+\.\d+[^<]*<\/strong>)\s*<\/p>/gi, '<h3>$1</h3>');
