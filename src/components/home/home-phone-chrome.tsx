@@ -1,20 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, MessageCircle, RotateCcw, Search, Sparkles, Store, Truck } from 'lucide-react';
+import { ChevronRight, Headphones, MessageCircle, RotateCcw, Search, Sparkles, Store, Truck } from 'lucide-react';
+import { openSupportChat } from '@/lib/support-chat';
 import MobileSectionHeader from '@/components/home/mobile-section-header';
-import { useFreeShipping } from '@/hooks/use-free-shipping';
-import type { HomeBanner } from '@/lib/home/pwa-settings';
 
 // Phone-only (md:hidden) pieces of the homepage. On phones the site header and
 // footer are hidden (mobile tier), so these take over their jobs on Home.
 
 const LOGO_SRC = process.env.NEXT_PUBLIC_LOGO_URL?.trim() || '/images/logo.png';
 
-/** Root top bar: logo and a search field that opens the full-screen search. */
+/** Root top bar: logo, a search field that opens the full-screen search, and support chat. */
 export function HomeTopBar() {
   return (
-    <header className="sticky top-0 z-m-header flex h-16 items-center gap-2 bg-m-surface pl-3 pr-4 md:hidden">
+    <header className="sticky top-0 z-m-header flex h-16 items-center gap-2 bg-m-surface pl-3 pr-1 md:hidden">
       <h1 className="sr-only">JulineMart</h1>
       <Link href="/" aria-label="JulineMart home" className="grid h-12 w-12 flex-none place-items-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -27,48 +26,44 @@ export function HomeTopBar() {
         <Search className="h-5 w-5 shrink-0" aria-hidden />
         <span className="truncate">Search JulineMart</span>
       </Link>
+      <button
+        type="button"
+        onClick={openSupportChat}
+        aria-label="Open support chat"
+        className="grid h-12 w-12 flex-none place-items-center rounded-full text-m-on-surface-variant active:bg-black/10"
+      >
+        <Headphones className="h-6 w-6" aria-hidden />
+      </button>
     </header>
   );
 }
 
-/**
- * The announcement bar (purple strip above the desktop header), as a tonal row
- * under the hero. Without admin text it advertises the live free-shipping offer.
- */
-export function HomePromoStrip({ banner }: { banner: HomeBanner }) {
-  const { threshold, loading } = useFreeShipping();
-  if (!banner.enabled) return null;
-
-  const text =
-    banner.text ||
-    (loading || threshold === null
-      ? ''
-      : threshold > 0
-        ? `Free delivery on orders over ₦${threshold.toLocaleString()}`
-        : 'Free delivery on every order');
-  if (!text) return null;
+/** The announcement bar (purple strip above the desktop header), as a tonal row under the hero. */
+export function HomePromoStrip({ promo }: { promo: { text: string; link: string } | null }) {
+  if (!promo) return null;
+  const { text, link } = promo;
 
   const Icon = /ship|deliver/i.test(text) ? Truck : Sparkles;
   const body = (
     <>
       <Icon className="h-5 w-5 flex-none" aria-hidden />
       <span className="min-w-0 flex-1 py-2.5">{text}</span>
-      {banner.link && <ChevronRight className="h-[18px] w-[18px] flex-none" aria-hidden />}
+      {link && <ChevronRight className="h-[18px] w-[18px] flex-none" aria-hidden />}
     </>
   );
   const className =
     'mx-4 mt-4 flex min-h-12 items-center gap-3 rounded-m-card bg-m-primary-container pl-4 pr-3 text-m-body-m text-m-on-primary-container md:hidden';
 
-  if (!banner.link) return <p className={className}>{body}</p>;
-  if (banner.link.startsWith('/')) {
+  if (!link) return <p className={className}>{body}</p>;
+  if (link.startsWith('/')) {
     return (
-      <Link href={banner.link} className={className}>
+      <Link href={link} className={className}>
         {body}
       </Link>
     );
   }
   return (
-    <a href={banner.link} target="_blank" rel="noopener noreferrer" className={className}>
+    <a href={link} target="_blank" rel="noopener noreferrer" className={className}>
       {body}
     </a>
   );

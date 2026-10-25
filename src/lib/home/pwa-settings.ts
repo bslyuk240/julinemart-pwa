@@ -17,6 +17,8 @@ export type HeroAd = {
   image_url: string;
   video_url?: string;
   link: string;
+  /** Short description for screen readers, set in JLO admin. Older ads have none. */
+  alt?: string;
 };
 
 export type HeroAdLists = { left: HeroAd[]; right: HeroAd[] };
@@ -77,6 +79,7 @@ function toHeroAd(value: unknown): HeroAd | null {
     image_url: imageUrl,
     video_url: videoUrl || undefined,
     link: typeof ad.link === 'string' ? ad.link.trim() : '',
+    alt: typeof ad.alt === 'string' && ad.alt.trim() ? ad.alt.trim() : undefined,
   };
 }
 
@@ -107,5 +110,39 @@ export function toHomeBanner(raw: unknown): HomeBanner {
     enabled: banner.enabled !== false,
     text: typeof banner.text === 'string' ? banner.text.trim() : '',
     link: safeLink(banner.link),
+  };
+}
+
+const JLO_BASE = (process.env.JLO_API_BASE_URL || process.env.NEXT_PUBLIC_JLO_CATALOG_URL || '').replace(/\/$/, '');
+
+/** Live free-shipping minimum from JLO (as /api/jlo/free-shipping), or null when none runs or JLO is slow. */
+async function getFreeShippingThreshold(): Promise<number | null> {
+  if (!JLO_BASE) return null;
+  try {
+    const res = await fetch(`${JLO_BASE}/.netlify/functions/free-shipping`, {
+      next: { revalidate: 300 },
+      signal: AbortSignal.timeout(2500),
+    });
+    const payload = await res.json().catch(() => null);
+    const min = Number(payload?.data?.minOrderValue);
+    return res.ok && payload?.success && Number.isFinite(min) ? min : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The phone homepage's announcement strip, worked out on the server so it renders
+ * with the page: the admin text, or else the live free-shipping offer, or nothing.
+ */
+export async function getHomePromo(raw: unknown): Promise<{ text: string; link: string } | null> {
+  const banner = toHomeBanner(raw);
+  if (!banner.enabled) return null;
+  if (banner.text) return { text: banner.text, link: banner.link };
+  const threshold = await getFreeShippingThreshold();
+  if (threshold === null) return null;
+  return {
+    text: threshold > 0 ? `Free delivery on orders over ₦${threshold.toLocaleString('en-NG')}` : 'Free delivery on every order',
+    link: banner.link,
   };
 }

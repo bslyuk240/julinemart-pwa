@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { Cookie, X } from 'lucide-react';
+import { getMobileTierRoute } from '@/lib/mobile/mobile-tier-routes';
 import {
   type ConsentChoice,
   getStoredConsent,
@@ -11,6 +13,8 @@ import {
 
 export default function CookieConsentBanner() {
   const [show, setShow] = useState(false);
+  // Mobile-tier pages with a tab bar: sit above its 80px bar instead of the old 3.5rem bottom nav.
+  const aboveTabBar = getMobileTierRoute(usePathname())?.tabBar === true;
 
   useEffect(() => {
     const stored = getStoredConsent();
@@ -43,7 +47,9 @@ export default function CookieConsentBanner() {
         // Tailwind arbitrary value keeps specificity equal so md:bottom-0 wins
         // on desktop via source order (responsive utilities come last in output).
         'fixed left-0 right-0 z-40',
-        'bottom-[calc(3.5rem_+_env(safe-area-inset-bottom,_0px)_+_var(--jm-vv-bottom-inset,_0px))] md:bottom-0',
+        aboveTabBar
+          ? 'bottom-[calc(var(--m-tabbar-h)_+_var(--jm-vv-bottom-inset,_0px))] md:bottom-0'
+          : 'bottom-[calc(3.5rem_+_env(safe-area-inset-bottom,_0px)_+_var(--jm-vv-bottom-inset,_0px))] md:bottom-0',
         'animate-in slide-in-from-bottom duration-300',
       ].join(' ')}
     >

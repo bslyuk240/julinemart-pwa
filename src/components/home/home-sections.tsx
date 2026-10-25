@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import FlashSales from '@/components/home/flash-sales';
 import DealsSection from '@/components/home/deals-section';
 import TrendingSection from '@/components/home/trending-section';
@@ -244,25 +245,18 @@ export default function HomeSections({ initialSections, phoneAds = [] }: HomeSec
         <MobileHomeRail key={s.key} title={s.title} products={s.products} />
       ))}
 
+      {/* Nothing tagged yet (or every fetch failed): a quiet line, not admin instructions. */}
       {!hasData(sections) && (
-        <div className="container-custom py-12 text-center max-md:hidden">
-          <p className="mb-4 text-gray-600">
-            No featured products yet. Add tags to your products to display them here.
+        <div className="container-custom py-12 text-center max-md:px-4 max-md:py-8">
+          <p className="mb-4 text-gray-600 max-md:text-m-body-m max-md:text-m-on-surface-variant">
+            New products are on their way. In the meantime, browse everything in the shop.
           </p>
-          <div className="mx-auto max-w-2xl rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <p className="mb-2 text-sm font-medium text-blue-800">
-              How to add products to homepage sections:
-            </p>
-            <ul className="space-y-1 text-left text-sm text-blue-700">
-              <li>&bull; Tag products with &quot;flash-sale&quot; for Flash Sales section</li>
-              <li>&bull; Tag products with &quot;deal&quot; for Deals section</li>
-              <li>&bull; Tag products with &quot;best-seller&quot; for Trending section</li>
-              <li>&bull; Tag products with &quot;top-seller&quot; for Top Sellers section</li>
-              <li>&bull; Tag products with &quot;sponsored&quot; for Sponsored Products section</li>
-              <li>&bull; Tag products with &quot;launching-deal&quot; for Launching Deals section</li>
-              <li>&bull; Tag products with &quot;handmade&quot;, &quot;made-in-nigeria&quot;, or &quot;customisable&quot; for Local Makers</li>
-            </ul>
-          </div>
+          <Link
+            href="/products"
+            className="inline-flex h-11 items-center rounded-lg bg-primary-600 px-5 text-sm font-semibold text-white hover:bg-primary-700 max-md:h-12 max-md:rounded-full max-md:bg-m-primary max-md:text-m-label-l"
+          >
+            Browse all products
+          </Link>
         </div>
       )}
     </>

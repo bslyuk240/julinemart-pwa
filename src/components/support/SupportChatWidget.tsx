@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { X, Send, Headphones, User, Bot, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useCustomerAuth } from '@/context/customer-auth-context';
+import { OPEN_SUPPORT_CHAT_EVENT } from '@/lib/support-chat';
 import Spinner from '@/components/ui/spinner';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -262,6 +263,17 @@ export default function SupportChatWidget() {
     }
   };
 
+  // Other buttons (e.g. the phone homepage top bar) open the chat through an event.
+  const openWidgetRef = useRef(openWidget);
+  useEffect(() => {
+    openWidgetRef.current = openWidget;
+  });
+  useEffect(() => {
+    const onOpen = () => openWidgetRef.current();
+    window.addEventListener(OPEN_SUPPORT_CHAT_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_SUPPORT_CHAT_EVENT, onOpen);
+  }, []);
+
   // ── Create session for logged-in user ─────────────────────────────────────
 
   const startSessionForLoggedInUser = async () => {
@@ -402,10 +414,11 @@ export default function SupportChatWidget() {
 
   return (
     <>
-      {/* Floating action button (kept off phone checkout, where it covers fields and the pay bar area) */}
+      {/* Floating action button. Kept off phone checkout (it covers fields and the pay bar) and the
+          phone homepage (it covers the product rows; the top bar has a chat button there instead). */}
       <button
         onClick={openWidget}
-        className={`fixed bottom-[var(--m-float-bottom,calc(5.25rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px)))] right-4 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95 md:bottom-6${pathname === '/checkout' ? ' max-md:hidden' : ''}`}
+        className={`fixed bottom-[var(--m-float-bottom,calc(5.25rem+env(safe-area-inset-bottom,0px)+var(--jm-vv-bottom-inset,0px)))] right-4 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-transform hover:scale-105 active:scale-95 md:bottom-6${pathname === '/checkout' || pathname === '/' ? ' max-md:hidden' : ''}`}
         style={{ backgroundColor: '#77088a' }}
         aria-label="Open support chat"
       >

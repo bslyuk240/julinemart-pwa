@@ -169,7 +169,7 @@ function AdPanel({ ad, side, flat = false }: { ad?: HeroAd; side: 'left' | 'righ
         ) : (
           <Image
             src={ad.image_url}
-            alt={`${side} ad banner`}
+            alt={ad.alt || `${side} ad banner`}
             fill
             className="object-cover"
             quality={90}

@@ -11,14 +11,16 @@ const noSubscribe = () => () => {};
 
 const isAppStoreAd = (ad: HeroAd) => /play\.google\.com|apps\.apple\.com/i.test(ad.link);
 
-/** Ads carry no alt text yet, so name them by where they go. */
+/** The ad's own description from admin; for older ads without one, name them by where they go. */
 function adLabel(ad: HeroAd, i: number, count: number) {
   const external = /^https?:\/\//i.test(ad.link);
-  const name = isAppStoreAd(ad)
-    ? 'Get the JulineMart app'
-    : /vendor/i.test(ad.link)
-      ? 'Sell on JulineMart'
-      : `Ad ${i + 1} of ${count}`;
+  const name = ad.alt
+    ? ad.alt
+    : isAppStoreAd(ad)
+      ? 'Get the JulineMart app'
+      : /vendor/i.test(ad.link)
+        ? 'Sell on JulineMart'
+        : `Ad ${i + 1} of ${count}`;
   return external ? `${name} (opens in a new tab)` : name;
 }
 

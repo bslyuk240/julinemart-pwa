@@ -11,7 +11,7 @@ import CampaignOffersPopup from '@/components/campaigns/CampaignOffersPopup';
 import GiftsHomeSection from '@/components/home/gifts-home-section';
 import { getHomepageSectionsData } from '@/lib/homepage-sections';
 import { getActiveCampaignSummaries } from '@/lib/campaigns/get-campaign';
-import { getPwaSettings, normalizeHeroAds, toHomeBanner } from '@/lib/home/pwa-settings';
+import { getHomePromo, getPwaSettings, normalizeHeroAds } from '@/lib/home/pwa-settings';
 import { HomeHelpLinks, HomePromoStrip, HomeTopBar } from '@/components/home/home-phone-chrome';
 
 export const revalidate = 300; // Re-fetch product sections every 5 minutes
@@ -33,6 +33,7 @@ export default async function HomePage() {
     getPwaSettings(),
   ]);
   const heroAds = normalizeHeroAds(settings?.hero_ads);
+  const promo = await getHomePromo(settings?.banner);
   // The phone carousel plays both desktop panels' ads, once each.
   const phoneAds = [...heroAds.left, ...heroAds.right].filter(
     (ad, i, all) => all.findIndex((other) => (other.image_url || other.video_url) === (ad.image_url || ad.video_url)) === i,
@@ -51,7 +52,7 @@ export default async function HomePage() {
 
       {activeCampaigns.length > 0 && <CampaignOffersPopup campaigns={activeCampaigns} />}
 
-      <HomePromoStrip banner={toHomeBanner(settings?.banner)} />
+      <HomePromoStrip promo={promo} />
 
       <CategoryStrip />
 
