@@ -20,9 +20,9 @@ Keep this section current. It sits outside the Next.js block above, which `next 
 ## WordPress and WooCommerce are retired
 
 - **WordPress is no longer used.** Don't add WordPress or WooCommerce API calls, and don't tell anyone to "edit it in WordPress".
-- `src/lib/wordpress/` is dead code (nothing imports it).
-- In `src/lib/woocommerce/`, only `products`, `shipping`, `categories`, `policies`, `settings` and `tax-calculator` are live, and they read from Supabase or JLO despite the folder name. `client`, `auth`, `customers`, `orders`, `refunds`, `vendors`, `vendors-custom`, `brands`, `pages` and `test-connection` are dead code. So is `src/app/api/woocommerce/proxy`.
-- `NEXT_PUBLIC_WP_URL`, `WC_KEY` and `WC_SECRET` in `.env.production` are leftovers. The only remaining use of `NEXT_PUBLIC_WP_URL` rewrites old absolute links inside policy page HTML.
+- The old WordPress/WooCommerce client code has been deleted: `src/lib/wordpress/`, the WooCommerce `client`, `auth`, `customers`, `orders`, `refunds`, `vendors`, `vendors-custom`, `brands`, `pages` and `test-connection` modules, and the `/api/woocommerce/proxy` route. Don't bring them back.
+- `src/lib/woocommerce/` now holds only live modules (`products`, `shipping`, `categories`, `policies`, `settings`, `tax-calculator`). They read from Supabase or JLO despite the folder name.
+- `WC_KEY` and `WC_SECRET` in `.env.production` are unused leftovers. `NEXT_PUBLIC_WP_URL` is still read in two places: `src/app/page/[slug]/page.tsx` rewrites old absolute links inside policy page HTML, and `scripts/seed-static-pages.mjs` (a one-off import script) uses it.
 
 ## Where data lives
 
