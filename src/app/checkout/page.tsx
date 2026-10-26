@@ -27,10 +27,7 @@ import PageLoading from '@/components/ui/page-loading';
 import JulineMartProtectBadge from '@/components/trust/JulineMartProtectBadge';
 import { calculateTax, getDefaultTaxRate } from '@/lib/woocommerce/tax-calculator';
 import { getShippingFee } from '@/lib/shipping/jloShipping';
-import {
-  resolveLineWeightKg,
-  DEFAULT_SHIPPING_LINE_WEIGHT_KG,
-} from '@/lib/shipping/cart-weight';
+import { resolveLineWeightKg } from '@/lib/shipping/cart-weight';
 import { getSavedCards, upsertAddress, updateCustomerProfile, getAddresses } from '@/lib/supabase/customers';
 import type { CustomerAddress, SavedCard } from '@/types/customer';
 import { trackBeginCheckout, trackPurchase } from '@/lib/gtag';
@@ -149,6 +146,8 @@ export default function CheckoutPage() {
   // JLO shipping calculation state
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
   const [shippingError, setShippingError] = useState<string | null>(null);
+  // "state|city" the current JLO shippingCost was quoted for; null while no real quote is in state.
+  const jloQuoteKeyRef = useRef<string | null>(null);
   const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod>('delivery');
   const isLocalCollection = isLocalCollectionMethod(fulfillmentMethod);
   const [storePickupStore, setStorePickupStore] = useState<{
@@ -237,6 +236,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (isLocalCollection) {
       setShippingCost(0);
+      jloQuoteKeyRef.current = null;
       setShippingError(null);
     }
   }, [isLocalCollection]);
@@ -353,25 +353,6 @@ export default function CheckoutPage() {
   const discountedShipping = Math.max(0, (shippingCost || 0) - activeShippingDiscount);
   const discountedSubtotal = Math.max(0, subtotal - voucherDiscount); // Vouchers discount products
   const total = discountedSubtotal + discountedShipping + taxAmount;
-
-  /** Total kg sent to JLO calc-shipping (per line: DB weight or default). */
-  const jloCartWeightKg = useMemo(
-    () =>
-      items.reduce(
-        (sum, item: any) =>
-          sum + resolveLineWeightKg(item.weight) * (Number(item.quantity) || 1),
-        0
-      ),
-    [items]
-  );
-
-  const linesMissingProductWeight = useMemo(
-    () =>
-      items.filter(
-        (item: any) => item.weight == null || !Number.isFinite(Number(item.weight))
-      ).length,
-    [items]
-  );
 
   const toAnalyticsItems = useCallback(
     () =>
@@ -730,7 +711,9 @@ export default function CheckoutPage() {
 
         if (options.length > 0) {
           setSelectedShipping(options[0].id);
-          setShippingCost(options[0].cost ?? null);
+          // JLO's flat cost in admin is only a placeholder; wait for a real quote for the address.
+          setShippingCost(options[0].methodId === 'jlo_shipping' ? null : options[0].cost ?? null);
+          jloQuoteKeyRef.current = null;
         } else {
           setSelectedShipping('');
           setShippingCost(null);
@@ -832,16 +815,26 @@ export default function CheckoutPage() {
 
   // Calculate JLO shipping
   useEffect(() => {
+    let cancelled = false;
     const doCalc = async () => {
       setShippingError(null);
 
-      if (!items.length) return;
-      if (!formData.state || !formData.city) return;
+      if (isLocalCollection) return;
 
       const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
       if (!selectedOption) return;
 
       if (selectedOption.methodId !== 'jlo_shipping') return;
+
+      // Never show a fee quoted for another address (or none) while this one is pending.
+      const quoteKey = `${formData.state}|${formData.city}`;
+      if (jloQuoteKeyRef.current !== quoteKey) {
+        jloQuoteKeyRef.current = null;
+        setShippingCost(null);
+      }
+
+      if (!items.length) return;
+      if (!formData.state || !formData.city) return;
 
       setIsCalculatingShipping(true);
 
@@ -859,23 +852,35 @@ export default function CheckoutPage() {
           items: shippingItems,
           totalOrderValue: subtotal,
         });
+        if (cancelled) return;
 
         if (!res.success) {
+          jloQuoteKeyRef.current = null;
+          setShippingCost(null);
           setShippingError(res.message ?? 'Unable to calculate shipping.');
           return;
         }
 
+        jloQuoteKeyRef.current = quoteKey;
         setShippingCost(res.shipping);
       } catch (err) {
+        if (cancelled) return;
         console.error('Error calculating JLO shipping:', err);
+        jloQuoteKeyRef.current = null;
+        setShippingCost(null);
         setShippingError('Error calculating shipping. Please try again.');
       } finally {
-        setIsCalculatingShipping(false);
+        if (!cancelled) setIsCalculatingShipping(false);
       }
     };
 
     doCalc();
-  }, [selectedShipping, formData.state, formData.city, items, shippingOptions, subtotal]);
+    return () => {
+      // A newer address or cart supersedes this request; its late answer must not land.
+      cancelled = true;
+      setIsCalculatingShipping(false);
+    };
+  }, [selectedShipping, formData.state, formData.city, items, shippingOptions, subtotal, isLocalCollection]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -891,6 +896,10 @@ export default function CheckoutPage() {
 
     if (option && option.methodId !== 'jlo_shipping') {
       setShippingCost(option.cost ?? null);
+    } else if (option && optionId !== selectedShipping) {
+      // Switching to JLO: drop the previous method's fee until JLO quotes this address.
+      jloQuoteKeyRef.current = null;
+      setShippingCost(null);
     }
   };
 
@@ -1554,6 +1563,14 @@ export default function CheckoutPage() {
   }
 
   const selectedOption = shippingOptions.find(o => o.id === selectedShipping);
+  const awaitingJloQuote =
+    !isLocalCollection && selectedOption?.methodId === 'jlo_shipping' && shippingCost === null;
+  const pendingDeliveryLabel =
+    !formData.state.trim() || !formData.city.trim()
+      ? 'Enter your address'
+      : shippingError && !isCalculatingShipping
+        ? 'Unavailable'
+        : 'Calculating…';
   const isPaystackGateway = selectedPayment === 'paystack';
   const hasSavedShipping = Boolean(
     defaultShippingAddress &&
@@ -2139,7 +2156,9 @@ export default function CheckoutPage() {
                                   ? (displayCost === 0
                                     ? 'FREE'
                                     : money(displayCost))
-                                  : 'Calculated at checkout'}
+                                  : isJlo
+                                    ? pendingDeliveryLabel
+                                    : 'Calculated at checkout'}
                               </p>
                             </div>
                           </div>
@@ -2153,7 +2172,7 @@ export default function CheckoutPage() {
 
                 {isCalculatingShipping && (
                   <p className="text-sm text-gray-500 mt-2">
-                    Calculating shipping...
+                    Calculating shipping…
                   </p>
                 )}
                 {shippingError && (
@@ -2501,7 +2520,7 @@ export default function CheckoutPage() {
                       ? 'FREE'
                       : `₦${shippingCost.toLocaleString()}`
                     : selectedOption?.methodId === 'jlo_shipping'
-                      ? 'Enter state & city'
+                      ? pendingDeliveryLabel
                       : 'Calculated at checkout'}
                 </span>
               </div>
@@ -2600,17 +2619,10 @@ export default function CheckoutPage() {
                     {shippingCost !== null
                       ? (shippingCost === 0 ? 'FREE' : formatPrice(shippingCost))
                       : selectedOption?.methodId === 'jlo_shipping'
-                        ? 'Enter state & city'
+                        ? pendingDeliveryLabel
                         : 'Calculated at checkout'}
                   </span>
                 </div>
-                {selectedOption?.methodId === 'jlo_shipping' && items.length > 0 && (
-                  <p className="text-xs text-gray-500">
-                    Est. weight for quote: {jloCartWeightKg.toFixed(2)} kg
-                    {linesMissingProductWeight > 0                      ? ` (${linesMissingProductWeight} line(s) use ${DEFAULT_SHIPPING_LINE_WEIGHT_KG} kg default — add weight on the product in admin for accuracy)`
-                      : ''}
-                  </p>
-                )}
                 
                 {/* Shipping discount from either an influencer coupon or a voucher's own shipping_discount_type */}
                 {activeShippingDiscount > 0 && (
@@ -2631,6 +2643,9 @@ export default function CheckoutPage() {
                   <span>Total</span>
                   <span className="text-primary-600">{formatPrice(total)}</span>
                 </div>
+                {awaitingJloQuote && (
+                  <p className="text-right text-xs text-gray-500">Shipping not included yet</p>
+                )}
               </div>
 
               <JulineMartProtectBadge variant="compact" className="mt-4" />
@@ -2700,10 +2715,16 @@ export default function CheckoutPage() {
       {tier && phoneStep < 3 && (
         <StickyActionBar className="flex-col items-stretch gap-2">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="text-m-body-m text-m-on-surface-variant">
-              {shippingCost === null ? 'Subtotal · delivery calculated next' : 'Total'}
+            <span className="min-w-0 text-m-body-m text-m-on-surface-variant">
+              {shippingCost !== null
+                ? 'Total'
+                : phoneStep === 1
+                  ? 'Subtotal · delivery calculated next'
+                  : shippingError && !isCalculatingShipping
+                    ? 'Subtotal · delivery unavailable'
+                    : 'Subtotal · calculating delivery'}
             </span>
-            <span className="text-lg font-bold tabular-nums text-m-on-surface">
+            <span className="shrink-0 text-lg font-bold tabular-nums text-m-on-surface">
               ₦{(shippingCost === null ? subtotal : total).toLocaleString()}
             </span>
           </div>
