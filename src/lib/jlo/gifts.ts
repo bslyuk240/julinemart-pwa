@@ -28,6 +28,24 @@ function budgetParams(budget?: string): { budget_min?: string; budget_max?: stri
   return {};
 }
 
+/**
+ * GET a JLO gift endpoint without letting a network failure (JLO down, DNS,
+ * timeout) crash the page that renders it — callers treat null as "no data".
+ */
+async function fetchGiftJson(params: URLSearchParams) {
+  try {
+    const res = await fetch(`${JLO_BASE}/.netlify/functions/gift-boxes?${params}`, {
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(8000),
+    });
+    const json = await safeJson(res);
+    return res.ok && json?.success ? json : null;
+  } catch (err) {
+    console.warn('[jlo/gifts] gift-boxes fetch failed:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 async function safeJson(res: Response): Promise<{ success?: boolean; data?: unknown; gfc?: unknown } | null> {
   const contentType = res.headers.get('content-type') ?? '';
   if (!contentType.includes('application/json')) {
@@ -56,11 +74,8 @@ export async function fetchGiftBoxes(
   if (bp.budget_min) params.set('budget_min', bp.budget_min);
   if (bp.budget_max) params.set('budget_max', bp.budget_max);
 
-  const res = await fetch(`${JLO_BASE}/.netlify/functions/gift-boxes?${params}`, {
-    next: { revalidate: 60 },
-  });
-  const json = await safeJson(res);
-  if (!res.ok || !json?.success) return { boxes: [], gfc: null };
+  const json = await fetchGiftJson(params);
+  if (!json) return { boxes: [], gfc: null };
   return { boxes: (json.data as GiftBox[]) || [], gfc: (json.gfc as GiftFulfilmentCentre) || null };
 }
 
@@ -72,10 +87,7 @@ export async function fetchGiftBoxBySlug(
 
   const params = gfcParams(gfc);
   params.set('slug', slug);
-  const res = await fetch(`${JLO_BASE}/.netlify/functions/gift-boxes?${params}`, {
-    next: { revalidate: 60 },
-  });
-  const json = await safeJson(res);
-  if (!res.ok || !json?.success) return { box: null, gfc: null };
+  const json = await fetchGiftJson(params);
+  if (!json) return { box: null, gfc: null };
   return { box: (json.data as GiftBox) || null, gfc: (json.gfc as GiftFulfilmentCentre) || null };
 }

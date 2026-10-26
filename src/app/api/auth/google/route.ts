@@ -25,7 +25,9 @@ export async function POST(request: NextRequest) {
     const googleUser = await tokenInfoRes.json();
 
     // Confirm the token was issued for this app's client ID
+    // NEXT_PUBLIC_GOOGLE_CLIENT_ID is the one the web sign-in button uses (google-sign-in-button.tsx).
     const expectedAudiences = [
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
       process.env.NEXT_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
       process.env.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID,
     ].filter(Boolean);
