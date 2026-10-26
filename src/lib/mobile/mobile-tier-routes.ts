@@ -72,3 +72,13 @@ export function getMobileTierRoute(
   if (!pathname) return null;
   return routes.find((route) => matchesPattern(route.pattern, pathname)) ?? null;
 }
+
+// Flow screens: a form or a pinned Pay/Continue bar owns the bottom of the
+// screen. Timed system prompts (install, notifications) wait until the shopper
+// leaves them, on phones only.
+const FLOW_ROUTE_PATTERNS = ['/checkout', '/gifts/build', '/gifts/checkout', '/order-success'];
+
+export function isFlowRoute(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  return FLOW_ROUTE_PATTERNS.some((pattern) => matchesPattern(pattern, pathname));
+}

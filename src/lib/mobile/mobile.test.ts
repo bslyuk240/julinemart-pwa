@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { closeTopOverlay, hasOpenOverlay, pushOverlay } from './back-stack';
-import { getMobileTierRoute, matchesPattern } from './mobile-tier-routes';
+import { getMobileTierRoute, isFlowRoute, matchesPattern } from './mobile-tier-routes';
 import { activeTab } from './tabs';
 import { hasInAppHistory, recordNavigation, resetNavigationTrail } from './nav-history';
 import { pullRefreshMode, registerSoftRefresh, runSoftRefresh } from './soft-refresh';
@@ -106,6 +106,23 @@ describe('getMobileTierRoute', () => {
 
   it('puts product pages in the mobile tier without the tab bar', () => {
     expect(getMobileTierRoute('/product/water-pump')).toEqual({ pattern: '/product/*', tabBar: false });
+  });
+});
+
+describe('isFlowRoute', () => {
+  it('quiets checkout, the gift box builder and order success', () => {
+    expect(isFlowRoute('/checkout')).toBe(true);
+    expect(isFlowRoute('/gifts/build')).toBe(true);
+    expect(isFlowRoute('/gifts/checkout')).toBe(true);
+    expect(isFlowRoute('/order-success')).toBe(true);
+  });
+
+  it('leaves browsing screens alone', () => {
+    expect(isFlowRoute('/')).toBe(false);
+    expect(isFlowRoute('/gifts')).toBe(false);
+    expect(isFlowRoute('/cart')).toBe(false);
+    expect(isFlowRoute('/product/fan')).toBe(false);
+    expect(isFlowRoute(null)).toBe(false);
   });
 });
 

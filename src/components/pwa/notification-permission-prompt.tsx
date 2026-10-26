@@ -5,6 +5,7 @@ import { Bell, Package, Truck, Tag, X } from 'lucide-react';
 import { WEB_PUSH_ENABLE_EVENT } from '@/lib/web-push-events';
 import { safeStorage } from '@/lib/safe-storage';
 import { getOrCreateAnonymousId } from '@/lib/analytics/anonymous-id';
+import { useQuietFlowRoute } from '@/hooks/use-quiet-flow-route';
 
 const PROMPT_SEEN_KEY = 'jm_notif_prompt_seen';
 const PROMPT_SNOOZED_KEY = 'jm_notif_prompt_snoozed';
@@ -33,6 +34,9 @@ export default function NotificationPermissionPrompt() {
   const [platform, setPlatform] = useState('web');
   const [requesting, setRequesting] = useState(false);
   const trackedRef = useRef(false);
+  // On phone flow screens the timer still runs; the sheet waits for the next page.
+  const quiet = useQuietFlowRoute();
+  const visible = show && !quiet;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -73,12 +77,12 @@ export default function NotificationPermissionPrompt() {
   }, []);
 
   useEffect(() => {
-    if (!show || trackedRef.current) return;
+    if (!visible || trackedRef.current) return;
     trackedRef.current = true;
     safeStorage.setItem(PROMPT_SEEN_KEY, '1');
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     void logNotifEvent('notification_prompt_shown', isIOS ? 'ios' : 'android_pwa');
-  }, [show]);
+  }, [visible]);
 
   const handleAllow = async () => {
     if (requesting) return;
@@ -106,18 +110,18 @@ export default function NotificationPermissionPrompt() {
     setShow(false);
   };
 
-  if (!show) return null;
+  if (!visible) return null;
 
   return (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 animate-in fade-in duration-300"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-m-system md:z-50 animate-in fade-in duration-300"
         onClick={handleSnooze}
       />
 
       {/* Bottom sheet */}
-      <div className="fixed bottom-[var(--jm-vv-bottom-inset,0px)] left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 md:bottom-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md">
+      <div className="fixed bottom-[var(--jm-vv-bottom-inset,0px)] left-0 right-0 z-m-system md:z-50 animate-in slide-in-from-bottom duration-300 md:bottom-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md">
         <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden relative">
 
           {/* Dismiss */}

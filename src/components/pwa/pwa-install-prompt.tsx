@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { trackPwaInstallAccepted, trackPwaInstallPromptShown } from '@/lib/gtag';
 import { safeStorage } from '@/lib/safe-storage';
 import { getOrCreateAnonymousId } from '@/lib/analytics/anonymous-id';
+import { useQuietFlowRoute } from '@/hooks/use-quiet-flow-route';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -53,6 +54,9 @@ export default function PWAInstallPrompt() {
   const [isStandalone, setIsStandalone] = useState(false);
   const [isReturningVisitor, setIsReturningVisitor] = useState(false);
   const hasTrackedPromptShownRef = useRef(false);
+  // On phone flow screens the timer still runs; the sheet waits for the next page.
+  const quiet = useQuietFlowRoute();
+  const visible = showPrompt && !quiet;
 
   useEffect(() => {
     const isInStandalone =
@@ -111,13 +115,13 @@ export default function PWAInstallPrompt() {
       hasTrackedPromptShownRef.current = false;
       return;
     }
-    if (isStandalone || hasTrackedPromptShownRef.current) return;
+    if (!visible || isStandalone || hasTrackedPromptShownRef.current) return;
 
     const platform = isIOS ? 'ios' : 'android_desktop';
     trackPwaInstallPromptShown({ platform });
     logPwaEvent({ event_name: 'pwa_install_prompt_shown', platform });
     hasTrackedPromptShownRef.current = true;
-  }, [showPrompt, isStandalone, isIOS]);
+  }, [showPrompt, visible, isStandalone, isIOS]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
@@ -146,7 +150,7 @@ export default function PWAInstallPrompt() {
     }
   };
 
-  if (isStandalone || !showPrompt) return null;
+  if (isStandalone || !visible) return null;
 
   // Message varies based on whether this is a returning visitor
   const headline = isReturningVisitor
@@ -160,10 +164,10 @@ export default function PWAInstallPrompt() {
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 animate-in fade-in duration-300" />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-m-system md:z-50 animate-in fade-in duration-300" />
 
       {/* Install Prompt */}
-      <div className="fixed bottom-[var(--jm-vv-bottom-inset,0px)] left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 md:bottom-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md md:rounded-t-2xl">
+      <div className="fixed bottom-[var(--jm-vv-bottom-inset,0px)] left-0 right-0 z-m-system md:z-50 animate-in slide-in-from-bottom duration-300 md:bottom-4 md:left-1/2 md:-translate-x-1/2 md:max-w-md md:rounded-t-2xl">
         <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl p-6 relative">
           {/* Close Button */}
           <button

@@ -46,7 +46,8 @@ export default function CookieConsentBanner() {
         // md+: flush to bottom (no bottom nav on desktop).
         // Tailwind arbitrary value keeps specificity equal so md:bottom-0 wins
         // on desktop via source order (responsive utilities come last in output).
-        'fixed left-0 right-0 z-40',
+        // Mobile tier z-scale: system overlays above sheets/bars; desktop unchanged.
+        'fixed left-0 right-0 z-m-system md:z-40',
         aboveTabBar
           ? 'bottom-[calc(var(--m-tabbar-h)_+_var(--jm-vv-bottom-inset,_0px))] md:bottom-0'
           : 'bottom-[calc(3.5rem_+_env(safe-area-inset-bottom,_0px)_+_var(--jm-vv-bottom-inset,_0px))] md:bottom-0',
