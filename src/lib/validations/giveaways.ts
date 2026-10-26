@@ -27,7 +27,7 @@ export const giveawayEntrySchema = z
     location: z.string().trim().max(80).optional(),
     marketingOptIn: z.boolean().optional(),
     acceptedTerms: z.literal(true, {
-      errorMap: () => ({ message: 'You must accept the giveaway terms' }),
+      error: 'You must accept the giveaway terms',
     }),
     source: z.string().optional(),
   })
@@ -42,11 +42,11 @@ export type GiveawayEntryInput = z.infer<typeof giveawayEntrySchema>;
 // control for the review composer, no login involved (see JLO's
 // giveaway-get-review-context.js for why that's safe: it's an unguessable uuid).
 export const giveawayReviewContextSchema = z.object({
-  entryId: z.string().uuid('Invalid review link'),
+  entryId: z.guid('Invalid review link'),
 });
 
 export const giveawayReviewSubmitSchema = z.object({
-  entryId: z.string().uuid('Invalid review link'),
+  entryId: z.guid('Invalid review link'),
   rating: z.number().int().min(1, 'Pick a rating').max(5),
   body: z.string().trim().min(10, 'Tell us a bit more (at least 10 characters)').max(2000),
   reviewerName: z.string().trim().max(120).optional(),

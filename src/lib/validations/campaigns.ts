@@ -65,7 +65,7 @@ export const campaignReviewRulesSchema = z.object({
 // discount engine — see Appendix C.
 export const campaignOfferConfigSchema = z
   .object({
-    voucherId: z.string().uuid().optional(),
+    voucherId: z.guid().optional(),
     couponCode: z.string().max(30).optional(),
     discountType: z.enum(['free', 'percentage', 'fixed_amount']).optional(),
     discountValue: z.number().min(0).optional(),
@@ -87,10 +87,10 @@ const campaignSectionInputSchema = z.object({
   sectionType: sectionTypeSchema,
   orderIndex: z.number().int().min(0),
   isVisible: z.boolean().default(true),
-  config: z.record(z.unknown()).default({}),
+  config: z.record(z.string(), z.unknown()).default({}),
 });
 
-export const campaignCreateSchema = z
+const campaignBaseSchema = z
   .object({
     internalName: z.string().min(3).max(255),
     publicTitle: z.string().min(3).max(255),
@@ -109,20 +109,25 @@ export const campaignCreateSchema = z
 
     sectionLayout: z.array(campaignSectionInputSchema).max(20).default([]),
     heroConfig: campaignHeroConfigSchema,
-    vendorOverride: z.record(z.unknown()).optional(),
+    vendorOverride: z.record(z.string(), z.unknown()).optional(),
     productSelectionRules: campaignProductSelectionRulesSchema,
     reviewRules: campaignReviewRulesSchema,
     offerConfig: campaignOfferConfigSchema.optional(),
     metaSeo: z
       .object({ title: z.string().optional(), description: z.string().optional(), ogImage: z.string().url().optional() })
       .optional(),
-  })
-  .refine((val) => !val.startDate || !val.endDate || new Date(val.startDate) < new Date(val.endDate), {
-    message: 'End date must be after start date',
-    path: ['endDate'],
   });
 
-export const campaignUpdateSchema = campaignCreateSchema.innerType().partial();
+export const campaignCreateSchema = campaignBaseSchema.refine(
+  (val) => !val.startDate || !val.endDate || new Date(val.startDate) < new Date(val.endDate),
+  {
+    message: 'End date must be after start date',
+    path: ['endDate'],
+  }
+);
+
+// Zod 4 keeps refinements on the object itself, so partial() must start from the unrefined base.
+export const campaignUpdateSchema = campaignBaseSchema.partial();
 
 // QR channel variant — admin creates one per physical/digital placement
 // (poster, flyer, Instagram bio, etc.), each with its own tracking slug.
@@ -136,8 +141,8 @@ export const campaignQrVariantSchema = z.object({
 });
 
 export const campaignAnalyticsEventSchema = z.object({
-  campaignId: z.string().uuid(),
-  qrId: z.string().uuid().optional(),
+  campaignId: z.guid(),
+  qrId: z.guid().optional(),
   eventType: z.enum([
     'scan',
     'page_visit',
@@ -151,7 +156,7 @@ export const campaignAnalyticsEventSchema = z.object({
   userId: z.string().max(255).optional(),
   orderId: z.string().max(255).optional(),
   revenue: z.number().min(0).max(1_000_000_000).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type CampaignAnalyticsEventInput = z.infer<typeof campaignAnalyticsEventSchema>;
