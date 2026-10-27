@@ -5,6 +5,7 @@
 *.aar
 *.ap_
 *.aab
+*.apks
 
 # Files for the ART/Dalvik VM
 *.dex
@@ -18,6 +19,9 @@ gen/
 out/
 #  Uncomment the following line in case you need and you don't have the release build type files in your app
 # release/
+# Android Studio's "Generate Signed Bundle/APK" output
+app/release/
+app/debug/
 
 # Gradle files
 .gradle/
@@ -52,17 +56,39 @@ captures/
 # Comment next line if keeping position of elements in Navigation Editor is relevant for you
 .idea/navEditor.xml
 
-# Keystore files
-# Uncomment the following lines if you do not want to check your keystore files in.
-#*.jks
-#*.keystore
+# Keystore files and signing credentials. Never commit these; CI gets them
+# from GitHub secrets.
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.der
+*.p8
+*.pepk
+key.properties
+keystore.properties
+signing.properties
+release-signing.properties
+julinemart-key
+julinemart-key.*
+*upload-key*
+*upload_key*
+*encryption_private_key*
+
+# Google Play / Google Cloud service-account keys
+*service-account*.json
+*service_account*.json
+play-store*.json
+play-console*.json
+google-play*.json
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild
 .cxx/
 
-# Google Services (e.g. APIs or Firebase)
-# google-services.json
+# Google Services (e.g. APIs or Firebase). Kept local; CI writes it from a secret.
+google-services.json
 
 # Freeline
 freeline.py

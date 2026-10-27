@@ -20,6 +20,23 @@ pnpm-debug.log*
 # Android Firebase config (client key — keep local for APK builds; not needed on Netlify)
 android/app/google-services.json
 
+# Android signing keys, Play service-account keys and release artifacts, anywhere
+# in the repo. CI gets credentials from GitHub secrets; see android/.gitignore.
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.p8
+*.pepk
+key.properties
+keystore.properties
+*.aab
+*.apks
+*service-account*.json
+*service_account*.json
+julinemart-key
+julinemart-key.*
+
 # Local Netlify folder
 .netlify
 .claude/

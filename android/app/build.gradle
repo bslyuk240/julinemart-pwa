@@ -1,5 +1,14 @@
 apply plugin: 'com.android.application'
 
+// Version defaults for releases built by hand in Android Studio. Bump these
+// for a manual release, as before. CI passes JULINEMART_VERSION_CODE and
+// JULINEMART_VERSION_NAME instead; see readReleaseVersion below.
+def defaultVersionCode = 2
+def defaultVersionName = "1.1"
+
+def releaseVersion = readReleaseVersion(defaultVersionCode, defaultVersionName)
+def releaseSigning = readReleaseSigning()
+
 android {
     namespace = "com.julinemart.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +16,8 @@ android {
         applicationId "com.julinemart.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1"
+        versionCode releaseVersion.code
+        versionName releaseVersion.name
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +25,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (releaseSigning != null) {
+            release {
+                storeFile releaseSigning.storeFile
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            // Signed here only when CI supplies the keystore through the
+            // environment. Otherwise the release stays unsigned and Android
+            // Studio's "Generate Signed Bundle" signs it, as before.
+            if (releaseSigning != null) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -51,4 +76,97 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+// Fails unless google-services.json exists, parses, and has an Android client
+// for this app's applicationId. The plugin block above silently skips a
+// missing file, which would ship a release without push notifications, so CI
+// runs this before building. Set JULINEMART_EXPECTED_FIREBASE_PROJECT to also
+// pin the Firebase project. Prints no API keys.
+tasks.register('validateGoogleServicesJson') {
+    group = 'verification'
+    description = 'Checks that google-services.json is present and matches this app.'
+    def jsonFile = file('google-services.json')
+    def applicationId = android.defaultConfig.applicationId
+    def expectedProject = System.getenv('JULINEMART_EXPECTED_FIREBASE_PROJECT')?.trim()
+    doLast {
+        if (!jsonFile.isFile() || jsonFile.length() == 0) {
+            throw new GradleException("google-services.json is missing or empty at ${jsonFile}")
+        }
+        def json
+        try {
+            json = new groovy.json.JsonSlurper().parse(jsonFile)
+        } catch (Exception e) {
+            // Not e.message: JsonSlurper quotes the input near the error, which
+            // could put the API key in CI logs.
+            throw new GradleException("google-services.json is not valid JSON (${e.class.simpleName})")
+        }
+        def projectId = json?.project_info?.project_id
+        if (!projectId) {
+            throw new GradleException('google-services.json has no project_info.project_id')
+        }
+        if (expectedProject && projectId != expectedProject) {
+            throw new GradleException("google-services.json is for Firebase project '${projectId}', expected '${expectedProject}'")
+        }
+        def client = (json.client ?: []).find {
+            it?.client_info?.android_client_info?.package_name == applicationId
+        }
+        if (client == null) {
+            throw new GradleException("google-services.json has no Android client for ${applicationId}")
+        }
+        if (!(client.api_key ?: []).any { it?.current_key }) {
+            throw new GradleException("google-services.json client for ${applicationId} has no API key")
+        }
+        logger.lifecycle("google-services.json OK: project ${projectId}, client ${applicationId}")
+    }
+}
+
+// Reads optional CI overrides for versionCode and versionName, from the
+// environment or -P properties of the same name. Without them the defaults
+// above apply, so local and Android Studio builds are unchanged.
+def readReleaseVersion(int defaultCode, String defaultName) {
+    def codeText = (findProperty('JULINEMART_VERSION_CODE') ?: System.getenv('JULINEMART_VERSION_CODE'))?.toString()?.trim()
+    def name = (findProperty('JULINEMART_VERSION_NAME') ?: System.getenv('JULINEMART_VERSION_NAME'))?.toString()?.trim()
+
+    def code = defaultCode
+    if (codeText) {
+        if (!(codeText ==~ /\d{1,10}/)) {
+            throw new GradleException("JULINEMART_VERSION_CODE must be a whole number, got '${codeText}'")
+        }
+        code = codeText.toLong()
+        // Play's ceiling is 2100000000. Never go below the checked-in value,
+        // which tracks the last release built by hand.
+        if (code < defaultCode || code > 2100000000L) {
+            throw new GradleException("JULINEMART_VERSION_CODE must be between ${defaultCode} and 2100000000, got ${code}")
+        }
+    }
+    if (name && !(name ==~ /[0-9A-Za-z][0-9A-Za-z._+-]{0,49}/)) {
+        throw new GradleException("JULINEMART_VERSION_NAME must be 1-50 letters, digits or . _ + -, got '${name}'")
+    }
+    return [code: code as int, name: name ?: defaultName]
+}
+
+// Reads release signing from environment variables only, so passwords never
+// land in source control, gradle.properties or the command line. Returns null
+// when none are set (the Android Studio flow), and fails when only some are,
+// so CI can never quietly produce an unsigned bundle.
+def readReleaseSigning() {
+    def names = ['JULINEMART_KEYSTORE_FILE', 'JULINEMART_KEYSTORE_PASSWORD',
+                 'JULINEMART_KEY_ALIAS', 'JULINEMART_KEY_PASSWORD']
+    def values = names.collectEntries { [(it): System.getenv(it)] }
+    def missing = names.findAll { !values[it] }
+    if (missing.size() == names.size()) {
+        return null
+    }
+    if (!missing.isEmpty()) {
+        throw new GradleException("Release signing is partly configured; missing: ${missing.join(', ')}")
+    }
+    def storeFile = file(values.JULINEMART_KEYSTORE_FILE)
+    if (!storeFile.isFile()) {
+        throw new GradleException("JULINEMART_KEYSTORE_FILE does not point to a file: ${storeFile}")
+    }
+    return [storeFile: storeFile,
+            storePassword: values.JULINEMART_KEYSTORE_PASSWORD,
+            keyAlias: values.JULINEMART_KEY_ALIAS,
+            keyPassword: values.JULINEMART_KEY_PASSWORD]
 }
