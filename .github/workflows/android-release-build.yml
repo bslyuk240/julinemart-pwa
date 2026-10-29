@@ -73,6 +73,15 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Node 22 ships npm 10, which rejects package-lock.json because of the
+      # brace-expansion overrides in package.json. npm 11 accepts it, and the
+      # lock file is maintained with 11.9.0, so CI uses that exact version.
+      # Remove this step once the overrides work with npm 10 too.
+      - name: Use npm 11.9.0
+        run: |
+          npm install --global npm@11.9.0
+          [ "$(npm --version)" = "11.9.0" ] || { echo "::error::npm is $(npm --version), expected 11.9.0"; exit 1; }
+
       # postinstall runs scripts/fix-capacitor-proguard.js, which the Android
       # build depends on, so scripts stay enabled.
       - name: Install npm dependencies
