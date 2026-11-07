@@ -94,7 +94,11 @@ function getAnalyticsLimiter(): Ratelimit | null {
 
 // ─── Auth paths ───────────────────────────────────────────────────────────────
 
-const AUTH_PATHS          = ['/api/auth/', '/forgot-password', '/login'];
+// Only the server sign-in endpoint. The /login and /forgot-password pages are not limited:
+// password sign-in and resets go from the browser straight to Supabase (which rate-limits
+// them itself), so counting page views only locked shoppers out, and many share one
+// carrier IP.
+const AUTH_PATHS          = ['/api/auth/'];
 const SIGNUP_PATHS        = ['/api/audit/signup'];
 const DEVICE_PATHS        = ['/api/notifications/register-device'];
 const VENDORS_STATUS_PATHS = ['/api/vendors/status'];
@@ -258,8 +262,6 @@ export const config = {
     '/campaigns/:path*',
     '/api/campaigns/:path*',
     '/api/analytics/events',
-    '/forgot-password',
-    '/login',
     '/',
     '/category/:path*',
     '/product/:path*',

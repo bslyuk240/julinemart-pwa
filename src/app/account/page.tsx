@@ -30,7 +30,6 @@ import { useMobileTier } from '@/components/mobile/mobile-tier-context';
 import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { getCustomerOrders } from '@/lib/supabase/customers';
-import PageLoading from '@/components/ui/page-loading';
 import { toast } from 'sonner';
 
 type AccountOrder = {
@@ -89,12 +88,24 @@ export default function AccountPage() {
   // Mobile tier (docs/mobile-tier-plan.md, wave 2): settings-style list below md.
   const tier = useMobileTier() !== null;
   const loggingOutRef = useRef(false);
+  // Signed in but the profile row hasn't arrived after a while: offer Retry / Logout.
+  const [profileSlow, setProfileSlow] = useState(false);
+  const waitingForProfile = !isLoading && isAuthenticated && !customer;
+  useEffect(() => {
+    if (!waitingForProfile) return undefined;
+    const timer = window.setTimeout(() => setProfileSlow(true), 8000);
+    return () => {
+      window.clearTimeout(timer);
+      setProfileSlow(false);
+    };
+  }, [waitingForProfile]);
 
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
         // Skip the login redirect during an explicit logout so we land on '/'
-        if (!loggingOutRef.current) router.push('/login');
+        // replace, not push: Back from the login page shouldn't bounce here again.
+        if (!loggingOutRef.current) router.replace('/login');
       } else if (user?.email) loadOrders();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,13 +145,20 @@ export default function AccountPage() {
       day: 'numeric',
     });
 
-  if (isLoading) return <PageLoading text="Loading your account..." />;
+  // Signed out: the effect above is sending them to /login; show the bare page background meanwhile.
+  if (!isLoading && !isAuthenticated) {
+    return <main className={clsx('min-h-screen bg-gray-50', tier && 'max-md:bg-m-surface-low')} aria-busy="true" />;
+  }
+
+  // Checking the session, or fetching the profile: the page's own shape, not a message.
+  if (isLoading || (!customer && !profileSlow)) return <AccountSkeleton tier={tier} />;
 
   if (!customer) {
     return (
-      <main className="min-h-screen bg-gray-50 pb-24 md:pb-8">
+      <main className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-4')}>
+        {tier && <MobileTopBar title="Account" />}
         <div className="mx-auto max-w-lg px-4 py-5">
-          <div className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg p-5 mb-5 text-white">
+          <div className={clsx('bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg p-5 mb-5 text-white', tier && 'max-md:hidden')}>
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
                 <User className="w-8 h-8" />
@@ -154,10 +172,12 @@ export default function AccountPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm p-6 text-center">
-            <h2 className="text-base font-semibold text-gray-900">Account profile is still loading</h2>
-            <p className="text-sm text-gray-600 mt-2">
-              If this takes too long on your device, retry the profile fetch or sign in again.
+          <div className={clsx('bg-white rounded-2xl shadow-sm p-6 text-center', tier && 'max-md:bg-m-surface-lowest max-md:shadow-[0_0_0_1px_rgb(30_26_31/0.07)]')}>
+            <h2 className={clsx('text-base font-semibold text-gray-900', tier && 'max-md:text-m-title-m max-md:text-m-on-surface')}>
+              Your profile is taking a while
+            </h2>
+            <p className={clsx('text-sm text-gray-600 mt-2', tier && 'max-md:text-m-body-m max-md:text-m-on-surface-variant')}>
+              Check your connection and try again, or sign out and back in.
             </p>
             <div className="mt-4 flex flex-col gap-2">
               <Button variant="primary" size="sm" onClick={refreshCustomer} fullWidth>Retry</Button>
@@ -492,6 +512,68 @@ export default function AccountPage() {
             </button>
           </div>
         )}
+      </div>
+    </main>
+  );
+}
+
+/** The account page's shape while the session and profile load (phone list on the mobile tier, card grid on desktop). */
+function AccountSkeleton({ tier }: { tier: boolean }) {
+  const bar = 'animate-pulse rounded bg-gray-200';
+  const mbar = 'animate-pulse rounded bg-m-surface-container';
+  return (
+    <main
+      className={clsx('min-h-screen bg-gray-50 pb-24 md:pb-8', tier && 'max-md:bg-m-surface-low max-md:pb-4')}
+      aria-busy="true"
+      aria-label="Loading your account"
+    >
+      {tier && (
+        <div className="md:hidden">
+          <MobileTopBar title="Account" />
+          <div className="space-y-3 px-4 pt-1">
+            <div className="rounded-2xl bg-m-surface-lowest p-4 shadow-[0_0_0_1px_rgb(30_26_31/0.07)]">
+              <div className="flex items-center gap-4">
+                <div className={clsx(mbar, 'h-14 w-14 rounded-full')} />
+                <div className="flex-1 space-y-2">
+                  <div className={clsx(mbar, 'h-5 w-40')} />
+                  <div className={clsx(mbar, 'h-4 w-52')} />
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-4 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className={clsx(mbar, 'h-10')} />
+                ))}
+              </div>
+            </div>
+            {[3, 2].map((rows, g) => (
+              <div key={g} className="rounded-2xl bg-m-surface-lowest py-2 shadow-[0_0_0_1px_rgb(30_26_31/0.07)]">
+                {Array.from({ length: rows }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 px-4 py-3">
+                    <div className={clsx(mbar, 'h-10 w-10 rounded-full')} />
+                    <div className="flex-1 space-y-2">
+                      <div className={clsx(mbar, 'h-4 w-32')} />
+                      <div className={clsx(mbar, 'h-3 w-44')} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className={clsx('container-custom space-y-5 py-5 md:space-y-6 md:py-8', tier && 'max-md:hidden')}>
+        <div className="flex items-center gap-5 rounded-2xl bg-white p-5 shadow-sm md:p-7">
+          <div className={clsx(bar, 'h-16 w-16 rounded-full md:h-20 md:w-20')} />
+          <div className="flex-1 space-y-2">
+            <div className={clsx(bar, 'h-6 w-48')} />
+            <div className={clsx(bar, 'h-4 w-64')} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className={clsx(bar, 'h-24 rounded-2xl bg-white shadow-sm')} />
+          ))}
+        </div>
       </div>
     </main>
   );
