@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
 import ProductGrid from '@/components/product/product-grid';
-import { Filter, ChevronDown, X, Search } from 'lucide-react';
+import { Filter, ChevronDown, X, Search, WifiOff } from 'lucide-react';
 import { Product } from '@/types/product';
 import { getCategoryDisplayName } from '@/lib/utils/category-display';
 import { useMobileTier } from '@/components/mobile/mobile-tier-context';
@@ -54,6 +54,9 @@ export default function CategoryPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  // The catalog couldn't be reached (not the same as an empty category); Try again bumps reloadKey.
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [sortBy, setSortBy] = useState<CategorySortOption>('date');
   const [showFilters, setShowFilters] = useState(false);
@@ -102,6 +105,7 @@ export default function CategoryPage() {
     const load = async () => {
       try {
         setLoading(true);
+        setLoadError(false);
         setApiPage(1);
         const { products: fetched, total: count, totalPages: pages } = await fetchFromApi(buildUrl(sortBy, 1), ac.signal);
         setProducts(fetched);
@@ -111,6 +115,7 @@ export default function CategoryPage() {
       } catch (error) {
         if ((error as Error).name === 'AbortError') return;
         console.error('Error fetching category products:', error);
+        setLoadError(true);
       } finally {
         if (!ac.signal.aborted) setLoading(false);
       }
@@ -118,13 +123,14 @@ export default function CategoryPage() {
     void load();
     return () => ac.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, sortBy]);
+  }, [slug, sortBy, reloadKey]);
 
   // Pull-to-refresh (M15): refetch the first page in place; the current grid stays on screen until it lands.
   useSoftRefresh(async () => {
     try {
       const { products: fresh, total: count, totalPages: pages } = await fetchFromApi(buildUrl(sortBy, 1));
       setProducts(fresh);
+      setLoadError(false);
       setTotal(count);
       setTotalPages(Math.max(1, pages));
       setApiPage(1);
@@ -365,6 +371,33 @@ export default function CategoryPage() {
               className="mt-5 h-10 rounded-full bg-m-primary-container px-5 text-m-label-l text-m-on-primary-container"
             >
               Clear filters
+            </button>
+          </div>
+        ) : loadError ? (
+          <div className={clsx('rounded-lg bg-white py-16 text-center', tier && 'max-md:bg-transparent max-md:px-6')}>
+            <div
+              className={clsx(
+                'mb-4 inline-flex h-20 w-20 items-center justify-center rounded-full bg-gray-100',
+                tier && 'max-md:h-16 max-md:w-16 max-md:bg-m-surface-container',
+              )}
+            >
+              <WifiOff className={clsx('h-10 w-10 text-gray-400', tier && 'max-md:h-8 max-md:w-8 max-md:text-m-on-surface-variant')} />
+            </div>
+            <h3 className={clsx('mb-2 text-xl font-semibold text-gray-900', tier && 'max-md:text-m-title-m max-md:text-m-on-surface')}>
+              Couldn&apos;t load products
+            </h3>
+            <p className={clsx('mb-6 text-gray-600', tier && 'max-md:text-m-body-m max-md:text-m-on-surface-variant')}>
+              Check your connection and try again.
+            </p>
+            <button
+              type="button"
+              onClick={() => setReloadKey((k) => k + 1)}
+              className={clsx(
+                'inline-block rounded-lg bg-primary-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-primary-700',
+                tier && 'max-md:h-12 max-md:rounded-full max-md:bg-m-primary max-md:py-0 max-md:text-m-label-l max-md:text-m-on-primary',
+              )}
+            >
+              Try again
             </button>
           </div>
         ) : (

@@ -27,24 +27,30 @@ async function jloFetch<T>(path: string): Promise<T | null> {
   const base = getJloCatalogBase();
   if (!base) return null;
 
-  try {
-    // Storefront catalog must not serve stale rows after delete/unpublish (avoid Next Data Cache / SWR).
-    const pathBase = path.split('?')[0];
-    const isCatalogList =
-      path.startsWith('/.netlify/functions/catalog-products') ||
-      path.includes('/catalog-products?');
-    const isCatalogProductDetail = pathBase === '/.netlify/functions/catalog-product';
-    const res = await fetch(`${base}${path}`, {
-      ...(isCatalogList || isCatalogProductDetail
-        ? { cache: 'no-store' as const }
-        : { next: { revalidate: 300 } }),
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
+  // Storefront catalog must not serve stale rows after delete/unpublish (avoid Next Data Cache / SWR).
+  const pathBase = path.split('?')[0];
+  const isCatalogList =
+    path.startsWith('/.netlify/functions/catalog-products') ||
+    path.includes('/catalog-products?');
+  const isCatalogProductDetail = pathBase === '/.netlify/functions/catalog-product';
+
+  // One retry on a dropped connection or a 5xx: a blip shouldn't read as "no products".
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(`${base}${path}`, {
+        ...(isCatalogList || isCatalogProductDetail
+          ? { cache: 'no-store' as const }
+          : { next: { revalidate: 300 } }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) return (await res.json()) as T;
+      if (res.status < 500) return null;
+    } catch {
+      // network error: retry once
+    }
+    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 300));
   }
+  return null;
 }
 
 // JLO functions return { success, data, meta } for lists and { success, data } for single

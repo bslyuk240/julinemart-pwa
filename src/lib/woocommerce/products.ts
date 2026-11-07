@@ -19,13 +19,13 @@ export async function getProducts(
 /**
  * Get products with pagination metadata (total, totalPages).
  * DEV-LAB: Supabase/JLO catalog only — WooCommerce fallback disabled to surface missing data.
+ * Null when the catalog couldn't be reached, so callers can tell "failed" from "empty".
  */
 export async function getProductsWithPagination(
   params: ProductsQueryParams = {}
-): Promise<{ products: Product[]; total: number; totalPages: number }> {
+): Promise<{ products: Product[]; total: number; totalPages: number } | null> {
   const { catalogGetProductsWithMeta } = await import('@/lib/catalog/client');
-  const catalogResult = await catalogGetProductsWithMeta(params);
-  return catalogResult ?? { products: [], total: 0, totalPages: 0 };
+  return catalogGetProductsWithMeta(params);
 }
 
 /**

@@ -37,6 +37,13 @@ export async function GET(request: NextRequest) {
   if (searchParams.get('pickup_available') === 'true') params.pickup_available = true;
 
   const result = await getProductsWithPagination(params);
+  if (!result) {
+    // Catalog unreachable: an error, so pages show "couldn't load" rather than "no products".
+    return NextResponse.json(
+      { products: [], total: 0, totalPages: 0, error: 'catalog_unavailable' },
+      { status: 502, headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
   return NextResponse.json(result, {
     headers: {
       // Product lists vary by page, sort, and filters — do not cache at shared caches.
