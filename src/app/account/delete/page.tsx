@@ -3,10 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { clsx } from 'clsx';
 import { Loader2, Mail, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import DeletionShell from '@/components/account/deletion-shell';
+import DeletionShell, { useDeletionStyles } from '@/components/account/deletion-shell';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { deletionFetch, type DeletionReason } from '@/lib/account-deletion';
 
@@ -25,6 +24,7 @@ type View = 'loading' | 'ready' | 'blocked' | 'sent' | 'error';
 
 export default function DeleteAccountPage() {
   const router = useRouter();
+  const s = useDeletionStyles();
   const { isAuthenticated, isLoading: authLoading } = useCustomerAuth();
   const [view, setView] = useState<View>('loading');
   const [reasons, setReasons] = useState<DeletionReason[]>([]);
@@ -68,72 +68,75 @@ export default function DeleteAccountPage() {
     }
   };
 
+  const action = view === 'ready' ? (
+    <button type="button" onClick={sendLink} disabled={sending} className={s.danger}>
+      {sending && <Loader2 className="h-4 w-4 animate-spin" />} Email me a confirmation link
+    </button>
+  ) : undefined;
+
   return (
-    <DeletionShell title="Delete your account" backHref="/account/settings">
+    <DeletionShell title="Delete account" subtitle="Permanently remove your account and data" action={action}>
       {view === 'loading' && (
-        <div className="py-10 text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin text-primary-600" /></div>
+        <div className={s.card}><div className="py-6 text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin text-primary-600" /></div></div>
       )}
 
       {view === 'error' && (
-        <p className="flex items-start gap-2 text-sm text-red-700"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{errorText}</p>
-      )}
-
-      {view === 'blocked' && (
-        <div className="space-y-4">
-          <p className="text-sm text-gray-700">You can&apos;t delete your account just yet:</p>
-          <ul className="space-y-2">
-            {reasons.map((r) => (
-              <li key={r.code} className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{r.message}</li>
-            ))}
-          </ul>
-          <p className="text-sm text-gray-600">
-            Need it done sooner? Email <a href="mailto:info@julinemart.com" className="font-medium text-primary-600 underline">info@julinemart.com</a>.
-          </p>
-          <Link href="/account/settings" className="inline-block text-sm font-medium text-primary-600 hover:text-primary-700">Back to settings</Link>
+        <div className={s.warnCard}>
+          <p className="flex items-start gap-2 text-sm"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{errorText}</p>
         </div>
       )}
 
+      {view === 'blocked' && (
+        <>
+          <div className={s.card}>
+            <h2 className={s.title}>You can&apos;t delete your account just yet</h2>
+            <p className={`${s.body} mt-1`}>Please finish these first:</p>
+          </div>
+          {reasons.map((r) => (
+            <div key={r.code} className={s.warnCard}><p className="text-sm leading-6">{r.message}</p></div>
+          ))}
+          <div className={s.card}>
+            <p className={s.body}>
+              Need it done sooner? Email <a href="mailto:info@julinemart.com" className="font-medium text-primary-600 underline">info@julinemart.com</a>.
+            </p>
+            <Link href="/account/settings" className={`${s.link} mt-3 inline-block`}>Back to settings</Link>
+          </div>
+        </>
+      )}
+
       {view === 'sent' && (
-        <div className="text-center">
-          <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 text-primary-600"><Mail className="h-7 w-7" /></span>
-          <h2 className="text-xl font-semibold text-gray-900">Check your email</h2>
-          <p className="mt-3 text-sm text-gray-600">
-            We sent a confirmation link to <span className="font-semibold text-gray-900">{hint}</span>. Open it on this device
-            and confirm to finish. The link works once and expires in 1 hour.
-          </p>
-          <p className="mt-3 text-sm text-gray-500">Nothing is deleted until you confirm.</p>
-          <Link href="/account" className="mt-6 inline-block text-sm font-medium text-primary-600 hover:text-primary-700">Back to my account</Link>
+        <div className={s.card}>
+          <div className="text-center">
+            <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 text-primary-600"><Mail className="h-7 w-7" /></span>
+            <h2 className={s.title}>Check your email</h2>
+            <p className={`${s.body} mt-2`}>
+              We sent a confirmation link to <span className="font-semibold text-gray-900">{hint}</span>. Open it on this device and confirm to
+              finish. The link works once and expires in 1 hour.
+            </p>
+            <p className={`${s.body} mt-2`}>Nothing is deleted until you confirm.</p>
+            <Link href="/account" className={`${s.link} mt-4 inline-block`}>Back to my account</Link>
+          </div>
         </div>
       )}
 
       {view === 'ready' && (
-        <div className="space-y-6">
-          <p className="text-sm leading-6 text-gray-700">
-            This permanently deletes your JulineMart account. To make sure it&apos;s really you, we&apos;ll first email you a link to confirm.
-            This can&apos;t be undone.
-          </p>
-          <section>
-            <h2 className="text-sm font-semibold text-gray-900">What gets deleted</h2>
-            <ul className="mt-2 space-y-1.5 text-sm text-gray-700">{DELETED.map((d) => <li key={d}>• {d}</li>)}</ul>
-          </section>
-          <section>
-            <h2 className="text-sm font-semibold text-gray-900">What we keep</h2>
-            <ul className="mt-2 space-y-1.5 text-sm text-gray-700">{KEPT.map((k) => <li key={k}>• {k}</li>)}</ul>
-          </section>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={sendLink}
-              disabled={sending}
-              className={clsx('inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60')}
-            >
-              {sending && <Loader2 className="h-4 w-4 animate-spin" />} Email me a confirmation link
-            </button>
-            <Link href="/account/settings" className="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
-              Keep my account
-            </Link>
+        <>
+          <div className={s.warnCard}>
+            <p className="text-sm leading-6">
+              This permanently deletes your JulineMart account. To make sure it&apos;s really you, we&apos;ll first email you a link to
+              confirm. <strong>This can&apos;t be undone.</strong>
+            </p>
           </div>
-        </div>
+          <div className={s.card}>
+            <h2 className={s.title}>What gets deleted</h2>
+            <ul className={s.list}>{DELETED.map((d) => <li key={d}>• {d}</li>)}</ul>
+          </div>
+          <div className={s.card}>
+            <h2 className={s.title}>What we keep</h2>
+            <ul className={s.list}>{KEPT.map((k) => <li key={k}>• {k}</li>)}</ul>
+            <Link href="/account/settings" className={`${s.link} mt-4 inline-block`}>Keep my account</Link>
+          </div>
+        </>
       )}
     </DeletionShell>
   );

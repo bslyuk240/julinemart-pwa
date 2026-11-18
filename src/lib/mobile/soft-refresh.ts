@@ -46,6 +46,7 @@ const OFF_ROUTES: (string | RegExp)[] = [
   '/search',
   '/account/settings',
   '/account/addresses',
+  '/account/delete', // account deletion: request and confirm steps
   /^\/account\/orders\/[^/]+\/(return|refund)(\/|$)/, // return / refund request forms
   /^\/returns\/[^/]+\/add-tracking$/, // tracking number form
   '/auth/', // sign-in callbacks: a reload would replay the one-time code

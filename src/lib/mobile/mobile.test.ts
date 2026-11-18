@@ -169,7 +169,7 @@ describe('back stack', () => {
 
 describe('pull to refresh', () => {
   it('stays off on forms and multi-step flows', () => {
-    for (const path of ['/checkout', '/login', '/signup', '/contact', '/search', '/gifts/build', '/account/orders/12/return', '/account/orders/12/refund', '/returns/r-1/add-tracking', '/auth/google/callback', '/account-deletion', '/vendor/10', '/vendors']) {
+    for (const path of ['/checkout', '/login', '/signup', '/contact', '/search', '/gifts/build', '/account/orders/12/return', '/account/orders/12/refund', '/returns/r-1/add-tracking', '/auth/google/callback', '/account-deletion', '/account/delete', '/account/delete/confirm', '/vendor/10', '/vendors']) {
       expect(pullRefreshMode(path)).toBe('off');
     }
   });

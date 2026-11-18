@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, Mail, ShieldAlert, Trash2 } from 'lucide-react';
+import { clsx } from 'clsx';
+import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
+import { getMobileTierRoute } from '@/lib/mobile/mobile-tier-routes';
 import { ACCOUNT_DELETION_EMAIL } from '@/lib/constants';
 
 export const metadata: Metadata = {
@@ -25,10 +28,19 @@ const retainedData = [
 ];
 
 export default function AccountDeletionPage() {
+  // Mobile tier (docs/mobile-tier-plan.md, M12): top bar carries the title; the
+  // policy reads edge to edge below md. Desktop is unchanged.
+  const tier = getMobileTierRoute('/account-deletion') !== null;
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white pb-24 md:pb-12">
-      <div className="container mx-auto max-w-4xl px-4 py-6">
-        <div className="mb-6">
+    <main className={clsx('min-h-screen bg-gradient-to-b from-gray-50 to-white pb-24 md:pb-12', tier && 'max-md:bg-none max-md:bg-m-surface max-md:pb-6')}>
+      {tier && (
+        <div className="sticky top-0 z-m-header bg-m-surface md:hidden">
+          <MobileTopBar title="Account deletion" backHref="/" />
+        </div>
+      )}
+      <div className={clsx('container mx-auto max-w-4xl px-4 py-6', tier && 'max-md:py-2')}>
+        <div className={clsx('mb-6', tier && 'max-md:hidden')}>
           <Link
             href="/"
             className="inline-flex items-center gap-2 text-primary-600 transition-colors hover:text-primary-700"
@@ -38,8 +50,14 @@ export default function AccountDeletionPage() {
           </Link>
         </div>
 
-        <article className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-          <header className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-8 text-white md:px-8">
+        {tier && (
+          <p className="mb-4 text-m-body-l text-m-on-surface-variant md:hidden">
+            You can ask us to delete your JulineMart account and personal data at any time.
+          </p>
+        )}
+
+        <article className={clsx('overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm', tier && 'max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:shadow-none')}>
+          <header className={clsx('bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-8 text-white md:px-8', tier && 'max-md:hidden')}>
             <div className="flex items-start gap-4">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15">
                 <Trash2 className="h-7 w-7" />
@@ -57,7 +75,7 @@ export default function AccountDeletionPage() {
             </div>
           </header>
 
-          <div className="space-y-8 px-6 py-8 md:px-8">
+          <div className={clsx('space-y-8 px-6 py-8 md:px-8', tier && 'max-md:space-y-4 max-md:px-0 max-md:py-0')}>
             <section className="rounded-2xl border border-amber-100 bg-amber-50 p-5">
               <div className="flex items-start gap-3">
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
