@@ -15,6 +15,7 @@ const deletedData = [
   'Login credentials',
   'Preferences',
   'Marketing data',
+  'JulinePoints balance (forfeited when the account is deleted)',
 ];
 
 const retainedData = [
@@ -144,7 +145,7 @@ export default function AccountDeletionPage() {
                     .
                   </p>
                   <p className="mt-2 text-xs uppercase tracking-wide text-gray-500">
-                    Last updated: March 11, 2026
+                    Last updated: November 18, 2026
                   </p>
                 </div>
               </div>
