@@ -25,6 +25,7 @@ const retainedData = [
   'Transaction records, retained for up to 7 years for tax and accounting compliance',
   'Vendor payout records, retained for up to 7 years',
   'Support communications, retained for up to 3 years',
+  'A one-way fingerprint of your email address (not the address itself), kept so the sign-up bonus and referral rewards cannot be claimed twice',
 ];
 
 export default function AccountDeletionPage() {

@@ -18,6 +18,7 @@ const DELETED = [
 const KEPT = [
   'Order records for tax and accounting, with your name, phone and address removed',
   'Support conversations, for up to 3 years',
+  "A one-way fingerprint of your email (never the address itself), so sign-up and referral rewards can't be claimed twice",
 ];
 
 type View = 'loading' | 'ready' | 'blocked' | 'sent' | 'error';
