@@ -31,6 +31,7 @@ const ROUTES: MobileTierRoute[] = [
     'notifications',
     'payments',
     'purchases',
+    'rewards',
     'returns',
     'settings',
     'wishlist',
