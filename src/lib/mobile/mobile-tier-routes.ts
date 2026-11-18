@@ -41,6 +41,7 @@ const ROUTES: MobileTierRoute[] = [
   // Wave 3
   { pattern: '/login', tabBar: false }, // M9: full-screen auth
   { pattern: '/signup', tabBar: false }, // M9
+  { pattern: '/auth/confirmed', tabBar: false }, // email-confirmation landing
   { pattern: '/forgot-password', tabBar: false }, // M9
   { pattern: '/reset-password', tabBar: false }, // M9
   { pattern: '/order-success', tabBar: false }, // M9: pinned next-step bar

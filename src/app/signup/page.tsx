@@ -14,6 +14,8 @@ import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import GoogleSignInButton from '@/components/auth/google-sign-in-button';
 import { trackSignupSuccess } from '@/lib/gtag';
+import ConfirmEmailPanel from '@/components/auth/confirm-email-panel';
+import { confirmRedirectUrl, isExistingAccountResponse, needsEmailConfirmation } from '@/lib/auth-confirm';
 
 export default function SignupPage() {
   // Mobile tier (docs/mobile-tier-plan.md, wave 3): full-screen sign-in below md —
@@ -54,6 +56,7 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -100,10 +103,11 @@ export default function SignupPage() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
+          emailRedirectTo: confirmRedirectUrl(),
           data: {
             first_name: formData.firstName,
             last_name: formData.lastName,
@@ -122,7 +126,23 @@ export default function SignupPage() {
         return;
       }
 
-      // Also save phone to customers table immediately
+      // "Confirm email" on: Supabase returns a user with no identities (and no
+      // error) when the address already has an account.
+      if (isExistingAccountResponse(signUpData)) {
+        setErrors({ email: 'An account with this email already exists' });
+        toast.error('Email already registered. Try logging in.');
+        return;
+      }
+
+      // "Confirm email" on: no session until the link is clicked. The phone is
+      // saved by the handle_new_customer trigger and SIGNUP is logged there too,
+      // so show the check-your-email screen. Sign-up tracking fires on /auth/confirmed.
+      if (needsEmailConfirmation(signUpData)) {
+        setPendingEmail(formData.email.trim());
+        return;
+      }
+
+      // Confirmation off: a session exists straight away.
       const { data: { user } } = await supabase.auth.getUser();
       if (user && formData.phone) {
         await supabase.from('customers').update({ phone: formData.phone }).eq('id', user.id);
@@ -158,6 +178,10 @@ export default function SignupPage() {
   };
 
   const logoSrc = process.env.NEXT_PUBLIC_LOGO_URL || '/images/logo.png';
+
+  if (pendingEmail) {
+    return <ConfirmEmailPanel email={pendingEmail} onChangeEmail={() => setPendingEmail(null)} />;
+  }
 
   return (
     <main className={clsx('min-h-screen bg-gray-50 py-12 px-4', tier && 'max-md:block max-md:min-h-0 max-md:bg-m-surface max-md:px-0 max-md:pb-10 max-md:pt-0')}>

@@ -16,6 +16,8 @@ import PageLoading from '@/components/ui/page-loading';
 import GoogleSignInButton from '@/components/auth/google-sign-in-button';
 import { trackLoginSuccess } from '@/lib/gtag';
 import { logActivity } from '@/lib/logActivity';
+import ConfirmEmailPanel from '@/components/auth/confirm-email-panel';
+import { resendConfirmation } from '@/lib/auth-confirm';
 
 function LoginContent() {
   // Mobile tier (docs/mobile-tier-plan.md, wave 3): full-screen sign-in below md —
@@ -29,6 +31,7 @@ function LoginContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -63,6 +66,12 @@ function LoginContent() {
       });
 
       if (error) {
+        if (error.code === 'email_not_confirmed' || /email not confirmed/i.test(error.message)) {
+          // Send a fresh link and show the check-your-email screen.
+          await resendConfirmation(formData.email);
+          setUnconfirmedEmail(formData.email.trim());
+          return;
+        }
         toast.error(error.message === 'Invalid login credentials'
           ? 'Invalid email or password'
           : error.message);
@@ -82,6 +91,10 @@ function LoginContent() {
   };
 
   const logoSrc = process.env.NEXT_PUBLIC_LOGO_URL || '/images/logo.png';
+
+  if (unconfirmedEmail) {
+    return <ConfirmEmailPanel email={unconfirmedEmail} reason="login" onChangeEmail={() => setUnconfirmedEmail(null)} />;
+  }
 
   return (
     <main className={clsx('min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4', tier && 'max-md:block max-md:min-h-0 max-md:bg-m-surface max-md:px-0 max-md:pb-10 max-md:pt-0')}>
