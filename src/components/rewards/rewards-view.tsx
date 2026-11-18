@@ -74,7 +74,7 @@ type RewardsViewProps = {
  * Layout is decided by CSS, per docs/mobile-tier-plan.md:
  *  - below `md` (phones): one column with the mobile design tokens, gated on the
  *    route allowlist (`tier`) so removing the route reverts it;
- *  - `lg` and up: a two-column dashboard (balance, daily reward and history on
+ *  - `xl` (1280px) and up: a two-column dashboard (balance, daily reward and history on
  *    the left, a sticky referral card on the right), not the phone column
  *    stretched across the screen.
  */
@@ -135,11 +135,11 @@ export default function RewardsView({ state, claiming, copied, onClaim, onShare,
       <div className="container-custom py-5 md:py-8">
         <AccountPageHeader title={name} subtitle="Earn points, then use them at checkout." />
 
-        <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-12 lg:gap-6">
+        <div className="mx-auto grid max-w-3xl gap-4 xl:max-w-6xl xl:grid-cols-12 xl:gap-6">
           {/* Balance */}
           <section
             className={clsx(
-              'relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-700 to-primary-500 p-5 text-white max-lg:order-1 md:p-8 lg:col-span-7',
+              'relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-700 to-primary-500 p-5 text-white max-xl:order-1 md:p-8 xl:col-span-7',
               tier &&
                 'max-md:rounded-m-sheet max-md:bg-none max-md:bg-m-primary-container max-md:p-5 max-md:text-m-on-primary-container',
             )}
@@ -187,7 +187,7 @@ export default function RewardsView({ state, claiming, copied, onClaim, onShare,
 
           {/* Referral: right column on desktop, spans the left column's three rows */}
           {ref.enabled && ref.code && (
-            <section className={clsx(card, 'max-lg:order-3 lg:col-span-5 lg:col-start-8 lg:row-span-3 lg:row-start-1 lg:self-start')}>
+            <section className={clsx(card, 'max-xl:order-3 xl:col-span-5 xl:col-start-8 xl:row-span-3 xl:row-start-1 xl:self-start')}>
               <h2 className={clsx(cardTitle, 'flex items-center gap-2')}>
                 <Users className="h-4 w-4 md:h-5 md:w-5" /> Refer a friend
               </h2>
@@ -270,7 +270,7 @@ export default function RewardsView({ state, claiming, copied, onClaim, onShare,
 
           {/* Daily reward */}
           {showClaim && (
-            <section className={clsx(card, 'max-lg:order-2 lg:col-span-7 lg:col-start-1')}>
+            <section className={clsx(card, 'max-xl:order-2 xl:col-span-7 xl:col-start-1')}>
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h2 className={cardTitle}>Daily reward</h2>
@@ -332,7 +332,7 @@ export default function RewardsView({ state, claiming, copied, onClaim, onShare,
           )}
 
           {/* History */}
-          <section className={clsx(cardFlush, 'max-lg:order-4 lg:col-span-7 lg:col-start-1')}>
+          <section className={clsx(cardFlush, 'max-xl:order-4 xl:col-span-7 xl:col-start-1')}>
             <h2 className={clsx(cardTitle, 'border-b border-gray-100 px-4 py-3 md:px-6 md:py-4', tier && 'max-md:border-m-outline-variant')}>History</h2>
             {(state.history || []).length === 0 ? (
               <p className={clsx('px-4 py-6 text-sm text-gray-500 md:px-6', tier && 'max-md:text-m-body-m max-md:text-m-on-surface-variant')}>
@@ -368,7 +368,7 @@ export default function RewardsView({ state, claiming, copied, onClaim, onShare,
             )}
           </section>
 
-          <p className={clsx('px-1 text-xs text-gray-500 max-lg:order-5 lg:col-span-12', tier && 'max-md:text-m-body-s max-md:text-m-on-surface-variant')}>
+          <p className={clsx('px-1 text-xs text-gray-500 max-xl:order-5 xl:col-span-12', tier && 'max-md:text-m-body-s max-md:text-m-on-surface-variant')}>
             {name} are reward points, not cash. They cannot be withdrawn or transferred, and can only be used on eligible items at
             checkout{p.redemption.enabled ? ` (up to ${p.redemption.cap_percent}% of eligible item value per order)` : ''}.
             {p.expiry.enabled ? ` Points expire ${p.expiry.days} days after they are earned.` : ''}
