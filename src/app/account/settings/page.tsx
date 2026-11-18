@@ -252,20 +252,22 @@ export default function AccountSettingsPage() {
                   <div className="flex-1">
                     <h3 className="font-medium text-red-900 text-sm">Delete Your Account</h3>
                     <p className="text-sm text-red-700 mt-1">
-                      To request account deletion, email{' '}
-                      <a href={`mailto:${ACCOUNT_DELETION_EMAIL}`} className="font-medium underline">{ACCOUNT_DELETION_EMAIL}</a>
-                      {' '}from your registered email.
+                      Permanently delete your account and personal data. We&apos;ll email you a link to confirm first.
                     </p>
                     <div className="mt-3 flex flex-wrap gap-3">
-                      <Link href="/account-deletion"
+                      <Link href="/account/delete"
                         className="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">
+                        Delete my account
+                      </Link>
+                      <Link href="/account-deletion"
+                        className="inline-flex items-center rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100">
                         View Deletion Policy
                       </Link>
-                      <a href={`mailto:${ACCOUNT_DELETION_EMAIL}`}
-                        className="inline-flex items-center rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100">
-                        Email Request
-                      </a>
                     </div>
+                    <p className="mt-3 text-xs text-red-700">
+                      Prefer email? Write to{' '}
+                      <a href={`mailto:${ACCOUNT_DELETION_EMAIL}`} className="font-medium underline">{ACCOUNT_DELETION_EMAIL}</a>.
+                    </p>
                   </div>
                 </div>
               </div>

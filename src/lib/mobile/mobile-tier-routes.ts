@@ -49,6 +49,8 @@ const ROUTES: MobileTierRoute[] = [
   { pattern: '/brand/*', tabBar: true }, // M10
   { pattern: '/vendors', tabBar: true }, // M10
   { pattern: '/vendor/*', tabBar: true }, // M10: public store page
+  { pattern: '/account/delete', tabBar: false }, // account deletion: request
+  { pattern: '/account/delete/confirm', tabBar: false }, // account deletion: confirm from email
   { pattern: '/account/orders/*', tabBar: false }, // M11: return request flow (other children just redirect)
   { pattern: '/returns/*', tabBar: false }, // M11: track return / add tracking
   { pattern: '/contact', tabBar: true }, // M12: info pages

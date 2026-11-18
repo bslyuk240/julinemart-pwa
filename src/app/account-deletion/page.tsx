@@ -61,9 +61,16 @@ export default function AccountDeletionPage() {
               <div className="flex items-start gap-3">
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">How to request account deletion</h2>
+                  <h2 className="text-lg font-semibold text-gray-900">How to delete your account</h2>
                   <p className="mt-2 text-sm leading-6 text-gray-700">
-                    Send a deletion request to{' '}
+                    The quickest way is to sign in and go to{' '}
+                    <Link href="/account/delete" className="font-medium text-primary-600 underline underline-offset-2">
+                      Account, Settings, Delete my account
+                    </Link>
+                    . We email you a confirmation link, and your account is deleted once you confirm.
+                  </p>
+                  <p className="mt-3 text-sm leading-6 text-gray-700">
+                    Can&apos;t sign in? Send a deletion request to{' '}
                     <a
                       href={`mailto:${ACCOUNT_DELETION_EMAIL}`}
                       className="font-medium text-primary-600 underline underline-offset-2"
