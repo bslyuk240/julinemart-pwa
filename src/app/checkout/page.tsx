@@ -2306,8 +2306,8 @@ export default function CheckoutPage() {
               <div className={clsx('rounded-2xl bg-white p-4 shadow-sm md:p-5', tier && 'max-md:order-1', tier && phoneStep !== 3 && 'max-md:hidden')}>
                 <label className="flex cursor-pointer items-start justify-between gap-3">
                   <span>
-                    <span className="block text-sm font-semibold text-gray-900 md:text-base">Use JulinePoints</span>
-                    <span className="mt-1 block text-sm text-gray-600">
+                    <span className={clsx('block text-sm font-semibold text-gray-900 md:text-base', tier && 'max-md:text-m-title-m max-md:text-m-on-surface')}>Use JulinePoints</span>
+                    <span className={clsx('mt-1 block text-sm text-gray-600', tier && 'max-md:text-m-body-m max-md:text-m-on-surface-variant')}>
                       You have {Number(pointsQuote.points.available_points).toLocaleString()} points (
                       {formatPrice(Number(pointsQuote.points.available_points) * Number(pointsQuote.points.points_to_ngn))}).{' '}
                       {Number(pointsQuote.points.max_points) >= Number(pointsQuote.points.min_points)
@@ -2317,7 +2317,7 @@ export default function CheckoutPage() {
                   </span>
                   <input
                     type="checkbox"
-                    className="mt-1 h-5 w-5 shrink-0"
+                    className={clsx('mt-1 h-5 w-5 shrink-0', tier && 'max-md:h-6 max-md:w-6 max-md:accent-[var(--m-primary)]')}
                     checked={usePoints}
                     disabled={Number(pointsQuote.points.max_points) < Number(pointsQuote.points.min_points)}
                     onChange={(e) => {
@@ -2331,14 +2331,14 @@ export default function CheckoutPage() {
                   <div className="mt-3">
                     <input
                       type="range"
-                      className="w-full"
+                      className={clsx('w-full', tier && 'max-md:accent-[var(--m-primary)]')}
                       min={Number(pointsQuote.points.min_points)}
                       max={Number(pointsQuote.points.max_points)}
                       value={pointsToUse ?? (pointsApplied || Number(pointsQuote.points.max_points))}
                       onChange={(e) => setPointsToUse(Number(e.target.value))}
                       aria-label="Points to use"
                     />
-                    <div className="mt-1 flex items-center justify-between text-sm text-gray-700">
+                    <div className={clsx('mt-1 flex items-center justify-between text-sm text-gray-700', tier && 'max-md:text-m-body-m max-md:text-m-on-surface')}>
                       <span>Using {pointsApplied.toLocaleString()} points (-{formatPrice(pointsDiscount)})</span>
                       <button type="button" className="text-primary-600 underline" onClick={() => setPointsToUse(null)}>
                         Use maximum

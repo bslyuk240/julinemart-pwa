@@ -56,7 +56,10 @@ const ROUTES: MobileTierRoute[] = [
   { pattern: '/', tabBar: true }, // M17: homepage
 ];
 
-const DEV_ROUTES: MobileTierRoute[] = [{ pattern: '/dev/mobile-shell', tabBar: true }];
+const DEV_ROUTES: MobileTierRoute[] = [
+  { pattern: '/dev/mobile-shell', tabBar: true },
+  { pattern: '/dev/rewards-preview', tabBar: true },
+];
 
 export function matchesPattern(pattern: string, pathname: string): boolean {
   if (pattern.endsWith('/*')) {
