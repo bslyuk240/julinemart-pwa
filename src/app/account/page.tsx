@@ -31,6 +31,8 @@ import MobileTopBar from '@/components/mobile/shell/mobile-top-bar';
 import { useCustomerAuth } from '@/context/customer-auth-context';
 import { getCustomerOrders } from '@/lib/supabase/customers';
 import { toast } from 'sonner';
+import { Gift as RewardsIcon } from 'lucide-react';
+import { rewardsFetch } from '@/lib/rewards';
 
 type AccountOrder = {
   id: string;
@@ -82,6 +84,12 @@ function buildOrderStats(orders: AccountOrder[]): OrderStats {
 export default function AccountPage() {
   const router = useRouter();
   const { user, customer, isAuthenticated, isLoading, logout, refreshCustomer } = useCustomerAuth();
+  // Show the Rewards entry only while the programme is live.
+  const [rewardsOn, setRewardsOn] = useState(false);
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return;
+    rewardsFetch('wallet').then((r) => setRewardsOn(r?.data?.enabled === true)).catch(() => setRewardsOn(false));
+  }, [isLoading, isAuthenticated]);
   const [recentOrders, setRecentOrders] = useState<AccountOrder[]>([]);
   const [orderStats, setOrderStats] = useState<OrderStats>(emptyOrderStats);
   const [ordersLoading, setOrdersLoading] = useState(true);
@@ -190,6 +198,16 @@ export default function AccountPage() {
   }
 
   const accountMenuItems = [
+    ...(rewardsOn
+      ? [{
+          icon: RewardsIcon,
+          title: 'JulinePoints',
+          description: 'Earn, claim & refer',
+          href: '/account/rewards',
+          color: 'text-amber-600',
+          bgColor: 'bg-amber-50',
+        }]
+      : []),
     {
       icon: Package,
       title: 'My Orders',
@@ -273,7 +291,7 @@ export default function AccountPage() {
 
   // Mobile tier groups for the settings-style list (same destinations as the shortcuts grid).
   const menuGroups = [
-    { title: 'Orders & purchases', hrefs: ['/orders', '/account/returns', '/account/purchases'] },
+    { title: 'Orders & purchases', hrefs: ['/account/rewards', '/orders', '/account/returns', '/account/purchases'] },
     { title: 'Saved', hrefs: ['/account/wishlist', '/account/following'] },
     { title: 'Your account', hrefs: ['/account/addresses', '/account/payments', '/account/notifications', '/account/settings'] },
   ].map((group) => ({

@@ -34,6 +34,7 @@ import { trackBeginCheckout, trackPurchase } from '@/lib/gtag';
 import { useCartStore } from '@/store/cart-store';
 import { jloItemIdsFromCartLine } from '@/lib/jlo/line-identity';
 import { ensurePaystackReady, resetPaystackLoader } from '@/lib/paystack';
+import { supabase as authSupabase } from '@/lib/supabase/client';
 import { logActivity } from '@/lib/logActivity';
 import { useLocationLgas } from '@/hooks/use-location-lgas';
 import {
@@ -1428,9 +1429,15 @@ export default function CheckoutPage() {
 
       console.log('📦 Creating order with coupon info:', orderData);
 
+      // Send the customer's login (if any) so JLO links the order to their account;
+      // guests simply have no token and check out as before.
+      const { data: { session: authSession } } = await authSupabase.auth.getSession().catch(() => ({ data: { session: null } } as any));
       const createOrderResponse = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authSession?.access_token ? { Authorization: `Bearer ${authSession.access_token}` } : {}),
+        },
         body: JSON.stringify(orderData),
       });
 

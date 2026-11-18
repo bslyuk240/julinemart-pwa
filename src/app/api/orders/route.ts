@@ -241,7 +241,11 @@ export async function POST(request: Request) {
 
     const jloRes = await fetch(`${JLO_BASE}/api/create-order`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // Forward the customer's own login so JLO can verify it and link the order.
+        ...(request.headers.get('authorization') ? { Authorization: request.headers.get('authorization') as string } : {}),
+      },
       body: JSON.stringify(jloPayload),
     });
 

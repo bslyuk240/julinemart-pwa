@@ -18,6 +18,7 @@ import GoogleAnalytics from '@/components/pwa/google-analytics';
 import VisualViewportBottomSync from '@/components/layout/visual-viewport-bottom-sync';
 import PaystackPreloader from '@/components/payments/paystack-preloader';
 import LaunchSplash from '@/components/pwa/launch-splash';
+import RewardsBootstrap from '@/components/rewards/rewards-bootstrap';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -97,6 +98,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <NativeBackButton />
         <PWAStandaloneTracker />
         <CustomerAuthProvider>
+          <RewardsBootstrap />
           <PushNotificationManager />
           <WebPushManager />
           <GlobalPullToRefresh>
