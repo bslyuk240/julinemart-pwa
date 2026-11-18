@@ -612,6 +612,22 @@ export default function OrderDetailPage() {
                     {formatPrice(order.shipping_total, order.currency)}
                   </span>
                 </div>
+                {parseFloat((order as any).discount_total || '0') > 0 && (
+                  <div className="flex justify-between text-sm text-green-700">
+                    <span>Discount</span>
+                    <span className="font-medium">
+                      -{formatPrice((order as any).discount_total, order.currency)}
+                    </span>
+                  </div>
+                )}
+                {parseFloat((order as any).points_discount || '0') > 0 && (
+                  <div className="flex justify-between text-sm text-green-700">
+                    <span>JulinePoints used ({Number((order as any).points_redeemed || 0).toLocaleString()} pts)</span>
+                    <span className="font-medium">
+                      -{formatPrice((order as any).points_discount, order.currency)}
+                    </span>
+                  </div>
+                )}
                 {parseFloat(order.total_tax || '0') > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Tax</span>

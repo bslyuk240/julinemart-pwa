@@ -95,6 +95,8 @@ function adaptOrder(o: any) {
     subtotal: String(o.subtotal ?? 0),
     shipping_total: String(o.shipping_fee_paid ?? 0),
     discount_total: String(o.discount_amount ?? 0),
+    points_redeemed: Number(o.points_redeemed ?? 0),
+    points_discount: String(o.points_discount ?? 0),
     currency: 'NGN',
     payment_method: o.payment_method || '',
     payment_method_title: o.payment_method || 'Paystack',
@@ -235,6 +237,11 @@ export async function POST(request: Request) {
           ? 'store_pickup'
           : 'delivery';
     jloPayload.fulfillment_method = fulfillmentMethod;
+
+    // JulinePoints: only a requested amount is sent; JLO decides what is allowed.
+    if (Number.isInteger(body.points_to_redeem) && body.points_to_redeem > 0) {
+      jloPayload.points_to_redeem = body.points_to_redeem;
+    }
     if (fulfillmentMethod === 'store_pickup' || fulfillmentMethod === 'reservation') {
       jloPayload.shipping_fee = 0;
     }
@@ -254,8 +261,12 @@ export async function POST(request: Request) {
     if (!jloRes.ok || !jloData.success) {
       console.error('JLO create-order failed:', jloRes.status, jloData);
       return NextResponse.json(
-        { error: jloData.error || jloData.message || 'Failed to create order', detail: jloData.detail },
-        { status: jloRes.status === 400 ? 400 : 500 }
+        {
+          error: jloData.error || jloData.message || 'Failed to create order',
+          detail: jloData.detail,
+          ...(jloData.code ? { code: jloData.code } : {}),
+        },
+        { status: [400, 401, 409, 503].includes(jloRes.status) ? jloRes.status : 500 }
       );
     }
 
@@ -269,6 +280,8 @@ export async function POST(request: Request) {
         total_amount: d.total_amount,
         subtotal: d.subtotal,
         discount_amount: d.discount_amount,
+        points_redeemed: d.points_redeemed ?? 0,
+        points_discount: d.points_discount ?? 0,
         shipping_fee: d.shipping_fee,
         item_count: d.item_count,
       },

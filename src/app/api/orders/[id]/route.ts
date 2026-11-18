@@ -107,6 +107,8 @@ function adaptOrder(o: any) {
     subtotal: String(o.subtotal ?? 0),
     shipping_total: String(o.shipping_fee_paid ?? 0),
     discount_total: String(o.discount_amount ?? 0),
+    points_redeemed: Number(o.points_redeemed ?? 0),
+    points_discount: String(o.points_discount ?? 0),
     currency: 'NGN',
     payment_method: o.payment_method || '',
     payment_method_title: o.payment_method || 'Paystack',

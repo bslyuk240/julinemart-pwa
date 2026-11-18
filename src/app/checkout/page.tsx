@@ -177,6 +177,13 @@ export default function CheckoutPage() {
   // the voucher itself carries a shipping_discount_type other than 'none'.
   const [voucherShippingDiscount, setVoucherShippingDiscount] = useState(0);
 
+  // JulinePoints: OFF by default. The amount always comes from the JLO quote.
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsToUse, setPointsToUse] = useState<number | null>(null); // null = maximum allowed
+  const [pointsQuote, setPointsQuote] = useState<any>(null);
+  const [pointsQuoting, setPointsQuoting] = useState(false);
+  const [quoteNonce, setQuoteNonce] = useState(0);
+
   // Prefill campaign voucher saved from "Save offer & shop" on a landing page.
   useEffect(() => {
     const pending = readPendingCampaignVoucher();
@@ -353,7 +360,67 @@ export default function CheckoutPage() {
   const activeShippingDiscount = appliedCoupon ? shippingDiscount : appliedVoucher ? voucherShippingDiscount : 0;
   const discountedShipping = Math.max(0, (shippingCost || 0) - activeShippingDiscount);
   const discountedSubtotal = Math.max(0, subtotal - voucherDiscount); // Vouchers discount products
-  const total = discountedSubtotal + discountedShipping + taxAmount;
+  const pointsApplied =
+    usePoints && pointsQuote?.points?.enabled ? Number(pointsQuote.points.applied_points) || 0 : 0;
+  const pointsDiscount = pointsApplied > 0 ? Number(pointsQuote.points.naira_value) || 0 : 0;
+  const total = Math.max(0, discountedSubtotal - pointsDiscount) + discountedShipping + taxAmount;
+
+  // Ask JLO what JulinePoints can be used on this exact cart (after any voucher).
+  const quoteItemsKey = items
+    .map((i: any) => `${i.id}:${i.quantity}:${i.variation?.id ?? ''}`)
+    .join('|');
+  useEffect(() => {
+    if (!isAuthenticated || items.length === 0) {
+      setPointsQuote(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setPointsQuoting(true);
+      try {
+        const { data: { session } } = await authSupabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) return;
+        const res = await fetch('/api/orders/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            items: items.map((item: any) => {
+              const ids = jloItemIdsFromCartLine(item);
+              return {
+                product_id: ids.product_id,
+                variation_id: ids.variation_id,
+                quantity: item.quantity,
+                ...(item.customisation
+                  ? {
+                      customisation: {
+                        schema_id: item.customisation.schema_id,
+                        field_values: item.customisation.field_values,
+                        price_adjustment: item.customisation.price_adjustment,
+                      },
+                    }
+                  : {}),
+              };
+            }),
+            voucher_code: appliedVoucher?.code || undefined,
+            influencer_coupon_code: appliedCoupon?.code || undefined,
+            ...(usePoints ? (pointsToUse ? { points_to_redeem: pointsToUse } : { points_use_max: true }) : {}),
+          }),
+        });
+        const json = res.ok ? await res.json().catch(() => null) : null;
+        if (!cancelled) setPointsQuote(json);
+      } catch {
+        if (!cancelled) setPointsQuote(null);
+      } finally {
+        if (!cancelled) setPointsQuoting(false);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, quoteItemsKey, appliedVoucher?.code, appliedCoupon?.code, usePoints, pointsToUse, quoteNonce]);
 
   const toAnalyticsItems = useCallback(
     () =>
@@ -595,7 +662,7 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleSavedCardPayment = async (orderId: number) => {
+  const handleSavedCardPayment = async (orderId: number, amountOverride?: number) => {
     if (!defaultSavedCard || !isAuthenticated || !customerId) {
       toast.error('Unable to process payment with saved card');
       return;
@@ -605,7 +672,7 @@ export default function CheckoutPage() {
       console.log('Charging saved card...');
       setIsProcessing(true);
 
-      const amountKobo = Math.max(0, Math.round(total * 100));
+      const amountKobo = Math.max(0, Math.round((amountOverride ?? total) * 100));
       if (amountKobo <= 0) {
         throw new Error('Invalid payment amount');
       }
@@ -1234,6 +1301,7 @@ export default function CheckoutPage() {
         payment_method: selectedPayment,
         payment_method_title: paymentGateways.find(g => g.id === selectedPayment)?.title || 'Payment',
         set_paid: false,
+        ...(pointsApplied > 0 ? { points_to_redeem: pointsApplied } : {}),
         billing: {
           first_name: formData.firstName,
           last_name: formData.lastName,
@@ -1427,6 +1495,12 @@ export default function CheckoutPage() {
         customer_note: formData.notes,
       };
 
+      if (usePoints && pointsQuoting) {
+        toast.message('Updating your points, please try again in a moment');
+        setIsProcessing(false);
+        return;
+      }
+
       console.log('📦 Creating order with coupon info:', orderData);
 
       // Send the customer's login (if any) so JLO links the order to their account;
@@ -1443,6 +1517,7 @@ export default function CheckoutPage() {
 
       if (!createOrderResponse.ok) {
         const errData = await createOrderResponse.json().catch(() => ({}));
+        if (errData.code === 'points_changed') setQuoteNonce((n) => n + 1);
         throw new Error(errData.error || errData.message || 'Failed to create order');
       }
 
@@ -1457,8 +1532,10 @@ export default function CheckoutPage() {
                                selectedGateway?.id !== 'bacs' && 
                                selectedGateway?.id !== 'cheque';
 
+        // Charge the server's order total (already net of vouchers and points).
+        const payableTotal = Number.isFinite(Number(order.total_amount)) ? Number(order.total_amount) : total;
         if (requiresPayment) {
-          const amountKobo = Math.max(0, Math.round(total * 100));
+          const amountKobo = Math.max(0, Math.round(payableTotal * 100));
           if (amountKobo <= 0) {
             // A 100%-off voucher can zero the total — Paystack can't charge
             // ₦0, so confirm the order directly instead of opening its popup.
@@ -1487,7 +1564,7 @@ export default function CheckoutPage() {
           }
 
           if (useSavedCard && defaultSavedCard && isAuthenticated) {
-            await handleSavedCardPayment(order.payment_reference ?? order.id);
+            await handleSavedCardPayment(order.payment_reference ?? order.id, payableTotal);
           } else {
             currentOrderRef.current = order.payment_reference ?? order.id;
 
@@ -2224,6 +2301,55 @@ export default function CheckoutPage() {
               </div>
             )}
 
+            {/* JulinePoints — optional, OFF by default; amounts come from JLO */}
+            {shippingCost !== null && isAuthenticated && pointsQuote?.points?.enabled && Number(pointsQuote.points.available_points) > 0 && (
+              <div className={clsx('rounded-2xl bg-white p-4 shadow-sm md:p-5', tier && 'max-md:order-1', tier && phoneStep !== 3 && 'max-md:hidden')}>
+                <label className="flex cursor-pointer items-start justify-between gap-3">
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-900 md:text-base">Use JulinePoints</span>
+                    <span className="mt-1 block text-sm text-gray-600">
+                      You have {Number(pointsQuote.points.available_points).toLocaleString()} points (
+                      {formatPrice(Number(pointsQuote.points.available_points) * Number(pointsQuote.points.points_to_ngn))}).{' '}
+                      {Number(pointsQuote.points.max_points) >= Number(pointsQuote.points.min_points)
+                        ? `Up to ${Number(pointsQuote.points.max_points).toLocaleString()} points (${formatPrice(Number(pointsQuote.points.max_points) * Number(pointsQuote.points.points_to_ngn))}) can be used on this order.`
+                        : 'No points can be used on this order.'}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-5 w-5 shrink-0"
+                    checked={usePoints}
+                    disabled={Number(pointsQuote.points.max_points) < Number(pointsQuote.points.min_points)}
+                    onChange={(e) => {
+                      setUsePoints(e.target.checked);
+                      setPointsToUse(null);
+                    }}
+                    aria-label="Use JulinePoints on this order"
+                  />
+                </label>
+                {usePoints && pointsQuote.points.partial_allowed && Number(pointsQuote.points.max_points) > Number(pointsQuote.points.min_points) && (
+                  <div className="mt-3">
+                    <input
+                      type="range"
+                      className="w-full"
+                      min={Number(pointsQuote.points.min_points)}
+                      max={Number(pointsQuote.points.max_points)}
+                      value={pointsToUse ?? (pointsApplied || Number(pointsQuote.points.max_points))}
+                      onChange={(e) => setPointsToUse(Number(e.target.value))}
+                      aria-label="Points to use"
+                    />
+                    <div className="mt-1 flex items-center justify-between text-sm text-gray-700">
+                      <span>Using {pointsApplied.toLocaleString()} points (-{formatPrice(pointsDiscount)})</span>
+                      <button type="button" className="text-primary-600 underline" onClick={() => setPointsToUse(null)}>
+                        Use maximum
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {usePoints && pointsQuoting && <p className="mt-2 text-xs text-gray-500">Updating...</p>}
+              </div>
+            )}
+
             {/* Promo code — single voucher / influencer entry */}
             {shippingCost !== null && (
               <div className={clsx('rounded-2xl bg-white p-4 shadow-sm md:p-5', tier && 'max-md:order-1', tier && phoneStep !== 3 && 'max-md:hidden')}>
@@ -2519,6 +2645,12 @@ export default function CheckoutPage() {
                   <span className="tabular-nums">-₦{voucherDiscount.toLocaleString()}</span>
                 </div>
               )}
+              {pointsDiscount > 0 && (
+                <div className="flex justify-between py-1 text-m-success">
+                  <span>JulinePoints ({pointsApplied.toLocaleString()} pts)</span>
+                  <span className="tabular-nums">-₦{pointsDiscount.toLocaleString()}</span>
+                </div>
+              )}
               <div className="flex justify-between gap-3 py-1">
                 <span className="text-m-on-surface-variant">Delivery</span>
                 <span className="text-right tabular-nums">
@@ -2617,6 +2749,13 @@ export default function CheckoutPage() {
                   <div className="flex justify-between text-green-600">
                     <span>Product Discount</span>
                     <span className="font-medium">-{formatPrice(voucherDiscount)}</span>
+                  </div>
+                )}
+
+                {pointsDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>JulinePoints ({pointsApplied.toLocaleString()} pts)</span>
+                    <span className="font-medium">-{formatPrice(pointsDiscount)}</span>
                   </div>
                 )}
                 
