@@ -4,9 +4,8 @@ import { getCampaignShareImageUrl } from '@/lib/campaigns/share-image';
 import { getCampaignBySlug, getCampaignQrVariantRefs } from '@/lib/campaigns/get-campaign';
 import { resolveCampaignProducts } from '@/lib/campaigns/products';
 import { resolveCampaignReviews } from '@/lib/campaigns/reviews';
+import { resolveCampaignOffer } from '@/lib/campaigns/offer';
 import CampaignTopNav from '@/components/campaigns/TopNav';
-import PromoBanner from '@/components/campaigns/PromoBanner';
-import CampaignCountdown from '@/components/campaigns/CampaignCountdown';
 import SectionRenderer from '@/components/campaigns/SectionRenderer';
 import CampaignFooter from '@/components/campaigns/CampaignFooter';
 import AppDownloadSection from '@/components/layout/app-download-section';
@@ -63,43 +62,54 @@ export default async function CampaignLandingPage({ params }: CampaignPageProps)
   // Fetch with requireActive: false first so we can tell "doesn't exist"
   // (real 404) apart from "exists but paused/expired" (friendly Empty State
   // from the UI Change Plan, not a bare 404).
-  const campaign = await getCampaignBySlug(slug, { requireActive: false });
-  if (!campaign) notFound();
+  const found = await getCampaignBySlug(slug, { requireActive: false });
+  if (!found) notFound();
 
   const now = Date.now();
   const withinWindow =
-    (!campaign.startDate || new Date(campaign.startDate).getTime() <= now) &&
-    (!campaign.endDate || new Date(campaign.endDate).getTime() >= now);
+    (!found.startDate || new Date(found.startDate).getTime() <= now) &&
+    (!found.endDate || new Date(found.endDate).getTime() >= now);
 
-  if (campaign.status !== 'active' || !withinWindow) {
+  if (found.status !== 'active' || !withinWindow) {
     return <CampaignOffline variant="inactive" />;
   }
 
-  const [{ products }, { reviews }, qrVariants] = await Promise.all([
-    resolveCampaignProducts(campaign),
-    resolveCampaignReviews(campaign),
-    getCampaignQrVariantRefs(campaign.id),
+  const [{ products }, { reviews }, qrVariants, { offer, appliesToAll }] = await Promise.all([
+    resolveCampaignProducts(found),
+    resolveCampaignReviews(found),
+    getCampaignQrVariantRefs(found.id),
+    resolveCampaignOffer(found.offerConfig),
   ]);
+  // The offer with its discount filled in from the linked voucher.
+  const campaign = { ...found, offerConfig: offer };
 
   const shareImageUrl = getCampaignShareImageUrl(campaign.heroConfig, SITE_URL);
 
   return (
-    <>
+    <div className="min-h-screen bg-[#f6f5f8]">
       <CampaignTopNav
         campaignName={campaign.publicTitle}
         campaignSlug={campaign.slug}
+        endDate={campaign.endDate}
         shareDescription={campaign.metaSeo?.description ?? campaign.heroConfig.subtitle}
         shareImageUrl={shareImageUrl}
       />
       <PageViewBeacon campaignId={campaign.id} qrVariants={qrVariants} />
-      <PromoBanner offerConfig={campaign.offerConfig} />
-      <div className="mx-auto flex max-w-6xl flex-col gap-5 p-4 pb-28 sm:p-6 sm:pb-8">
-        {campaign.endDate && <CampaignCountdown endDate={campaign.endDate} />}
-        <SectionRenderer campaign={campaign} products={products} reviews={reviews} qrVariants={qrVariants} />
+      {/* The countdown lives in the sticky top bar and the offer in the hero
+          badge and coupon ticket, so there is no separate promo pill or
+          countdown card here. */}
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 pb-32 pt-4 sm:gap-10 sm:px-6 sm:pb-12 sm:pt-6">
+        <SectionRenderer
+          campaign={campaign}
+          products={products}
+          reviews={reviews}
+          qrVariants={qrVariants}
+          codeAppliesToAll={appliesToAll}
+        />
         <AppDownloadSection />
         <CampaignFooter />
       </div>
-      <StickyOfferBar offer={campaign.offerConfig} endDate={campaign.endDate} />
-    </>
+      <StickyOfferBar offer={campaign.offerConfig} campaignTitle={campaign.publicTitle} />
+    </div>
   );
 }

@@ -2,23 +2,26 @@
 
 import { useState } from 'react';
 import { X, ArrowRight } from 'lucide-react';
+import { toast } from 'sonner';
 import type { CampaignOfferConfig } from '@/types/campaigns';
-import CampaignCountdown from '@/components/campaigns/CampaignCountdown';
+import { offerHeadline } from '@/lib/campaigns/offer-copy';
 
 // StickyOfferFloatingBar (UI Change Plan / New Components) — mobile only.
 // isDismissed collapses to a small reopenable pill; copied gives tap-to-copy
 // feedback. Matches the props/states named in the PRD's component spec.
 export default function StickyOfferBar({
   offer,
-  endDate,
+  campaignTitle,
 }: {
   offer?: CampaignOfferConfig;
-  endDate?: string;
+  campaignTitle: string;
 }) {
   const [isDismissed, setIsDismissed] = useState(false);
   const [copied, setCopied] = useState(false);
 
   if (!offer?.couponCode) return null;
+  // The countdown already sits in the sticky top bar, so this bar only carries the code.
+  const headline = offerHeadline(offer, campaignTitle);
 
   async function handleCopy() {
     try {
@@ -26,7 +29,7 @@ export default function StickyOfferBar({
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      // Clipboard API unavailable — the offer section above still shows the code.
+      toast.error(`Couldn't copy. Your code is ${offer!.couponCode}`);
     }
   }
 
@@ -35,24 +38,28 @@ export default function StickyOfferBar({
       {isDismissed ? (
         <button
           onClick={() => setIsDismissed(false)}
-          className="flex min-h-[48px] items-center gap-1.5 rounded-full bg-secondary-500 px-4 text-xs font-extrabold text-white"
+          className="flex min-h-[48px] items-center gap-1.5 rounded-full bg-secondary-500 px-4 text-xs font-extrabold text-gray-950"
         >
-          {offer.displayText ?? 'Offer available'} <ArrowRight className="h-3 w-3" />
+          {headline} <ArrowRight className="h-3 w-3" />
         </button>
       ) : (
         <div className="flex w-full items-center justify-between gap-3">
           <div className="min-w-0">
-            <span className="font-mono text-sm font-extrabold text-primary-600">{offer.couponCode}</span>
-            <p className="truncate text-[11px] text-gray-500">{offer.displayText}</p>
-            <CampaignCountdown endDate={endDate} variant="compact" />
+            <p className="truncate text-xs text-gray-500">{headline}</p>
+            <span className="inline-block rounded-md border border-dashed border-gray-300 px-2 py-0.5 font-mono text-sm font-bold tracking-[0.1em] text-gray-900">
+              {offer.couponCode}
+            </span>
           </div>
           <div className="flex flex-none items-center gap-2">
             <button
               onClick={handleCopy}
-              className="min-h-[48px] rounded-full bg-primary-600 px-4 text-xs font-extrabold text-white"
+              className="min-h-[48px] rounded-full bg-gray-900 px-5 text-sm font-bold text-white"
             >
-              {copied ? 'Copied' : 'Copy'}
+              {copied ? 'Copied' : 'Copy code'}
             </button>
+            <span role="status" className="sr-only">
+              {copied ? 'Code copied' : ''}
+            </span>
             <button
               onClick={() => setIsDismissed(true)}
               aria-label="Dismiss offer bar"

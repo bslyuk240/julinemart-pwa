@@ -3,6 +3,7 @@ import type { Product } from '@/types/product';
 import type { CampaignReview } from '@/lib/campaigns/reviews';
 import type { CampaignQrVariantRef } from '@/hooks/useCampaignTelemetry';
 import { resolveCampaignViewMore } from '@/lib/campaigns/view-more';
+import { offerHeadline, perProductCodeLabel } from '@/lib/campaigns/offer-copy';
 import HeroSection from '@/components/campaigns/HeroSection';
 import BenefitsSection from '@/components/campaigns/BenefitsSection';
 import VendorStorySection from '@/components/campaigns/VendorStorySection';
@@ -21,13 +22,23 @@ export default function SectionRenderer({
   products,
   reviews,
   qrVariants,
+  codeAppliesToAll = false,
 }: {
   campaign: Campaign;
+  /** The campaign code works on every product (no voucher limits). */
+  codeAppliesToAll?: boolean;
   products: Product[];
   reviews: CampaignReview[];
   qrVariants: CampaignQrVariantRef[];
 }) {
   const viewMore = resolveCampaignViewMore(campaign, products);
+  // Only advertise a per-product saving when there is a code that covers every product.
+  // Fixed-amount and free-delivery codes are order-level, so they never get a per-product line.
+  const codeDiscountLabel = codeAppliesToAll ? perProductCodeLabel(campaign.offerConfig) : null;
+  // Carried to the quick view and product page; resolved so it never just repeats the title.
+  const offerText = campaign.offerConfig?.couponCode
+    ? offerHeadline(campaign.offerConfig, campaign.publicTitle)
+    : campaign.offerConfig?.displayText;
 
   return (
     <>
@@ -58,7 +69,8 @@ export default function SectionRenderer({
                 campaignId={campaign.id}
                 campaignSlug={campaign.slug}
                 campaignTitle={campaign.publicTitle}
-                offerText={campaign.offerConfig?.displayText}
+                offerText={offerText}
+                codeDiscountLabel={codeDiscountLabel}
                 products={products}
                 viewMore={viewMore}
                 qrVariants={qrVariants}
@@ -69,6 +81,8 @@ export default function SectionRenderer({
               <OfferSection
                 key={section.id}
                 campaignId={campaign.id}
+                campaignTitle={campaign.publicTitle}
+                endDate={campaign.endDate}
                 offer={campaign.offerConfig}
                 qrVariants={qrVariants}
               />
@@ -81,6 +95,7 @@ export default function SectionRenderer({
                 key={section.id}
                 campaignId={campaign.id}
                 items={section.config.items as CampaignMediaItem[] | undefined}
+                title={typeof section.config.title === 'string' ? section.config.title : undefined}
                 qrVariants={qrVariants}
               />
             );

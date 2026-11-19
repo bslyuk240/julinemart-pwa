@@ -10,6 +10,19 @@ export function resolveVendorStoreHref(url?: string): string | undefined {
   return id ? `/vendor/${encodeURIComponent(id)}` : undefined;
 }
 
+/** The first category that every product belongs to, if any. */
+function sharedCategory(products: Product[]): { name: string; slug: string } | null {
+  if (!products.length) return null;
+  const [first, ...rest] = products;
+  for (const cat of first.categories ?? []) {
+    if (!cat?.slug) continue;
+    if (rest.every((p) => (p.categories ?? []).some((c) => c?.slug === cat.slug))) {
+      return { name: cat.name, slug: cat.slug };
+    }
+  }
+  return null;
+}
+
 export type CampaignViewMoreLink = {
   href: string;
   label: string;
@@ -43,32 +56,13 @@ export function resolveCampaignViewMore(
     return { href: vendorHref, label: `View more from ${name}` };
   }
 
-  if (
-    campaign.targetType === 'category' ||
-    (rules.categoryIds && rules.categoryIds.length > 0)
-  ) {
-    const category =
-      products.find((p) => p.categories?.length)?.categories?.[0] ??
-      products.flatMap((p) => p.categories ?? []).find(Boolean);
-
-    if (category?.slug) {
-      return {
-        href: `/category/${encodeURIComponent(category.slug)}`,
-        label: `View more in ${category.name || 'this category'}`,
-      };
-    }
-  }
-
-  if (campaign.targetType === 'general' || campaign.targetType === 'collection') {
-    return { href: '/products', label: 'Browse more products' };
-  }
-
-  // Manual / product / multi_vendor: try first product category, else catalog.
-  const fallbackCategory = products.find((p) => p.categories?.length)?.categories?.[0];
-  if (fallbackCategory?.slug) {
+  // Only name a category when every campaign product is in it. A mixed grid
+  // (watches, hair care, sofas) must not be labelled "View more in Watches".
+  const category = sharedCategory(products);
+  if (category) {
     return {
-      href: `/category/${encodeURIComponent(fallbackCategory.slug)}`,
-      label: `View more in ${fallbackCategory.name || 'this category'}`,
+      href: `/category/${encodeURIComponent(category.slug)}`,
+      label: `View more in ${category.name || 'this category'}`,
     };
   }
 

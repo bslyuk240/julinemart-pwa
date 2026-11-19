@@ -6,6 +6,7 @@ import { Play, ArrowRight } from 'lucide-react';
 import type { CampaignVendorOverride } from '@/types/campaigns';
 import { useCampaignTelemetry, type CampaignQrVariantRef } from '@/hooks/useCampaignTelemetry';
 import CampaignVideoPlayer from '@/components/campaigns/CampaignVideoPlayer';
+import CampaignLightbox from '@/components/campaigns/CampaignLightbox';
 
 /** Storefront vendor pages are `/vendor/[id]`. Normalize bare `/10` / `10` typos. */
 function resolveVendorStoreHref(url?: string): string | undefined {
@@ -28,14 +29,18 @@ export default function VendorStorySection({
   const { track } = useCampaignTelemetry(campaignId, qrVariants);
   const [videoOpen, setVideoOpen] = useState(false);
   if (!vendor) return null;
+  // A vendor override with no name, story or media is an empty card. Skip it.
+  if (!vendor.name?.trim() && !vendor.story?.trim() && !vendor.shopImageUrl && !vendor.introVideoUrl) {
+    return null;
+  }
 
   const storeHref = resolveVendorStoreHref(vendor.storeLinkUrl);
 
   return (
-    <section className="grid gap-8 rounded-3xl bg-white p-6 shadow-sm sm:p-8 md:grid-cols-[1.2fr_0.8fr] md:items-center">
+    <section className="grid gap-8 rounded-3xl bg-white p-6 ring-1 ring-gray-200/70 sm:p-8 md:grid-cols-[1.2fr_0.8fr] md:items-center">
       <div>
-        <p className="mb-3 text-xs font-extrabold uppercase tracking-wide text-primary-600">Meet the vendor</p>
-        <h2 className="mb-3 text-2xl font-extrabold text-gray-900">{vendor.name}</h2>
+        <p className="mb-2 text-sm font-medium text-gray-500">Meet the vendor</p>
+        {vendor.name && <h2 className="mb-3 text-2xl font-extrabold tracking-tight text-gray-900">{vendor.name}</h2>}
         {vendor.story && <p className="mb-6 max-w-prose text-sm text-gray-600">{vendor.story}</p>}
         {vendor.yearsOperating != null && (
           <div className="mb-6 flex gap-8">
@@ -51,9 +56,9 @@ export default function VendorStorySection({
           <a
             href={storeHref}
             onClick={() => track('cta_click', { cta: 'visit_store' })}
-            className="inline-flex items-center gap-1.5 text-sm font-extrabold text-primary-600"
+            className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-gray-900 underline-offset-4 hover:underline"
           >
-            Visit {vendor.name}&rsquo;s full store <ArrowRight className="h-3.5 w-3.5" />
+            {vendor.name ? <>Visit {vendor.name}&rsquo;s full store</> : <>Visit the full store</>} <ArrowRight className="h-3.5 w-3.5" />
           </a>
         )}
       </div>
@@ -84,17 +89,11 @@ export default function VendorStorySection({
       )}
 
       {videoOpen && vendor.introVideoUrl && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setVideoOpen(false)}
-        >
-          <div
-            className="aspect-video w-full max-w-xl overflow-hidden rounded-xl bg-black"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <CampaignLightbox label="Vendor introduction video" onClose={() => setVideoOpen(false)}>
+          <div className="aspect-video w-full max-w-xl overflow-hidden rounded-xl bg-black">
             <CampaignVideoPlayer url={vendor.introVideoUrl} className="h-full w-full" />
           </div>
-        </div>
+        </CampaignLightbox>
       )}
     </section>
   );

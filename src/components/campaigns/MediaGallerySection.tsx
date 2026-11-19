@@ -6,6 +6,7 @@ import { Play } from 'lucide-react';
 import type { CampaignMediaItem } from '@/types/campaigns';
 import { useCampaignTelemetry, type CampaignQrVariantRef } from '@/hooks/useCampaignTelemetry';
 import CampaignVideoPlayer from '@/components/campaigns/CampaignVideoPlayer';
+import CampaignLightbox from '@/components/campaigns/CampaignLightbox';
 import { resolveYoutubeThumbnail } from '@/lib/campaigns/video-playback';
 
 function videoThumbnail(item: CampaignMediaItem): string | null {
@@ -15,10 +16,13 @@ function videoThumbnail(item: CampaignMediaItem): string | null {
 export default function MediaGallerySection({
   campaignId,
   items,
+  title,
   qrVariants = [],
 }: {
   campaignId: string;
   items?: CampaignMediaItem[];
+  /** Section heading from the admin config; neutral default otherwise. */
+  title?: string;
   qrVariants?: CampaignQrVariantRef[];
 }) {
   const { track } = useCampaignTelemetry(campaignId, qrVariants);
@@ -29,26 +33,27 @@ export default function MediaGallerySection({
   const openItem = openIndex != null ? items[openIndex] : null;
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm sm:p-8">
-      <p className="mb-1 text-xs font-extrabold uppercase tracking-wide text-primary-600">From our customers</p>
-      <h2 className="mb-5 text-xl font-extrabold text-gray-900">Behind the scenes &amp; customer stories</h2>
+    <section aria-labelledby="campaign-gallery-title">
+      <h2 id="campaign-gallery-title" className="mb-4 text-2xl font-extrabold tracking-tight text-gray-900">
+        {title?.trim() || 'Campaign highlights'}
+      </h2>
 
       {/* Tiles are fixed at aspect-video (YouTube's own 16:9) regardless of the
           source media's real dimensions — cropped to fill via object-cover.
           Clicking opens the uncropped item at its natural aspect ratio instead
           of playing/zooming inside this same cropped box. */}
-      <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2">
+      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:gap-4 sm:px-0 [&::-webkit-scrollbar]:hidden">
         {items.map((item, i) => {
           const thumbnail = item.type === 'video' ? videoThumbnail(item) : null;
           return (
-            <div key={i} className="w-[80vw] flex-none overflow-hidden rounded-2xl bg-gray-50 sm:w-80">
+            <div key={i} className="w-[80vw] flex-none snap-start overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/70 sm:w-80">
               <button
                 type="button"
                 onClick={() => {
                   setOpenIndex(i);
                   if (item.type === 'video') track('video_view', { mediaIndex: i });
                 }}
-                className="relative block aspect-video w-full overflow-hidden bg-gradient-to-br from-primary-500 to-primary-800"
+                className="relative block aspect-video w-full overflow-hidden bg-gray-100"
                 aria-label={item.type === 'video' ? 'Play video' : 'View image'}
               >
                 {item.type === 'video' ? (
@@ -78,22 +83,19 @@ export default function MediaGallerySection({
                   />
                 )}
               </button>
-              {item.caption && <p className="p-3 text-xs text-gray-600">{item.caption}</p>}
+              {item.caption && <p className="px-4 py-3 text-sm text-gray-700">{item.caption}</p>}
             </div>
           );
         })}
       </div>
 
       {openItem && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setOpenIndex(null)}
+        <CampaignLightbox
+          label={openItem.caption || (openItem.type === 'video' ? 'Campaign video' : 'Campaign image')}
+          onClose={() => setOpenIndex(null)}
         >
           {openItem.type === 'video' ? (
-            <div
-              className="aspect-video w-full max-w-xl overflow-hidden rounded-xl bg-black"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="aspect-video w-full max-w-xl overflow-hidden rounded-xl bg-black">
               <CampaignVideoPlayer url={openItem.url} className="h-full w-full" />
             </div>
           ) : (
@@ -101,11 +103,10 @@ export default function MediaGallerySection({
             <img
               src={openItem.url}
               alt={openItem.caption || 'Campaign media'}
-              onClick={(e) => e.stopPropagation()}
               className="max-h-[85vh] w-auto max-w-full rounded-xl object-contain"
             />
           )}
-        </div>
+        </CampaignLightbox>
       )}
     </section>
   );

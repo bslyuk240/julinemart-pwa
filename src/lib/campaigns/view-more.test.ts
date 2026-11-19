@@ -60,6 +60,26 @@ describe('resolveCampaignViewMore', () => {
   });
 });
 
+describe('resolveCampaignViewMore with mixed products', () => {
+  it('does not name one category when products span several', () => {
+    const products = [
+      { categories: [{ id: 1, name: 'Jewelry & Watches', slug: 'jewelry' }] },
+      { categories: [{ id: 2, name: 'Hair Care', slug: 'hair' }] },
+    ] as Product[];
+    const link = resolveCampaignViewMore(baseCampaign({ targetType: 'multi_vendor' }), products);
+    expect(link).toEqual({ href: '/products', label: 'Browse more products' });
+  });
+
+  it('names the category every product shares', () => {
+    const products = [
+      { categories: [{ id: 9, name: 'Beauty', slug: 'beauty' }, { id: 2, name: 'Hair Care', slug: 'hair' }] },
+      { categories: [{ id: 2, name: 'Hair Care', slug: 'hair' }] },
+    ] as Product[];
+    const link = resolveCampaignViewMore(baseCampaign({ targetType: 'product' }), products);
+    expect(link).toEqual({ href: '/category/hair', label: 'View more in Hair Care' });
+  });
+});
+
 describe('buildCampaignProductHref', () => {
   it('includes return-to-campaign params', () => {
     expect(buildCampaignProductHref('juicer', 'first', 'First buyers', '20% off')).toBe(

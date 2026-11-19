@@ -109,7 +109,7 @@ export default function CampaignCountdown({
     const Tag = inline ? 'span' : 'p';
     return (
       <Tag
-        className={`text-[11px] font-bold tabular-nums ${urgent ? 'text-secondary-600' : 'text-gray-500'} ${className}`.trim()}
+        className={`text-[11px] font-bold tabular-nums ${urgent ? 'text-secondary-800' : 'text-gray-500'} ${className}`.trim()}
       >
         {text}
       </Tag>

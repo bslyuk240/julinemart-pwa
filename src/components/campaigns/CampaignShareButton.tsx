@@ -71,7 +71,7 @@ export default function CampaignShareButton({
   const triggerClass =
     variant === 'button'
       ? 'inline-flex min-h-[48px] items-center gap-1.5 rounded-full bg-primary-50 px-4 py-2 text-xs font-bold text-primary-700'
-      : 'flex min-h-[48px] min-w-[48px] items-center justify-center rounded-full bg-primary-50 text-primary-700';
+      : 'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-gray-100 text-gray-900 hover:bg-gray-200';
 
   return (
     <div className={`relative ${className}`}>

@@ -10,13 +10,13 @@ export default function ReviewsSection({ reviews }: { reviews: CampaignReview[] 
   if (!reviews.length) return null;
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm sm:p-8">
-      <p className="mb-5 text-xs font-extrabold uppercase tracking-wide text-primary-600">
+    <section aria-labelledby="campaign-reviews-title">
+      <h2 id="campaign-reviews-title" className="mb-4 text-2xl font-extrabold tracking-tight text-gray-900">
         What shoppers are saying
-      </p>
+      </h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {reviews.map((review) => (
-          <figure key={review.id} className="rounded-2xl bg-gray-50 p-5">
+          <figure key={review.id} className="rounded-2xl bg-white p-5 ring-1 ring-gray-200/70">
             <Quote className="mb-2 h-4 w-4 text-secondary-500 opacity-60" />
             <p className="mb-3 text-sm text-gray-800">&ldquo;{review.body}&rdquo;</p>
             <div className="mb-2 flex items-center gap-2">

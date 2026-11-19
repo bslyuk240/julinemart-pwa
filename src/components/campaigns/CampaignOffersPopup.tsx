@@ -9,6 +9,7 @@ import type { CampaignSummary } from '@/types/campaigns';
 import { safeStorage } from '@/lib/safe-storage';
 import { pushOverlay } from '@/lib/mobile/back-stack';
 import { CampaignOffersList } from '@/components/campaigns/CampaignOfferCard';
+import { filterLiveCampaigns } from '@/lib/campaigns/live';
 
 const DISMISSED_KEY = 'jm_campaign_offers_popup_dismissed';
 const DISMISS_COOLDOWN_HOURS = 24;
@@ -32,13 +33,16 @@ function isDismissedRecently(): boolean {
  * Phones (max-md:): a bottom sheet that slides up, closes on swipe down, scrim
  * tap or the Android Back button.
  */
-export default function CampaignOffersPopup({ campaigns }: CampaignOffersPopupProps) {
+export default function CampaignOffersPopup({ campaigns: allCampaigns }: CampaignOffersPopupProps) {
   const pathname = usePathname();
   const [visible, setVisible] = useState(false);
   const [entered, setEntered] = useState(false);
   const [drag, setDrag] = useState(0);
   const dragStart = useRef<number | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Only rendered after mount (visible starts false), so reading the clock
+  // here cannot cause a hydration mismatch.
+  const campaigns = visible ? filterLiveCampaigns(allCampaigns) : allCampaigns;
 
   const dismiss = useCallback(() => {
     safeStorage.setItem(DISMISSED_KEY, String(Date.now()));
@@ -47,11 +51,11 @@ export default function CampaignOffersPopup({ campaigns }: CampaignOffersPopupPr
   }, []);
 
   useEffect(() => {
-    if (pathname !== '/' || campaigns.length === 0 || isDismissedRecently()) return;
+    if (pathname !== '/' || filterLiveCampaigns(allCampaigns).length === 0 || isDismissedRecently()) return;
 
     const timer = window.setTimeout(() => setVisible(true), 1200);
     return () => window.clearTimeout(timer);
-  }, [pathname, campaigns.length]);
+  }, [pathname, allCampaigns]);
 
   // While open: slide in, lock page scroll, let Back and Escape close it.
   useEffect(() => {
