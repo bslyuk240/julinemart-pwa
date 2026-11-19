@@ -21,6 +21,27 @@ function baseCampaign(overrides: Partial<Campaign> = {}): Campaign {
   };
 }
 
+describe('resolveCampaignViewMore (multi-vendor)', () => {
+  const withCategories = [{ id: 1, name: 'Shoes', slug: 'shoes' }] as unknown as Product['categories'];
+  const product = { categories: withCategories } as unknown as Product;
+
+  it('does not pick the first product category for a multi-vendor campaign', () => {
+    const link = resolveCampaignViewMore(
+      baseCampaign({ targetType: 'multi_vendor', productSelectionRules: { source: 'rules_based', vendorIds: ['a', 'b'] } }),
+      [product]
+    );
+    expect(link).toEqual({ href: '/products', label: 'Browse more products' });
+  });
+
+  it('still uses the category a multi-vendor campaign was deliberately narrowed to', () => {
+    const link = resolveCampaignViewMore(
+      baseCampaign({ targetType: 'multi_vendor', productSelectionRules: { source: 'rules_based', vendorIds: ['a', 'b'], categoryIds: ['cat-1'] } }),
+      [product]
+    );
+    expect(link?.href).toBe('/category/shoes');
+  });
+});
+
 describe('resolveCampaignViewMore', () => {
   it('links to vendor store when vendor-targeted', () => {
     const link = resolveCampaignViewMore(

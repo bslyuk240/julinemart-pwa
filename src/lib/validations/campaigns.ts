@@ -39,6 +39,7 @@ export const campaignHeroConfigSchema = z.object({
 export const campaignProductSelectionRulesSchema = z.object({
   source: z.enum(['automatic', 'manual', 'rules_based']),
   vendorId: z.union([z.string(), z.number()]).optional(),
+  vendorIds: z.array(z.union([z.string(), z.number()])).max(50).optional(),
   categoryIds: z.array(z.union([z.string(), z.number()])).optional(),
   manualProductIds: z.array(z.union([z.string(), z.number()])).optional(),
   pinnedProductIds: z.array(z.union([z.string(), z.number()])).optional(),

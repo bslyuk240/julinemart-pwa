@@ -165,6 +165,17 @@ async function productIdsForCategory(categoryId: string): Promise<string[]> {
   return (data ?? []).map((r: { product_id: string }) => r.product_id);
 }
 
+// A campaign may list several categories; a product in any of them qualifies.
+async function productIdsForCategories(categoryIds: (string | number)[]): Promise<string[]> {
+  if (categoryIds.length === 1) return productIdsForCategory(String(categoryIds[0]));
+  const supabase = getSupabaseServerClient();
+  const { data } = await supabase
+    .from('product_category_map')
+    .select('product_id')
+    .in('category_id', categoryIds.map(String));
+  return [...new Set((data ?? []).map((r: { product_id: string }) => r.product_id))];
+}
+
 // campaign_selection_rules.vendorId is entered by admins as either the
 // Supabase vendors.id (uuid) or the legacy WooCommerce vendor id (varchar) —
 // try both so either input shape resolves to the real vendor row.
@@ -181,6 +192,12 @@ async function resolveVendorUuid(vendorId: string | number): Promise<string | nu
     .eq('woocommerce_vendor_id', raw)
     .maybeSingle<{ id: string }>();
   return data?.id ?? null;
+}
+
+// Resolves every entry of a multi-vendor list, dropping ones that match no vendor.
+async function resolveVendorUuids(vendorIds: (string | number)[]): Promise<string[]> {
+  const resolved = await Promise.all(vendorIds.map((v) => resolveVendorUuid(v)));
+  return [...new Set(resolved.filter((id): id is string => Boolean(id)))];
 }
 
 // Queries Supabase directly instead of the JLO catalog Netlify function.
@@ -203,7 +220,7 @@ async function fetchProductsFromSupabase(rules: CampaignProductSelectionRules): 
     if (!numericIds.length) return [];
     query = query.in('woo_product_id', numericIds);
   } else if (rules.categoryIds?.length) {
-    const productIds = await productIdsForCategory(String(rules.categoryIds[0]));
+    const productIds = await productIdsForCategories(rules.categoryIds);
     if (!productIds.length) return [];
     query = query.in('id', productIds);
   }
@@ -214,6 +231,11 @@ async function fetchProductsFromSupabase(rules: CampaignProductSelectionRules): 
     const vendorUuid = await resolveVendorUuid(rules.vendorId);
     if (!vendorUuid) return [];
     query = query.eq('vendor_id', vendorUuid);
+  } else if (rules.vendorIds?.length) {
+    // Multi-vendor campaign: products from any of the listed sellers, and only those.
+    const vendorUuids = await resolveVendorUuids(rules.vendorIds);
+    if (!vendorUuids.length) return [];
+    query = query.in('vendor_id', vendorUuids);
   }
 
   if (rules.source !== 'manual') {
@@ -272,7 +294,7 @@ export function resolveEffectiveProductRules(campaign: Campaign): CampaignProduc
   // Vendor / category targets should never resolve as an unscoped "automatic" dump.
   if (
     rules.source === 'automatic' &&
-    (rules.vendorId != null || (rules.categoryIds && rules.categoryIds.length > 0))
+    (rules.vendorId != null || (rules.vendorIds?.length ?? 0) > 0 || (rules.categoryIds && rules.categoryIds.length > 0))
   ) {
     rules.source = 'rules_based';
   }

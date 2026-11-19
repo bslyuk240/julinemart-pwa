@@ -43,6 +43,14 @@ export function resolveCampaignViewMore(
     return { href: vendorHref, label: `View more from ${name}` };
   }
 
+  // Several sellers across different categories: there is no single category or store to
+  // send people to, and "first product's category" would just follow whichever product
+  // happens to come first. Only a category the campaign was deliberately narrowed to counts.
+  const isMultiVendor = campaign.targetType === 'multi_vendor' || (rules.vendorIds?.length ?? 0) > 1;
+  if (isMultiVendor && !(rules.categoryIds && rules.categoryIds.length === 1)) {
+    return { href: '/products', label: 'Browse more products' };
+  }
+
   if (
     campaign.targetType === 'category' ||
     (rules.categoryIds && rules.categoryIds.length > 0)
