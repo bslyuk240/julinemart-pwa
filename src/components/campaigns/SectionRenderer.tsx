@@ -20,6 +20,7 @@ import GiveawayEntrySection from '@/components/campaigns/GiveawayEntrySection';
 export default function SectionRenderer({
   campaign,
   products,
+  totalProducts,
   reviews,
   qrVariants,
   codeAppliesToAll = false,
@@ -28,10 +29,12 @@ export default function SectionRenderer({
   /** The campaign code works on every product (no voucher limits). */
   codeAppliesToAll?: boolean;
   products: Product[];
+  /** Every product the rules match; more than products.length means a "view all" link is shown. */
+  totalProducts?: number;
   reviews: CampaignReview[];
   qrVariants: CampaignQrVariantRef[];
 }) {
-  const viewMore = resolveCampaignViewMore(campaign, products);
+  const viewMore = resolveCampaignViewMore(campaign, products.length, totalProducts ?? products.length);
   // Only advertise a per-product saving when there is a code that covers every product.
   // Fixed-amount and free-delivery codes are order-level, so they never get a per-product line.
   const codeDiscountLabel = codeAppliesToAll ? perProductCodeLabel(campaign.offerConfig) : null;

@@ -1,5 +1,4 @@
 import type { Campaign } from '@/types/campaigns';
-import type { Product } from '@/types/product';
 
 /** Storefront vendor pages are `/vendor/[id]`. Normalize bare `/10` / `10` typos. */
 export function resolveVendorStoreHref(url?: string): string | undefined {
@@ -10,63 +9,28 @@ export function resolveVendorStoreHref(url?: string): string | undefined {
   return id ? `/vendor/${encodeURIComponent(id)}` : undefined;
 }
 
-/** The first category that every product belongs to, if any. */
-function sharedCategory(products: Product[]): { name: string; slug: string } | null {
-  if (!products.length) return null;
-  const [first, ...rest] = products;
-  for (const cat of first.categories ?? []) {
-    if (!cat?.slug) continue;
-    if (rest.every((p) => (p.categories ?? []).some((c) => c?.slug === cat.slug))) {
-      return { name: cat.name, slug: cat.slug };
-    }
-  }
-  return null;
-}
-
 export type CampaignViewMoreLink = {
   href: string;
   label: string;
 };
 
+/** Where the full, paginated list of a campaign's products lives. */
+export function campaignProductsHref(campaignSlug: string, page = 1): string {
+  const base = `/campaigns/${encodeURIComponent(campaignSlug)}/products`;
+  return page > 1 ? `${base}?page=${page}` : base;
+}
+
 /**
- * Build a "view more products" destination from campaign targeting
- * (vendor store / category / general catalog).
+ * "View more" opens the campaign's own full product list (paginated), i.e. every product its rules match, not a
+ * vendor store, a category or the whole catalogue. It only appears when there is more than the preview shows.
  */
 export function resolveCampaignViewMore(
-  campaign: Campaign,
-  products: Product[]
+  campaign: Pick<Campaign, 'slug'>,
+  shownCount: number,
+  total: number
 ): CampaignViewMoreLink | null {
-  const rules = campaign.productSelectionRules;
-  const vendor = campaign.vendorOverride;
-
-  const vendorHref =
-    resolveVendorStoreHref(vendor?.storeLinkUrl) ??
-    (vendor?.vendorId != null
-      ? `/vendor/${encodeURIComponent(String(vendor.vendorId))}`
-      : undefined) ??
-    (campaign.targetType === 'vendor' && campaign.targetId
-      ? `/vendor/${encodeURIComponent(campaign.targetId)}`
-      : undefined) ??
-    (rules.vendorId != null
-      ? `/vendor/${encodeURIComponent(String(rules.vendorId))}`
-      : undefined);
-
-  if (vendorHref) {
-    const name = vendor?.name?.trim() || 'this store';
-    return { href: vendorHref, label: `View more from ${name}` };
-  }
-
-  // Only name a category when every campaign product is in it. A mixed grid
-  // (watches, hair care, sofas) must not be labelled "View more in Watches".
-  const category = sharedCategory(products);
-  if (category) {
-    return {
-      href: `/category/${encodeURIComponent(category.slug)}`,
-      label: `View more in ${category.name || 'this category'}`,
-    };
-  }
-
-  return { href: '/products', label: 'Browse more products' };
+  if (!(total > shownCount)) return null;
+  return { href: campaignProductsHref(campaign.slug), label: `View all ${total} products` };
 }
 
 export function buildCampaignProductHref(
