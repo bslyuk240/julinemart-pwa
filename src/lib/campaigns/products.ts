@@ -12,7 +12,11 @@ import {
 // only" pattern already used for the rate-limiter fallback in middleware.ts.
 // Fine for this: worst case is a cold serverless instance re-fetching once.
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const cache = new Map<string, { expiresAt: number; products: Product[] }>();
+const cache = new Map<string, { expiresAt: number; products: Product[]; total: number }>();
+
+// The landing page shows a capped preview; the "view all" page pages through everything that matches, up to this.
+const PREVIEW_FETCH_LIMIT = 100;
+const VIEW_ALL_FETCH_LIMIT = 500;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -90,7 +94,7 @@ function mapVariationRow(row: Record<string, unknown>): ProductVariation {
  * with empty price/attributes. Attach active `product_variations` rows so the
  * landing picker and card prices work without a second client round-trip.
  */
-async function attachVariationsToProducts(products: Product[]): Promise<Product[]> {
+export async function attachVariationsToProducts(products: Product[]): Promise<Product[]> {
   const needs = products.filter(
     (p) =>
       p.type === 'variable' &&
@@ -206,7 +210,10 @@ async function resolveVendorUuids(vendorIds: (string | number)[]): Promise<strin
 // returned the same list as no filter at all. Rather than depend on that
 // upstream contract, campaign product selection reads the same `products`
 // table the JLO function itself serves from, applying the filters ourselves.
-async function fetchProductsFromSupabase(rules: CampaignProductSelectionRules): Promise<Product[]> {
+async function fetchProductsFromSupabase(
+  rules: CampaignProductSelectionRules,
+  opts: { limit?: number; withVariations?: boolean } = {},
+): Promise<Product[]> {
   const supabase = getSupabaseServerClient();
   let query = supabase
     .from('products')
@@ -245,7 +252,7 @@ async function fetchProductsFromSupabase(rules: CampaignProductSelectionRules): 
     if (rules.discountedOnly) {
       query = query.not('sale_price', 'is', null);
     }
-    query = query.limit(100);
+    query = query.limit(opts.limit ?? PREVIEW_FETCH_LIMIT);
   }
 
   const { data, error } = await query;
@@ -265,11 +272,12 @@ async function fetchProductsFromSupabase(rules: CampaignProductSelectionRules): 
     products.sort((a, b) => wantedIds.indexOf(String(a.id)) - wantedIds.indexOf(String(b.id)));
   }
 
-  return attachVariationsToProducts(products);
+  return opts.withVariations === false ? products : attachVariationsToProducts(products);
 }
 
 export interface ResolvedCampaignProducts {
   products: Product[];
+  /** Every product that matches the campaign's rules. Can exceed products.length when the preview is capped by maxProducts. */
   total: number;
   source: CampaignProductSelectionRules['source'];
 }
@@ -302,38 +310,61 @@ export function resolveEffectiveProductRules(campaign: Campaign): CampaignProduc
   return rules;
 }
 
+/** Filters and ordering shared by the landing-page preview and the full list, so both always agree. */
+function applyRuleFilters(products: Product[], rules: CampaignProductSelectionRules): Product[] {
+  let result = products;
+
+  if (rules.excludeSkus?.length) {
+    const excluded = new Set(rules.excludeSkus);
+    result = result.filter((p) => !excluded.has(p.sku));
+  }
+
+  if (rules.minimumRating != null) {
+    const minRating = rules.minimumRating;
+    result = result.filter((p) => parseFloat(p.average_rating || '0') >= minRating);
+  }
+
+  if (rules.pinnedProductIds?.length) {
+    const pinned = new Set(rules.pinnedProductIds.map(String));
+    result = [
+      ...result.filter((p) => pinned.has(String(p.id))),
+      ...result.filter((p) => !pinned.has(String(p.id))),
+    ];
+  }
+
+  return result;
+}
+
 export async function resolveCampaignProducts(campaign: Campaign): Promise<ResolvedCampaignProducts> {
   const rules = resolveEffectiveProductRules(campaign);
   const cacheKey = `${campaign.id}:${JSON.stringify(rules)}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    return { products: cached.products, total: cached.products.length, source: rules.source };
+    return { products: cached.products, total: cached.total, source: rules.source };
   }
 
-  let products = await fetchProductsFromSupabase(rules);
+  const matching = applyRuleFilters(await fetchProductsFromSupabase(rules), rules);
+  const total = matching.length;
+  const products = rules.maxProducts ? matching.slice(0, rules.maxProducts) : matching;
 
-  if (rules.excludeSkus?.length) {
-    const excluded = new Set(rules.excludeSkus);
-    products = products.filter((p) => !excluded.has(p.sku));
-  }
+  cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, products, total });
+  return { products, total, source: rules.source };
+}
 
-  if (rules.minimumRating != null) {
-    const minRating = rules.minimumRating;
-    products = products.filter((p) => parseFloat(p.average_rating || '0') >= minRating);
-  }
+/**
+ * Every product the campaign's rules match (no maxProducts cap), for the paginated "view all" page. Variations are
+ * not attached here: do that for just the page being shown (attachVariationsToProducts), not all of them.
+ */
+export async function resolveAllCampaignProducts(campaign: Campaign): Promise<{ products: Product[]; total: number }> {
+  const rules = resolveEffectiveProductRules(campaign);
+  const cacheKey = `all:${campaign.id}:${JSON.stringify(rules)}`;
+  const cached = cache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return { products: cached.products, total: cached.total };
 
-  if (rules.pinnedProductIds?.length) {
-    const pinned = new Set(rules.pinnedProductIds.map(String));
-    products = [
-      ...products.filter((p) => pinned.has(String(p.id))),
-      ...products.filter((p) => !pinned.has(String(p.id))),
-    ];
-  }
-
-  if (rules.maxProducts) {
-    products = products.slice(0, rules.maxProducts);
-  }
-
-  cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, products });
-  return { products, total: products.length, source: rules.source };
+  const products = applyRuleFilters(
+    await fetchProductsFromSupabase(rules, { limit: VIEW_ALL_FETCH_LIMIT, withVariations: false }),
+    rules,
+  );
+  cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, products, total: products.length });
+  return { products, total: products.length };
 }

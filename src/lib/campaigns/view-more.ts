@@ -1,5 +1,4 @@
 import type { Campaign } from '@/types/campaigns';
-import type { Product } from '@/types/product';
 
 /** Storefront vendor pages are `/vendor/[id]`. Normalize bare `/10` / `10` typos. */
 export function resolveVendorStoreHref(url?: string): string | undefined {
@@ -15,72 +14,23 @@ export type CampaignViewMoreLink = {
   label: string;
 };
 
+/** Where the full, paginated list of a campaign's products lives. */
+export function campaignProductsHref(campaignSlug: string, page = 1): string {
+  const base = `/campaigns/${encodeURIComponent(campaignSlug)}/products`;
+  return page > 1 ? `${base}?page=${page}` : base;
+}
+
 /**
- * Build a "view more products" destination from campaign targeting
- * (vendor store / category / general catalog).
+ * "View more" opens the campaign's own full product list (paginated), i.e. every product its rules match, not a
+ * vendor store, a category or the whole catalogue. It only appears when there is more than the preview shows.
  */
 export function resolveCampaignViewMore(
-  campaign: Campaign,
-  products: Product[]
+  campaign: Pick<Campaign, 'slug'>,
+  shownCount: number,
+  total: number
 ): CampaignViewMoreLink | null {
-  const rules = campaign.productSelectionRules;
-  const vendor = campaign.vendorOverride;
-
-  const vendorHref =
-    resolveVendorStoreHref(vendor?.storeLinkUrl) ??
-    (vendor?.vendorId != null
-      ? `/vendor/${encodeURIComponent(String(vendor.vendorId))}`
-      : undefined) ??
-    (campaign.targetType === 'vendor' && campaign.targetId
-      ? `/vendor/${encodeURIComponent(campaign.targetId)}`
-      : undefined) ??
-    (rules.vendorId != null
-      ? `/vendor/${encodeURIComponent(String(rules.vendorId))}`
-      : undefined);
-
-  if (vendorHref) {
-    const name = vendor?.name?.trim() || 'this store';
-    return { href: vendorHref, label: `View more from ${name}` };
-  }
-
-  // Several sellers across different categories: there is no single category or store to
-  // send people to, and "first product's category" would just follow whichever product
-  // happens to come first. Only a category the campaign was deliberately narrowed to counts.
-  const isMultiVendor = campaign.targetType === 'multi_vendor' || (rules.vendorIds?.length ?? 0) > 1;
-  if (isMultiVendor && !(rules.categoryIds && rules.categoryIds.length === 1)) {
-    return { href: '/products', label: 'Browse more products' };
-  }
-
-  if (
-    campaign.targetType === 'category' ||
-    (rules.categoryIds && rules.categoryIds.length > 0)
-  ) {
-    const category =
-      products.find((p) => p.categories?.length)?.categories?.[0] ??
-      products.flatMap((p) => p.categories ?? []).find(Boolean);
-
-    if (category?.slug) {
-      return {
-        href: `/category/${encodeURIComponent(category.slug)}`,
-        label: `View more in ${category.name || 'this category'}`,
-      };
-    }
-  }
-
-  if (campaign.targetType === 'general' || campaign.targetType === 'collection') {
-    return { href: '/products', label: 'Browse more products' };
-  }
-
-  // Manual / product / multi_vendor: try first product category, else catalog.
-  const fallbackCategory = products.find((p) => p.categories?.length)?.categories?.[0];
-  if (fallbackCategory?.slug) {
-    return {
-      href: `/category/${encodeURIComponent(fallbackCategory.slug)}`,
-      label: `View more in ${fallbackCategory.name || 'this category'}`,
-    };
-  }
-
-  return { href: '/products', label: 'Browse more products' };
+  if (!(total > shownCount)) return null;
+  return { href: campaignProductsHref(campaign.slug), label: `View all ${total} products` };
 }
 
 export function buildCampaignProductHref(

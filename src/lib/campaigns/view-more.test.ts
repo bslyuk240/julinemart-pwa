@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Campaign } from '@/types/campaigns';
-import type { Product } from '@/types/product';
-import { resolveCampaignViewMore, buildCampaignProductHref } from './view-more';
+import { resolveCampaignViewMore, campaignProductsHref, buildCampaignProductHref } from './view-more';
 
 function baseCampaign(overrides: Partial<Campaign> = {}): Campaign {
   return {
@@ -21,63 +20,25 @@ function baseCampaign(overrides: Partial<Campaign> = {}): Campaign {
   };
 }
 
-describe('resolveCampaignViewMore (multi-vendor)', () => {
-  const withCategories = [{ id: 1, name: 'Shoes', slug: 'shoes' }] as unknown as Product['categories'];
-  const product = { categories: withCategories } as unknown as Product;
-
-  it('does not pick the first product category for a multi-vendor campaign', () => {
-    const link = resolveCampaignViewMore(
-      baseCampaign({ targetType: 'multi_vendor', productSelectionRules: { source: 'rules_based', vendorIds: ['a', 'b'] } }),
-      [product]
-    );
-    expect(link).toEqual({ href: '/products', label: 'Browse more products' });
+describe('resolveCampaignViewMore', () => {
+  it('opens the campaign\'s own product list, whatever the campaign targets', () => {
+    for (const targetType of ['vendor', 'category', 'multi_vendor', 'general'] as const) {
+      const link = resolveCampaignViewMore(baseCampaign({ targetType, slug: 'black-friday' }), 12, 40);
+      expect(link).toEqual({ href: '/campaigns/black-friday/products', label: 'View all 40 products' });
+    }
   });
 
-  it('still uses the category a multi-vendor campaign was deliberately narrowed to', () => {
-    const link = resolveCampaignViewMore(
-      baseCampaign({ targetType: 'multi_vendor', productSelectionRules: { source: 'rules_based', vendorIds: ['a', 'b'], categoryIds: ['cat-1'] } }),
-      [product]
-    );
-    expect(link?.href).toBe('/category/shoes');
+  it('is hidden when the preview already shows every product', () => {
+    expect(resolveCampaignViewMore(baseCampaign(), 12, 12)).toBeNull();
+    expect(resolveCampaignViewMore(baseCampaign(), 0, 0)).toBeNull();
   });
 });
 
-describe('resolveCampaignViewMore', () => {
-  it('links to vendor store when vendor-targeted', () => {
-    const link = resolveCampaignViewMore(
-      baseCampaign({
-        targetType: 'vendor',
-        targetId: '10',
-        vendorOverride: { vendorId: 10, name: 'Kitchen World', storeLinkUrl: '/vendor/10' },
-      }),
-      []
-    );
-    expect(link).toEqual({
-      href: '/vendor/10',
-      label: 'View more from Kitchen World',
-    });
-  });
-
-  it('links to category from product categories', () => {
-    const products = [
-      {
-        categories: [{ id: 1, name: 'Kitchen', slug: 'kitchen' }],
-      },
-    ] as Product[];
-    const link = resolveCampaignViewMore(
-      baseCampaign({
-        targetType: 'category',
-        productSelectionRules: {
-          source: 'rules_based',
-          categoryIds: ['abc'],
-        },
-      }),
-      products
-    );
-    expect(link).toEqual({
-      href: '/category/kitchen',
-      label: 'View more in Kitchen',
-    });
+describe('campaignProductsHref', () => {
+  it('links page 1 without a query and later pages with ?page=', () => {
+    expect(campaignProductsHref('bf')).toBe('/campaigns/bf/products');
+    expect(campaignProductsHref('bf', 1)).toBe('/campaigns/bf/products');
+    expect(campaignProductsHref('bf', 3)).toBe('/campaigns/bf/products?page=3');
   });
 });
 

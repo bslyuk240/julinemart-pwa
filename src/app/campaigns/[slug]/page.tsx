@@ -75,7 +75,7 @@ export default async function CampaignLandingPage({ params }: CampaignPageProps)
     return <CampaignOffline variant="inactive" />;
   }
 
-  const [{ products }, { reviews }, qrVariants] = await Promise.all([
+  const [{ products, total: totalProducts }, { reviews }, qrVariants] = await Promise.all([
     resolveCampaignProducts(campaign),
     resolveCampaignReviews(campaign),
     getCampaignQrVariantRefs(campaign.id),
@@ -95,7 +95,7 @@ export default async function CampaignLandingPage({ params }: CampaignPageProps)
       <PromoBanner offerConfig={campaign.offerConfig} />
       <div className="mx-auto flex max-w-6xl flex-col gap-5 p-4 pb-28 sm:p-6 sm:pb-8">
         {campaign.endDate && <CampaignCountdown endDate={campaign.endDate} />}
-        <SectionRenderer campaign={campaign} products={products} reviews={reviews} qrVariants={qrVariants} />
+        <SectionRenderer campaign={campaign} products={products} totalProducts={totalProducts} reviews={reviews} qrVariants={qrVariants} />
         <AppDownloadSection />
         <CampaignFooter />
       </div>
