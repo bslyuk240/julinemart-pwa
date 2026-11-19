@@ -52,7 +52,7 @@ vi.mock('@/lib/supabase-server', () => ({
   getSupabaseServerClient: () => ({ from: supabaseFromMock }),
 }));
 
-import { resolveCampaignProducts, resolveEffectiveProductRules } from './products';
+import { resolveAllCampaignProducts, resolveCampaignProducts, resolveEffectiveProductRules } from './products';
 
 function makeRow(overrides: Record<string, unknown> = {}) {
   const wooId = (overrides.woo_product_id as number) ?? 1;
@@ -203,6 +203,38 @@ describe('resolveCampaignProducts', () => {
     const result = await resolveCampaignProducts(campaign);
     expect(builders.products[0].eq).toHaveBeenCalledWith('vendor_id', 'vendor-uuid-1');
     expect(result.products.map((p) => p.id)).toEqual([9]);
+  });
+});
+
+describe('view all (preview cap vs full list)', () => {
+  const rows = () => [1, 2, 3, 4, 5].map((n) => makeRow({ woo_product_id: n }));
+
+  it('reports every matching product as total even when the landing preview is capped', async () => {
+    state.products = rows();
+    const campaign = makeCampaign('cap-total', { source: 'automatic', maxProducts: 2 });
+    const result = await resolveCampaignProducts(campaign);
+    expect(result.products).toHaveLength(2);
+    expect(result.total).toBe(5);
+  });
+
+  it('returns the whole matching list, ignoring the preview cap, for the view-all page', async () => {
+    state.products = rows();
+    const campaign = makeCampaign('all-uncapped', { source: 'automatic', maxProducts: 2 });
+    const result = await resolveAllCampaignProducts(campaign);
+    expect(result.products.map((p) => p.id)).toEqual([1, 2, 3, 4, 5]);
+    expect(result.total).toBe(5);
+    expect(builders.products[0].limit).toHaveBeenCalledWith(500);
+  });
+
+  it('applies the same filters as the preview (excluded SKUs, minimum rating)', async () => {
+    state.products = [
+      makeRow({ woo_product_id: 1, sku: 'BAD', average_rating: '5' }),
+      makeRow({ woo_product_id: 2, sku: 'OK', average_rating: '5' }),
+      makeRow({ woo_product_id: 3, sku: 'LOW', average_rating: '1' }),
+    ];
+    const campaign = makeCampaign('all-filtered', { source: 'automatic', excludeSkus: ['BAD'], minimumRating: 4, maxProducts: 12 });
+    const result = await resolveAllCampaignProducts(campaign);
+    expect(result.products.map((p) => p.id)).toEqual([2]);
   });
 });
 

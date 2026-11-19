@@ -19,15 +19,18 @@ import GiveawayEntrySection from '@/components/campaigns/GiveawayEntrySection';
 export default function SectionRenderer({
   campaign,
   products,
+  totalProducts,
   reviews,
   qrVariants,
 }: {
   campaign: Campaign;
   products: Product[];
+  /** Every product the rules match; more than products.length means a "view all" link is shown. */
+  totalProducts?: number;
   reviews: CampaignReview[];
   qrVariants: CampaignQrVariantRef[];
 }) {
-  const viewMore = resolveCampaignViewMore(campaign, products);
+  const viewMore = resolveCampaignViewMore(campaign, products.length, totalProducts ?? products.length);
 
   return (
     <>
