@@ -206,6 +206,39 @@ describe('resolveCampaignProducts', () => {
   });
 });
 
+describe('multi-vendor campaigns', () => {
+  it('limits products to the listed vendors with a single IN filter', async () => {
+    state.vendor = { id: 'vendor-uuid-1' };
+    state.products = [makeRow({ woo_product_id: 5, vendor_id: 'vendor-uuid-1' })];
+    const campaign = {
+      ...makeCampaign('multi-vendor', { source: 'rules_based', vendorIds: ['vendor-uuid-1', 'vendor-uuid-1'], maxProducts: 12 }),
+      targetType: 'multi_vendor' as const,
+    };
+    const result = await resolveCampaignProducts(campaign);
+    expect(builders.products[0].in).toHaveBeenCalledWith('vendor_id', ['vendor-uuid-1']);
+    expect(result.products.map((p) => p.id)).toEqual([5]);
+  });
+
+  it('shows nothing, not the whole catalog, when none of the listed vendors exist', async () => {
+    state.vendor = null;
+    state.products = [makeRow({ woo_product_id: 6 })];
+    const campaign = {
+      ...makeCampaign('multi-vendor-missing', { source: 'rules_based', vendorIds: ['ghost'], maxProducts: 12 }),
+      targetType: 'multi_vendor' as const,
+    };
+    const result = await resolveCampaignProducts(campaign);
+    expect(result.products).toEqual([]);
+  });
+
+  it('never resolves a multi-vendor campaign as an unscoped automatic dump', () => {
+    const rules = resolveEffectiveProductRules({
+      ...makeCampaign('mv', { source: 'automatic', vendorIds: ['a', 'b'] }),
+      targetType: 'multi_vendor',
+    });
+    expect(rules.source).toBe('rules_based');
+  });
+});
+
 describe('resolveEffectiveProductRules', () => {
   it('copies vendor target into vendorId', () => {
     const rules = resolveEffectiveProductRules({

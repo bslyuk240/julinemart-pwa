@@ -124,6 +124,8 @@ export type ProductSelectionSource = 'automatic' | 'manual' | 'rules_based';
 export interface CampaignProductSelectionRules {
   source: ProductSelectionSource;
   vendorId?: string | number;
+  /** Several sellers in one campaign (target type "multi_vendor"). Supabase vendors.id or legacy Woo vendor ids. */
+  vendorIds?: (string | number)[];
   categoryIds?: (string | number)[];
   manualProductIds?: (string | number)[];
   pinnedProductIds?: (string | number)[];
