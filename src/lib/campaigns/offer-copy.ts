@@ -50,12 +50,18 @@ export function offerHeadline(offer: CampaignOfferConfig | undefined, campaignTi
   return display || 'Special offer on this campaign';
 }
 
-/** "Min. spend ₦10,000 · New customers only · Ends 30 Nov" */
-export function offerConditions(offer: CampaignOfferConfig | undefined, endDate?: string): string {
+/** "Min. spend ₦10,000 · New customers only · One use per customer · Ends 30 Nov" */
+export function offerConditions(
+  offer: CampaignOfferConfig | undefined,
+  endDate?: string,
+  usesPerCustomer?: number,
+): string {
   if (!offer) return '';
   const parts: string[] = [];
   if (offer.minimumSpend) parts.push(`Min. spend ₦${offer.minimumSpend.toLocaleString('en-NG')}`);
   if (offer.newCustomersOnly) parts.push('New customers only');
+  if (usesPerCustomer === 1) parts.push('One use per customer');
+  else if (usesPerCustomer && usesPerCustomer > 1) parts.push(`${usesPerCustomer} uses per customer`);
   // Whichever ends first: the code stops working, or the campaign page goes offline.
   const endTimes = [offer.expirationDate, endDate]
     .map((d) => (d ? new Date(d).getTime() : NaN))

@@ -30,6 +30,7 @@ function makeBuilder(table: string): any {
       return builder;
     }),
     not: vi.fn(() => builder),
+    order: vi.fn(() => builder),
     limit: vi.fn(() => builder),
     maybeSingle: vi.fn(async () => ({ data: table === 'vendors' ? state.vendor : null })),
     then: (resolve: (v: { data: unknown; error: null }) => unknown) => {
@@ -52,7 +53,7 @@ vi.mock('@/lib/supabase-server', () => ({
   getSupabaseServerClient: () => ({ from: supabaseFromMock }),
 }));
 
-import { resolveAllCampaignProducts, resolveCampaignProducts, resolveEffectiveProductRules } from './products';
+import { mixProductRows, resolveAllCampaignProducts, resolveCampaignProducts, resolveEffectiveProductRules, roundRobin } from './products';
 
 function makeRow(overrides: Record<string, unknown> = {}) {
   const wooId = (overrides.woo_product_id as number) ?? 1;
@@ -223,7 +224,7 @@ describe('view all (preview cap vs full list)', () => {
     const result = await resolveAllCampaignProducts(campaign);
     expect(result.products.map((p) => p.id)).toEqual([1, 2, 3, 4, 5]);
     expect(result.total).toBe(5);
-    expect(builders.products[0].limit).toHaveBeenCalledWith(500);
+    expect(builders.products[0].limit).toHaveBeenCalledWith(1000);
   });
 
   it('applies the same filters as the preview (excluded SKUs, minimum rating)', async () => {
@@ -289,5 +290,56 @@ describe('resolveEffectiveProductRules', () => {
       targetId: 'cat-1',
     });
     expect(rules.categoryIds).toEqual(['cat-1']);
+  });
+});
+
+describe('vendor and category mix', () => {
+  const cat = (slug: string) => [{ categories: { id: 1, name: slug, slug } }];
+
+  it('round-robins groups and keeps each group in its own order', () => {
+    expect(roundRobin(['a1', 'a2', 'a3', 'b1', 'c1', 'c2'], (x) => x[0])).toEqual(['a1', 'b1', 'c1', 'a2', 'c2', 'a3']);
+  });
+
+  it('lets every vendor appear early instead of one seller filling the preview', () => {
+    const rows = [
+      ...[1, 2, 3, 4].map((n) => makeRow({ woo_product_id: n, vendor_id: 'jewellery' })),
+      makeRow({ woo_product_id: 5, vendor_id: 'perfume' }),
+      makeRow({ woo_product_id: 6, vendor_id: 'kitchen' }),
+    ];
+    expect(mixProductRows(rows).slice(0, 3).map((r) => r.vendor_id)).toEqual(['jewellery', 'perfume', 'kitchen']);
+  });
+
+  it('alternates categories within one vendor', () => {
+    const rows = [
+      makeRow({ woo_product_id: 1, vendor_id: 'v', category_map: cat('watches') }),
+      makeRow({ woo_product_id: 2, vendor_id: 'v', category_map: cat('watches') }),
+      makeRow({ woo_product_id: 3, vendor_id: 'v', category_map: cat('rings') }),
+    ];
+    expect(mixProductRows(rows).map((r) => r.woo_product_id)).toEqual([1, 3, 2]);
+  });
+
+  it('uses the same mixed order for the preview and the view-all list, and counts the whole pool', async () => {
+    state.products = [
+      ...[1, 2, 3, 4].map((n) => makeRow({ woo_product_id: n, sku: `J${n}`, vendor_id: 'jewellery' })),
+      makeRow({ woo_product_id: 5, sku: 'P5', vendor_id: 'perfume' }),
+    ];
+    const campaign = makeCampaign('mix', { source: 'automatic', maxProducts: 2 });
+    const preview = await resolveCampaignProducts(campaign);
+    const all = await resolveAllCampaignProducts(campaign);
+    expect(preview.total).toBe(5);
+    expect(preview.products.map((p) => p.id)).toEqual(all.products.slice(0, 2).map((p) => p.id));
+    expect(preview.products.map((p) => p.id)).toEqual([1, 5]);
+  });
+
+  it('keeps manual picks in the order the admin set', async () => {
+    state.products = [
+      makeRow({ woo_product_id: 2, vendor_id: 'a' }),
+      makeRow({ woo_product_id: 1, vendor_id: 'a' }),
+      makeRow({ woo_product_id: 3, vendor_id: 'b' }),
+    ];
+    const { products } = await resolveCampaignProducts(
+      makeCampaign('manual-order', { source: 'manual', manualProductIds: [2, 1, 3] })
+    );
+    expect(products.map((p) => p.id)).toEqual([2, 1, 3]);
   });
 });

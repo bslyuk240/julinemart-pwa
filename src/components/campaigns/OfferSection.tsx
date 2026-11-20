@@ -40,12 +40,15 @@ export default function OfferSection({
   campaignTitle,
   endDate,
   offer,
+  usesPerCustomer,
   qrVariants = [],
 }: {
   campaignId: string;
   campaignTitle: string;
   endDate?: string;
   offer?: CampaignOfferConfig;
+  /** From the linked voucher; shown as "One use per customer". */
+  usesPerCustomer?: number;
   qrVariants?: CampaignQrVariantRef[];
 }) {
   const { track } = useCampaignTelemetry(campaignId, qrVariants);
@@ -53,7 +56,7 @@ export default function OfferSection({
 
   if (!offer?.couponCode) return null;
   const code = offer.couponCode.trim().toUpperCase();
-  const conditions = offerConditions(offer, endDate);
+  const conditions = offerConditions(offer, endDate, usesPerCustomer);
 
   async function copyCode() {
     try {

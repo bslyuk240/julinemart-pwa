@@ -3,6 +3,7 @@ import type { CampaignOfferConfig } from '@/types/campaigns';
 
 interface VoucherDiscountRow {
   status: string | null;
+  max_uses_per_customer: number | null;
   discount_type: 'free' | 'percentage' | 'fixed_amount' | null;
   discount_value: number | null;
   shipping_discount_type: 'none' | 'percentage' | 'fixed' | 'free' | null;
@@ -24,6 +25,8 @@ export interface ResolvedCampaignOffer {
    * is honest.
    */
   appliesToAll: boolean;
+  /** How many times one customer may use the code (checkout enforces it per email). Undefined when unlimited or unknown. */
+  usesPerCustomer?: number;
 }
 
 const LIMIT_FIELDS = [
@@ -52,7 +55,7 @@ export async function resolveCampaignOffer(offer?: CampaignOfferConfig): Promise
   const { data, error } = await getSupabaseServerClient()
     .from('campaign_vouchers')
     .select(
-      'status, discount_type, discount_value, shipping_discount_type, valid_until, product_ids, product_skus, vendor_ids, category_ids, gift_box_skus, gift_occasion_slugs, gift_recipient_slugs'
+      'status, max_uses_per_customer, discount_type, discount_value, shipping_discount_type, valid_until, product_ids, product_skus, vendor_ids, category_ids, gift_box_skus, gift_occasion_slugs, gift_recipient_slugs'
     )
     .eq('id', offer.voucherId)
     .maybeSingle<VoucherDiscountRow>();
@@ -75,5 +78,10 @@ export async function resolveCampaignOffer(offer?: CampaignOfferConfig): Promise
 
   // Min. spend and new-customer rules mean not every product qualifies on its own.
   const conditional = Boolean(merged.minimumSpend) || Boolean(merged.newCustomersOnly);
-  return { offer: merged, appliesToAll: !limited && !conditional };
+  const perCustomer = Number(data.max_uses_per_customer);
+  return {
+    offer: merged,
+    appliesToAll: !limited && !conditional,
+    usesPerCustomer: Number.isFinite(perCustomer) && perCustomer > 0 ? perCustomer : undefined,
+  };
 }

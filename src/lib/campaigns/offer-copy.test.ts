@@ -56,3 +56,12 @@ describe('perProductCodeLabel', () => {
     expect(perProductCodeLabel({ discountType: 'percentage', discountValue: 20 })).toBeNull();
   });
 });
+
+describe('offerConditions per-customer limit', () => {
+  it('says one use per customer when the voucher allows one', () => {
+    expect(offerConditions({}, '2026-11-30T22:59:00+00:00', 1)).toBe('One use per customer · Ends 30 Nov');
+  });
+  it('leaves it out when unlimited', () => {
+    expect(offerConditions({}, undefined, undefined)).toBe('');
+  });
+});

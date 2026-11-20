@@ -24,10 +24,13 @@ export default function SectionRenderer({
   reviews,
   qrVariants,
   codeAppliesToAll = false,
+  usesPerCustomer,
 }: {
   campaign: Campaign;
   /** The campaign code works on every product (no voucher limits). */
   codeAppliesToAll?: boolean;
+  /** Per-customer limit on the linked voucher, for the coupon ticket. */
+  usesPerCustomer?: number;
   products: Product[];
   /** Every product the rules match; more than products.length means a "view all" link is shown. */
   totalProducts?: number;
@@ -87,6 +90,7 @@ export default function SectionRenderer({
                 campaignTitle={campaign.publicTitle}
                 endDate={campaign.endDate}
                 offer={campaign.offerConfig}
+                usesPerCustomer={usesPerCustomer}
                 qrVariants={qrVariants}
               />
             );

@@ -74,7 +74,7 @@ export default async function CampaignLandingPage({ params }: CampaignPageProps)
     return <CampaignOffline variant="inactive" />;
   }
 
-  const [{ products, total: totalProducts }, { reviews }, qrVariants, { offer, appliesToAll }] = await Promise.all([
+  const [{ products, total: totalProducts }, { reviews }, qrVariants, { offer, appliesToAll, usesPerCustomer }] = await Promise.all([
     resolveCampaignProducts(found),
     resolveCampaignReviews(found),
     getCampaignQrVariantRefs(found.id),
@@ -106,6 +106,7 @@ export default async function CampaignLandingPage({ params }: CampaignPageProps)
           reviews={reviews}
           qrVariants={qrVariants}
           codeAppliesToAll={appliesToAll}
+          usesPerCustomer={usesPerCustomer}
         />
         <AppDownloadSection />
         <CampaignFooter />

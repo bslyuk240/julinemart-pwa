@@ -12,11 +12,12 @@ import {
 // only" pattern already used for the rate-limiter fallback in middleware.ts.
 // Fine for this: worst case is a cold serverless instance re-fetching once.
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const cache = new Map<string, { expiresAt: number; products: Product[]; total: number }>();
+const cache = new Map<string, { expiresAt: number; products: Product[] }>();
 
-// The landing page shows a capped preview; the "view all" page pages through everything that matches, up to this.
-const PREVIEW_FETCH_LIMIT = 100;
-const VIEW_ALL_FETCH_LIMIT = 500;
+// One pool feeds both the landing preview (its first maxProducts) and the
+// paginated "view all" page, so the two always agree and the count is real.
+// 1000 is also Supabase's default max rows per request.
+const POOL_FETCH_LIMIT = 1000;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -210,6 +211,55 @@ async function resolveVendorUuids(vendorIds: (string | number)[]): Promise<strin
 // returned the same list as no filter at all. Rather than depend on that
 // upstream contract, campaign product selection reads the same `products`
 // table the JLO function itself serves from, applying the filters ourselves.
+/**
+ * Round-robin interleave: one item from each group in turn, keeping each
+ * group's own order. Groups take turns in the order they first appear.
+ */
+export function roundRobin<T>(items: T[], keyOf: (item: T) => string): T[] {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = keyOf(item);
+    const list = groups.get(key);
+    if (list) list.push(item);
+    else groups.set(key, [item]);
+  }
+  if (groups.size < 2) return items;
+  const queues = [...groups.values()];
+  const out: T[] = [];
+  for (let i = 0; out.length < items.length; i++) {
+    for (const queue of queues) {
+      if (i < queue.length) out.push(queue[i]);
+    }
+  }
+  return out;
+}
+
+function firstCategorySlug(row: ProductRow): string {
+  return row.category_map?.find((m) => m.categories?.slug)?.categories?.slug ?? '';
+}
+
+function vendorKey(row: ProductRow): string {
+  return String(row.vendor_id ?? row.vendor?.id ?? '');
+}
+
+/**
+ * Mix a rule-matched list so a shopper sees every seller and range early:
+ * vendors take turns, and within each vendor its categories take turns.
+ * Without this the preview was whatever order Postgres returned, which
+ * clusters by vendor (one seller's jewellery filled the whole landing page).
+ */
+export function mixProductRows(rows: ProductRow[]): ProductRow[] {
+  const byVendor = new Map<string, ProductRow[]>();
+  for (const row of rows) {
+    const key = vendorKey(row);
+    const list = byVendor.get(key);
+    if (list) list.push(row);
+    else byVendor.set(key, [row]);
+  }
+  const mixedWithinVendor = [...byVendor.values()].flatMap((list) => roundRobin(list, firstCategorySlug));
+  return roundRobin(mixedWithinVendor, vendorKey);
+}
+
 async function fetchProductsFromSupabase(
   rules: CampaignProductSelectionRules,
   opts: { limit?: number; withVariations?: boolean } = {},
@@ -252,7 +302,12 @@ async function fetchProductsFromSupabase(
     if (rules.discountedOnly) {
       query = query.not('sale_price', 'is', null);
     }
-    query = query.limit(opts.limit ?? PREVIEW_FETCH_LIMIT);
+    // A stable order (newest first) before the vendor mix, so the preview
+    // doesn't change from one request to the next.
+    query = query
+      .order('created_at', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: true })
+      .limit(opts.limit ?? POOL_FETCH_LIMIT);
   }
 
   const { data, error } = await query;
@@ -262,6 +317,9 @@ async function fetchProductsFromSupabase(
   if (rules.source !== 'manual' && rules.discountedOnly) {
     rows = rows.filter((r) => Number(r.sale_price ?? 0) > 0 && Number(r.sale_price) < Number(r.regular_price ?? 0));
   }
+
+  // Manual picks keep the admin's own order (below); everything else is mixed.
+  if (rules.source !== 'manual') rows = mixProductRows(rows);
 
   let products = rows.map(rowToProduct);
 
@@ -335,36 +393,38 @@ function applyRuleFilters(products: Product[], rules: CampaignProductSelectionRu
   return result;
 }
 
-export async function resolveCampaignProducts(campaign: Campaign): Promise<ResolvedCampaignProducts> {
-  const rules = resolveEffectiveProductRules(campaign);
+/** Every product the rules match, mixed and filtered, without variations. Cached; shared by both pages. */
+async function loadCampaignPool(campaign: Campaign, rules: CampaignProductSelectionRules): Promise<Product[]> {
   const cacheKey = `${campaign.id}:${JSON.stringify(rules)}`;
   const cached = cache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return { products: cached.products, total: cached.total, source: rules.source };
-  }
+  if (cached && cached.expiresAt > Date.now()) return cached.products;
 
-  const matching = applyRuleFilters(await fetchProductsFromSupabase(rules), rules);
-  const total = matching.length;
-  const products = rules.maxProducts ? matching.slice(0, rules.maxProducts) : matching;
-
-  cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, products, total });
-  return { products, total, source: rules.source };
+  const products = applyRuleFilters(
+    await fetchProductsFromSupabase(rules, { limit: POOL_FETCH_LIMIT, withVariations: false }),
+    rules,
+  );
+  cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, products });
+  return products;
 }
 
 /**
- * Every product the campaign's rules match (no maxProducts cap), for the paginated "view all" page. Variations are
- * not attached here: do that for just the page being shown (attachVariationsToProducts), not all of them.
+ * The landing-page preview: the first maxProducts of the mixed pool, with
+ * variations attached. `total` is the whole pool, i.e. what "View all" pages through.
+ */
+export async function resolveCampaignProducts(campaign: Campaign): Promise<ResolvedCampaignProducts> {
+  const rules = resolveEffectiveProductRules(campaign);
+  const pool = await loadCampaignPool(campaign, rules);
+  const preview = rules.maxProducts ? pool.slice(0, rules.maxProducts) : pool;
+  return { products: await attachVariationsToProducts(preview), total: pool.length, source: rules.source };
+}
+
+/**
+ * Every product the campaign's rules match (no maxProducts cap), in the same
+ * mixed order as the preview, for the paginated "view all" page. Variations are
+ * not attached here: do that for just the page being shown (attachVariationsToProducts).
  */
 export async function resolveAllCampaignProducts(campaign: Campaign): Promise<{ products: Product[]; total: number }> {
   const rules = resolveEffectiveProductRules(campaign);
-  const cacheKey = `all:${campaign.id}:${JSON.stringify(rules)}`;
-  const cached = cache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return { products: cached.products, total: cached.total };
-
-  const products = applyRuleFilters(
-    await fetchProductsFromSupabase(rules, { limit: VIEW_ALL_FETCH_LIMIT, withVariations: false }),
-    rules,
-  );
-  cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, products, total: products.length });
+  const products = await loadCampaignPool(campaign, rules);
   return { products, total: products.length };
 }

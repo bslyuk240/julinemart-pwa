@@ -21,6 +21,7 @@ const OFFER = { voucherId: 'v1', couponCode: 'BLACKFRIDAY20', displayText: 'Blac
 function voucher(extra: Record<string, unknown> = {}) {
   return {
     status: 'active',
+    max_uses_per_customer: 1,
     discount_type: 'percentage',
     discount_value: 20,
     shipping_discount_type: 'none',
@@ -46,6 +47,13 @@ describe('resolveCampaignOffer', () => {
     const { offer, appliesToAll } = await resolveCampaignOffer(OFFER);
     expect(offer).toMatchObject({ discountType: 'percentage', discountValue: 20 });
     expect(appliesToAll).toBe(true);
+  });
+
+  it('reports the per-customer limit', async () => {
+    voucherRow.current = voucher();
+    expect((await resolveCampaignOffer(OFFER)).usesPerCustomer).toBe(1);
+    voucherRow.current = voucher({ max_uses_per_customer: 0 });
+    expect((await resolveCampaignOffer(OFFER)).usesPerCustomer).toBeUndefined();
   });
 
   it('does not claim every product when the voucher is limited', async () => {
